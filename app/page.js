@@ -62,7 +62,7 @@ export default function TntHouse() {
     return () => { if (document.head.contains(script)) document.head.removeChild(script); };
   }, []);
 
-  // Launch Jupiter
+  // Launch Jupiter (modal or link)
   const handleLaunchJupiter = () => {
     setIsBuyDropdownOpen(false);
     if (window.Jupiter) {
@@ -75,6 +75,12 @@ export default function TntHouse() {
     } else {
       window.open('https://jup.ag/swap?sell=So11111111111111111111111111111111111111112&buy=8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg', '_blank');
     }
+  };
+
+  // Open Raydium
+  const handleOpenRaydium = () => {
+    setIsBuyDropdownOpen(false);
+    window.open('https://raydium.io/liquidity/increase/?mode=add&pool_id=6cMTXZyCrnut7Lv39qt4dqEARbC2jbebvhzdCR1t2HEV', '_blank');
   };
 
   // Connect Phantom
@@ -263,15 +269,12 @@ export default function TntHouse() {
                 
                 {isBuyDropdownOpen && (
                   <div className="absolute right-0 mt-2 w-48 bg-slate-900 border border-purple-500/30 rounded-lg shadow-xl z-50 py-1 text-sm">
-                    <button onClick={handleLaunchJupiter} className="w-full text-left px-4 py-2 hover:bg-purple-500/10 text-emerald-400 flex items-center gap-2">
-                      <ExternalLink className="w-4 h-4" /> Jupiter Swap (Best Price)
+                    <button onClick={handleLaunchJupiter} className="w-full text-left px-4 py-2.5 hover:bg-purple-500/10 text-emerald-400 flex items-center gap-2 text-sm">
+                      <ExternalLink className="w-4 h-4" /> Jupiter Swap
                     </button>
-                    <a href="https://dexscreener.com/solana/6cmtxzycrnut7lv39qt4dqearbc2jbebvhzdcr1t2hev" target="_blank" className="w-full text-left px-4 py-2 hover:bg-purple-500/10 text-emerald-400 flex items-center gap-2">
-                      <ExternalLink className="w-4 h-4" /> View on Dexscreener
-                    </a>
-                    <a href="https://t.me/tnt_house2026" target="_blank" className="w-full text-left px-4 py-2 hover:bg-purple-500/10 text-emerald-400 flex items-center gap-2">
-                      <ExternalLink className="w-4 h-4" /> Buy via Telegram
-                    </a>
+                    <button onClick={handleOpenRaydium} className="w-full text-left px-4 py-2.5 hover:bg-purple-500/10 text-emerald-400 flex items-center gap-2 text-sm">
+                      <ExternalLink className="w-4 h-4" /> Raydium
+                    </button>
                   </div>
                 )}
               </div>
