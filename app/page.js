@@ -62,30 +62,16 @@ export default function TntHouse() {
     return () => { if (document.head.contains(script)) document.head.removeChild(script); };
   }, []);
 
-  // Launch Jupiter with better RPC
+  // Launch Jupiter
   const handleLaunchJupiter = () => {
     setIsBuyDropdownOpen(false);
-    
-    const jupiterConfig = {
-      displayMode: "modal",
-      mintAccounts: { 
-        input: 'So11111111111111111111111111111111111111112', 
-        output: '8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg' 
-      },
-      endpoint: "https://api.mainnet-beta.solana.com", // More stable RPC
-      strictTokenList: false,
-      formProps: {
-        fixedOutputMint: true
-      }
-    };
-
     if (window.Jupiter) {
-      try {
-        window.Jupiter.init(jupiterConfig);
-      } catch (e) {
-        // Fallback to direct link if modal fails
-        window.open('https://jup.ag/swap?sell=So11111111111111111111111111111111111111112&buy=8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg', '_blank');
-      }
+      window.Jupiter.init({
+        displayMode: "modal",
+        mintAccounts: { input: 'So11111111111111111111111111111111111111112', output: '8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg' },
+        endpoint: "https://api.mainnet-beta.solana.com",
+        strictTokenList: false
+      });
     } else {
       window.open('https://jup.ag/swap?sell=So11111111111111111111111111111111111111112&buy=8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg', '_blank');
     }
@@ -439,16 +425,39 @@ export default function TntHouse() {
           </div>
         </section>
 
-        {/* Form */}
+        {/* Form Section with Pricing */}
         <section className="max-w-7xl mx-auto px-6 py-8">
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <div className="space-y-4">
               <h3 className="text-2xl font-black text-purple-400">Подай заявку на ИИ-Аудит</h3>
-              <p className="text-slate-300 text-sm leading-relaxed">Первые 3 токена — бесплатно! Для премиум-вывода нужно держать $MRDT.</p>
-              <div className="space-y-2.5 text-xs text-slate-300 font-mono">
+              <p className="text-slate-300 text-sm leading-relaxed">
+                Твой токен пройдёт проверку нашими алгоритмами. Первые 3 токена — бесплатно! Для премиум-вывода нужно держать $MRDT.
+              </p>
+
+              {/* Pricing Tiers */}
+              <div className="mt-4 space-y-3">
+                <div className="bg-slate-900/60 border border-purple-500/20 rounded-lg p-3">
+                  <div className="font-bold text-emerald-400 text-sm">Базовый ИИ-Аудит (до 24ч)</div>
+                  <div className="text-xs text-slate-300 mt-0.5">Эквивалент <span className="font-bold text-emerald-400">$10 в $MRDT</span> — ИИ сканирует контракт и заносит в общую базу.</div>
+                </div>
+                
+                <div className="bg-slate-900/60 border border-purple-500/20 rounded-lg p-3">
+                  <div className="font-bold text-emerald-400 text-sm">Быстрый Листинг (Fast-Track, 5 мин)</div>
+                  <div className="text-xs text-slate-300 mt-0.5">Эквивалент <span className="font-bold text-emerald-400">$40 в $MRDT</span> — приоритетная проверка + значок «Verified by AI».</div>
+                </div>
+
+                <div className="bg-slate-900/60 border border-purple-500/20 rounded-lg p-3">
+                  <div className="font-bold text-emerald-400 text-sm">VIP-Буст (Баннер на главной 24ч)</div>
+                  <div className="text-xs text-slate-300 mt-0.5">Эквивалент <span className="font-bold text-emerald-400">$120 в $MRDT</span> — максимальная видимость в самом верху сайта.</div>
+                </div>
+              </div>
+
+              <div className="space-y-2.5 text-xs text-slate-300 font-mono mt-4">
                 {auditPoints.map((item, i) => (
                   <div key={i} className="flex gap-2 items-center">
-                    <div className="w-4 h-4 border border-emerald-400 rounded bg-emerald-500/10 flex items-center justify-center"><div className="w-1.5 h-1.5 bg-emerald-400 rounded-sm"></div></div>
+                    <div className="w-4 h-4 border border-emerald-400 rounded bg-emerald-500/10 flex items-center justify-center">
+                      <div className="w-1.5 h-1.5 bg-emerald-400 rounded-sm"></div>
+                    </div>
                     <span>{item}</span>
                   </div>
                 ))}
