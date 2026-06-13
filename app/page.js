@@ -62,16 +62,30 @@ export default function TntHouse() {
     return () => { if (document.head.contains(script)) document.head.removeChild(script); };
   }, []);
 
-  // Launch Jupiter (modal or link)
+  // Launch Jupiter with better RPC
   const handleLaunchJupiter = () => {
     setIsBuyDropdownOpen(false);
+    
+    const jupiterConfig = {
+      displayMode: "modal",
+      mintAccounts: { 
+        input: 'So11111111111111111111111111111111111111112', 
+        output: '8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg' 
+      },
+      endpoint: "https://api.mainnet-beta.solana.com", // More stable RPC
+      strictTokenList: false,
+      formProps: {
+        fixedOutputMint: true
+      }
+    };
+
     if (window.Jupiter) {
-      window.Jupiter.init({
-        displayMode: "modal",
-        mintAccounts: { input: 'So11111111111111111111111111111111111111112', output: '8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg' },
-        endpoint: "https://api.mainnet-beta.solana.com",
-        strictTokenList: false
-      });
+      try {
+        window.Jupiter.init(jupiterConfig);
+      } catch (e) {
+        // Fallback to direct link if modal fails
+        window.open('https://jup.ag/swap?sell=So11111111111111111111111111111111111111112&buy=8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg', '_blank');
+      }
     } else {
       window.open('https://jup.ag/swap?sell=So11111111111111111111111111111111111111112&buy=8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg', '_blank');
     }
