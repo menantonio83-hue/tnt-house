@@ -29,6 +29,8 @@ Open [http://localhost:3000](http://localhost:3000)
 
 Vercel-ready. Connected to GitHub main branch for auto-deploys.
 
+**Latest: Next.js full migration done. Forced new deploy trigger.**
+
 **Part of $MRDT ecosystem** • D10S vibes
 
 **Links:** [X @Crypto_D10S](https://x.com/Crypto_D10S) | [Telegram](https://t.me/D10S_Solana_Stadium) | [Site](https://www.maradonatoken-mrdt.xyz)
