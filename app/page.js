@@ -20,7 +20,7 @@ export default function TntHouse() {
   // AI Chat states
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState([
-    { sender: 'bot', text: 'Привет! Я ИИ-Инспектор TNT House. Спроси меня про любой контракт или токен $MRDT.' }
+    { sender: 'bot', text: 'Привет! Я ИИ-Инспектор TNT House. Спроси меня про любой контракт или токен $MRDT. ⚽️' }
   ]);
   const [userMsg, setUserMsg] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -57,24 +57,20 @@ export default function TntHouse() {
     { name: 'Test Gem', symbol: 'TGEM', ca: '11111111111111111111111111111111', price: '0.00001234', liquidity: 45000, volume24h: 120000, priceChange24h: 8.5, verified: true, dexUrl: 'https://dexscreener.com', chain: 'solana' }
   ];
 
-  // Generate mock safety score for demo (later will come from real AI)
+  // Generate mock safety score for demo
   const getSafetyScore = (token) => {
     if (!token) return 75;
-    if (token.symbol === 'MRDT') return 98; // $MRDT is always very safe in our system
-    
-    // Semi-random but consistent score based on symbol
+    if (token.symbol === 'MRDT') return 98;
     const hash = token.symbol.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
     return Math.max(35, Math.min(95, hash % 60 + 35));
   };
 
-  // Get color and status based on score
   const getScoreStyle = (score) => {
     if (score >= 90) return { color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/50', label: 'Ironclad Safe ★', glow: 'shadow-[0_0_12px_rgba(16,185,129,0.6)]' };
     if (score >= 50) return { color: 'text-yellow-400', bg: 'bg-yellow-500/10', border: 'border-yellow-500/50', label: 'Pulsing Warning ⚠️', glow: 'shadow-[0_0_12px_rgba(234,179,8,0.5)]' };
     return { color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/50', label: 'Extreme Danger 🚨', glow: 'shadow-[0_0_12px_rgba(239,68,68,0.6)] animate-pulse' };
   };
 
-  // Open Blueprint Modal
   const openTokenBlueprint = (token) => {
     setSelectedToken(token);
     setIsBlueprintOpen(true);
@@ -94,19 +90,16 @@ export default function TntHouse() {
     return () => { if (document.head.contains(script)) document.head.removeChild(script); };
   }, []);
 
-  // Launch Jupiter
   const handleLaunchJupiter = () => {
     setIsBuyDropdownOpen(false);
     window.open('https://jup.ag/swap?sell=So11111111111111111111111111111111111111112&buy=8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg', '_blank');
   };
 
-  // Open Raydium
   const handleOpenRaydium = () => {
     setIsBuyDropdownOpen(false);
     window.open('https://raydium.io/liquidity/increase/?mode=add&pool_id=6cMTXZyCrnut7Lv39qt4dqEARbC2jbebvhzdCR1t2HEV', '_blank');
   };
 
-  // Connect Phantom
   const handleConnectWallet = async () => {
     if (window.solana && window.solana.isPhantom) {
       try {
@@ -215,31 +208,51 @@ export default function TntHouse() {
     setTimeout(() => setSubmitted(false), 4000);
   };
 
-  // AI Chat
-  const handleSendChat = (e) => {
+  // REAL AI Chat using our backend API route
+  const handleSendChat = async (e) => {
     e.preventDefault();
     if (!userMsg.trim()) return;
 
-    const newMessages = [...chatMessages, { sender: 'user', text: userMsg }];
-    setChatMessages(newMessages);
-    const typedText = userMsg.toLowerCase();
+    const userMessage = { sender: 'user', text: userMsg };
+    setChatMessages(prev => [...prev, userMessage]);
+    const currentMessage = userMsg;
     setUserMsg('');
     setIsTyping(true);
 
-    setTimeout(() => {
-      let botResponse = '';
-      if (typedText.includes('ca') || typedText.includes('контракт') || typedText.includes('проверь') || typedText.length > 25) {
-        botResponse = '🔍 ИИ-Инспектор запускает аудит контракта... Права на выпуск (Mint) отозваны, заморозка (Freeze) отключена! Скрытых связанных кошельков создателя не обнаружено. Этот контракт на 100% безопасен! 🧱✓';
-      } else if (typedText.includes('mrdt') || typedText.includes('токен') || typedText.includes('марад')) {
-        botResponse = '⚽️💎 $MRDT (MARADONATOKEN) — главный партнер TNT House! Ликвидность залочена, контракт проверен, права на выпуск отключены навсегда. Это наш фундамент! LFG! 🚀';
-      } else if (typedText.includes('цена') || typedText.includes('стоимость') || typedText.includes('аудит')) {
-        botResponse = 'Первые 3 проекта — аудит и листинг БЕСПЛАТНО! Далее базовый аудит $10, приоритетный — $40. Оплата только в $MRDT! 🧨';
-      } else {
-        botResponse = 'Бро, наша цель — защитить тебя от Rug Pull в Solana и Base. Держи $MRDT, пользуйся TNT House и забивай голы вместе! ⚽️💎';
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: [{ role: 'user', content: currentMessage }]
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('AI service error');
       }
-      setChatMessages(prev => [...prev, { sender: 'bot', text: botResponse }]);
+
+      const data = await response.json();
+      
+      const botMessage = { 
+        sender: 'bot', 
+        text: data.message || "Sorry bro, the inspector is taking a quick break. Try again! ⚽️" 
+      };
+      
+      setChatMessages(prev => [...prev, botMessage]);
+
+    } catch (error) {
+      console.error('Chat error:', error);
+      const errorMessage = { 
+        sender: 'bot', 
+        text: "Бро, ИИ-инспектор сейчас перегружен. Попробуй через минуту! 🧨" 
+      };
+      setChatMessages(prev => [...prev, errorMessage]);
+    } finally {
       setIsTyping(false);
-    }, 1400);
+    }
   };
 
   const formatNumber = (num) => {
