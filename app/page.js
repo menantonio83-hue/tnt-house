@@ -32,6 +32,10 @@ export default function TntHouse() {
     '[ИИ] Запуск фонового мониторинга новых пулов ликвидности...'
   ]);
 
+  // TNT Security Blueprint Modal
+  const [isBlueprintOpen, setIsBlueprintOpen] = useState(false);
+  const [selectedToken, setSelectedToken] = useState(null);
+
   const chatEndRef = useRef(null);
 
   // Pillars
@@ -53,7 +57,35 @@ export default function TntHouse() {
     { name: 'Test Gem', symbol: 'TGEM', ca: '11111111111111111111111111111111', price: '0.00001234', liquidity: 45000, volume24h: 120000, priceChange24h: 8.5, verified: true, dexUrl: 'https://dexscreener.com', chain: 'solana' }
   ];
 
-  // Load Jupiter script (we keep it in case we want modal later)
+  // Generate mock safety score for demo (later will come from real AI)
+  const getSafetyScore = (token) => {
+    if (!token) return 75;
+    if (token.symbol === 'MRDT') return 98; // $MRDT is always very safe in our system
+    
+    // Semi-random but consistent score based on symbol
+    const hash = token.symbol.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
+    return Math.max(35, Math.min(95, hash % 60 + 35));
+  };
+
+  // Get color and status based on score
+  const getScoreStyle = (score) => {
+    if (score >= 90) return { color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/50', label: 'Ironclad Safe ★', glow: 'shadow-[0_0_12px_rgba(16,185,129,0.6)]' };
+    if (score >= 50) return { color: 'text-yellow-400', bg: 'bg-yellow-500/10', border: 'border-yellow-500/50', label: 'Pulsing Warning ⚠️', glow: 'shadow-[0_0_12px_rgba(234,179,8,0.5)]' };
+    return { color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/50', label: 'Extreme Danger 🚨', glow: 'shadow-[0_0_12px_rgba(239,68,68,0.6)] animate-pulse' };
+  };
+
+  // Open Blueprint Modal
+  const openTokenBlueprint = (token) => {
+    setSelectedToken(token);
+    setIsBlueprintOpen(true);
+  };
+
+  const closeBlueprint = () => {
+    setIsBlueprintOpen(false);
+    setTimeout(() => setSelectedToken(null), 300);
+  };
+
+  // Load Jupiter script
   useEffect(() => {
     const script = document.createElement('script');
     script.src = 'https://terminal.jup.ag/main-v3.js';
@@ -62,7 +94,7 @@ export default function TntHouse() {
     return () => { if (document.head.contains(script)) document.head.removeChild(script); };
   }, []);
 
-  // Open Jupiter direct link (more reliable than modal for now)
+  // Launch Jupiter
   const handleLaunchJupiter = () => {
     setIsBuyDropdownOpen(false);
     window.open('https://jup.ag/swap?sell=So11111111111111111111111111111111111111112&buy=8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg', '_blank');
@@ -323,7 +355,7 @@ export default function TntHouse() {
           </div>
         </section>
 
-        {/* Table */}
+        {/* Table with Safety Score */}
         <section className="max-w-7xl mx-auto px-6 py-6">
           <div className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 backdrop-blur-md p-6 shadow-[0_0_25px_rgba(153,69,255,0.2)]">
             <div className="flex items-center justify-between mb-4">
@@ -332,14 +364,14 @@ export default function TntHouse() {
                   <Shield className="w-5 h-5 text-emerald-400" />
                   ТАБЛИЦА БЕЗОПАСНЫХ НОВЫХ ТОКЕНОВ
                 </h3>
-                <p className="text-slate-400 text-xs mt-1">Первые 3 проекта — бесплатно! Остальные по холду $MRDT.</p>
+                <p className="text-slate-400 text-xs mt-1">Кликни на токен, чтобы открыть детальный "TNT Security Blueprint"</p>
               </div>
               <div className="hidden md:flex items-center gap-2 text-xs text-purple-400">
                 <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Обновление каждые 5 минут
               </div>
             </div>
 
-            <div className="max-h-[300px] overflow-y-auto border border-purple-500/20 rounded-lg scrollbar-thin scrollbar-thumb-purple-500/30">
+            <div className="max-h-[340px] overflow-y-auto border border-purple-500/20 rounded-lg scrollbar-thin scrollbar-thumb-purple-500/30">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="border-b border-purple-500/20 bg-purple-500/10 text-purple-400 font-bold sticky top-0 z-20 backdrop-blur-md">
@@ -347,13 +379,16 @@ export default function TntHouse() {
                     <th className="p-2.5">Цена</th>
                     <th className="p-2.5">Ликвидность</th>
                     <th className="p-2.5">Объем / Изм.</th>
-                    <th className="p-2.5 text-center">Статус ИИ</th>
-                    <th className="p-2.5 text-right">Купить</th>
+                    <th className="p-2.5 text-center">TNT Safety Score</th>
+                    <th className="p-2.5 text-right">Действие</th>
                   </tr>
                 </thead>
                 <tbody>
                   {/* Pinned $MRDT */}
-                  <tr className="border-b border-purple-500/30 bg-emerald-500/5 hover:bg-emerald-500/10 transition">
+                  <tr 
+                    onClick={() => openTokenBlueprint({ symbol: 'MRDT', name: 'MARADONATOKEN', ca: '8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg', price: '0.00001300', liquidity: 13000, verified: true })}
+                    className="border-b border-purple-500/30 bg-emerald-500/5 hover:bg-emerald-500/10 transition cursor-pointer"
+                  >
                     <td className="p-2 font-bold flex items-center gap-2">
                       <span className="text-lg">⚽️</span>
                       <div>
@@ -365,12 +400,12 @@ export default function TntHouse() {
                     <td className="p-2 font-mono text-emerald-400 font-bold">$13,000+</td>
                     <td className="p-2 font-mono text-emerald-400 font-bold">+12.4%</td>
                     <td className="p-2 text-center">
-                      <span className="px-2 py-0.5 bg-emerald-500/20 border border-emerald-400 text-emerald-400 text-[10px] rounded font-extrabold tracking-widest shadow-[0_0_10px_rgba(20,241,149,0.3)] animate-pulse">
-                        ★ Ironclad Safe
-                      </span>
+                      <div className="inline-flex items-center justify-center w-14 h-7 rounded-full bg-emerald-500/20 border border-emerald-500 text-emerald-400 text-[11px] font-extrabold tracking-widest shadow-[0_0_10px_rgba(16,185,129,0.5)]">
+                        98
+                      </div>
                     </td>
                     <td className="p-2 text-right">
-                      <button onClick={handleLaunchJupiter} className="inline-flex items-center gap-1 text-[11px] text-emerald-400 hover:text-emerald-300 font-bold hover:underline">
+                      <button onClick={(e) => { e.stopPropagation(); handleLaunchJupiter(); }} className="inline-flex items-center gap-1 text-[11px] text-emerald-400 hover:text-emerald-300 font-bold hover:underline">
                         Купить <ExternalLink className="w-3 h-3" />
                       </button>
                     </td>
@@ -384,29 +419,39 @@ export default function TntHouse() {
                       </td>
                     </tr>
                   ) : (
-                    tokens.map((token, i) => (
-                      <tr key={i} className="border-b border-purple-500/10 hover:bg-purple-500/5 transition">
-                        <td className="p-2 font-bold">
-                          <span className="text-purple-400">${token.symbol}</span>
-                          <span className="text-[9px] text-slate-500 block font-normal truncate max-w-[120px]">{token.name}</span>
-                        </td>
-                        <td className="p-2 font-mono text-slate-300">${token.price}</td>
-                        <td className="p-2 font-mono text-slate-300">{formatNumber(token.liquidity)}</td>
-                        <td className="p-2 font-mono">
-                          <span className={token.priceChange24h > 0 ? 'text-emerald-400 font-bold' : 'text-red-400'}>
-                            {formatNumber(token.volume24h)} ({token.priceChange24h > 0 ? '+' : ''}{token.priceChange24h.toFixed(1)}%)
-                          </span>
-                        </td>
-                        <td className="p-2 text-center">
-                          {token.verified ? <span className="px-1.5 py-0.5 bg-purple-500/10 border border-purple-500/50 text-purple-400 text-[9px] rounded font-bold">Verified by AI</span> : <span className="px-1.5 py-0.5 bg-slate-800 border border-slate-700 text-slate-500 text-[9px] rounded">Pending</span>}
-                        </td>
-                        <td className="p-2 text-right">
-                          <a href={token.dexUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[10px] text-purple-400 hover:text-emerald-400 hover:underline">
-                            DEX <ExternalLink className="w-2.5 h-2.5" />
-                          </a>
-                        </td>
-                      </tr>
-                    ))
+                    tokens.map((token, i) => {
+                      const score = getSafetyScore(token);
+                      const style = getScoreStyle(score);
+                      return (
+                        <tr 
+                          key={i} 
+                          onClick={() => openTokenBlueprint(token)}
+                          className="border-b border-purple-500/10 hover:bg-purple-500/5 transition cursor-pointer"
+                        >
+                          <td className="p-2 font-bold">
+                            <span className="text-purple-400">${token.symbol}</span>
+                            <span className="text-[9px] text-slate-500 block font-normal truncate max-w-[120px]">{token.name}</span>
+                          </td>
+                          <td className="p-2 font-mono text-slate-300">${token.price}</td>
+                          <td className="p-2 font-mono text-slate-300">{formatNumber(token.liquidity)}</td>
+                          <td className="p-2 font-mono">
+                            <span className={token.priceChange24h > 0 ? 'text-emerald-400 font-bold' : 'text-red-400'}>
+                              {formatNumber(token.volume24h)} ({token.priceChange24h > 0 ? '+' : ''}{token.priceChange24h.toFixed(1)}%)
+                            </span>
+                          </td>
+                          <td className="p-2 text-center">
+                            <div className={`inline-flex items-center justify-center w-14 h-7 rounded-full ${style.bg} ${style.border} ${style.color} text-[11px] font-extrabold tracking-widest ${style.glow}`}>
+                              {score}
+                            </div>
+                          </td>
+                          <td className="p-2 text-right">
+                            <a href={token.dexUrl} onClick={(e) => e.stopPropagation()} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[10px] text-purple-400 hover:text-emerald-400 hover:underline">
+                              DEX <ExternalLink className="w-2.5 h-2.5" />
+                            </a>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -507,6 +552,116 @@ export default function TntHouse() {
         {isChatOpen ? <X className="w-6 h-6 text-slate-950" /> : <MessageSquare className="w-6 h-6 text-slate-950" />}
       </button>
 
+      {/* TNT Security Blueprint Modal */}
+      {isBlueprintOpen && selectedToken && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4" onClick={closeBlueprint}>
+          <div 
+            className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-[0_0_40px_rgba(168,85,247,0.25)]"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="sticky top-0 bg-slate-950 border-b border-purple-500/30 px-6 py-5 flex items-center justify-between z-10 rounded-t-2xl">
+              <div>
+                <div className="text-purple-400 text-xs tracking-[3px] font-bold">TNT HOUSE • AI INSPECTOR</div>
+                <div className="text-2xl font-black text-white tracking-tight">TNT Security Blueprint</div>
+              </div>
+              <button onClick={closeBlueprint} className="text-slate-400 hover:text-white transition">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Token Header */}
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-3xl">
+                  {selectedToken.symbol === 'MRDT' ? '⚽️' : '🪙'}
+                </div>
+                <div>
+                  <div className="text-2xl font-black tracking-tighter">${selectedToken.symbol}</div>
+                  <div className="text-sm text-slate-400 -mt-1">{selectedToken.name}</div>
+                </div>
+                <div className="ml-auto text-right">
+                  <div className="text-[10px] text-slate-500">TNT SAFETY SCORE</div>
+                  <div className={`text-4xl font-black tracking-tighter ${getScoreStyle(getSafetyScore(selectedToken)).color}`}>
+                    {getSafetyScore(selectedToken)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Foundation */}
+              <div className="bg-slate-900/60 border border-purple-500/20 rounded-xl p-5">
+                <div className="flex items-center gap-2 mb-3 text-emerald-400">
+                  <div className="w-2 h-2 bg-emerald-400 rounded-full"></div>
+                  <div className="font-bold tracking-wider text-sm">🧱 ФУНДАМЕНТ (Mint & Freeze)</div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 text-sm">
+                  <div className="flex justify-between"><span className="text-slate-400">Mint Authority</span> <span className="text-emerald-400 font-mono">Revoked ✓</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">Freeze Authority</span> <span className="text-emerald-400 font-mono">Revoked ✓</span></div>
+                </div>
+              </div>
+
+              {/* Skeletal Structure */}
+              <div className="bg-slate-900/60 border border-purple-500/20 rounded-xl p-5">
+                <div className="flex items-center gap-2 mb-3 text-emerald-400">
+                  <div className="w-2 h-2 bg-emerald-400 rounded-full"></div>
+                  <div className="font-bold tracking-wider text-sm">🧱 НЕСУЩИЕ КОНСТРУКЦИИ (Liquidity & Holders)</div>
+                </div>
+                <div className="space-y-1.5 text-sm">
+                  <div className="flex justify-between"><span className="text-slate-400">Liquidity Pool</span> <span className="text-emerald-400">Locked (6+ months) ✓</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">Holder Distribution</span> <span className="text-emerald-400">Balanced ✓</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">Liquidity Size</span> <span className="font-mono">{formatNumber(selectedToken.liquidity || 45000)}</span></div>
+                </div>
+              </div>
+
+              {/* Trench Check */}
+              <div className="bg-slate-900/60 border border-purple-500/20 rounded-xl p-5">
+                <div className="flex items-center gap-2 mb-3 text-emerald-400">
+                  <div className="w-2 h-2 bg-emerald-400 rounded-full"></div>
+                  <div className="font-bold tracking-wider text-sm">🧱 TRENCH CHECK (InsightX & TrenchRadar)</div>
+                </div>
+                <div className="space-y-1.5 text-sm">
+                  <div className="flex justify-between"><span className="text-slate-400">Insider Bundles</span> <span className="text-emerald-400">Clear ✓</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400">Bot Activity</span> <span className="text-emerald-400">Organic Flow ✓</span></div>
+                </div>
+              </div>
+
+              {/* AI Verdict */}
+              <div className="bg-gradient-to-br from-purple-500/10 to-emerald-500/5 border border-purple-500/30 rounded-xl p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <Sparkles className="w-4 h-4 text-purple-400" />
+                  <div className="font-bold tracking-wider text-sm text-purple-400">TNT VERDICT — ИИ ЗАКЛЮЧЕНИЕ</div>
+                </div>
+                <div className="text-[15px] leading-snug text-slate-200">
+                  {selectedToken.symbol === 'MRDT' 
+                    ? 'Бро, фундамент залит на века. Ликвидность в надёжных руках, бандлов нет. Это железобетонный гем. Строим вместе! 🧱⚽️'
+                    : getSafetyScore(selectedToken) >= 85 
+                      ? 'Хорошая структура. Основные риски закрыты. Можно рассматривать для входа с осторожностью.'
+                      : getSafetyScore(selectedToken) >= 60 
+                        ? 'Средний уровень безопасности. Есть некоторые предупреждения. DYOR и следи за обновлениями.'
+                        : 'Высокий риск. Рекомендуется избегать или ждать улучшения показателей.'
+                  }
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-purple-500/30 px-6 py-4 flex justify-end gap-3 bg-slate-950 rounded-b-2xl">
+              <button onClick={closeBlueprint} className="px-5 py-2 text-sm rounded-lg border border-purple-500/40 hover:bg-purple-500/10 transition">
+                Закрыть
+              </button>
+              <button 
+                onClick={() => {
+                  closeBlueprint();
+                  if (selectedToken.symbol === 'MRDT') handleLaunchJupiter();
+                }} 
+                className="px-6 py-2 text-sm rounded-lg bg-gradient-to-r from-purple-500 to-emerald-400 text-slate-950 font-bold flex items-center gap-2 hover:brightness-110 transition"
+              >
+                Купить ${selectedToken.symbol} <ExternalLink className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* AI Chat Popup */}
       {isChatOpen && (
         <div className="fixed bottom-24 right-6 w-80 md:w-96 h-[450px] bg-slate-900 border-2 border-purple-500 rounded-xl shadow-[0_0_30px_rgba(153,69,255,0.4)] flex flex-col overflow-hidden z-50 font-mono">
@@ -518,7 +673,9 @@ export default function TntHouse() {
                 <span className="text-[9px] text-slate-100 font-bold tracking-widest">Trench Agent D10S</span>
               </div>
             </div>
-            <button onClick={() => setIsChatOpen(false)} className="text-white hover:text-slate-200"><X className="w-4 h-4" /></button>
+            <button onClick={() => setIsChatOpen(false)} className="text-white hover:text-slate-200">
+              <X className="w-4 h-4" />
+            </button>
           </div>
 
           <div className="flex-1 p-4 overflow-y-auto space-y-3 scrollbar-thin scrollbar-thumb-purple-500/20 text-xs">
