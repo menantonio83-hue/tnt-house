@@ -53,7 +53,7 @@ export default function TntHouse() {
     { name: 'Test Gem', symbol: 'TGEM', ca: '11111111111111111111111111111111', price: '0.00001234', liquidity: 45000, volume24h: 120000, priceChange24h: 8.5, verified: true, dexUrl: 'https://dexscreener.com', chain: 'solana' }
   ];
 
-  // Load Jupiter script
+  // Load Jupiter script (we keep it in case we want modal later)
   useEffect(() => {
     const script = document.createElement('script');
     script.src = 'https://terminal.jup.ag/main-v3.js';
@@ -62,19 +62,10 @@ export default function TntHouse() {
     return () => { if (document.head.contains(script)) document.head.removeChild(script); };
   }, []);
 
-  // Launch Jupiter
+  // Open Jupiter direct link (more reliable than modal for now)
   const handleLaunchJupiter = () => {
     setIsBuyDropdownOpen(false);
-    if (window.Jupiter) {
-      window.Jupiter.init({
-        displayMode: "modal",
-        mintAccounts: { input: 'So11111111111111111111111111111111111111112', output: '8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg' },
-        endpoint: "https://api.mainnet-beta.solana.com",
-        strictTokenList: false
-      });
-    } else {
-      window.open('https://jup.ag/swap?sell=So11111111111111111111111111111111111111112&buy=8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg', '_blank');
-    }
+    window.open('https://jup.ag/swap?sell=So11111111111111111111111111111111111111112&buy=8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg', '_blank');
   };
 
   // Open Raydium
