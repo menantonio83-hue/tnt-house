@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   TrendingUp, Shield, Lock, Zap, Send, MessageSquare, X, 
-  RefreshCw, AlertCircle, Sparkles, ExternalLink 
+  RefreshCw, AlertCircle, Sparkles, ExternalLink, ChevronDown 
 } from 'lucide-react';
 
 export default function TntHouse() {
@@ -14,6 +14,9 @@ export default function TntHouse() {
   const [error, setError] = useState('');
   const [walletAddress, setWalletAddress] = useState('');
   
+  // Buy Dropdown
+  const [isBuyDropdownOpen, setIsBuyDropdownOpen] = useState(false);
+
   // AI Chat states
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState([
@@ -31,53 +34,50 @@ export default function TntHouse() {
 
   const chatEndRef = useRef(null);
 
-  // Pillars for hero section
+  // Pillars
   const pillars = [
     { icon: Shield, label: 'AI Аудит', desc: 'Проверка контрактов', color: 'text-purple-400' },
     { icon: Zap, label: 'Микро-капы', desc: '$5K-$100K', color: 'text-emerald-400' },
     { icon: Lock, label: 'DAO Лицензия', desc: 'Через $MRDT', color: 'text-purple-400' }
   ];
 
-  // Audit points for form
+  // Audit points
   const auditPoints = [
     'Анализ связей кошельков разработчиков (InsightX)',
     'Детектор скрытых инсайдерских бандлов (TrenchRadar)',
     'Автоматический вывод в таблицу TNT House'
   ];
 
-  // Fallback tokens if API fails
+  // Fallback tokens
   const fallbackTokens = [
-    { name: 'Test Gem 1', symbol: 'TGEM1', ca: '11111111111111111111111111111111', price: '0.00001234', liquidity: 45000, volume24h: 120000, priceChange24h: 8.5, verified: true, dexUrl: 'https://dexscreener.com', chain: 'solana' },
-    { name: 'Test Gem 2', symbol: 'TGEM2', ca: '22222222222222222222222222222222', price: '0.00004567', liquidity: 78000, volume24h: 95000, priceChange24h: -3.2, verified: false, dexUrl: 'https://dexscreener.com', chain: 'solana' }
+    { name: 'Test Gem', symbol: 'TGEM', ca: '11111111111111111111111111111111', price: '0.00001234', liquidity: 45000, volume24h: 120000, priceChange24h: 8.5, verified: true, dexUrl: 'https://dexscreener.com', chain: 'solana' }
   ];
 
-  // Load Jupiter Terminal script
+  // Load Jupiter script
   useEffect(() => {
     const script = document.createElement('script');
     script.src = 'https://terminal.jup.ag/main-v3.js';
     script.async = true;
     document.head.appendChild(script);
-    return () => {
-      if (document.head.contains(script)) document.head.removeChild(script);
-    };
+    return () => { if (document.head.contains(script)) document.head.removeChild(script); };
   }, []);
 
-  // Launch Jupiter Swap Modal for $MRDT
+  // Launch Jupiter
   const handleLaunchJupiter = () => {
+    setIsBuyDropdownOpen(false);
     if (window.Jupiter) {
       window.Jupiter.init({
         displayMode: "modal",
         mintAccounts: { input: 'So11111111111111111111111111111111111111112', output: '8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg' },
         endpoint: "https://api.mainnet-beta.solana.com",
-        strictTokenList: false,
-        containerStyles: { zIndex: 100 }
+        strictTokenList: false
       });
     } else {
       window.open('https://jup.ag/swap?sell=So11111111111111111111111111111111111111112&buy=8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg', '_blank');
     }
   };
 
-  // Connect Phantom Wallet
+  // Connect Phantom
   const handleConnectWallet = async () => {
     if (window.solana && window.solana.isPhantom) {
       try {
@@ -85,21 +85,21 @@ export default function TntHouse() {
         const pubKey = response.publicKey.toString();
         setWalletAddress(pubKey.slice(0, 4) + '...' + pubKey.slice(-4));
       } catch (err) {
-        console.error("Ошибка подключения кошелька:", err);
+        console.error("Wallet error:", err);
       }
     } else {
-      alert("Кошелек Phantom не найден! Открой сайт в приложении Phantom.");
+      alert("Phantom wallet not found. Open in Phantom browser.");
     }
   };
 
-  // Live AI Scanner Logs
+  // Live Logs
   useEffect(() => {
     const logTemplates = [
       'Обнаружен новый пул на Raydium! Анализ ликвидности...',
       'Сканирование RugCheck: Mint Authority отключена ✓.',
       'ИИ-Агент: Сканирование завершено. Уровень угрозы: НИЗКИЙ.',
       'Анализ холдеров: скрытых бандлов не обнаружено.',
-      'Подключение к API DexScreener для обновления котировок.',
+      'Подключение к API DexScreener.',
       'Проверка Base L2 контракта. Freeze Authority заблокирована ✓.',
       'VIP-проект MARADONATOKEN ($MRDT) проверен. Безопасность: 100%.',
       'Мониторинг "окопов" запущен. Ищем новые гемы...'
@@ -114,15 +114,14 @@ export default function TntHouse() {
     return () => clearInterval(interval);
   }, []);
 
-  // Fetch tokens from DexScreener (with cache)
+  // Fetch tokens
   useEffect(() => {
     const fetchTokens = async () => {
       try {
         setLoading(true);
-        
-        // Check cache (2 minutes)
         const cachedData = localStorage.getItem('tnt_cached_tokens');
         const cachedTime = localStorage.getItem('tnt_cached_time');
+        
         if (cachedData && cachedTime && (Date.now() - parseInt(cachedTime) < 120000)) {
           setTokens(JSON.parse(cachedData));
           setLoading(false);
@@ -134,10 +133,7 @@ export default function TntHouse() {
         
         if (data.pairs && data.pairs.length > 0) {
           const filtered = data.pairs
-            .filter(p => {
-              const mc = p.marketCap || 0;
-              return mc >= 1000 && mc <= 300000;
-            })
+            .filter(p => { const mc = p.marketCap || 0; return mc >= 1000 && mc <= 300000; })
             .slice(0, 9)
             .map(p => ({
               name: p.baseToken?.name || 'Unknown',
@@ -162,7 +158,7 @@ export default function TntHouse() {
         }
         throw new Error("No pairs");
       } catch (err) {
-        console.error('API error, using fallback:', err);
+        console.error('Using fallback tokens');
         setTokens(fallbackTokens);
         setLoading(false);
       }
@@ -173,7 +169,7 @@ export default function TntHouse() {
     return () => clearInterval(interval);
   }, []);
 
-  // Auto-scroll chat
+  // Auto scroll chat
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
@@ -190,7 +186,7 @@ export default function TntHouse() {
     setTimeout(() => setSubmitted(false), 4000);
   };
 
-  // AI Chat bot
+  // AI Chat
   const handleSendChat = (e) => {
     e.preventDefault();
     if (!userMsg.trim()) return;
@@ -203,7 +199,6 @@ export default function TntHouse() {
 
     setTimeout(() => {
       let botResponse = '';
-      
       if (typedText.includes('ca') || typedText.includes('контракт') || typedText.includes('проверь') || typedText.length > 25) {
         botResponse = '🔍 ИИ-Инспектор запускает аудит контракта... Права на выпуск (Mint) отозваны, заморозка (Freeze) отключена! Скрытых связанных кошельков создателя не обнаружено. Этот контракт на 100% безопасен! 🧱✓';
       } else if (typedText.includes('mrdt') || typedText.includes('токен') || typedText.includes('марад')) {
@@ -213,7 +208,6 @@ export default function TntHouse() {
       } else {
         botResponse = 'Бро, наша цель — защитить тебя от Rug Pull в Solana и Base. Держи $MRDT, пользуйся TNT House и забивай голы вместе! ⚽️💎';
       }
-      
       setChatMessages(prev => [...prev, { sender: 'bot', text: botResponse }]);
       setIsTyping(false);
     }, 1400);
@@ -231,7 +225,7 @@ export default function TntHouse() {
       <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] rounded-full bg-purple-600/10 blur-[120px] pointer-events-none"></div>
       <div className="absolute bottom-[20%] right-[-10%] w-[500px] h-[500px] rounded-full bg-emerald-500/10 blur-[120px] pointer-events-none"></div>
 
-      {/* Grid background */}
+      {/* Grid */}
       <div className="absolute inset-0 opacity-5 pointer-events-none">
         <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
           <defs>
@@ -256,12 +250,36 @@ export default function TntHouse() {
                 <span className="text-[10px] text-purple-400 block font-bold tracking-widest">TOP NEW TOKENS v1.0</span>
               </div>
             </div>
-            <button 
-              onClick={handleConnectWallet}
-              className="bg-gradient-to-r from-purple-500 to-emerald-400 hover:from-purple-400 hover:to-emerald-300 text-slate-950 font-black px-4 py-2 rounded text-xs transition duration-300 shadow-[0_0_15px_rgba(153,69,255,0.4)]"
-            >
-              {walletAddress ? walletAddress : "CONNECT WALLET"}
-            </button>
+            
+            {/* Buy Dropdown + Wallet */}
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <button 
+                  onClick={() => setIsBuyDropdownOpen(!isBuyDropdownOpen)}
+                  className="bg-gradient-to-r from-purple-500 to-emerald-400 hover:from-purple-400 hover:to-emerald-300 text-slate-950 font-black px-4 py-2 rounded text-xs transition duration-300 flex items-center gap-1 shadow-[0_0_15px_rgba(153,69,255,0.4)]"
+                >
+                  BUY $MRDT <ChevronDown className="w-3 h-3" />
+                </button>
+                
+                {isBuyDropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-48 bg-slate-900 border border-purple-500/30 rounded-lg shadow-xl z-50 py-1 text-sm">
+                    <button onClick={handleLaunchJupiter} className="w-full text-left px-4 py-2 hover:bg-purple-500/10 text-emerald-400 flex items-center gap-2">
+                      <ExternalLink className="w-4 h-4" /> Jupiter Swap (Best Price)
+                    </button>
+                    <a href="https://dexscreener.com/solana/6cmtxzycrnut7lv39qt4dqearbc2jbebvhzdcr1t2hev" target="_blank" className="w-full text-left px-4 py-2 hover:bg-purple-500/10 text-emerald-400 flex items-center gap-2">
+                      <ExternalLink className="w-4 h-4" /> View on Dexscreener
+                    </a>
+                    <a href="https://t.me/tnt_house2026" target="_blank" className="w-full text-left px-4 py-2 hover:bg-purple-500/10 text-emerald-400 flex items-center gap-2">
+                      <ExternalLink className="w-4 h-4" /> Buy via Telegram
+                    </a>
+                  </div>
+                )}
+              </div>
+
+              <button onClick={handleConnectWallet} className="bg-gradient-to-r from-purple-500 to-emerald-400 hover:from-purple-400 hover:to-emerald-300 text-slate-950 font-black px-4 py-2 rounded text-xs transition duration-300 shadow-[0_0_15px_rgba(153,69,255,0.4)]">
+                {walletAddress ? walletAddress : "CONNECT WALLET"}
+              </button>
+            </div>
           </div>
         </header>
 
@@ -311,7 +329,7 @@ export default function TntHouse() {
           </div>
         </section>
 
-        {/* Table Section */}
+        {/* Table */}
         <section className="max-w-7xl mx-auto px-6 py-6">
           <div className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 backdrop-blur-md p-6 shadow-[0_0_25px_rgba(153,69,255,0.2)]">
             <div className="flex items-center justify-between mb-4">
@@ -404,7 +422,7 @@ export default function TntHouse() {
           </div>
         </section>
 
-        {/* Form Section */}
+        {/* Form */}
         <section className="max-w-7xl mx-auto px-6 py-8">
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <div className="space-y-4">
@@ -449,7 +467,7 @@ export default function TntHouse() {
             <div className="absolute top-0 right-0 w-40 h-40 bg-purple-500/10 rounded-full blur-3xl"></div>
             <div className="relative z-10 max-w-2xl">
               <h3 className="text-2xl font-black text-purple-400 mb-2">🐋 TNT WHALE CLUB (DAO)</h3>
-              <p className="text-slate-300 text-sm leading-relaxed mb-5"> Держи $MRDT и получи доступ к закрытому Telegram чату. Первым узнавай о новых гемах, голосуй за листинги и общайся с опытными инвесторами!</p>
+              <p className="text-slate-300 text-sm leading-relaxed mb-5">Держи $MRDT и получи доступ к закрытому Telegram чату. Первым узнавай о новых гемах, голосуй за листинги и общайся с опытными инвесторами!</p>
               <a href="https://t.me/tnt_house2026" target="_blank" rel="noopener noreferrer" className="inline-block bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-400 hover:to-purple-500 text-white font-bold py-2.5 px-6 rounded text-xs transition duration-300 shadow-md shadow-purple-500/30">
                 Вступить в VIP-Клуб →
               </a>
