@@ -93,7 +93,7 @@ export default function TntHouse() {
     return () => { if (document.head.contains(script)) document.head.removeChild(script); };
   }, []);
 
-  // Jupiter с комиссией 0.2% на твой кошелёк
+  // Jupiter (убрал проблемный endpoint, чтобы не было ошибки RPC)
   const handleLaunchJupiter = () => {
     setIsBuyDropdownOpen(false);
     if (window.Jupiter) {
@@ -103,7 +103,6 @@ export default function TntHouse() {
           input: 'So11111111111111111111111111111111111111112', 
           output: MRDT_CA 
         },
-        endpoint: "https://api.mainnet-beta.solana.com",
         strictTokenList: false,
         containerStyles: { zIndex: 100 },
         formProps: {
@@ -226,7 +225,7 @@ export default function TntHouse() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
 
-  // РЕАЛЬНЫЙ ИИ ЧАТ через /api/chat
+  // РЕАЛЬНЫЙ ИИ ЧАТ
   const handleSendChat = async (e) => {
     e.preventDefault();
     if (!userMsg.trim()) return;
@@ -273,7 +272,7 @@ export default function TntHouse() {
     return `$${num.toFixed(0)}`;
   };
 
-  // Форма — простой и рабочий вариант
+  // Форма
   const handleFormSubmit = (e) => {
     e.preventDefault();
     if (!formData.projectName || !formData.ca || !formData.email) {
