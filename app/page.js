@@ -15,6 +15,7 @@ export default function TntHouse() {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
   const [walletAddress, setWalletAddress] = useState('');
+  const [selectedTier, setSelectedTier] = useState('basic');
   
   // Buy Dropdown
   const [isBuyDropdownOpen, setIsBuyDropdownOpen] = useState(false);
@@ -214,12 +215,31 @@ export default function TntHouse() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
 
+  // Solana Pay Form Submission
   const handleFormSubmit = (e) => {
     e.preventDefault();
     if (!formData.projectName || !formData.ca || !formData.email) {
       setError('Пожалуйста, заполни все поля формы!');
       return;
     }
+
+    let mrdtAmount = 770000; // Basic ~$10
+    if (selectedTier === 'fast') {
+      mrdtAmount = 3000000; // Fast ~$40
+    } else if (selectedTier === 'vip') {
+      mrdtAmount = 9200000; // VIP ~$120
+    }
+
+    const recipient = "AZyzUySu6HP9ocJYhZECG5syycYNV6ubTQKyfB2mDWgG";
+    const splToken = "8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg";
+    const label = encodeURIComponent("TNT House Audit");
+    const message = encodeURIComponent(`Audit request for $${formData.projectName}`);
+
+    const solanaPayUrl = `solana:${recipient}?amount=${mrdtAmount}&spl-token=${splToken}&label=${label}&message=${message}`;
+
+    // Redirect to Solana Pay
+    window.location.href = solanaPayUrl;
+
     setSubmitted(true);
     setFormData({ projectName: '', ca: '', email: '' });
     setError('');
@@ -551,6 +571,21 @@ export default function TntHouse() {
                   <label className="block text-purple-400 text-xs font-bold mb-1.5">Contract Address (Solana/Base)</label>
                   <input type="text" value={formData.ca} onChange={(e) => setFormData({...formData, ca: e.target.value})} placeholder="Впиши адрес контракта..." className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none transition font-mono" />
                 </div>
+
+                {/* Tier Selector */}
+                <div>
+                  <label className="block text-purple-400 text-xs font-bold mb-1.5">Выберите Тариф</label>
+                  <select
+                    value={selectedTier}
+                    onChange={(e) => setSelectedTier(e.target.value)}
+                    className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white focus:border-purple-500 focus:outline-none transition font-mono"
+                  >
+                    <option value="basic">Базовый Аудит — $10 в $MRDT (~770,000 $MRDT)</option>
+                    <option value="fast">Быстрый Листинг — $40 в $MRDT (~3,000,000 $MRDT)</option>
+                    <option value="vip">VIP-Буст (Баннер 24ч) — $120 в $MRDT (~9,200,000 $MRDT)</option>
+                  </select>
+                </div>
+
                 <div>
                   <label className="block text-purple-400 text-xs font-bold mb-1.5">Email для связи</label>
                   <input type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} placeholder="your@email.com" className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none transition" />
