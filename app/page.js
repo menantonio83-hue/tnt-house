@@ -84,7 +84,7 @@ export default function TntHouse() {
     setTimeout(() => setSelectedToken(null), 300);
   };
 
-  // Load Jupiter script
+  // Load Jupiter script (необязательно теперь)
   useEffect(() => {
     const script = document.createElement('script');
     script.src = 'https://terminal.jup.ag/main-v3.js';
@@ -93,32 +93,13 @@ export default function TntHouse() {
     return () => { if (document.head.contains(script)) document.head.removeChild(script); };
   }, []);
 
-  // Jupiter (убрал проблемный endpoint, чтобы не было ошибки RPC)
+  // Jupiter теперь открывает прямую ссылку (самый надёжный способ)
   const handleLaunchJupiter = () => {
     setIsBuyDropdownOpen(false);
-    if (window.Jupiter) {
-      window.Jupiter.init({
-        displayMode: "modal",
-        mintAccounts: { 
-          input: 'So11111111111111111111111111111111111111112', 
-          output: MRDT_CA 
-        },
-        strictTokenList: false,
-        containerStyles: { zIndex: 100 },
-        formProps: {
-          fixedOutputMint: true,
-        },
-        platformFeeBps: 20,
-        feeAccounts: new Map([
-          [MRDT_CA, WALLET_ADDRESS]
-        ])
-      });
-    } else {
-      window.open(
-        `https://jup.ag/swap?inputMint=So11111111111111111111111111111111111111112&outputMint=${MRDT_CA}`,
-        '_blank'
-      );
-    }
+    window.open(
+      `https://jup.ag/swap?inputMint=So11111111111111111111111111111111111111112&outputMint=${MRDT_CA}`,
+      '_blank'
+    );
   };
 
   const handleOpenRaydium = () => {
