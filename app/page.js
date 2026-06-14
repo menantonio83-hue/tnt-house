@@ -93,8 +93,9 @@ export default function TntHouse() {
     return () => { if (document.head.contains(script)) document.head.removeChild(script); };
   }, []);
 
-  // Jupiter Swap с правильным форматом
+  // Jupiter с комиссией 0.2% на твой кошелёк
   const handleLaunchJupiter = () => {
+    setIsBuyDropdownOpen(false);
     if (window.Jupiter) {
       window.Jupiter.init({
         displayMode: "modal",
@@ -225,7 +226,7 @@ export default function TntHouse() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
 
-  // РАБОЧИЙ ИИ CHAT через мок-ответы (без бэкенда)
+  // РЕАЛЬНЫЙ ИИ ЧАТ через /api/chat
   const handleSendChat = async (e) => {
     e.preventDefault();
     if (!userMsg.trim()) return;
@@ -236,34 +237,43 @@ export default function TntHouse() {
     setUserMsg('');
     setIsTyping(true);
 
-    // Симуляция ИИ ответа (можешь заменить на реальный API)
-    setTimeout(() => {
-      const responses = [
-        'Анализирую смарт-контракт... Структура выглядит чистой. Mint Authority отключена, ликвидность заблокирована. SAFE ✓',
-        'Проверяю холдеров на InsightX... Бандлов не обнаружено. Распределение выглядит честным.',
-        'Эй, $MRDT это 100% железобетонный гем! Фундамент залит навсегда. 🧱⚽️',
-        'Сканирую ругпулы... Никаких подозрительных активностей. Можешь спать спокойно.',
-        'Проверяю комиссии... Всё честно. Никаких скрытых платежей разработчикам. ✓'
-      ];
-      
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [{ role: 'user', content: currentMessage }]
+        }),
+      });
+
+      if (!response.ok) throw new Error('AI error');
+
+      const data = await response.json();
       const botMessage = { 
         sender: 'bot', 
-        text: responses[Math.floor(Math.random() * responses.length)]
+        text: data.message || "Бро, ИИ-инспектор сейчас занят. Попробуй чуть позже! ⚽️" 
       };
-      
       setChatMessages(prev => [...prev, botMessage]);
+
+    } catch (error) {
+      console.error('Chat error:', error);
+      const errorMessage = { 
+        sender: 'bot', 
+        text: "Бро, ИИ-инспектор сейчас перегружен. Попробуй через минуту! 🧨" 
+      };
+      setChatMessages(prev => [...prev, errorMessage]);
+    } finally {
       setIsTyping(false);
-    }, 1000);
+    }
   };
 
-  // Исправленная функция форматирования чисел
   const formatNumber = (num) => {
     if (num >= 1e6) return `$${(num / 1e6).toFixed(1)}M`;
     if (num >= 1e3) return `$${(num / 1e3).toFixed(1)}K`;
     return `$${num.toFixed(0)}`;
   };
 
-  // ИСПРАВЛЕННЫЙ SOLANA PAY (без ошибок синтаксиса)
+  // Форма — простой и рабочий вариант
   const handleFormSubmit = (e) => {
     e.preventDefault();
     if (!formData.projectName || !formData.ca || !formData.email) {
@@ -271,25 +281,11 @@ export default function TntHouse() {
       return;
     }
 
-    // Определяем сумму в зависимости от тарифа
-    let mrdtAmount = 770000; // Basic ~$10
-    if (selectedTier === 'fast') {
-      mrdtAmount = 3000000; // Fast ~$40
-    } else if (selectedTier === 'vip') {
-      mrdtAmount = 9200000; // VIP ~$120
-    }
+    let mrdtAmount = 770000;
+    if (selectedTier === 'fast') mrdtAmount = 3000000;
+    if (selectedTier === 'vip') mrdtAmount = 9200000;
 
-    // Правильный формат Solana Pay (если используешь Phantom)
-    // Вариант 1: Просто открыть Phantom для транзакции
-    if (window.solana && window.solana.isPhantom) {
-      alert(`Отправь ${mrdtAmount} токенов $MRDT на адрес:\n${WALLET_ADDRESS}\n\nТвой проект: ${formData.projectName}\nCA: ${formData.ca}\nEmail: ${formData.email}`);
-      // Можно добавить реальную транзакцию через Phantom API здесь
-      handleConnectWallet();
-    } else {
-      // Вариант 2: Открыть Jupiter для свопа
-      alert(`Нужно отправить ${mrdtAmount} токенов $MRDT. Сейчас откроется Jupiter. После обмена отправь скрин на email: tnt@house.com`);
-      handleLaunchJupiter();
-    }
+    alert(`Спасибо! Чтобы оплатить ${selectedTier.toUpperCase()} аудит, отправь ${mrdtAmount} $MRDT на адрес:\n\n${WALLET_ADDRESS}\n\nПосле оплаты напиши мне в TG: @Crypto_D10S`);
 
     setSubmitted(true);
     setFormData({ projectName: '', ca: '', email: '' });
@@ -325,7 +321,7 @@ export default function TntHouse() {
               </a>
               <div>
                 <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-emerald-400 tracking-wider">TNT HOUSE</h1>
-                <span className="text-[10px] text-purple-400 block font-bold tracking-widest">TOP NEW TOKENS v1.0 FIXED</span>
+                <span className="text-[10px] text-purple-400 block font-bold tracking-widest">TOP NEW TOKENS v1.0</span>
               </div>
             </div>
             
@@ -563,23 +559,11 @@ export default function TntHouse() {
               <form onSubmit={handleFormSubmit} className="space-y-4">
                 <div>
                   <label className="block text-purple-400 text-xs font-bold mb-1.5">Название проекта</label>
-                  <input 
-                    type="text" 
-                    value={formData.projectName} 
-                    onChange={(e) => setFormData({...formData, projectName: e.target.value})} 
-                    placeholder="Твой токен..." 
-                    className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none transition" 
-                  />
+                  <input type="text" value={formData.projectName} onChange={(e) => setFormData({...formData, projectName: e.target.value})} placeholder="Твой токен..." className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none transition" />
                 </div>
                 <div>
                   <label className="block text-purple-400 text-xs font-bold mb-1.5">Contract Address (Solana)</label>
-                  <input 
-                    type="text" 
-                    value={formData.ca} 
-                    onChange={(e) => setFormData({...formData, ca: e.target.value})} 
-                    placeholder="Впиши адрес контракта..." 
-                    className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none transition font-mono" 
-                  />
+                  <input type="text" value={formData.ca} onChange={(e) => setFormData({...formData, ca: e.target.value})} placeholder="Впиши адрес контракта..." className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none transition font-mono" />
                 </div>
 
                 {/* Tier Selector */}
@@ -598,18 +582,9 @@ export default function TntHouse() {
 
                 <div>
                   <label className="block text-purple-400 text-xs font-bold mb-1.5">Email для связи</label>
-                  <input 
-                    type="email" 
-                    value={formData.email} 
-                    onChange={(e) => setFormData({...formData, email: e.target.value})} 
-                    placeholder="your@email.com" 
-                    className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none transition" 
-                  />
+                  <input type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} placeholder="your@email.com" className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none transition" />
                 </div>
-                <button 
-                  type="submit" 
-                  className="w-full bg-gradient-to-r from-purple-500 to-emerald-400 hover:from-purple-400 hover:to-emerald-300 text-slate-950 font-black py-2.5 rounded text-xs transition flex items-center justify-center gap-1.5 shadow-[0_0_15px_rgba(153,69,255,0.3)]"
-                >
+                <button type="submit" className="w-full bg-gradient-to-r from-purple-500 to-emerald-400 hover:from-purple-400 hover:to-emerald-300 text-slate-950 font-black py-2.5 rounded text-xs transition flex items-center justify-center gap-1.5 shadow-[0_0_15px_rgba(153,69,255,0.3)]">
                   <Send className="w-3.5 h-3.5" /> ЗАПУСТИТЬ ИИ-ИНСПЕКЦИЮ
                 </button>
                 {submitted && <div className="p-3 bg-emerald-950/40 border border-emerald-500/30 rounded text-emerald-300 text-xs text-center">✓ Заявка принята! Проверяем твой токен...</div>}
@@ -635,7 +610,7 @@ export default function TntHouse() {
         {/* Footer */}
         <footer className="border-t border-purple-500/20 mt-12 py-6 bg-slate-950/60 backdrop-blur-lg">
           <div className="max-w-7xl mx-auto px-6 text-center space-y-2">
-            <div className="text-purple-400 font-bold text-sm tracking-widest">TNT HOUSE v1.0 FIXED</div>
+            <div className="text-purple-400 font-bold text-sm tracking-widest">TNT HOUSE v1.0</div>
             <div className="text-slate-400 text-xs">Powered by $MRDT • AI Contract Audits • Solana Ecosystem</div>
             <div className="text-slate-500 text-[10px]">Built with Next.js + Tailwind CSS • DexScreener API</div>
           </div>
@@ -643,19 +618,13 @@ export default function TntHouse() {
       </div>
 
       {/* Floating AI Chat Button */}
-      <button 
-        onClick={() => setIsChatOpen(!isChatOpen)} 
-        className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-tr from-purple-500 to-emerald-400 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(153,69,255,0.5)] hover:scale-105 transition duration-300 z-50 animate-bounce"
-      >
+      <button onClick={() => setIsChatOpen(!isChatOpen)} className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-tr from-purple-500 to-emerald-400 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(153,69,255,0.5)] hover:scale-105 transition duration-300 z-50 animate-bounce">
         {isChatOpen ? <X className="w-6 h-6 text-slate-950" /> : <MessageSquare className="w-6 h-6 text-slate-950" />}
       </button>
 
       {/* TNT Security Blueprint Modal */}
       {isBlueprintOpen && selectedToken && (
-        <div 
-          className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4" 
-          onClick={closeBlueprint}
-        >
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4" onClick={closeBlueprint}>
           <div 
             className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-[0_0_40px_rgba(168,85,247,0.25)]"
             onClick={e => e.stopPropagation()}
@@ -792,16 +761,8 @@ export default function TntHouse() {
           </div>
 
           <form onSubmit={handleSendChat} className="p-3 border-t border-purple-500/20 bg-slate-950 flex gap-2">
-            <input 
-              type="text" 
-              value={userMsg} 
-              onChange={(e) => setUserMsg(e.target.value)} 
-              placeholder="Спроси у ИИ или вставь CA..." 
-              className="flex-1 bg-slate-900 border border-purple-500/20 rounded px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" 
-            />
-            <button type="submit" className="bg-purple-500 hover:bg-purple-400 text-slate-950 px-3 rounded text-xs font-bold transition">
-              <Send className="w-3.5 h-3.5" />
-            </button>
+            <input type="text" value={userMsg} onChange={(e) => setUserMsg(e.target.value)} placeholder="Спроси у ИИ или вставь CA..." className="flex-1 bg-slate-900 border border-purple-500/20 rounded px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" />
+            <button type="submit" className="bg-purple-500 hover:bg-purple-400 text-slate-950 px-3 rounded text-xs font-bold transition"><Send className="w-3.5 h-3.5" /></button>
           </form>
         </div>
       )}
