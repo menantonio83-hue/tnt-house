@@ -6,6 +6,8 @@ import {
   RefreshCw, AlertCircle, Sparkles, ExternalLink, ChevronDown 
 } from 'lucide-react';
 
+const WALLET_ADDRESS = "AZyzUySu6HP9ocJYhZECG5syycYNV6ubTQKyfB2mDWgG";
+
 export default function TntHouse() {
   const [tokens, setTokens] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -57,7 +59,6 @@ export default function TntHouse() {
     { name: 'Test Gem', symbol: 'TGEM', ca: '11111111111111111111111111111111', price: '0.00001234', liquidity: 45000, volume24h: 120000, priceChange24h: 8.5, verified: true, dexUrl: 'https://dexscreener.com', chain: 'solana' }
   ];
 
-  // Generate mock safety score for demo
   const getSafetyScore = (token) => {
     if (!token) return 75;
     if (token.symbol === 'MRDT') return 98;
@@ -90,9 +91,26 @@ export default function TntHouse() {
     return () => { if (document.head.contains(script)) document.head.removeChild(script); };
   }, []);
 
+  // Updated Jupiter with 0.2% fee to your wallet
   const handleLaunchJupiter = () => {
-    setIsBuyDropdownOpen(false);
-    window.open('https://jup.ag/swap?sell=So11111111111111111111111111111111111111112&buy=8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg', '_blank');
+    if (window.Jupiter) {
+      window.Jupiter.init({
+        displayMode: "modal",
+        mintAccounts: { input: 'So11111111111111111111111111111111111111112', output: '8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg' },
+        endpoint: "https://api.mainnet-beta.solana.com",
+        strictTokenList: false,
+        containerStyles: { zIndex: 100 },
+        formProps: {
+          fixedOutputMint: true,
+        },
+        platformFeeBps: 20,
+        feeAccounts: new Map([
+          ['8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg', WALLET_ADDRESS]
+        ])
+      });
+    } else {
+      window.open('https://jup.ag/swap?sell=So11111111111111111111111111111111111111112&buy=8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg', '_blank');
+    }
   };
 
   const handleOpenRaydium = () => {
@@ -208,7 +226,7 @@ export default function TntHouse() {
     setTimeout(() => setSubmitted(false), 4000);
   };
 
-  // REAL AI Chat using our backend API route
+  // REAL AI Chat
   const handleSendChat = async (e) => {
     e.preventDefault();
     if (!userMsg.trim()) return;
@@ -483,22 +501,32 @@ export default function TntHouse() {
                 Твой токен пройдёт проверку нашими алгоритмами. Первые 3 токена — бесплатно! Для премиум-вывода нужно держать $MRDT.
               </p>
 
-              {/* Pricing Tiers */}
-              <div className="mt-4 space-y-3">
-                <div className="bg-slate-900/60 border border-purple-500/20 rounded-lg p-3">
-                  <div className="font-bold text-emerald-400 text-sm">Базовый ИИ-Аудит (до 24ч)</div>
-                  <div className="text-xs text-slate-300 mt-0.5">Эквивалент <span className="font-bold text-emerald-400">$10 в $MRDT</span> — ИИ сканирует контракт и заносит в общую базу.</div>
+              {/* NEW PRICING BLOCK */}
+              <div className="mt-6 border-t border-purple-500/20 pt-4 space-y-3">
+                <h4 className="text-sm font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400 flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-purple-400 animate-pulse" /> ТАРИФЫ И СТОИМОСТЬ:
+                </h4>
+                <div className="grid grid-cols-1 gap-2 text-xs font-mono">
+                  <div className="flex justify-between p-2.5 bg-purple-500/10 border border-purple-500/20 rounded-lg">
+                    <span className="text-slate-300">🎁 Первые 3 токена</span>
+                    <span className="text-emerald-400 font-bold">БЕСПЛАТНО</span>
+                  </div>
+                  <div className="flex justify-between p-2.5 bg-slate-900 border border-purple-500/10 rounded-lg">
+                    <span className="text-slate-300">🔍 Базовый ИИ-Аудит (Очередь 24ч)</span>
+                    <span className="text-emerald-400 font-bold">$10 в $MRDT</span>
+                  </div>
+                  <div className="flex justify-between p-2.5 bg-slate-900 border border-purple-500/10 rounded-lg">
+                    <span className="text-slate-300">⚡ Быстрый Листинг (За 5 минут)</span>
+                    <span className="text-emerald-400 font-bold">$40 в $MRDT</span>
+                  </div>
+                  <div className="flex justify-between p-2.5 bg-slate-900 border border-purple-500/10 rounded-lg">
+                    <span className="text-slate-300">👑 VIP-Буст (Баннер на главную 24ч)</span>
+                    <span className="text-emerald-400 font-bold">$120 в $MRDT</span>
+                  </div>
                 </div>
-                
-                <div className="bg-slate-900/60 border border-purple-500/20 rounded-lg p-3">
-                  <div className="font-bold text-emerald-400 text-sm">Быстрый Листинг (Fast-Track, 5 мин)</div>
-                  <div className="text-xs text-slate-300 mt-0.5">Эквивалент <span className="font-bold text-emerald-400">$40 в $MRDT</span> — приоритетная проверка + значок «Verified by AI».</div>
-                </div>
-
-                <div className="bg-slate-900/60 border border-purple-500/20 rounded-lg p-3">
-                  <div className="font-bold text-emerald-400 text-sm">VIP-Буст (Баннер на главной 24ч)</div>
-                  <div className="text-xs text-slate-300 mt-0.5">Эквивалент <span className="font-bold text-emerald-400">$120 в $MRDT</span> — максимальная видимость в самом верху сайта.</div>
-                </div>
+                <p className="text-[10px] text-slate-400 leading-relaxed font-mono">
+                  * Все собранные за услуги средства в $MRDT пересылаются на кошелек администратора: AZyzUySu6HP9ocJYhZECG5syycYNV6ubTQKyfB2mDWgG. Сборы распределяются: 50% сжигаются (Burn) навсегда, а 30% отправляются в пул наград TNT Whale Club (DAO)! 🧨🔥
+                </p>
               </div>
 
               <div className="space-y-2.5 text-xs text-slate-300 font-mono mt-4">
