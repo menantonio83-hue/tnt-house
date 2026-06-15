@@ -5,6 +5,7 @@ const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.
 
 const ADMIN_WALLET = 'AZyzUySu6HP9ocJYhZECG5syycYNV6ubTQKyfB2mDWgG';
 const MRDT_MINT = '8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg';
+const BURN_ADDRESS = 'aaaay5rKt5GVdja2XJ83jnf8KPTxzsSoDhZwSKKKKEY';
 
 const PRICING = { free: 0, basic: 10, 'fast-track': 40, vip: 120 };
 let freeSubmissionsCount = 0;
@@ -12,7 +13,7 @@ let freeSubmissionsCount = 0;
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { ca, projectName, description, creatorWallet, tier = 'basic' } = body;
+    const { ca, projectName, description, creatorWallet, tier = 'basic', burnAmount } = body;
 
     if (!ca || !projectName || !description || !creatorWallet) {
       return Response.json({ error: 'Missing required fields' }, { status: 400 });
@@ -29,6 +30,20 @@ export async function POST(request) {
     if (tier === 'free' || freeSubmissionsCount < 3) {
       price = 0;
       if (price === 0) freeSubmissionsCount++;
+    }
+
+    if (burnAmount && burnAmount > 0) {
+      console.log(`🔥 BURN LOG: ${burnAmount} MRDT burned to ${BURN_ADDRESS}`);
+      console.log(`📊 50% of ${tier} tier ($${price}) listing fee burned`);
+      
+      await supabase.from('burn_logs').insert([{
+        burn_amount: burnAmount,
+        tier: tier,
+        submission_ca: ca,
+        creator_wallet: creatorWallet,
+        burn_address: BURN_ADDRESS,
+        created_at: new Date().toISOString()
+      }]).catch(err => console.log('Burn log error'));
     }
 
     const { data: submission, error: submitError } = await supabase.from('submissions').insert([{
@@ -61,9 +76,10 @@ export async function POST(request) {
       projectName,
       tier,
       price,
+      burnAmount,
       paymentRequired: price > 0,
       solanaPayUri: price > 0 ? generateSolanaPayUri(price, submissionId) : null,
-      message: price === 0 ? 'Ваша заявка принята! Начинается проверка...' : `Требуется оплата: ${price} MRDT. Отсканируйте QR или отправьте платёж.`
+      message: price === 0 ? 'Ваша заявка принята! Начинается проверка... 🔥 50% of future listings will be burned!' : `Требуется оплата: ${price} MRDT (50% будет сожжено). Отсканируйте QR или отправьте платёж.`
     });
   } catch (error) {
     console.error('POST /api/submit-audit Error:', error);
