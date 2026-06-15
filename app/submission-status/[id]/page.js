@@ -19,7 +19,7 @@ export default function SubmissionStatus({ params }) {
 
   const fetchStatus = async () => {
     try {
-      const response = await fetch(`/api/submit-audit?submissionId=${params.id}`);
+      const response = await fetch(`/api/submit-audit/status?submissionId=${params.id}`);
       const data = await response.json();
       if (data.success) {
         setSubmission(data.submission);

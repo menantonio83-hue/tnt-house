@@ -27,7 +27,7 @@ export default function AdminPanel() {
   const fetchPendingTokens = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/admin');
+      const response = await fetch('/api/admin/pending');
       const data = await response.json();
       setPendingTokens(data.submissions || []);
     } catch (error) {
@@ -39,7 +39,7 @@ export default function AdminPanel() {
 
   const approveToken = async (submissionId, auditData) => {
     try {
-      const response = await fetch('/api/admin', {
+      const response = await fetch('/api/admin/approve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ submissionId, adminWallet: publicKey.toString(), auditData })
@@ -59,7 +59,7 @@ export default function AdminPanel() {
 
   const rejectToken = async (submissionId) => {
     try {
-      const response = await fetch('/api/admin', {
+      const response = await fetch('/api/admin/reject', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ submissionId, adminWallet: publicKey.toString(), reason: rejectionReason })
