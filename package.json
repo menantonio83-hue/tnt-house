@@ -18,7 +18,8 @@
     "@solana/wallet-adapter-react-ui": "^0.9.35",
     "@solana/wallet-adapter-wallets": "^0.19.32",
     "@supabase/supabase-js": "^2.45.0",
-    "lucide-react": "^0.378.0"
+    "lucide-react": "^0.378.0",
+    "pino-pretty": "^10.2.3"
   },
   "devDependencies": {
     "eslint": "^8.57.0",
