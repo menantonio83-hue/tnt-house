@@ -141,6 +141,38 @@ export default function Home() {
         </div>
       </header>
 
+      {/* === БОЛЬШОЙ РЕКЛАМНЫЙ БАННЕР (ДОБАВЛЕН) === */}
+      <div className="max-w-7xl mx-auto px-4 pt-8 pb-6">
+        <div className="bg-gradient-to-r from-yellow-900 via-amber-900 to-yellow-900 border-2 border-yellow-500 rounded-3xl p-8 text-center relative overflow-hidden">
+          <div className="absolute inset-0 bg-[radial-gradient(#eab308_1px,transparent_1px)] [background-size:25px_25px] opacity-20"></div>
+          
+          <span className="inline-block px-6 py-2 bg-yellow-500 text-black font-bold rounded-full text-sm mb-4">🌟 PREMIUM SPONSORED POSITION</span>
+          
+          <h2 className="text-4xl md:text-5xl font-black text-white mb-4">Хочешь свой токен на 1 месте в таблице?</h2>
+          <p className="text-xl text-yellow-200 mb-8 max-w-2xl mx-auto">
+            VIP баннер + закреплённая топ-позиция. Максимальная видимость для твоего проекта.
+          </p>
+
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <a 
+              href="https://jup.ag/swap?sell=So11111111111111111111111111111111111111112&buy=8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg" 
+              target="_blank" 
+              className="px-10 py-4 bg-gradient-to-r from-yellow-400 to-amber-500 text-black font-bold text-lg rounded-2xl hover:scale-105 transition-all"
+            >
+              1 День — $120 MRDT
+            </a>
+            <a 
+              href="https://jup.ag/swap?sell=So11111111111111111111111111111111111111112&buy=8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg" 
+              target="_blank" 
+              className="px-10 py-4 bg-gradient-to-r from-purple-500 to-cyan-500 text-black font-bold text-lg rounded-2xl hover:scale-105 transition-all"
+            >
+              7 Дней — $700 MRDT
+            </a>
+          </div>
+          <p className="text-yellow-300 text-sm mt-6">После оплаты напиши @Crypto_D10S для размещения</p>
+        </div>
+      </div>
+
       <main className="max-w-7xl mx-auto px-4 py-12">
         {showForm && (
           <div className="mb-12 p-6 rounded-xl border border-purple-500/50 bg-gradient-to-br from-purple-900/20 to-cyan-900/20 backdrop-blur-sm">
@@ -289,4 +321,4 @@ export default function Home() {
       `}</style>
     </div>
   );
-    }              
+}
