@@ -218,7 +218,7 @@ export default function Home() {
         </div>
       )}
 
-      <a href="https://jup.ag/swap/SOL-8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg" target="_blank" rel="noopener noreferrer" className="fixed bottom-8 right-8 px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-bold text-lg hover:from-emerald-400 hover:to-cyan-400 transition-all shadow-lg shadow-emerald-500/50 hover:shadow-emerald-500/70 z-40">💰 BUY $MRDT</a>
+      <a href="https://jup.ag/swap?sell=8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg&buy=So11111111111111111111111111111111111111112" target="_blank" rel="noopener noreferrer" className="fixed bottom-8 right-8 px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-bold text-lg hover:from-emerald-400 hover:to-cyan-400 transition-all shadow-lg shadow-emerald-500/50 hover:shadow-emerald-500/70 z-40">💰 BUY $MRDT</a>
 
       <style jsx global>{`
         @keyframes blob {
