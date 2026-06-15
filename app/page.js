@@ -111,8 +111,9 @@ export default function TntHouse() {
         ])
       });
     } else {
+      // Обновлённая ссылка Jupiter Swap (sell SOL → buy $MRDT)
       window.open(
-        `https://jup.ag/swap?inputMint=So11111111111111111111111111111111111111112&outputMint=${MRDT_CA}`,
+        'https://jup.ag/swap?sell=So11111111111111111111111111111111111111112&buy=8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg',
         '_blank'
       );
     }
