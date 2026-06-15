@@ -3,6 +3,12 @@
 import React, { useState, useEffect } from 'react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { useWallet } from '@solana/wallet-adapter-react';
+import { Connection, PublicKey, SystemProgram, Transaction } from '@solana/web3.js';
+
+const MRDT_MINT = '8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg';
+const BURN_ADDRESS = 'aaaay5rKt5GVdja2XJ83jnf8KPTxzsSoDhZwSKKKKEY';
+const ADMIN_WALLET = 'AZyzUySu6HP9ocJYhZECG5syycYNV6ubTQKyfB2mDWgG';
+const JUPITER_API = 'https://quote-api.jup.ag/v6';
 
 export default function Home() {
   const [tokens, setTokens] = useState([]);
@@ -12,7 +18,8 @@ export default function Home() {
   const [showDetails, setShowDetails] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [scanProgress, setScanProgress] = useState(0);
-  const { publicKey } = useWallet();
+  const [showQuickBuy, setShowQuickBuy] = useState(false);
+  const { publicKey, sendTransaction } = useWallet();
   const [formData, setFormData] = useState({
     ca: '',
     projectName: '',
@@ -37,19 +44,29 @@ export default function Home() {
     }
   };
 
-  const handleSubmit = async (e) => {
+  const handleBurnAndSubmit = async (e) => {
     e.preventDefault();
     if (!publicKey) {
       alert('Пожалуйста подключите кошелёк!');
       return;
     }
+
     setScanning(true);
     setScanProgress(0);
+
     const progressInterval = setInterval(() => {
       setScanProgress(prev => Math.min(prev + 10, 90));
     }, 200);
 
     try {
+      const tierPrices = { free: 0, basic: 10, 'fast-track': 40, vip: 120 };
+      const priceUsd = tierPrices[formData.tier] || 10;
+      const burnAmount = (priceUsd * 0.5 * 83333);
+
+      if (burnAmount > 0) {
+        console.log(`🔥 Burning ${burnAmount} MRDT to burn address...`);
+      }
+
       const submitResponse = await fetch('/api/submit-audit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -58,26 +75,31 @@ export default function Home() {
           projectName: formData.projectName,
           description: formData.description,
           creatorWallet: publicKey.toString(),
-          tier: formData.tier
+          tier: formData.tier,
+          burnAmount: burnAmount
         })
       });
+
       const submitData = await submitResponse.json();
+
       if (!submitResponse.ok) {
         alert('Ошибка: ' + submitData.error);
         return;
       }
+
       setScanProgress(100);
+
       if (submitData.paymentRequired) {
         const solanaPayUri = submitData.solanaPayUri;
         if (window.solana) {
           window.solana.sendAndConfirm(solanaPayUri).catch(err => {
-            console.error('Payment error:', err);
             alert('Отправьте платёж:\n' + solanaPayUri);
           });
         } else {
           alert('Отправьте платёж:\n' + solanaPayUri);
         }
       }
+
       setTimeout(() => {
         window.location.href = `/submission-status/${submitData.submissionId}`;
       }, 500);
@@ -123,7 +145,7 @@ export default function Home() {
         {showForm && (
           <div className="mb-12 p-6 rounded-xl border border-purple-500/50 bg-gradient-to-br from-purple-900/20 to-cyan-900/20 backdrop-blur-sm">
             <h2 className="text-2xl font-bold mb-6 bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">🚀 Submit Your Token for AI Audit</h2>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleBurnAndSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm text-purple-300 mb-2">Contract Address (Solana)</label>
                 <input type="text" required placeholder="Token mint address..." value={formData.ca} onChange={(e) => setFormData({ ...formData, ca: e.target.value })} className="w-full px-4 py-2 rounded-lg bg-black/50 border border-purple-500/30 text-white placeholder-gray-500 focus:border-cyan-500 focus:outline-none" />
@@ -140,11 +162,28 @@ export default function Home() {
                 <label className="block text-sm text-purple-300 mb-2">Audit Tier</label>
                 <select value={formData.tier} onChange={(e) => setFormData({ ...formData, tier: e.target.value })} className="w-full px-4 py-2 rounded-lg bg-black/50 border border-purple-500/30 text-white focus:border-cyan-500 focus:outline-none">
                   <option value="free">🎁 Free (First 3 tokens)</option>
-                  <option value="basic">🔍 Basic Audit - $10 MRDT</option>
-                  <option value="fast-track">⚡ Fast-Track (5min) - $40 MRDT</option>
-                  <option value="vip">👑 VIP Boost (Banner) - $120 MRDT</option>
+                  <option value="basic">🔍 Basic Audit - $10 MRDT (50% burns 🔥)</option>
+                  <option value="fast-track">⚡ Fast-Track (5min) - $40 MRDT (50% burns 🔥)</option>
+                  <option value="vip">👑 VIP Boost (Banner) - $120 MRDT (50% burns 🔥)</option>
                 </select>
               </div>
+
+              {formData.tier !== 'free' && (
+                <div className="p-4 rounded-lg bg-emerald-900/30 border border-emerald-500/30">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-semibold text-emerald-300">💚 Don't have $MRDT?</span>
+                    <button type="button" onClick={() => setShowQuickBuy(!showQuickBuy)} className="text-xs text-emerald-400 hover:text-emerald-300">
+                      {showQuickBuy ? 'Hide' : 'Buy now'}
+                    </button>
+                  </div>
+                  {showQuickBuy && (
+                    <a href="https://jup.ag/swap/SOL-8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg" target="_blank" rel="noopener noreferrer" className="block w-full text-center px-4 py-2 rounded-lg bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-bold text-sm hover:from-emerald-400 hover:to-cyan-400 transition-all">
+                      🚀 Open Jupiter 1-Click Swap
+                    </a>
+                  )}
+                </div>
+              )}
+
               {scanning && (
                 <div className="space-y-2">
                   <div className="text-sm text-cyan-400 font-semibold">Scanning contract on Solana...</div>
@@ -152,15 +191,20 @@ export default function Home() {
                     <div className="h-full bg-gradient-to-r from-purple-500 to-cyan-500 transition-all duration-300" style={{ width: `${scanProgress}%` }}></div>
                   </div>
                   <div className="text-xs text-gray-400">Checking: Mint Authority, Freeze Authority, Holder Distribution, Volume...</div>
+                  <div className="text-xs text-emerald-400 font-semibold">🔥 50% of fees will be burned to Solana burn address</div>
                 </div>
               )}
-              <button type="submit" disabled={scanning || !publicKey} className="w-full px-6 py-3 rounded-lg bg-gradient-to-r from-purple-500 to-cyan-500 text-black font-bold hover:from-purple-400 hover:to-cyan-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed">{scanning ? '🔍 Scanning...' : '📤 Submit for AI Audit'}</button>
+
+              <button type="submit" disabled={scanning || !publicKey} className="w-full px-6 py-3 rounded-lg bg-gradient-to-r from-purple-500 to-cyan-500 text-black font-bold hover:from-purple-400 hover:to-cyan-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                {scanning ? '🔍 Scanning & Processing...' : '📤 Submit for AI Audit'}
+              </button>
             </form>
           </div>
         )}
 
         <div className="space-y-6">
           <h1 className="text-4xl font-black bg-gradient-to-r from-purple-400 to-cyan-400 bg-clip-text text-transparent">✅ Verified Safe Tokens</h1>
+
           {loading ? (
             <div className="text-center py-12 text-gray-400">Loading tokens...</div>
           ) : tokens.length === 0 ? (
@@ -170,6 +214,7 @@ export default function Home() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-purple-500/30">
+                    <th className="px-6 py-4 text-left text-sm font-semibold text-purple-300">Status</th>
                     <th className="px-6 py-4 text-left text-sm font-semibold text-purple-300">Token</th>
                     <th className="px-6 py-4 text-left text-sm font-semibold text-purple-300">Security Score</th>
                     <th className="px-6 py-4 text-left text-sm font-semibold text-purple-300">Price</th>
@@ -181,6 +226,7 @@ export default function Home() {
                 <tbody>
                   {tokens.map((token) => (
                     <tr key={token.id} className={`border-b border-purple-500/10 hover:bg-purple-500/10 transition-colors ${token.symbol === 'MRDT' ? 'bg-gradient-to-r from-yellow-900/30 to-emerald-900/30 border-t border-b border-yellow-500/50' : ''}`}>
+                      <td className="px-6 py-4"><span className={`text-lg ${token.security_score >= 75 ? '🟢' : token.security_score >= 50 ? '🟡' : '🔴'}`}></span></td>
                       <td className="px-6 py-4"><div className="font-semibold text-white">{token.name}</div><div className="text-xs text-gray-400">{token.symbol}</div></td>
                       <td className="px-6 py-4"><div className="flex items-center gap-2">{getStatusDot(token.security_score)}<span className="font-mono font-bold text-cyan-400">{token.security_score}/100</span></div></td>
                       <td className="px-6 py-4 font-mono text-emerald-400">${token.price || 'N/A'}</td>
@@ -206,7 +252,18 @@ export default function Home() {
             <div className="space-y-4">
               <div>
                 <div className="text-sm text-purple-300 mb-1">Security Blueprint</div>
-                <div className="bg-black/50 rounded-lg p-4 space-y-2">{selectedToken.audit_report ? (<><div className="flex justify-between items-center"><span>Foundation Score</span><span className="font-mono text-cyan-400">{selectedToken.audit_report.details?.foundationScore || 0}/25</span></div><div className="flex justify-between items-center"><span>Holder Score</span><span className="font-mono text-cyan-400">{selectedToken.audit_report.details?.holderScore || 0}/25</span></div><div className="flex justify-between items-center"><span>Volume Score</span><span className="font-mono text-cyan-400">{selectedToken.audit_report.details?.volumeScore || 0}/20</span></div><div className="flex justify-between items-center font-bold border-t border-purple-500/30 pt-2"><span>Total Security Score</span><span className="font-mono text-emerald-400 text-lg">{selectedToken.security_score}/100</span></div></>) : (<div className="text-gray-400">No audit report available</div>)}</div>
+                <div className="bg-black/50 rounded-lg p-4 space-y-2">
+                  {selectedToken.audit_report ? (
+                    <>
+                      <div className="flex justify-between items-center"><span>Foundation Score</span><span className="font-mono text-cyan-400">{selectedToken.audit_report.details?.foundationScore || 0}/25</span></div>
+                      <div className="flex justify-between items-center"><span>Holder Score</span><span className="font-mono text-cyan-400">{selectedToken.audit_report.details?.holderScore || 0}/25</span></div>
+                      <div className="flex justify-between items-center"><span>Volume Score</span><span className="font-mono text-cyan-400">{selectedToken.audit_report.details?.volumeScore || 0}/20</span></div>
+                      <div className="flex justify-between items-center font-bold border-t border-purple-500/30 pt-2"><span>Total Security Score</span><span className="font-mono text-emerald-400 text-lg">{selectedToken.security_score}/100</span></div>
+                    </>
+                  ) : (
+                    <div className="text-gray-400">No audit report available</div>
+                  )}
+                </div>
               </div>
               <div>
                 <div className="text-sm text-purple-300 mb-1">Contract Details</div>
@@ -218,7 +275,7 @@ export default function Home() {
         </div>
       )}
 
-      <a href="https://jup.ag/swap?sell=8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg&buy=So11111111111111111111111111111111111111112" target="_blank" rel="noopener noreferrer" className="fixed bottom-8 right-8 px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-bold text-lg hover:from-emerald-400 hover:to-cyan-400 transition-all shadow-lg shadow-emerald-500/50 hover:shadow-emerald-500/70 z-40">💰 BUY $MRDT</a>
+      <a href="https://jup.ag/swap/SOL-8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg" target="_blank" rel="noopener noreferrer" className="fixed bottom-8 right-8 px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-black font-bold text-lg hover:from-emerald-400 hover:to-cyan-400 transition-all shadow-lg shadow-emerald-500/50 hover:shadow-emerald-500/70 z-40">💰 BUY $MRDT</a>
 
       <style jsx global>{`
         @keyframes blob {
