@@ -82,25 +82,6 @@ export default function TntHouse() {
     setTimeout(() => setSelectedToken(null), 300);
   };
 
-  // Load Jupiter script (оставляем, но не используем как основной способ)
-  useEffect(() => {
-    const script = document.createElement('script');
-    script.src = 'https://terminal.jup.ag/main-v3.js';
-    script.async = true;
-    document.head.appendChild(script);
-    return () => { if (document.head.contains(script)) document.head.removeChild(script); };
-  }, []);
-
-  // Jupiter теперь всегда открывает прямую ссылку (более стабильно)
-  const handleLaunchJupiter = () => {
-    // Прямая ссылка на Jupiter Swap (sell SOL → buy $MRDT)
-    // Это самый стабильный способ на данный момент
-    window.open(
-      'https://jup.ag/swap?sell=So11111111111111111111111111111111111111112&buy=8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg',
-      '_blank'
-    );
-  };
-
   const handleOpenRaydium = () => {
     setIsBuyDropdownOpen(false);
     window.open('https://raydium.io/liquidity/increase/?mode=add&pool_id=6cMTXZyCrnut7Lv39qt4dqEARbC2jbebvhzdCR1t2HEV', '_blank');
@@ -290,6 +271,9 @@ export default function TntHouse() {
     return `$${num.toFixed(0)}`;
   };
 
+  // Прямая ссылка на Jupiter (самый стабильный способ)
+  const jupiterSwapUrl = 'https://jup.ag/swap?sell=So11111111111111111111111111111111111111112&buy=8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg';
+
   return (
     <div className="min-h-screen bg-slate-950 text-white font-mono relative overflow-hidden pb-12">
       {/* Neon glows */}
@@ -334,9 +318,16 @@ export default function TntHouse() {
                 
                 {isBuyDropdownOpen && (
                   <div className="absolute right-0 mt-2 w-48 bg-slate-900 border border-purple-500/30 rounded-lg shadow-xl z-50 py-1 text-sm">
-                    <button onClick={handleLaunchJupiter} className="w-full text-left px-4 py-2.5 hover:bg-purple-500/10 text-emerald-400 flex items-center gap-2 text-sm">
+                    {/* Jupiter - прямая ссылка (самый стабильный способ) */}
+                    <a 
+                      href={jupiterSwapUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => setIsBuyDropdownOpen(false)}
+                      className="w-full text-left px-4 py-2.5 hover:bg-purple-500/10 text-emerald-400 flex items-center gap-2 text-sm block"
+                    >
                       <ExternalLink className="w-4 h-4" /> Jupiter Swap
-                    </button>
+                    </a>
                     <button onClick={handleOpenRaydium} className="w-full text-left px-4 py-2.5 hover:bg-purple-500/10 text-emerald-400 flex items-center gap-2 text-sm">
                       <ExternalLink className="w-4 h-4" /> Raydium
                     </button>
@@ -447,9 +438,15 @@ export default function TntHouse() {
                       </div>
                     </td>
                     <td className="p-2 text-right">
-                      <button onClick={(e) => { e.stopPropagation(); handleLaunchJupiter(); }} className="inline-flex items-center gap-1 text-[11px] text-emerald-400 hover:text-emerald-300 font-bold hover:underline">
+                      <a 
+                        href={jupiterSwapUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex items-center gap-1 text-[11px] text-emerald-400 hover:text-emerald-300 font-bold hover:underline"
+                      >
                         Купить <ExternalLink className="w-3 h-3" />
-                      </button>
+                      </a>
                     </td>
                   </tr>
 
