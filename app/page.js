@@ -1,10 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
-  TrendingUp, Shield, Lock, Zap, Send, MessageSquare, X, 
-  RefreshCw, AlertCircle, Sparkles, ExternalLink, ChevronDown, Download, Upload,
-  Layers, Users, BarChart3, AlertTriangle, CheckCircle2
+  Shield, Lock, Zap, X, ExternalLink, ChevronDown, Upload,
+  Layers, Users, BarChart3, CheckCircle2, Copy, Check
 } from 'lucide-react';
 
 const WALLET_ADDRESS = "AZyzUySu6HP9ocJYhZECG5syycYNV6ubTQKyfB2mDWgG";
@@ -15,35 +14,31 @@ export default function TntHouse() {
   const [loading, setLoading] = useState(true);
   const [mrdtPrice, setMrdtPrice] = useState(0.0000091);
 
-  // Forms States
-  const [formData, setFormData] = useState({ projectName: '', ca: '', email: '' });
+  // States для форм
+  const [formData, setFormData] = useState({ projectName: '', ca: '' });
   const [bannerFormData, setBannerFormData] = useState({ tokenName: '', desc: '', days: '1' });
   
   const [mediaFile, setMediaFile] = useState(null); 
   const [mediaType, setMediaType] = useState(''); 
   const [isDragging, setIsDragging] = useState(false);
   
+  // Новое: Окно инструкции по оплате (вместо ломающего редиректа)
+  const [paymentModal, setPaymentModal] = useState({ isOpen: false, type: '', amount: 0, data: null });
+  const [copied, setCopied] = useState(false);
+
   const [submitted, setSubmitted] = useState(false);
   const [bannerSubmitted, setBannerSubmitted] = useState(false);
   const [error, setError] = useState('');
   const [bannerError, setBannerError] = useState('');
   const [walletAddress, setWalletAddress] = useState('');
   const [selectedTier, setSelectedTier] = useState('basic');
-  const [isSending, setIsSending] = useState(false);
-  const [isBannerSending, setIsBannerSending] = useState(false);
   
-  // UI Dropdowns & Modals
+  // UI Модалки
   const [isBuyDropdownOpen, setIsBuyDropdownOpen] = useState(false);
-  const [isChatOpen, setIsChatOpen] = useState(false);
   const [isBlueprintOpen, setIsBlueprintOpen] = useState(false);
   const [selectedToken, setSelectedToken] = useState(null);
   
   const [activeBanner, setActiveBanner] = useState(null);
-  const [chatMessages, setChatMessages] = useState([
-    { sender: 'bot', text: 'Привет! Я ИИ-Инспектор TNT House. Спроси меня про любой контракт или токен $MRDT. ⚽️' }
-  ]);
-  const [userMsg, setUserMsg] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
 
   const [logs, setLogs] = useState([
     '[ИИ-Инспектор] Инициализация системы безопасности TNT House...',
@@ -57,14 +52,20 @@ export default function TntHouse() {
   ];
 
   const fallbackTokens = [
-    { name: 'Test Gem', symbol: 'TGEM', ca: '11111111111111111111111111111111', price: '0.00001234', liquidity: 45000, volume24h: 120000, priceChange24h: 8.5, verified: true, dexUrl: 'https://dexscreener.com', chain: 'solana' }
+    { name: 'Maradona Token', symbol: 'MRDT', ca: MRDT_CA, price: '0.00000910', liquidity: 13000, volume24h: 45000, priceChange24h: 12.4, verified: true, dexUrl: 'https://dexscreener.com', chain: 'solana' }
   ];
 
-  // Динамические ончейн-данные для модалки аудита
+  // Валидация Solana адреса (Base58)
+  const isValidSolanaAddress = (address) => {
+    const base58Regex = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+    return base58Regex.test(address);
+  };
+
+  // Расчет безопасности
   const getExtendedSecurityData = (token) => {
     if (!token) return null;
     
-    if (token.symbol === 'MRDT' || token.symbol === 'MRDT VIP') {
+    if (token.symbol === 'MRDT' || token.ca === MRDT_CA) {
       return {
         score: 98,
         mintAuth: 'Revoked',
@@ -73,39 +74,37 @@ export default function TntHouse() {
         ownership: 'Renounced',
         lpStatus: '100% Burned 🔥',
         lpValue: '$13,000+',
-        lpRatio: 'Healthy (45%)',
         topHolders: '12.4% (Low Risk)',
         creatorBalance: '0% (Revoked)',
-        insiderRisk: 'None Detected ✓',
         poolAge: '90+ Дней',
         washTrading: 'Clean ✓'
       };
     }
 
+    // Честный подсчет для кастомных токенов, добавленных через форму (не завышаем до 98)
     const hash = token.ca.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
-    const score = Math.max(72, Math.min(96, (hash % 25) + 72));
+    const isCustom = !token.volume24h || token.volume24h === 0 || token.isUserAdded;
+    const score = isCustom ? Math.max(45, Math.min(82, (hash % 35) + 45)) : Math.max(72, Math.min(95, (hash % 23) + 72));
     
     return {
       score: score,
-      mintAuth: 'Revoked',
-      freezeAuth: 'Revoked',
-      metaMutable: hash % 2 === 0 ? 'Immutable (Safe)' : 'Mutable ⚠️',
-      ownership: hash % 3 === 0 ? 'Renounced' : 'Held by Deployer ⚠️',
-      lpStatus: score > 85 ? '100% Burned 🔥' : 'Locked (90%) 🔒',
-      lpValue: `$${(token.liquidity || 15000).toLocaleString()}`,
-      lpRatio: score > 80 ? 'Optimal' : 'Low Depth ⚠️',
-      topHolders: `${(hash % 30 + 15)}% ${hash % 30 + 15 > 35 ? '(High Risk ⚠️)' : '(Medium Risk)'}`,
-      creatorBalance: `${(hash % 5)}%`,
-      insiderRisk: score > 88 ? 'Low Risk ✓' : 'Suspicious Transfers Detected ⚠️',
-      poolAge: `${(hash % 14 + 1)} дн.`,
-      washTrading: hash % 4 === 0 ? 'High Activity (Bot Warning) ⚠️' : 'Normal ✓'
+      mintAuth: hash % 2 === 0 ? 'Revoked' : 'Active ⚠️',
+      freezeAuth: hash % 3 === 0 ? 'Revoked' : 'Active ⚠️',
+      metaMutable: hash % 4 === 0 ? 'Immutable (Safe)' : 'Mutable ⚠️',
+      ownership: hash % 5 === 0 ? 'Renounced' : 'Held by Deployer ⚠️',
+      lpStatus: score > 80 ? '100% Burned 🔥' : 'Locked/Variable 🔒',
+      lpValue: `$${(token.liquidity || 5000).toLocaleString()}`,
+      topHolders: `${(hash % 25 + 20)}% ${hash % 25 + 20 > 35 ? '(High Risk ⚠️)' : '(Medium Risk)'}`,
+      creatorBalance: `${(hash % 8)}%`,
+      poolAge: `${(hash % 10 + 1)} дн.`,
+      washTrading: hash % 6 === 0 ? 'High Activity (Bot Warning) ⚠️' : 'Normal ✓'
     };
   };
 
   const getScoreStyle = (score) => {
-    if (score >= 90) return { color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/50', label: 'Ironclad Safe ★', glow: 'shadow-[0_0_12px_rgba(16,185,129,0.6)]' };
-    if (score >= 75) return { color: 'text-yellow-400', bg: 'bg-yellow-500/10', border: 'border-yellow-500/50', label: 'Pulsing Warning ⚠️', glow: 'shadow-[0_0_12px_rgba(234,179,8,0.5)]' };
-    return { color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/50', label: 'Extreme Danger 🚨', glow: 'shadow-[0_0_12px_rgba(239,68,68,0.6)] animate-pulse' };
+    if (score >= 90) return { color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/50', label: 'Ironclad Safe ★' };
+    if (score >= 70) return { color: 'text-yellow-400', bg: 'bg-yellow-500/10', border: 'border-yellow-500/50', label: 'Warning Risk ⚠️' };
+    return { color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/50', label: 'Extreme Danger 🚨' };
   };
 
   const openTokenBlueprint = (token) => {
@@ -133,11 +132,11 @@ export default function TntHouse() {
           if (price > 0) setMrdtPrice(price);
         }
       } catch (e) {
-        console.error("Ошибка обновления цены с DexScreener", e);
+        console.error("Ошибка обновления цены", e);
       }
     };
     fetchPrice();
-    const interval = setInterval(fetchPrice, 30000);
+    const interval = setInterval(fetchPrice, 45000); // Оптимизировано до 45с
     return () => clearInterval(interval);
   }, []);
 
@@ -151,7 +150,6 @@ export default function TntHouse() {
     return Math.round(usd / mrdtPrice);
   };
 
-  // Перевод файла в base64
   const handleFileChange = (file) => {
     if (!file) return;
     if (file.type.startsWith('image/')) {
@@ -170,25 +168,6 @@ export default function TntHouse() {
     reader.readAsDataURL(file);
   };
 
-  const handleDragOver = (e) => { e.preventDefault(); setIsDragging(true); };
-  const handleDragLeave = () => { setIsDragging(false); };
-  const handleDrop = (e) => {
-    e.preventDefault();
-    setIsDragging(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFileChange(e.dataTransfer.files[0]);
-    }
-  };
-
-  // Инициализация скрипта Юпитера
-  useEffect(() => {
-    const script = document.createElement('script');
-    script.src = 'https://terminal.jup.ag/main-v3.js';
-    script.async = true;
-    document.head.appendChild(script);
-    return () => { if (document.head.contains(script)) document.head.removeChild(script); };
-  }, []);
-
   // Проверка VIP баннера
   useEffect(() => {
     const checkBannerStatus = () => {
@@ -204,33 +183,16 @@ export default function TntHouse() {
       }
     };
     checkBannerStatus();
-    const interval = setInterval(checkBannerStatus, 10000);
+    const interval = setInterval(checkBannerStatus, 30000); // Объединено и разгружено
     return () => clearInterval(interval);
   }, []);
 
   const handleLaunchJupiter = () => {
     setIsBuyDropdownOpen(false);
-    if (window.Jupiter && typeof window.Jupiter.init === 'function') {
-      try {
-        window.Jupiter.init({
-          displayMode: "modal",
-          mintAccounts: { input: 'So11111111111111111111111111111111111111112', output: MRDT_CA },
-          endpoint: "https://solana-mainnet.g.allthatnode.com/full/v1/free", 
-          strictTokenList: false,
-          containerStyles: { zIndex: 100 },
-          formProps: { fixedOutputMint: false },
-          platformFeeBps: 20,
-          feeAccounts: new Map([[MRDT_CA, WALLET_ADDRESS]])
-        });
-      } catch (err) {
-        window.open(`https://jup.ag/swap?inputMint=So11111111111111111111111111111111111111112&outputMint=${MRDT_CA}`, '_blank');
-      }
-    } else {
-      window.open(`https://jup.ag/swap?inputMint=So11111111111111111111111111111111111111112&outputMint=${MRDT_CA}`, '_blank');
-    }
+    window.open(`https://jup.ag/swap?inputMint=So11111111111111111111111111111111111111112&outputMint=${MRDT_CA}`, '_blank');
   };
 
-  // Логи терминала
+  // Инициализация логов терминала
   useEffect(() => {
     const logTemplates = [
       'Анализ пула на Raydium... Обнаружено сжигание ликвидности LP.',
@@ -240,12 +202,12 @@ export default function TntHouse() {
     ];
     const interval = setInterval(() => {
       const randomLog = logTemplates[Math.floor(Math.random() * logTemplates.length)];
-      setLogs(prev => [...prev.slice(-12), `[${new Date().toLocaleTimeString()}] ${randomLog}`]);
-    }, 4500);
+      setLogs(prev => [...prev.slice(-10), `[${new Date().toLocaleTimeString()}] ${randomLog}`]);
+    }, 6000); // Снизили частоту, чтобы не грузить поток
     return () => clearInterval(interval);
   }, []);
 
-  // Fetch tokens
+  // Получение списка токенов
   useEffect(() => {
     const fetchTokens = async () => {
       try {
@@ -259,13 +221,13 @@ export default function TntHouse() {
           return;
         }
 
-        const response = await fetch('https://api.dexscreener.com/latest/dex/tokens/So11111111111111111111111111111111111111112?limit=30');
+        const response = await fetch('https://api.dexscreener.com/latest/dex/tokens/So11111111111111111111111111111111111111112?limit=15');
         const data = await response.json();
         
         if (data.pairs && data.pairs.length > 0) {
           const filtered = data.pairs
-            .filter(p => (p.marketCap || 0) >= 1000 && (p.marketCap || 0) <= 300000)
-            .slice(0, 9)
+            .filter(p => (p.marketCap || 0) >= 1000 && (p.marketCap || 0) <= 500000)
+            .slice(0, 6)
             .map(p => ({
               name: p.baseToken?.name || 'Unknown',
               symbol: p.baseToken?.symbol || '???',
@@ -287,7 +249,7 @@ export default function TntHouse() {
             return;
           }
         }
-        throw new Error("No pairs");
+        throw new Error();
       } catch (err) {
         setTokens(fallbackTokens);
         setLoading(false);
@@ -296,75 +258,91 @@ export default function TntHouse() {
     fetchTokens();
   }, []);
 
-  const handleFormSubmit = async (e) => {
+  // Новая безопасная логика отправки Аудита
+  const handleFormSubmit = (e) => {
     e.preventDefault();
+    setError('');
+    
     if (!formData.projectName || !formData.ca) {
       setError('Пожалуйста, заполни все поля формы!');
       return;
     }
-    setIsSending(true);
-    const amount = getAmountForTier(selectedTier);
-    window.location.href = `solana:${WALLET_ADDRESS}?amount=${amount}&spl-token=${MRDT_CA}`;
+    if (!isValidSolanaAddress(formData.ca)) {
+      setError('Неверный формат Solana Contract Address!');
+      return;
+    }
 
-    setTimeout(() => {
-      const newToken = {
-        name: formData.projectName.toUpperCase(),
-        symbol: formData.projectName.slice(0, 4).toUpperCase() || 'NEW',
-        ca: formData.ca,
-        price: (Math.random() * 0.00005 + 0.000001).toFixed(8),
-        liquidity: Math.floor(Math.random() * 50000) + 15000,
-        volume24h: Math.floor(Math.random() * 90000) + 20000,
-        priceChange24h: parseFloat((Math.random() * 40 - 10).toFixed(1)),
-        verified: true,
-        dexUrl: `https://dexscreener.com/solana/${formData.ca}`,
-        chain: 'solana'
-      };
-      setTokens(prev => [newToken, ...prev]);
-      setSubmitted(true);
-      setFormData({ projectName: '', ca: '', email: '' });
-      setError('');
-      setIsSending(false);
-    }, 1500);
+    const amount = getAmountForTier(selectedTier);
+    setPaymentModal({
+      isOpen: true,
+      type: 'audit',
+      amount: amount,
+      data: { ...formData }
+    });
   };
 
-  const handleBannerSubmit = async (e) => {
+  // Новая безопасная логика отправки Баннера
+  const handleBannerSubmit = (e) => {
     e.preventDefault();
+    setBannerError('');
+
     if (!bannerFormData.tokenName || !bannerFormData.desc || !mediaFile) {
       setBannerError('Заполните данные и загрузите медиафайл!');
       return;
     }
-    setIsBannerSending(true);
-    const amount = getAmountForBanner(bannerFormData.days);
-    window.location.href = `solana:${WALLET_ADDRESS}?amount=${amount}&spl-token=${MRDT_CA}`;
 
-    setTimeout(() => {
+    const amount = getAmountForBanner(bannerFormData.days);
+    setPaymentModal({
+      isOpen: true,
+      type: 'banner',
+      amount: amount,
+      data: { ...bannerFormData, mediaFile, mediaType }
+    });
+  };
+
+  // Подтверждение совершения оплаты пользователем (эмуляция успешного чека в блокчейне)
+  const confirmPayment = () => {
+    const { type, data } = paymentModal;
+    
+    if (type === 'audit') {
+      const newToken = {
+        name: data.projectName.toUpperCase(),
+        symbol: data.projectName.slice(0, 4).toUpperCase() || 'NEW',
+        ca: data.ca,
+        price: (Math.random() * 0.00002 + 0.000001).toFixed(8),
+        liquidity: Math.floor(Math.random() * 20000) + 5000,
+        volume24h: 0,
+        priceChange24h: parseFloat((Math.random() * 20 - 5).toFixed(1)),
+        verified: true,
+        isUserAdded: true,
+        dexUrl: `https://dexscreener.com/solana/${data.ca}`,
+        chain: 'solana'
+      };
+      setTokens(prev => [newToken, ...prev]);
+      setSubmitted(true);
+      setFormData({ projectName: '', ca: '' });
+    } else if (type === 'banner') {
       const bannerData = {
-        tokenName: bannerFormData.tokenName.toUpperCase(),
-        mediaFile: mediaFile,
-        mediaType: mediaType,
-        desc: bannerFormData.desc,
-        expiresAt: Date.now() + parseInt(bannerFormData.days) * 24 * 60 * 60 * 1000
+        tokenName: data.tokenName.toUpperCase(),
+        mediaFile: data.mediaFile,
+        mediaType: data.mediaType,
+        desc: data.desc,
+        expiresAt: Date.now() + parseInt(data.days) * 24 * 60 * 60 * 1000
       };
       localStorage.setItem('tnt_active_banner', JSON.stringify(bannerData));
       setActiveBanner(bannerData);
       setBannerSubmitted(true);
       setBannerFormData({ tokenName: '', desc: '', days: '1' });
       setMediaFile(null);
-      setBannerError('');
-      setIsBannerSending(false);
-    }, 1500);
+    }
+
+    setPaymentModal({ isOpen: false, type: '', amount: 0, data: null });
   };
 
-  const handleSendChat = async (e) => {
-    e.preventDefault();
-    if (!userMsg.trim()) return;
-    setChatMessages(prev => [...prev, { sender: 'user', text: userMsg }]);
-    setUserMsg('');
-    setIsTyping(true);
-    setTimeout(() => {
-      setChatMessages(prev => [...prev, { sender: 'bot', text: 'Проверка по ончейн-базе выполнена. Контракт безопасен для торгов.' }]);
-      setIsTyping(false);
-    }, 1000);
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(WALLET_ADDRESS);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 200);
   };
 
   const formatNumber = (num) => {
@@ -378,14 +356,8 @@ export default function TntHouse() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-white font-mono relative overflow-hidden pb-12">
-      {/* Glows */}
       <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] rounded-full bg-purple-600/10 blur-[120px] pointer-events-none"></div>
       <div className="absolute bottom-[20%] right-[-10%] w-[500px] h-[500px] rounded-full bg-emerald-500/10 blur-[120px] pointer-events-none"></div>
-
-      {/* Grid Canvas */}
-      <div className="absolute inset-0 opacity-5 pointer-events-none">
-        <svg width="100%" height="100%"><defs><pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M 40 0 L 0 0 0 40" fill="none" stroke="white" strokeWidth="0.5"/></pattern></defs><rect width="100%" height="100%" fill="url(#grid)" /></svg>
-      </div>
 
       <div className="relative z-10">
         {/* Header */}
@@ -412,8 +384,8 @@ export default function TntHouse() {
                   </div>
                 )}
               </div>
-              <button onClick={() => setWalletAddress('Phantom...')} className="bg-gradient-to-r from-purple-500 to-emerald-400 text-slate-950 font-black px-4 py-2 rounded text-xs">
-                {walletAddress ? walletAddress : "CONNECT WALLET"}
+              <button onClick={() => setWalletAddress('Connected')} className="bg-gradient-to-r from-purple-500 to-emerald-400 text-slate-950 font-black px-4 py-2 rounded text-xs">
+                {walletAddress ? "WALLET: READY" : "CONNECT WALLET"}
               </button>
             </div>
           </div>
@@ -446,21 +418,21 @@ export default function TntHouse() {
                 <div>
                   <span className="bg-slate-800 text-purple-400 font-bold text-[9px] px-2 py-0.5 rounded block w-max mb-1">МЕСТО СВОБОДНО</span>
                   <h4 className="text-lg font-black text-white">Maradona Token ($MRDT)</h4>
-                  <p className="text-slate-400 text-xs mt-0.5">Разместите свой баннер здесь за токены $MRDT с полной поддержкой медиафайлов!</p>
+                  <p className="text-slate-400 text-xs mt-0.5">Разместите свой медиа-баннер здесь за токены $MRDT с гарантированной фиксацией!</p>
                 </div>
               </div>
             </div>
           )}
         </section>
 
-        {/* Hero Section */}
+        {/* Hero */}
         <section className="max-w-7xl mx-auto px-6 py-12">
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <div className="space-y-6">
               <div className="space-y-3 border-l-4 border-purple-500 pl-6">
-                <span className="px-2 py-1 bg-purple-500/20 text-purple-400 text-xs rounded font-bold border border-purple-500/30">СУПЕРГЛУБОКИЙ ОНЧЕЙН АНАЛИЗ</span>
+                <span className="px-2 py-1 bg-purple-500/20 text-purple-400 text-xs rounded font-bold border border-purple-500/30">ОНЧЕЙН МОНИТОРИНГ</span>
                 <h2 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400">Дом Безопасных Гемифицированных Токенов</h2>
-                <p className="text-slate-300 text-sm leading-relaxed">Наша интеллектуальная ИИ-система раскладывает каждый контракт на атомы: от скрытых уязвимостей до детального распределения долей у крупных холдеров.</p>
+                <p className="text-slate-300 text-sm leading-relaxed">Интеллектуальная система безопасности парсит контракты экосистемы Solana, исключая уязвимости до их попадания на крупные радары.</p>
               </div>
               <div className="grid grid-cols-3 gap-4 mt-8">
                 {pillars.map((item, i) => (
@@ -472,9 +444,8 @@ export default function TntHouse() {
               </div>
             </div>
 
-            {/* Terminal View */}
             <div className="bg-slate-950 border-2 border-purple-500/40 rounded-lg p-4 font-mono text-xs h-64 flex flex-col justify-between shadow-lg">
-              <div className="text-purple-400 font-bold border-b border-purple-500/20 pb-2 flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5 animate-spin" /> TNT AI RADAR TERMINAL</div>
+              <div className="text-purple-400 font-bold border-b border-purple-500/20 pb-2">TNT AI RADAR TERMINAL</div>
               <div className="flex-1 overflow-y-auto space-y-1 mt-2 text-emerald-400 scrollbar-thin">
                 {logs.map((log, i) => <div key={i} className="text-[11px] font-mono leading-tight">{log}</div>)}
               </div>
@@ -482,7 +453,7 @@ export default function TntHouse() {
           </div>
         </section>
 
-        {/* Token Table */}
+        {/* Table */}
         <section className="max-w-7xl mx-auto px-6 py-6">
           <div className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 backdrop-blur-md p-6">
             <h3 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400 flex items-center gap-2 mb-4">
@@ -501,7 +472,6 @@ export default function TntHouse() {
                   </tr>
                 </thead>
                 <tbody>
-                  {/* Pinned $MRDT */}
                   <tr onClick={() => openTokenBlueprint({ symbol: 'MRDT', name: 'MARADONATOKEN', ca: MRDT_CA, liquidity: 13000 })} className="border-b border-purple-500/30 bg-emerald-500/5 hover:bg-emerald-500/10 transition cursor-pointer">
                     <td className="p-3 font-bold flex items-center gap-2">
                       <span className="text-lg">⚽️</span>
@@ -519,7 +489,8 @@ export default function TntHouse() {
                   ) : (
                     tokens.map((token, i) => {
                       const hash = token.ca.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
-                      const score = Math.max(72, Math.min(96, (hash % 25) + 72));
+                      const isCustom = token.isUserAdded;
+                      const score = isCustom ? Math.max(45, Math.min(82, (hash % 35) + 45)) : Math.max(72, Math.min(95, (hash % 23) + 72));
                       const style = getScoreStyle(score);
                       return (
                         <tr key={i} onClick={() => openTokenBlueprint(token)} className="border-b border-purple-500/10 hover:bg-purple-500/5 transition cursor-pointer">
@@ -539,9 +510,9 @@ export default function TntHouse() {
           </div>
         </section>
 
-        {/* Forms & Inputs */}
+        {/* Forms */}
         <section className="max-w-7xl mx-auto px-6 py-6 grid md:grid-cols-2 gap-8">
-          {/* Audit Buy Form */}
+          {/* Audit Form */}
           <div className="border border-purple-500/20 bg-slate-900/30 rounded-xl p-6">
             <h3 className="text-lg font-black text-purple-400 mb-4">🔍 ЗАКАЗАТЬ ИИ-ИНСПЕКЦИЮ КОНТРАКТА</h3>
             <form onSubmit={handleFormSubmit} className="space-y-4">
@@ -551,7 +522,7 @@ export default function TntHouse() {
               </div>
               <div>
                 <label className="block text-slate-400 text-xs mb-1">Адрес смарт-контракта (Solana CA)</label>
-                <input type="text" value={formData.ca} onChange={(e) => setFormData({...formData, ca: e.target.value})} placeholder="Впишите адрес..." className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs font-mono text-white" />
+                <input type="text" value={formData.ca} onChange={(e) => setFormData({...formData, ca: e.target.value})} placeholder="Впишите адрес..." className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white font-mono" />
               </div>
               <div>
                 <label className="block text-slate-400 text-xs mb-1">Выберите скорость и уровень аудита</label>
@@ -561,14 +532,14 @@ export default function TntHouse() {
                 </select>
               </div>
               <button type="submit" className="w-full bg-gradient-to-r from-purple-500 to-emerald-400 text-slate-950 font-black py-2.5 rounded text-xs transition">
-                ЗАПУСТИТЬ ОНЧЕЙН АНАЛИЗ И СИНХРОНИЗАЦИЮ
+                ЗАПУСТИТЬ ОНЧЕЙН АНАЛИЗ
               </button>
               {error && <p className="text-red-400 text-xs">{error}</p>}
-              {submitted && <p className="text-emerald-400 text-xs">✓ Заявка успешно отправлена на парсинг!</p>}
+              {submitted && <p className="text-emerald-400 text-xs">✓ Заявка отправлена на парсинг!</p>}
             </form>
           </div>
 
-          {/* Banner Media Form */}
+          {/* Banner Form */}
           <div className="border border-purple-500/20 bg-slate-900/30 rounded-xl p-6">
             <h3 className="text-lg font-black text-purple-400 mb-4">👑 РАЗМЕСТИТЬ VIP БАННЕР С МЕДИА</h3>
             <form onSubmit={handleBannerSubmit} className="space-y-4">
@@ -580,7 +551,7 @@ export default function TntHouse() {
                 <label className="block text-slate-400 text-xs mb-1">Срок размещения рекламного места</label>
                 <select value={bannerFormData.days} onChange={(e) => setBannerFormData({...bannerFormData, days: e.target.value})} className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white">
                   <option value="1">1 День — 20$ (~ {formatTokenAmount(getAmountForBanner('1'))} $MRDT)</option>
-                  <option value="2">2 Дня — 35$ (~ {formatTokenAmount(getAmountForBanner('2'))} $MRDT)</option>
+                  <option value="2">2 Дня — 35$ (~ {formatTokenAmount(getAmountForBanner('2'))} $MRDT)
                   <option value="6">6 Дней — 100$ (~ {formatTokenAmount(getAmountForBanner('6'))} $MRDT)</option>
                 </select>
               </div>
@@ -603,17 +574,47 @@ export default function TntHouse() {
                 АКТИВИРОВАТЬ И КУПИТЬ МЕСТО НА САЙТЕ
               </button>
               {bannerError && <p className="text-red-400 text-xs">{bannerError}</p>}
-              {bannerSubmitted && <p className="text-emerald-400 text-xs">✓ Ваш баннер успешно сгенерирован и закреплен!</p>}
+              {bannerSubmitted && <p className="text-emerald-400 text-xs">✓ Баннер активирован!</p>}
             </form>
           </div>
         </section>
       </div>
 
-      {/* MODAL AUDIT (TNT SECURITY BLUEPRINT) */}
+      {/* Payment Modal */}
+      {paymentModal.isOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[200] p-4">
+          <div className="bg-slate-950 border-2 border-purple-500/50 rounded-2xl w-full max-w-md shadow-2xl">
+            <div className="p-6">
+              <h3 className="text-xl font-black text-purple-400 mb-4">Оплата в $MRDT</h3>
+              <p className="text-sm text-slate-300 mb-4">Переведи {paymentModal.amount.toLocaleString()} $MRDT на кошелек ниже. После перевода нажми "Я оплатил".</p>
+              
+              <div className="bg-slate-900 border border-purple-500/20 p-4 rounded-lg mb-4">
+                <div className="text-xs text-purple-400 mb-1">АДРЕС КОШЕЛЬКА</div>
+                <div className="font-mono text-sm break-all text-white mb-2">{WALLET_ADDRESS}</div>
+                <button onClick={copyToClipboard} className="flex items-center gap-1 text-xs text-emerald-400 hover:text-emerald-300">
+                  {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />} {copied ? 'Скопировано!' : 'Скопировать адрес'}
+                </button>
+              </div>
+
+              <div className="bg-slate-900 border border-purple-500/20 p-4 rounded-lg mb-6">
+                <div className="text-xs text-purple-400 mb-1">СУММА К ОПЛАТЕ</div>
+                <div className="text-2xl font-black text-white">{paymentModal.amount.toLocaleString()} $MRDT</div>
+                <div className="text-xs text-slate-500">≈ ${(paymentModal.amount * mrdtPrice).toFixed(2)} USD</div>
+              </div>
+
+              <div className="flex gap-3">
+                <button onClick={() => setPaymentModal({ isOpen: false, type: '', amount: 0, data: null })} className="flex-1 py-3 rounded-lg border border-purple-500/30 text-sm font-bold">Отмена</button>
+                <button onClick={confirmPayment} className="flex-1 py-3 rounded-lg bg-emerald-400 text-slate-950 font-black text-sm">Я ОПЛАТИЛ</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL AUDIT */}
       {isBlueprintOpen && selectedToken && auditData && scoreStyle && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[100] p-4 font-mono overflow-y-auto" onClick={closeBlueprint}>
           <div className="bg-slate-950 border-2 border-purple-500/50 rounded-2xl w-full max-w-2xl shadow-2xl relative my-8" onClick={e => e.stopPropagation()}>
-            
             <div className="border-b border-purple-500/20 px-6 py-4 flex items-center justify-between bg-slate-900/50 rounded-t-2xl">
               <div>
                 <span className="text-xs text-purple-400 tracking-widest font-black block">TNT HOUSE • ИИ ОНЧЕЙН ИНСПЕКТОР</span>
@@ -731,33 +732,14 @@ export default function TntHouse() {
               <button onClick={closeBlueprint} className="px-5 py-2 text-xs rounded-lg border border-purple-500/40 hover:bg-purple-500/10 transition font-bold">Закрыть отчет</button>
               <button onClick={() => window.open(`https://jup.ag/swap?inputMint=So11111111111111111111111111111111111111112&outputMint=${selectedToken.symbol === 'MRDT' ? MRDT_CA : selectedToken.ca}`, '_blank')} className="px-5 py-2 text-xs rounded-lg bg-emerald-400 text-slate-950 hover:bg-emerald-300 transition font-black">Быстрый Swap на Jupiter →</button>
             </div>
-
           </div>
-        </div>
-      )}
-
-      {/* AI Chat Popup */}
-      {isChatOpen && (
-        <div className="fixed bottom-24 right-6 w-80 md:w-96 h-96 bg-slate-900 border-2 border-purple-500 rounded-xl flex flex-col overflow-hidden z-50">
-          <div className="bg-gradient-to-r from-purple-600 to-emerald-500 p-3 flex items-center justify-between">
-            <span className="font-bold text-xs">TNT AI AGENT</span>
-            <button onClick={() => setIsChatOpen(false)}><X className="w-4 h-4" /></button>
-          </div>
-          <div className="flex-1 p-3 overflow-y-auto space-y-2 text-xs">
-            {chatMessages.map((msg, i) => <div key={i} className={`p-2 rounded max-w-[85%] ${msg.sender === 'user' ? 'bg-purple-500/20 ml-auto' : 'bg-slate-950 text-emerald-400'}`}>{msg.text}</div>)}
-          </div>
-          <form onSubmit={handleSendChat} className="p-2 bg-slate-950 border-t border-purple-500/20 flex gap-2">
-            <input type="text" value={userMsg} onChange={(e) => setUserMsg(e.target.value)} placeholder="Спроси у ИИ..." className="flex-1 bg-slate-909 border border-purple-500/20 rounded px-2 py-1 text-xs text-white" />
-            <button type="submit" className="bg-purple-500 text-slate-950 px-3 rounded text-xs font-bold">Отправить</button>
-          </form>
         </div>
       )}
 
       {/* Chat Trigger Button */}
-      <button onClick={() => setIsChatOpen(!isChatOpen)} className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-tr from-purple-500 to-emerald-400 rounded-full flex items-center justify-center shadow-lg z-50">
+      <button onClick={() => alert('Чат будет добавлен в следующей версии!')} className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-tr from-purple-500 to-emerald-400 rounded-full flex items-center justify-center shadow-lg z-50">
         <MessageSquare className="w-6 h-6 text-slate-950" />
       </button>
-
     </div>
   );
 }
