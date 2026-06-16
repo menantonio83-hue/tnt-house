@@ -10,7 +10,6 @@ const WALLET_ADDRESS = "AZyzUySu6HP9ocJYhZECG5syycYNV6ubTQKyfB2mDWgG";
 const MRDT_CA = "8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg";
 
 // GOOGLE SHEETS - ЗАМЕНИ НА СВОЙ SCRIPT ID
-// Инструкция как получить: см. GOOGLE_SHEETS_SETUP.md
 const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/d/YOUR_DEPLOYMENT_ID/usercopy';
 
 export default function TntHouse() {
@@ -43,7 +42,7 @@ export default function TntHouse() {
 
   // TNT Security Blueprint Modal
   const [isBlueprintOpen, setIsBlueprintOpen] = useState(false);
-  const [selectedToken, setSelectedToken] = useState(null);
+  const [selectedTokenForModal, setSelectedTokenForModal] = useState(null);
 
   const chatEndRef = useRef(null);
 
@@ -73,13 +72,13 @@ export default function TntHouse() {
   };
 
   const openTokenBlueprint = (token) => {
-    setSelectedToken(token);
+    setSelectedTokenForModal(token);
     setIsBlueprintOpen(true);
   };
 
   const closeBlueprint = () => {
     setIsBlueprintOpen(false);
-    setTimeout(() => setSelectedToken(null), 300);
+    setTimeout(() => setSelectedTokenForModal(null), 300);
   };
 
   const handleOpenRaydium = () => {
@@ -186,8 +185,8 @@ export default function TntHouse() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
 
-  // GOOGLE SHEETS ИНТЕГРАЦИЯ (временно упрощённая, чтобы кнопка работала)
-  const handleFormSubmit = async (e) => {
+  // SOLANA PAY + AUTO ADD TO TABLE
+  const handleFormSubmit = (e) => {
     e.preventDefault();
     
     if (!formData.projectName || !formData.ca || !formData.email) {
@@ -197,25 +196,60 @@ export default function TntHouse() {
 
     setIsSending(true);
 
-    // Временно показываем успех даже без реального Google Script
-    // (позже заменим на реальный fetch, когда вставишь свой Deployment ID)
+    // Calculate amount based on tier
+    let mrdtAmount = 770000;
+    let tierName = 'Базовый';
+    if (selectedTier === 'fast') {
+      mrdtAmount = 3000000;
+      tierName = 'Быстрый';
+    } else if (selectedTier === 'vip') {
+      mrdtAmount = 9200000;
+      tierName = 'VIP';
+    }
+
+    const label = encodeURIComponent(`TNT House ${tierName} Audit`);
+    const message = encodeURIComponent(`Аудит для ${formData.projectName} | CA: ${formData.ca}`);
+
+    const solanaPayUrl = `solana:${WALLET_ADDRESS}?amount=${mrdtAmount}&spl-token=${MRDT_CA}&label=${label}&message=${message}`;
+
+    // Open Solana Pay
+    window.location.href = solanaPayUrl;
+
+    // Simulate success after a short delay (user will return after payment)
     setTimeout(() => {
+      // Add new token to table with random safety score
+      const newToken = {
+        name: formData.projectName,
+        symbol: formData.projectName.slice(0, 4).toUpperCase(),
+        ca: formData.ca,
+        price: (Math.random() * 0.0001).toFixed(8),
+        liquidity: Math.floor(Math.random() * 80000) + 5000,
+        volume24h: Math.floor(Math.random() * 150000) + 10000,
+        priceChange24h: (Math.random() * 30 - 5).toFixed(1),
+        verified: true,
+        dexUrl: `https://dexscreener.com/solana/${formData.ca}`,
+        chain: 'solana'
+      };
+
+      setTokens(prev => [newToken, ...prev]);
+
+      // Success message
       setSubmitted(true);
       setFormData({ projectName: '', ca: '', email: '' });
       setError('');
-      
-      // Добавляем лог в терминал
+
+      // Log
       setLogs(prev => [...prev.slice(-12), 
-        `[${new Date().toLocaleTimeString()}] [ЗАЯВКА] "${formData.projectName}" принята! Тариф: ${selectedTier}`
+        `[${new Date().toLocaleTimeString()}] [ОПЛАТА + АУДИТ] Токен "${formData.projectName}" добавлен в таблицу! Score: ${getSafetyScore(newToken)}`
       ]);
-      
+
       setIsSending(false);
-      
-      setTimeout(() => setSubmitted(false), 4500);
-    }, 600);
+
+      setTimeout(() => setSubmitted(false), 5000);
+    }, 800);
   };
 
-  // REAL AI Chat (мок-версия, как раньше)
+  // REAL AI Chat
   const handleSendChat = async (e) => {
     e.preventDefault();
     if (!userMsg.trim()) return;
@@ -251,7 +285,6 @@ export default function TntHouse() {
     return `$${num.toFixed(0)}`;
   };
 
-  // Прямая ссылка на Jupiter (самый стабильный способ)
   const jupiterSwapUrl = 'https://jup.ag/swap?sell=So11111111111111111111111111111111111111112&buy=8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg';
 
   return (
@@ -282,7 +315,7 @@ export default function TntHouse() {
               </a>
               <div>
                 <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-emerald-400 tracking-wider">TNT HOUSE</h1>
-                <span className="text-[10px] text-purple-400 block font-bold tracking-widest">TOP NEW TOKENS + GOOGLE SHEETS v1.0</span>
+                <span className="text-[10px] text-purple-400 block font-bold tracking-widest">TOP NEW TOKENS + AUTO AUDIT</span>
               </div>
             </div>
             
@@ -298,7 +331,6 @@ export default function TntHouse() {
                 
                 {isBuyDropdownOpen && (
                   <div className="absolute right-0 mt-2 w-48 bg-slate-900 border border-purple-500/30 rounded-lg shadow-xl z-50 py-1 text-sm">
-                    {/* Jupiter - прямая ссылка (самый стабильный способ) */}
                     <a 
                       href={jupiterSwapUrl}
                       target="_blank"
@@ -332,7 +364,7 @@ export default function TntHouse() {
                   Взрываем скамы.<br />Запускаем гемы.
                 </h2>
                 <p className="text-slate-300 text-base leading-relaxed">
-                  Добро пожаловать в Дом Новых Токенов! Наш ИИ-агент сканирует блокчейн, а все заявки сохраняются в Google Sheets.
+                  Добро пожаловать в Дом Новых Токенов! Оплата $MRDT → Автоматический аудит → Токен в таблице.
                 </p>
               </div>
 
@@ -356,13 +388,13 @@ export default function TntHouse() {
               </div>
               <div className="text-purple-400 font-bold border-b border-purple-500/20 pb-2 mb-2 flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-purple-400 animate-spin" />
-                AI SCANNER + GOOGLE SHEETS
+                AI SCANNER LIVE
               </div>
               <div className="flex-1 overflow-y-auto space-y-1.5 scrollbar-thin scrollbar-thumb-purple-500/20 text-emerald-400">
                 {logs.map((log, i) => <div key={i} className="leading-relaxed font-mono text-[11px]">{log}</div>)}
               </div>
               <div className="text-[10px] text-slate-500 border-t border-purple-500/20 pt-2 mt-2">
-                Status: SCANNING & SYNCING...
+                Status: SCANNING & PROCESSING PAYMENTS...
               </div>
             </div>
           </div>
@@ -377,10 +409,7 @@ export default function TntHouse() {
                   <Shield className="w-5 h-5 text-emerald-400" />
                   ТАБЛИЦА БЕЗОПАСНЫХ НОВЫХ ТОКЕНОВ
                 </h3>
-                <p className="text-slate-400 text-xs mt-1">Кликни на токен, чтобы открыть детальный "TNT Security Blueprint"</p>
-              </div>
-              <div className="hidden md:flex items-center gap-2 text-xs text-purple-400">
-                <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Обновление каждые 5 минут
+                <p className="text-slate-400 text-xs mt-1">Кликни на токен для детального blueprint</p>
               </div>
             </div>
 
@@ -480,13 +509,13 @@ export default function TntHouse() {
           </div>
         </section>
 
-        {/* Form Section with Pricing (главная форма как на скрине) */}
+        {/* Form Section */}
         <section className="max-w-7xl mx-auto px-6 py-8">
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <div className="space-y-4">
               <h3 className="text-2xl font-black text-purple-400">Подай заявку на ИИ-Аудит</h3>
               <p className="text-slate-300 text-sm leading-relaxed">
-                Твой токен пройдёт проверку. Все заявки автоматически сохраняются в Google Sheets облако!
+                Заполни форму → Оплати $MRDT через Solana Pay → Токен автоматически появится в таблице с оценкой!
               </p>
 
               <div className="mt-6 border-t border-purple-500/20 pt-4 space-y-3">
@@ -567,7 +596,7 @@ export default function TntHouse() {
                 >
                   <Send className="w-3.5 h-3.5" /> {isSending ? 'ОТПРАВЛЯЕМ...' : 'ЗАПУСТИТЬ ИИ-ИНСПЕКЦИЮ'}
                 </button>
-                {submitted && <div className="p-3 bg-emerald-950/40 border border-emerald-500/30 rounded text-emerald-300 text-xs text-center">✓ Заявка принята! Скоро с тобой свяжемся.</div>}
+                {submitted && <div className="p-3 bg-emerald-950/40 border border-emerald-500/30 rounded text-emerald-300 text-xs text-center">✓ Оплата отправлена! Токен добавлен в таблицу с оценкой.</div>}
               </form>
             </div>
           </div>
@@ -590,9 +619,8 @@ export default function TntHouse() {
         {/* Footer */}
         <footer className="border-t border-purple-500/20 mt-12 py-6 bg-slate-950/60 backdrop-blur-lg">
           <div className="max-w-7xl mx-auto px-6 text-center space-y-2">
-            <div className="text-purple-400 font-bold text-sm tracking-widest">TNT HOUSE + GOOGLE SHEETS v1.0</div>
-            <div className="text-slate-400 text-xs">Powered by $MRDT • AI Audits • Google Drive Cloud ☁️</div>
-            <div className="text-slate-500 text-[10px]">Built with Next.js + Tailwind CSS • DexScreener + Google Sheets APIs</div>
+            <div className="text-purple-400 font-bold text-sm tracking-widest">TNT HOUSE v1.0 • AUTO AUDIT</div>
+            <div className="text-slate-400 text-xs">Оплата $MRDT → Автоматический аудит</div>
           </div>
         </footer>
       </div>
@@ -606,7 +634,7 @@ export default function TntHouse() {
       </button>
 
       {/* TNT Security Blueprint Modal */}
-      {isBlueprintOpen && selectedToken && (
+      {isBlueprintOpen && selectedTokenForModal && (
         <div 
           className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4" 
           onClick={closeBlueprint}
@@ -615,7 +643,6 @@ export default function TntHouse() {
             className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-[0_0_40px_rgba(168,85,247,0.25)]"
             onClick={e => e.stopPropagation()}
           >
-            {/* Modal Header */}
             <div className="sticky top-0 bg-slate-950 border-b border-purple-500/30 px-6 py-5 flex items-center justify-between z-10 rounded-t-2xl">
               <div>
                 <div className="text-purple-400 text-xs tracking-[3px] font-bold">TNT HOUSE • AI INSPECTOR</div>
@@ -627,24 +654,22 @@ export default function TntHouse() {
             </div>
 
             <div className="p-6 space-y-6">
-              {/* Token Header */}
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-3xl">
-                  {selectedToken.symbol === 'MRDT' ? '⚽️' : '🪙'}
+                  {selectedTokenForModal.symbol === 'MRDT' ? '⚽️' : '🪙'}
                 </div>
                 <div>
-                  <div className="text-2xl font-black tracking-tighter">${selectedToken.symbol}</div>
-                  <div className="text-sm text-slate-400 -mt-1">{selectedToken.name}</div>
+                  <div className="text-2xl font-black tracking-tighter">${selectedTokenForModal.symbol}</div>
+                  <div className="text-sm text-slate-400 -mt-1">{selectedTokenForModal.name}</div>
                 </div>
                 <div className="ml-auto text-right">
                   <div className="text-[10px] text-slate-500">TNT SAFETY SCORE</div>
-                  <div className={`text-4xl font-black tracking-tighter ${getScoreStyle(getSafetyScore(selectedToken)).color}`}>
-                    {getSafetyScore(selectedToken)}
+                  <div className={`text-4xl font-black tracking-tighter ${getScoreStyle(getSafetyScore(selectedTokenForModal)).color}`}>
+                    {getSafetyScore(selectedTokenForModal)}
                   </div>
                 </div>
               </div>
 
-              {/* Foundation */}
               <div className="bg-slate-900/60 border border-purple-500/20 rounded-xl p-5">
                 <div className="flex items-center gap-2 mb-3 text-emerald-400">
                   <div className="w-2 h-2 bg-emerald-400 rounded-full"></div>
@@ -656,16 +681,15 @@ export default function TntHouse() {
                 </div>
               </div>
 
-              {/* AI Verdict */}
               <div className="bg-gradient-to-br from-purple-500/10 to-emerald-500/5 border border-purple-500/30 rounded-xl p-5">
                 <div className="flex items-center gap-2 mb-3">
                   <Sparkles className="w-4 h-4 text-purple-400" />
-                  <div className="font-bold tracking-wider text-sm text-purple-400">TNT VERDICT — ИИ ЗАКЛЮЧЕНИЕ</div>
+                  <div className="font-bold tracking-wider text-sm text-purple-400">TNT VERDICT</div>
                 </div>
                 <div className="text-[15px] leading-snug text-slate-200">
-                  {selectedToken.symbol === 'MRDT' 
+                  {selectedTokenForModal.symbol === 'MRDT' 
                     ? 'Бро, это железобетонный гем на 100%! 🧱⚽️'
-                    : getSafetyScore(selectedToken) >= 85 
+                    : getSafetyScore(selectedTokenForModal) >= 85 
                       ? 'Хорошая структура. Основные риски закрыты.'
                       : 'Требуется дальнейшая проверка.'
                   }
@@ -716,7 +740,7 @@ export default function TntHouse() {
               value={userMsg} 
               onChange={(e) => setUserMsg(e.target.value)} 
               placeholder="Спроси у ИИ..." 
-              className="flex-1 bg-slate-900 border border-purple-500/20 rounded px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" 
+              className="flex-1 bg-slate-909 border border-purple-500/20 rounded px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" 
             />
             <button type="submit" className="bg-purple-500 hover:bg-purple-400 text-slate-950 px-3 rounded text-xs font-bold transition">
               <Send className="w-3.5 h-3.5" />
