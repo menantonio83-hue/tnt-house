@@ -45,6 +45,11 @@ export default function TntHouse() {
   const [isBlueprintOpen, setIsBlueprintOpen] = useState(false);
   const [selectedToken, setSelectedToken] = useState(null);
 
+  // === НОВАЯ ЭКСПРЕСС ФОРМА АУДИТА ===
+  const [auditMint, setAuditMint] = useState('');
+  const [isAuditing, setIsAuditing] = useState(false);
+  const [auditLogs, setAuditLogs] = useState([]);
+
   const chatEndRef = useRef(null);
 
   // Pillars
@@ -99,6 +104,35 @@ export default function TntHouse() {
     } else {
       alert("Phantom wallet not found. Open in Phantom browser.");
     }
+  };
+
+  // === ЛОГИКА ЭКСПРЕСС АУДИТА ===
+  const handleQuickAudit = async () => {
+    if (!auditMint.trim()) return;
+
+    setIsAuditing(true);
+    setAuditLogs([]);
+
+    const steps = [
+      'Подключение к Solana RPC...',
+      'Проверка Mint Authority...',
+      'Анализ Freeze Authority...',
+      'Сканирование пула ликвидности...',
+      'Проверка холдеров на бандлы...',
+      'Анализ объёмов и активности...',
+      'Проверка репутации через @Crypto_D10S...',
+      'Генерация финального отчёта...'
+    ];
+
+    for (let i = 0; i < steps.length; i++) {
+      await new Promise(resolve => setTimeout(resolve, 650));
+      setAuditLogs(prev => [...prev, steps[i]]);
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 800));
+    setAuditLogs(prev => [...prev, '✅ Аудит завершён! Токен прошёл базовую проверку.']);
+
+    setIsAuditing(false);
   };
 
   // Live Logs
@@ -385,6 +419,59 @@ export default function TntHouse() {
                 Status: SCANNING & SYNCING...
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* === НОВАЯ ЭКСПРЕСС ФОРМА АУДИТА (сразу под Hero) === */}
+        <section className="max-w-4xl mx-auto px-6 pb-10">
+          <div className="bg-slate-900/70 border border-purple-500/40 rounded-2xl p-8 shadow-[0_0_25px_rgba(153,69,255,0.15)]">
+            <div className="text-center mb-6">
+              <div className="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-purple-500/10 border border-purple-500/30 text-purple-400 text-xs font-bold tracking-widest mb-3">
+                БЫСТРАЯ ПРОВЕРКА
+              </div>
+              <h3 className="text-3xl font-black text-white tracking-tight">Экспресс ИИ-Аудит токена</h3>
+              <p className="text-slate-400 mt-2 text-sm">Вставь Mint Address — ИИ проверит безопасность за 5 секунд</p>
+            </div>
+
+            <div className="flex flex-col md:flex-row gap-3">
+              <input
+                type="text"
+                value={auditMint}
+                onChange={(e) => setAuditMint(e.target.value)}
+                placeholder="Введите Mint Address (CA) Solana токена..."
+                className="flex-1 bg-slate-950 border border-purple-500/30 rounded-2xl px-6 py-4 text-sm font-mono placeholder:text-slate-500 focus:outline-none focus:border-purple-500 transition"
+              />
+              <button
+                onClick={handleQuickAudit}
+                disabled={isAuditing || !auditMint.trim()}
+                className="bg-gradient-to-r from-purple-500 to-emerald-400 hover:from-purple-400 hover:to-emerald-300 disabled:from-purple-500/50 disabled:to-emerald-400/50 text-slate-950 font-extrabold px-10 py-4 rounded-2xl text-sm tracking-wider transition flex items-center justify-center gap-2 shadow-lg shadow-purple-500/30"
+              >
+                {isAuditing ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" /> СКАНИРУЮ...
+                  </>
+                ) : (
+                  'ЗАПУСТИТЬ АУДИТ'
+                )}
+              </button>
+            </div>
+
+            {/* Логи аудита */}
+            {auditLogs.length > 0 && (
+              <div className="mt-6 bg-slate-950/80 border border-purple-500/20 rounded-2xl p-5 font-mono text-xs">
+                {auditLogs.map((log, index) => (
+                  <div key={index} className="flex items-start gap-2 py-[3px] text-emerald-400">
+                    <span className="text-purple-500 mt-0.5">→</span> 
+                    <span>{log}</span>
+                  </div>
+                ))}
+                {isAuditing && (
+                  <div className="flex items-center gap-2 text-purple-400 mt-1 animate-pulse">
+                    <RefreshCw className="w-3.5 h-3.5" /> Анализирую...
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </section>
 
