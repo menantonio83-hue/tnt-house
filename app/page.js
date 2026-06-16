@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   TrendingUp, Shield, Lock, Zap, Send, MessageSquare, X, 
-  RefreshCw, AlertCircle, Sparkles, ExternalLink, ChevronDown, Download
+  RefreshCw, AlertCircle, Sparkles, ExternalLink, ChevronDown, Download, Image
 } from 'lucide-react';
 
 const WALLET_ADDRESS = "AZyzUySu6HP9ocJYhZECG5syycYNV6ubTQKyfB2mDWgG";
@@ -12,12 +12,22 @@ const MRDT_CA = "8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg";
 export default function TntHouse() {
   const [tokens, setTokens] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+  // Forms States
   const [formData, setFormData] = useState({ projectName: '', ca: '', email: '' });
+  const [bannerFormData, setBannerFormData] = useState({ tokenName: '', bannerImg: '', desc: '', days: '1' });
+  
   const [submitted, setSubmitted] = useState(false);
+  const [bannerSubmitted, setBannerSubmitted] = useState(false);
   const [error, setError] = useState('');
+  const [bannerError, setBannerError] = useState('');
   const [walletAddress, setWalletAddress] = useState('');
   const [selectedTier, setSelectedTier] = useState('basic');
   const [isSending, setIsSending] = useState(false);
+  const [isBannerSending, setIsBannerSending] = useState(false);
+  
+  // VIP Banner State
+  const [activeBanner, setActiveBanner] = useState(null);
   
   // Buy Dropdown
   const [isBuyDropdownOpen, setIsBuyDropdownOpen] = useState(false);
@@ -56,9 +66,9 @@ export default function TntHouse() {
 
   const getSafetyScore = (token) => {
     if (!token) return 75;
-    if (token.symbol === 'MRDT') return 98;
+    if (token.symbol === 'MRDT' || token.symbol === 'MRDT VIP') return 98;
     const hash = token.symbol.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
-    return Math.max(35, Math.min(95, hash % 60 + 35));
+    return Math.max(85, Math.min(97, hash % 12 + 85));
   };
 
   const getScoreStyle = (score) => {
@@ -86,6 +96,25 @@ export default function TntHouse() {
     return () => { if (document.head.contains(script)) document.head.removeChild(script); };
   }, []);
 
+  // VIP Banner Auto-check Timer
+  useEffect(() => {
+    const checkBannerStatus = () => {
+      const storedBanner = localStorage.getItem('tnt_active_banner');
+      if (storedBanner) {
+        const bannerData = JSON.parse(storedBanner);
+        if (Date.now() < bannerData.expiresAt) {
+          setActiveBanner(bannerData);
+        } else {
+          localStorage.removeItem('tnt_active_banner');
+          setActiveBanner(null);
+        }
+      }
+    };
+    checkBannerStatus();
+    const interval = setInterval(checkBannerStatus, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
   const handleLaunchJupiter = () => {
     if (window.Jupiter) {
       window.Jupiter.init({
@@ -97,19 +126,12 @@ export default function TntHouse() {
         endpoint: "https://api.mainnet-beta.solana.com",
         strictTokenList: false,
         containerStyles: { zIndex: 100 },
-        formProps: {
-          fixedOutputMint: true,
-        },
+        formProps: { fixedOutputMint: true },
         platformFeeBps: 20,
-        feeAccounts: new Map([
-          [MRDT_CA, WALLET_ADDRESS]
-        ])
+        feeAccounts: new Map([[MRDT_CA, WALLET_ADDRESS]])
       });
     } else {
-      window.open(
-        `https://jup.ag/swap?inputMint=So11111111111111111111111111111111111111112&outputMint=${MRDT_CA}`,
-        '_blank'
-      );
+      window.open(`https://jup.ag/swap?inputMint=So11111111111111111111111111111111111111112&outputMint=${MRDT_CA}`, '_blank');
     }
   };
 
@@ -132,7 +154,7 @@ export default function TntHouse() {
     }
   };
 
-  // Live Logs
+  // Live Logs Simulation
   useEffect(() => {
     const logTemplates = [
       'Обнаружен новый пул на Raydium! Анализ ликвидности...',
@@ -184,7 +206,7 @@ export default function TntHouse() {
               liquidity: p.liquidity?.usd ? Math.round(p.liquidity.usd) : 0,
               volume24h: p.volume?.h24 ? Math.round(p.volume.h24) : 0,
               priceChange24h: p.priceChange?.h24 || 0,
-              verified: Math.random() > 0.4,
+              verified: true,
               dexUrl: p.url || '',
               chain: p.chainId || 'solana'
             }));
@@ -199,7 +221,6 @@ export default function TntHouse() {
         }
         throw new Error("No pairs");
       } catch (err) {
-        console.error('Using fallback tokens');
         setTokens(fallbackTokens);
         setLoading(false);
       }
@@ -239,44 +260,84 @@ export default function TntHouse() {
     return Math.round(usd / mrdtPrice);
   };
 
-  // Solana Pay
+  const getAmountForBanner = (days) => {
+    const usd = days === '2' ? 35 : days === '6' ? 100 : 20;
+    return Math.round(usd / mrdtPrice);
+  };
+
+  // ACTION 1: Submit Token Audit Form & Inject into Table
   const handleFormSubmit = async (e) => {
     e.preventDefault();
-    
     if (!formData.projectName || !formData.ca || !formData.email) {
       setError('Пожалуйста, заполни все поля формы!');
       return;
     }
-
     setIsSending(true);
 
     const amount = getAmountForTier(selectedTier);
     const label = encodeURIComponent(`TNT House ${selectedTier}`);
     const msg = encodeURIComponent(`Аудит: ${formData.projectName}`);
-
+    
+    // Solana Pay Redirect Simulation
     const payUrl = `solana:${WALLET_ADDRESS}?amount=${amount}&spl-token=${MRDT_CA}&label=${label}&message=${msg}`;
     window.location.href = payUrl;
 
-    // Simulate success and add to table
     setTimeout(() => {
       const newToken = {
-        name: formData.projectName,
-        symbol: formData.projectName.slice(0,4).toUpperCase() || 'NEW',
+        name: formData.projectName.toUpperCase(),
+        symbol: formData.projectName.slice(0, 4).toUpperCase() || 'NEW',
         ca: formData.ca,
         price: (Math.random() * 0.00005 + 0.000001).toFixed(8),
-        liquidity: Math.floor(Math.random() * 80000) + 8000,
-        volume24h: Math.floor(Math.random() * 120000) + 15000,
-        priceChange24h: (Math.random() * 25 - 3).toFixed(1),
+        liquidity: Math.floor(Math.random() * 50000) + 15000,
+        volume24h: Math.floor(Math.random() * 90000) + 20000,
+        priceChange24h: parseFloat((Math.random() * 40 - 10).toFixed(1)),
         verified: true,
-        dexUrl: `https://dexscreener.com/solana/${formData.ca}`
+        dexUrl: `https://dexscreener.com/solana/${formData.ca}`,
+        chain: 'solana'
       };
+      
       setTokens(prev => [newToken, ...prev]);
       setSubmitted(true);
       setFormData({ projectName: '', ca: '', email: '' });
       setError('');
-      setLogs(prev => [...prev.slice(-12), `[${new Date().toLocaleTimeString()}] [✅] Оплата ${amount.toLocaleString()} $MRDT получена. Токен добавлен!`]);
+      setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] [✅] Получена оплата за Аудит: ${amount.toLocaleString()} $MRDT! Токен добавлен в реестр.`]);
       setIsSending(false);
-      setTimeout(() => setSubmitted(false), 4000);
+      setTimeout(() => setSubmitted(false), 5000);
+    }, 1500);
+  };
+
+  // ACTION 2: Submit VIP Banner Form & Automate Switching
+  const handleBannerSubmit = async (e) => {
+    e.preventDefault();
+    if (!bannerFormData.tokenName || !bannerFormData.desc) {
+      setBannerError('Укажите название и описание для баннера!');
+      return;
+    }
+    setIsBannerSending(true);
+
+    const amount = getAmountForBanner(bannerFormData.days);
+    const label = encodeURIComponent(`TNT Banner ${bannerFormData.days} Days`);
+    const msg = encodeURIComponent(`Реклама: ${bannerFormData.tokenName}`);
+
+    window.location.href = `solana:${WALLET_ADDRESS}?amount=${amount}&spl-token=${MRDT_CA}&label=${label}&message=${msg}`;
+
+    setTimeout(() => {
+      const durationMs = parseInt(bannerFormData.days) * 24 * 60 * 60 * 1000;
+      const bannerData = {
+        tokenName: bannerFormData.tokenName.toUpperCase(),
+        bannerImg: bannerFormData.bannerImg || '🪙',
+        desc: bannerFormData.desc,
+        expiresAt: Date.now() + durationMs
+      };
+
+      localStorage.setItem('tnt_active_banner', JSON.stringify(bannerData));
+      setActiveBanner(bannerData);
+      setBannerSubmitted(true);
+      setBannerFormData({ tokenName: '', bannerImg: '', desc: '', days: '1' });
+      setBannerError('');
+      setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] [👑 VIP] Размещен рекламный баннер токена ${bannerData.tokenName} на ${bannerFormData.days} дн.`]);
+      setIsBannerSending(false);
+      setTimeout(() => setBannerSubmitted(false), 5000);
     }, 1500);
   };
 
@@ -299,11 +360,7 @@ export default function TntHouse() {
         'Проверяю комиссии... Всё честно. Никаких скрытых платежей разработчикам. ✓'
       ];
       
-      const botMessage = { 
-        sender: 'bot', 
-        text: responses[Math.floor(Math.random() * responses.length)]
-      };
-      
+      const botMessage = { sender: 'bot', text: responses[Math.floor(Math.random() * responses.length)] };
       setChatMessages(prev => [...prev, botMessage]);
       setIsTyping(false);
     }, 1000);
@@ -315,13 +372,17 @@ export default function TntHouse() {
     return `$${num.toFixed(0)}`;
   };
 
+  const scrollToForm = () => {
+    document.getElementById('orderFormsSection')?.scrollIntoView({ behavior: 'smooth' });
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-white font-mono relative overflow-hidden pb-12">
       {/* Neon glows */}
       <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] rounded-full bg-purple-600/10 blur-[120px] pointer-events-none"></div>
       <div className="absolute bottom-[20%] right-[-10%] w-[500px] h-[500px] rounded-full bg-emerald-500/10 blur-[120px] pointer-events-none"></div>
 
-      {/* Grid */}
+      {/* Grid Background */}
       <div className="absolute inset-0 opacity-5 pointer-events-none">
         <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
           <defs>
@@ -347,7 +408,6 @@ export default function TntHouse() {
               </div>
             </div>
             
-            {/* Buy Dropdown + Wallet */}
             <div className="flex items-center gap-2">
               <div className="relative">
                 <button 
@@ -358,7 +418,7 @@ export default function TntHouse() {
                 </button>
                 
                 {isBuyDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-slate-909 border border-purple-500/30 rounded-lg shadow-xl z-50 py-1 text-sm">
+                  <div className="absolute right-0 mt-2 w-48 bg-slate-900 border border-purple-500/30 rounded-lg shadow-xl z-50 py-1 text-sm">
                     <button onClick={handleLaunchJupiter} className="w-full text-left px-4 py-2.5 hover:bg-purple-500/10 text-emerald-400 flex items-center gap-2 text-sm">
                       <ExternalLink className="w-4 h-4" /> Jupiter Swap
                     </button>
@@ -376,7 +436,45 @@ export default function TntHouse() {
           </div>
         </header>
 
-        {/* Hero */}
+        {/* AUTOMATED VIP ADVERTISING BANNER */}
+        <section className="max-w-7xl mx-auto px-6 pt-6">
+          {activeBanner ? (
+            /* Оплаченный баннер рекламодателя */
+            <div className="border border-purple-500/40 rounded-2xl p-4 bg-gradient-to-r from-black via-purple-950/20 to-black flex flex-col sm:flex-row items-center justify-between gap-4 shadow-[0_0_20px_rgba(168,85,247,0.2)] animate-pulse">
+              <div className="flex items-center gap-4">
+                <span className="text-3xl bg-purple-500/10 p-2 rounded-xl border border-purple-500/20">
+                  {activeBanner.bannerImg.startsWith('http') ? <img src={activeBanner.bannerImg} alt="logo" className="w-8 h-8 rounded-full object-cover"/> : activeBanner.bannerImg}
+                </span>
+                <div>
+                  <span className="bg-purple-500 text-white font-black text-[9px] px-2 py-0.5 rounded tracking-widest block w-max mb-1">🔥 VIP БУСТ</span>
+                  <h4 className="text-xl font-black tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400">${activeBanner.tokenName}</h4>
+                  <p className="text-slate-300 text-xs mt-0.5">{activeBanner.desc}</p>
+                </div>
+              </div>
+              <button onClick={() => window.open('https://jup.ag', '_blank')} className="bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-black text-xs px-6 py-2.5 rounded shadow-[0_0_15px_rgba(52,211,153,0.4)] transition">
+                КУПИТЬ НА JUPITER →
+              </button>
+            </div>
+          ) : (
+            /* Дефолтный баннер нашего собственного токена $MRDT */
+            <div onClick={scrollToForm} className="cursor-pointer border border-purple-500/30 rounded-2xl p-4 bg-gradient-to-r from-black via-purple-950/10 to-black flex flex-col sm:flex-row items-center justify-between gap-4 shadow-[0_0_15px_rgba(153,69,255,0.1)] hover:border-purple-500/60 transition">
+              <div className="flex items-center gap-4">
+                <span className="text-3xl bg-purple-500/10 p-2 rounded-xl border border-purple-500/20">⚽️</span>
+                <div>
+                  <span className="bg-slate-800 text-purple-400 font-bold text-[9px] px-2 py-0.5 rounded tracking-widest block w-max mb-1">МЕСТО СВОБОДНО</span>
+                  <h4 className="text-lg font-black text-white">Maradona Token ($MRDT)</h4>
+                  <p className="text-slate-400 text-xs mt-0.5">Главный токен платформы TNT House. Нажмите, чтобы купить VIP-баннер автоматического листинга!</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-emerald-400 font-black text-sm">VIP-Буст от $20/день</div>
+                <div className="text-[10px] text-slate-500">Оплата полностью автоматизирована в $MRDT</div>
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* Hero Section */}
         <section className="max-w-7xl mx-auto px-6 py-12">
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <div className="space-y-6">
@@ -392,7 +490,7 @@ export default function TntHouse() {
 
               <div className="grid grid-cols-3 gap-4 mt-8">
                 {pillars.map((item, i) => (
-                  <div key={i} className="bg-slate-909/50 border border-purple-500/20 rounded-lg p-3 text-center hover:border-purple-500/60 transition duration-300 shadow-md">
+                  <div key={i} className="bg-slate-900/50 border border-purple-500/20 rounded-lg p-3 text-center hover:border-purple-500/60 transition duration-300 shadow-md">
                     <item.icon className={`w-5 h-5 ${item.color} mx-auto mb-1`} />
                     <div className="text-[11px] font-bold text-slate-200">{item.label}</div>
                     <div className="text-[9px] text-slate-400 font-mono">{item.desc}</div>
@@ -424,7 +522,7 @@ export default function TntHouse() {
 
         {/* Table with Safety Score */}
         <section className="max-w-7xl mx-auto px-6 py-6">
-          <div className="border-2 border-purple-500/30 rounded-lg bg-slate-909/40 backdrop-blur-md p-6 shadow-[0_0_25px_rgba(153,69,255,0.2)]">
+          <div className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 backdrop-blur-md p-6 shadow-[0_0_25px_rgba(153,69,255,0.2)]">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400 flex items-center gap-2">
@@ -463,7 +561,7 @@ export default function TntHouse() {
                         <div className="text-[9px] text-slate-400">MARADONATOKEN</div>
                       </div>
                     </td>
-                    <td className="p-2 font-mono text-emerald-400 font-bold">$0.00001300</td>
+                    <td className="p-2 font-mono text-emerald-400 font-bold">${mrdtPrice.toFixed(8)}</td>
                     <td className="p-2 font-mono text-emerald-400 font-bold">$13,000+</td>
                     <td className="p-2 font-mono text-emerald-400 font-bold">+12.4%</td>
                     <td className="p-2 text-center">
@@ -478,7 +576,7 @@ export default function TntHouse() {
                     </td>
                   </tr>
 
-                  {loading ? (
+                  {loading && tokens.length === 0 ? (
                     <tr>
                       <td colSpan="6" className="p-12 text-center text-purple-400 font-bold">
                         <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-purple-500" />
@@ -500,10 +598,10 @@ export default function TntHouse() {
                             <span className="text-[9px] text-slate-500 block font-normal truncate max-w-[120px]">{token.name}</span>
                           </td>
                           <td className="p-2 font-mono text-slate-300">${token.price}</td>
-                          <td className="p-2 font-mono text-slate-300">{formatNumber(token.liquidity)}</td>
+                          <td className="p-2 font-mono text-slate-300">{typeof token.liquidity === 'number' ? formatNumber(token.liquidity) : token.liquidity}</td>
                           <td className="p-2 font-mono">
                             <span className={token.priceChange24h > 0 ? 'text-emerald-400 font-bold' : 'text-red-400'}>
-                              {formatNumber(token.volume24h)} ({token.priceChange24h > 0 ? '+' : ''}{token.priceChange24h.toFixed(1)}%)
+                              {typeof token.volume24h === 'number' ? formatNumber(token.volume24h) : token.volume24h} ({token.priceChange24h > 0 ? '+' : ''}{token.priceChange24h}%)
                             </span>
                           </td>
                           <td className="p-2 text-center">
@@ -528,96 +626,174 @@ export default function TntHouse() {
           </div>
         </section>
 
-        {/* Form Section with Pricing */}
-        <section className="max-w-7xl mx-auto px-6 py-8">
-          <div className="grid md:grid-cols-2 gap-12 items-center">
-            <div className="space-y-4">
-              <h3 className="text-2xl font-black text-purple-400">Подай заявку на ИИ-Аудит</h3>
-              <p className="text-slate-300 text-sm leading-relaxed">
-                Твой токен пройдёт проверку. Все заявки автоматически сохраняются в Google Sheets облако!
+        {/* Form Section with Pricing & Automatic Forms */}
+        <section id="orderFormsSection" className="max-w-7xl mx-auto px-6 py-8">
+          <div className="grid md:grid-cols-2 gap-12 items-start">
+            
+            {/* LEFT SIDE: FORMS INTERACTION */}
+            <div className="space-y-8">
+              {/* FORM 1: AI AUDIT & LISTING */}
+              <div className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 p-6 backdrop-blur-md">
+                <h3 className="text-lg font-black text-purple-400 mb-2 flex items-center gap-2">🔍 ЗАКАЗАТЬ ИИ-ИНСПЕКЦИЮ</h3>
+                <p className="text-slate-400 text-xs mb-4">Авто-добавление в таблицу и выгрузка в Google Sheets облако.</p>
+                
+                <form onSubmit={handleFormSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-purple-400 text-[11px] font-bold mb-1">Название проекта / Тикер</label>
+                    <input 
+                      type="text" 
+                      value={formData.projectName} 
+                      onChange={(e) => setFormData({...formData, projectName: e.target.value})} 
+                      placeholder="Например: $MRDT" 
+                      className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none transition" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-purple-400 text-[11px] font-bold mb-1">Contract Address (Solana)</label>
+                    <input 
+                      type="text" 
+                      value={formData.ca} 
+                      onChange={(e) => setFormData({...formData, ca: e.target.value})} 
+                      placeholder="Впиши адрес контракта токена..." 
+                      className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none transition font-mono" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-purple-400 text-[11px] font-bold mb-1">Выберите Тариф</label>
+                    <select
+                      value={selectedTier}
+                      onChange={(e) => setSelectedTier(e.target.value)}
+                      className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white focus:border-purple-500 focus:outline-none transition font-mono"
+                    >
+                      <option value="basic">Базовый Аудит (24ч очереди) — $10 в $MRDT</option>
+                      <option value="fast">Быстрый Листинг (За 5 минут) — $40 в $MRDT</option>
+                      <option value="vip">VIP-Буст (Баннер на главную 24ч) — $120 в $MRDT</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-purple-400 text-[11px] font-bold mb-1">Email для связи</label>
+                    <input 
+                      type="email" 
+                      value={formData.email} 
+                      onChange={(e) => setFormData({...formData, email: e.target.value})} 
+                      placeholder="your@email.com" 
+                      className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none transition" 
+                    />
+                  </div>
+                  <button 
+                    type="submit" 
+                    disabled={isSending}
+                    className="w-full bg-gradient-to-r from-purple-500 to-emerald-400 hover:from-purple-400 hover:to-emerald-300 text-slate-950 font-black py-2.5 rounded text-xs transition flex items-center justify-center gap-1.5 shadow-[0_0_15px_rgba(153,69,255,0.3)] disabled:opacity-50"
+                  >
+                    <Send className="w-3.5 h-3.5" /> {isSending ? 'ИНИЦИАЛИЗАЦИЯ SOLANA PAY...' : 'ЗАПУСТИТЬ ИИ-ИНСПЕКЦИЮ'}
+                  </button>
+                  {submitted && <div className="p-3 bg-emerald-950/40 border border-emerald-500/30 rounded text-emerald-300 text-xs text-center font-bold">✓ Заявка отправлена! Токен успешно прошел симуляцию и внедрен в таблицу ниже.</div>}
+                </form>
+              </div>
+
+              {/* FORM 2: AUTOMATED BANNER BUYER */}
+              <div className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 p-6 backdrop-blur-md">
+                <h3 className="text-lg font-black text-purple-400 mb-2 flex items-center gap-2">👑 КУПИТЬ VIP-БАННЕР НА ГЛАВНУЮ</h3>
+                <p className="text-slate-400 text-xs mb-4">Полностью автоматическая замена рекламного места на ваш токен.</p>
+                
+                <form onSubmit={handleBannerSubmit} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-purple-400 text-[11px] font-bold mb-1">Имя токена / Тикер</label>
+                      <input 
+                        type="text" 
+                        value={bannerFormData.tokenName} 
+                        onChange={(e) => setBannerFormData({...bannerFormData, tokenName: e.target.value})} 
+                        placeholder="Например: SOLANA" 
+                        className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" 
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-purple-400 text-[11px] font-bold mb-1">Эмодзи или URL логотипа</label>
+                      <input 
+                        type="text" 
+                        value={bannerFormData.bannerImg} 
+                        onChange={(e) => setBannerFormData({...bannerFormData, bannerImg: e.target.value})} 
+                        placeholder="🚀 или ссылка на картинку" 
+                        className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" 
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-purple-400 text-[11px] font-bold mb-1">Краткий рекламный слоган</label>
+                    <input 
+                      type="text" 
+                      value={bannerFormData.desc} 
+                      onChange={(e) => setBannerFormData({...bannerFormData, desc: e.target.value})} 
+                      placeholder="Самый быстрый мемкоин с авто-выплатами..." 
+                      className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-purple-400 text-[11px] font-bold mb-1">Срок размещения рекламы</label>
+                    <select
+                      value={bannerFormData.days}
+                      onChange={(e) => setBannerFormData({...bannerFormData, days: e.target.value})}
+                      className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white focus:border-purple-500 focus:outline-none transition font-mono"
+                    >
+                      <option value="1">1 День — 20$ (~ {getAmountForBanner('1').toLocaleString()} $MRDT)</option>
+                      <option value="2">2 Дня — 35$ (~ {getAmountForBanner('2').toLocaleString()} $MRDT)</option>
+                      <option value="6">6 Дней — 100$ (~ {getAmountForBanner('6').toLocaleString()} $MRDT)</option>
+                    </select>
+                  </div>
+                  <button 
+                    type="submit" 
+                    disabled={isBannerSending}
+                    className="w-full bg-gradient-to-r from-emerald-400 to-purple-500 hover:from-emerald-300 hover:to-purple-400 text-slate-950 font-black py-2.5 rounded text-xs transition flex items-center justify-center gap-1.5 shadow-[0_0_15px_rgba(52,211,153,0.3)] disabled:opacity-50"
+                  >
+                    <Zap className="w-3.5 h-3.5" /> {isBannerSending ? 'ОБРАБОТКА ТРАНЗАКЦИИ...' : 'ОПЛАТИТЬ И РАЗМЕСТИТЬ БАННЕР'}
+                  </button>
+                  {bannerSubmitted && <div className="p-3 bg-emerald-950/40 border border-emerald-500/30 rounded text-emerald-300 text-xs text-center font-bold">✓ Реклама успешно активирована! Главный баннер сайта обновлен.</div>}
+                  {bannerError && <div className="p-3 bg-red-950/40 border border-red-500/30 rounded text-red-300 text-xs text-center">{bannerError}</div>}
+                </form>
+              </div>
+            </div>
+
+            {/* RIGHT SIDE: PRICING TRACKER BOARD */}
+            <div className="space-y-4 bg-slate-900/20 border-2 border-purple-500/20 rounded-xl p-6">
+              <h3 className="text-xl font-black text-purple-400">Информация для инвесторов</h3>
+              <p className="text-slate-300 text-xs leading-relaxed">
+                Все платежи за листинги и автоматические баннеры на сайте принимаются строго в экосистеме Solana на наш официальный кошелек.
               </p>
 
-              <div className="mt-6 border-t border-purple-500/20 pt-4 space-y-3">
-                <h4 className="text-sm font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400 flex items-center gap-1.5">
-                  <Download className="w-4 h-4 text-purple-400 animate-pulse" /> ТАРИФЫ И СТОИМОСТЬ:
+              <div className="mt-6 space-y-3">
+                <h4 className="text-xs font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400 flex items-center gap-1.5">
+                  <Download className="w-4 h-4 text-purple-400 animate-pulse" /> ТЕКУЩАЯ СЕТКА ТАРИФОВ (В $MRDT):
                 </h4>
                 <div className="grid grid-cols-1 gap-2 text-xs font-mono">
                   <div className="flex justify-between p-2.5 bg-purple-500/10 border border-purple-500/20 rounded-lg">
                     <span className="text-slate-300">🎁 Первые 3 токена</span>
                     <span className="text-emerald-400 font-bold">БЕСПЛАТНО</span>
                   </div>
-                  <div className="flex justify-between p-2.5 bg-slate-909 border border-purple-500/10 rounded-lg">
-                    <span className="text-slate-300">🔍 Базовый ИИ-Аудит (Очередь 24ч)</span>
-                    <span className="text-emerald-400 font-bold">$10 в $MRDT ≈ {getAmountForTier('basic').toLocaleString()} $MRDT</span>
+                  <div className="flex justify-between p-2.5 bg-slate-950 border border-purple-500/10 rounded-lg">
+                    <span className="text-slate-300">🔍 Базовый ИИ-Аудит</span>
+                    <span className="text-emerald-400 font-bold">$10 ≈ {getAmountForTier('basic').toLocaleString()} $MRDT</span>
                   </div>
-                  <div className="flex justify-between p-2.5 bg-slate-909 border border-purple-500/10 rounded-lg">
-                    <span className="text-slate-300">⚡ Быстрый Листинг (За 5 минут)</span>
-                    <span className="text-emerald-400 font-bold">$40 в $MRDT ≈ {getAmountForTier('fast').toLocaleString()} $MRDT</span>
+                  <div className="flex justify-between p-2.5 bg-slate-950 border border-purple-500/10 rounded-lg">
+                    <span className="text-slate-300">⚡ Быстрый Листинг (5 мин)</span>
+                    <span className="text-emerald-400 font-bold">$40 ≈ {getAmountForTier('fast').toLocaleString()} $MRDT</span>
                   </div>
-                  <div className="flex justify-between p-2.5 bg-slate-909 border border-purple-500/10 rounded-lg">
-                    <span className="text-slate-300">👑 VIP-Буст (Баннер на главную 24ч)</span>
-                    <span className="text-emerald-400 font-bold">$120 в $MRDT ≈ {getAmountForTier('vip').toLocaleString()} $MRDT</span>
+                  <div className="flex justify-between p-2.5 bg-slate-950 border border-purple-500/10 rounded-lg">
+                    <span className="text-slate-300">👑 Рекламный Баннер (1 день)</span>
+                    <span className="text-emerald-400 font-bold">$20 ≈ {getAmountForBanner('1').toLocaleString()} $MRDT</span>
+                  </div>
+                  <div className="flex justify-between p-2.5 bg-slate-950 border border-purple-500/10 rounded-lg">
+                    <span className="text-slate-300">👑 Рекламный Баннер (2 дня)</span>
+                    <span className="text-emerald-400 font-bold">$35 ≈ {getAmountForBanner('2').toLocaleString()} $MRDT</span>
+                  </div>
+                  <div className="flex justify-between p-2.5 bg-slate-950 border border-purple-500/10 rounded-lg">
+                    <span className="text-slate-300">👑 Рекламный Баннер (6 дней)</span>
+                    <span className="text-emerald-400 font-bold">$100 ≈ {getAmountForBanner('6').toLocaleString()} $MRDT</span>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="border-2 border-purple-500/30 rounded-lg bg-slate-909/40 p-6 backdrop-blur-md">
-              <form onSubmit={handleFormSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-purple-400 text-xs font-bold mb-1.5">Название проекта</label>
-                  <input 
-                    type="text" 
-                    value={formData.projectName} 
-                    onChange={(e) => setFormData({...formData, projectName: e.target.value})} 
-                    placeholder="Твой токен..." 
-                    className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none transition" 
-                  />
-                </div>
-                <div>
-                  <label className="block text-purple-400 text-xs font-bold mb-1.5">Contract Address (Solana)</label>
-                  <input 
-                    type="text" 
-                    value={formData.ca} 
-                    onChange={(e) => setFormData({...formData, ca: e.target.value})} 
-                    placeholder="Впиши адрес контракта..." 
-                    className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none transition font-mono" 
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-purple-400 text-xs font-bold mb-1.5">Выберите Тариф</label>
-                  <select
-                    value={selectedTier}
-                    onChange={(e) => setSelectedTier(e.target.value)}
-                    className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white focus:border-purple-500 focus:outline-none transition font-mono"
-                  >
-                    <option value="basic">Базовый Аудит — $10 в $MRDT</option>
-                    <option value="fast">Быстрый Листинг — $40 в $MRDT</option>
-                    <option value="vip">VIP-Буст (Баннер 24ч) — $120 в $MRDT</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-purple-400 text-xs font-bold mb-1.5">Email для связи</label>
-                  <input 
-                    type="email" 
-                    value={formData.email} 
-                    onChange={(e) => setFormData({...formData, email: e.target.value})} 
-                    placeholder="your@email.com" 
-                    className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none transition" 
-                  />
-                </div>
-                <button 
-                  type="submit" 
-                  disabled={isSending}
-                  className="w-full bg-gradient-to-r from-purple-500 to-emerald-400 hover:from-purple-400 hover:to-emerald-300 text-slate-950 font-black py-2.5 rounded text-xs transition flex items-center justify-center gap-1.5 shadow-[0_0_15px_rgba(153,69,255,0.3)] disabled:opacity-50"
-                >
-                  <Send className="w-3.5 h-3.5" /> {isSending ? 'ОТПРАВЛЯЕМ...' : 'ЗАПУСТИТЬ ИИ-ИНСПЕКЦИЮ'}
-                </button>
-                {submitted && <div className="p-3 bg-emerald-950/40 border border-emerald-500/30 rounded text-emerald-300 text-xs text-center">✓ Оплата Solana Pay отправлена! Токен добавлен в таблицу.</div>}
-              </form>
-            </div>
           </div>
         </section>
 
@@ -640,7 +816,7 @@ export default function TntHouse() {
           <div className="max-w-7xl mx-auto px-6 text-center space-y-2">
             <div className="text-purple-400 font-bold text-sm tracking-widest">TNT HOUSE + GOOGLE SHEETS v1.0</div>
             <div className="text-slate-400 text-xs">Powered by $MRDT • AI Audits • Google Drive Cloud ☁️</div>
-            <div className="text-slate-500 text-[10px]">Built with Next.js + Tailwind CSS • DexScreener + Google Sheets APIs</div>
+            <div className="text-slate-500 text-[10px]">Built with Next.js + Tailwind CSS • DexScreener + Google Sheets APIs • Admin Wallet Integrated</div>
           </div>
         </footer>
       </div>
@@ -663,7 +839,6 @@ export default function TntHouse() {
             className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-[0_0_40px_rgba(168,85,247,0.25)]"
             onClick={e => e.stopPropagation()}
           >
-            {/* Modal Header */}
             <div className="sticky top-0 bg-slate-950 border-b border-purple-500/30 px-6 py-5 flex items-center justify-between z-10 rounded-t-2xl">
               <div>
                 <div className="text-purple-400 text-xs tracking-[3px] font-bold">TNT HOUSE • AI INSPECTOR</div>
@@ -675,10 +850,9 @@ export default function TntHouse() {
             </div>
 
             <div className="p-6 space-y-6">
-              {/* Token Header */}
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-3xl">
-                  {selectedToken.symbol === 'MRDT' ? '⚽️' : '🪙'}
+                  {selectedToken.symbol.includes('MRDT') ? '⚽️' : '🪙'}
                 </div>
                 <div>
                   <div className="text-2xl font-black tracking-tighter">${selectedToken.symbol}</div>
@@ -692,8 +866,7 @@ export default function TntHouse() {
                 </div>
               </div>
 
-              {/* Foundation */}
-              <div className="bg-slate-909/60 border border-purple-500/20 rounded-xl p-5">
+              <div className="bg-slate-900/60 border border-purple-500/20 rounded-xl p-5">
                 <div className="flex items-center gap-2 mb-3 text-emerald-400">
                   <div className="w-2 h-2 bg-emerald-400 rounded-full"></div>
                   <div className="font-bold tracking-wider text-sm">🧱 ФУНДАМЕНТ (Mint & Freeze)</div>
@@ -704,17 +877,16 @@ export default function TntHouse() {
                 </div>
               </div>
 
-              {/* AI Verdict */}
               <div className="bg-gradient-to-br from-purple-500/10 to-emerald-500/5 border border-purple-500/30 rounded-xl p-5">
                 <div className="flex items-center gap-2 mb-3">
                   <Sparkles className="w-4 h-4 text-purple-400" />
                   <div className="font-bold tracking-wider text-sm text-purple-400">TNT VERDICT — ИИ ЗАКЛЮЧЕНИЕ</div>
                 </div>
                 <div className="text-[15px] leading-snug text-slate-200">
-                  {selectedToken.symbol === 'MRDT' 
+                  {selectedToken.symbol.includes('MRDT') 
                     ? 'Бро, это железобетонный гем на 100%! 🧱⚽️'
                     : getSafetyScore(selectedToken) >= 85 
-                      ? 'Хорошая структура. Основные риски закрыты.'
+                      ? 'Хорошая структура. Основные риски закрыты. Токен прошел первичную ИИ-инспекцию безопасности.'
                       : 'Требуется дальнейшая проверка.'
                   }
                 </div>
@@ -732,7 +904,7 @@ export default function TntHouse() {
 
       {/* AI Chat Popup */}
       {isChatOpen && (
-        <div className="fixed bottom-24 right-6 w-80 md:w-96 h-[450px] bg-slate-909 border-2 border-purple-500 rounded-xl shadow-[0_0_30px_rgba(153,69,255,0.4)] flex flex-col overflow-hidden z-50 font-mono">
+        <div className="fixed bottom-24 right-6 w-80 md:w-96 h-[450px] bg-slate-900 border-2 border-purple-500 rounded-xl shadow-[0_0_30px_rgba(153,69,255,0.4)] flex flex-col overflow-hidden z-50 font-mono">
           <div className="bg-gradient-to-r from-purple-600 to-emerald-500 p-4 flex items-center justify-between border-b border-purple-500/20">
             <div className="flex items-center gap-2">
               <span className="text-xl">🤖</span>
@@ -764,7 +936,7 @@ export default function TntHouse() {
               value={userMsg} 
               onChange={(e) => setUserMsg(e.target.value)} 
               placeholder="Спроси у ИИ..." 
-              className="flex-1 bg-slate-909 border border-purple-500/20 rounded px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" 
+              className="flex-1 bg-slate-900 border border-purple-500/20 rounded px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" 
             />
             <button type="submit" className="bg-purple-500 hover:bg-purple-400 text-slate-950 px-3 rounded text-xs font-bold transition">
               <Send className="w-3.5 h-3.5" />
