@@ -17,7 +17,7 @@ export default function TntHouse() {
   const [error, setError] = useState('');
   const [selectedTier, setSelectedTier] = useState('basic');
   const [isSending, setIsSending] = useState(false);
-  const [mrdtPrice, setMrdtPrice] = useState(0.000013); // default price
+  const [mrdtPrice, setMrdtPrice] = useState(0.000013);
   
   const [isBuyDropdownOpen, setIsBuyDropdownOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -33,7 +33,7 @@ export default function TntHouse() {
 
   const chatEndRef = useRef(null);
 
-  // Fetch live $MRDT price
+  // Live $MRDT price
   useEffect(() => {
     const fetchPrice = async () => {
       try {
@@ -43,84 +43,84 @@ export default function TntHouse() {
           const price = parseFloat(data.pairs[0].priceUsd);
           if (price > 0) setMrdtPrice(price);
         }
-      } catch (e) {
-        console.log('Using default MRDT price');
-      }
+      } catch (e) {}
     };
     fetchPrice();
-    const interval = setInterval(fetchPrice, 60000); // refresh every minute
+    const interval = setInterval(fetchPrice, 60000);
     return () => clearInterval(interval);
   }, []);
 
   const getAmountForTier = (tier) => {
-    const usdAmount = tier === 'fast' ? 40 : tier === 'vip' ? 120 : 10;
-    return Math.round(usdAmount / mrdtPrice);
+    const usd = tier === 'fast' ? 40 : tier === 'vip' ? 120 : 10;
+    return Math.round(usd / mrdtPrice);
   };
 
   const getTierLabel = (tier) => {
-    const amount = getAmountForTier(tier);
-    if (tier === 'basic') return `Базовый Аудит — $10 ≈ ${amount.toLocaleString()} $MRDT`;
-    if (tier === 'fast') return `Быстрый Листинг — $40 ≈ ${amount.toLocaleString()} $MRDT`;
-    return `VIP-Буст (Баннер 24ч) — $120 ≈ ${amount.toLocaleString()} $MRDT`;
+    const amt = getAmountForTier(tier);
+    if (tier === 'basic') return `Базовый — $10 ≈ ${amt.toLocaleString()} $MRDT`;
+    if (tier === 'fast') return `Быстрый — $40 ≈ ${amt.toLocaleString()} $MRDT`;
+    return `VIP — $120 ≈ ${amt.toLocaleString()} $MRDT`;
   };
 
+  // Solana Pay (как утром)
   const handleFormSubmit = (e) => {
     e.preventDefault();
-    
     if (!formData.projectName || !formData.ca || !formData.email) {
-      setError('Пожалуйста, заполни все поля формы!');
+      setError('Заполни все поля!');
       return;
     }
 
     setIsSending(true);
 
-    const mrdtAmount = getAmountForTier(selectedTier);
-    const label = encodeURIComponent(`TNT House ${selectedTier} Audit`);
-    const message = encodeURIComponent(`Аудит для ${formData.projectName}`);
+    const amount = getAmountForTier(selectedTier);
+    const label = encodeURIComponent(`TNT House ${selectedTier}`);
+    const msg = encodeURIComponent(`Аудит: ${formData.projectName}`);
 
-    const solanaPayUrl = `solana:${WALLET_ADDRESS}?amount=${mrdtAmount}&spl-token=${MRDT_CA}&label=${label}&message=${message}`;
-    window.location.href = solanaPayUrl;
+    const payUrl = `solana:${WALLET_ADDRESS}?amount=${amount}&spl-token=${MRDT_CA}&label=${label}&message=${msg}`;
+    window.location.href = payUrl;
 
     setTimeout(() => {
       const newToken = {
         name: formData.projectName,
         symbol: formData.projectName.slice(0,4).toUpperCase(),
         ca: formData.ca,
-        price: (Math.random() * 0.00005 + 0.000001).toFixed(8),
-        liquidity: Math.floor(Math.random() * 80000) + 8000,
-        volume24h: Math.floor(Math.random() * 120000) + 15000,
-        priceChange24h: (Math.random() * 25 - 3).toFixed(1),
+        price: (Math.random()*0.00005+0.000001).toFixed(8),
+        liquidity: Math.floor(Math.random()*80000)+8000,
+        volume24h: Math.floor(Math.random()*120000)+15000,
+        priceChange24h: (Math.random()*25-3).toFixed(1),
         verified: true,
-        dexUrl: `https://dexscreener.com/solana/${formData.ca}`,
-        chain: 'solana'
+        dexUrl: `https://dexscreener.com/solana/${formData.ca}`
       };
-
       setTokens(prev => [newToken, ...prev]);
       setSubmitted(true);
       setFormData({ projectName: '', ca: '', email: '' });
       setError('');
-
-      setLogs(prev => [...prev.slice(-12), 
-        `[${new Date().toLocaleTimeString()}] [✅ ОПЛАТА] Заявка "${formData.projectName}" — ${mrdtAmount.toLocaleString()} $MRDT отправлено. Токен добавлен!`
-      ]);
-
+      setLogs(prev => [...prev.slice(-10), `[${new Date().toLocaleTimeString()}] [✅] Оплата ${amount.toLocaleString()} $MRDT отправлена. Токен добавлен!`]);
       setIsSending(false);
-      setTimeout(() => setSubmitted(false), 4500);
-    }, 2200);
+      setTimeout(() => setSubmitted(false), 4000);
+    }, 2000);
   };
 
   const handleSendChat = (e) => {
     e.preventDefault();
     if (!userMsg.trim()) return;
-
     setChatMessages(prev => [...prev, { sender: 'user', text: userMsg }]);
     setUserMsg('');
     setIsTyping(true);
 
     setTimeout(() => {
-      setChatMessages(prev => [...prev, { sender: 'bot', text: 'Анализирую CA... Токен добавлен в таблицу с оценкой! ⚽️' }]);
+      setChatMessages(prev => [...prev, { sender: 'bot', text: 'Анализирую... Токен добавлен в таблицу с оценкой! ⚽️' }]);
       setIsTyping(false);
-    }, 1100);
+    }, 1000);
+  };
+
+  // Jupiter
+  const handleLaunchJupiter = () => {
+    window.open(`https://jup.ag/swap?sell=So11111111111111111111111111111111111111112&buy=${MRDT_CA}`, '_blank');
+  };
+
+  const handleOpenRaydium = () => {
+    window.open('https://raydium.io/liquidity/increase/?mode=add&pool_id=6cMTXZyCrnut7Lv39qt4dqEARbC2jbebvhzdCR1t2HEV', '_blank');
   };
 
   return (
@@ -143,12 +143,12 @@ export default function TntHouse() {
         <header className="border-b border-purple-500/30 backdrop-blur-lg bg-slate-950/60 sticky top-0 z-50">
           <div className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <a href="https://t.me/tnt_house2026" target="_blank" rel="noopener noreferrer" className="w-10 h-10 border-2 border-purple-500 rounded-lg flex items-center justify-center bg-purple-500/10 shadow-[0_0_15px_rgba(153,69,255,0.4)] animate-pulse">
+              <a href="https://t.me/tnt_house2026" target="_blank" className="w-10 h-10 border-2 border-purple-500 rounded-lg flex items-center justify-center bg-purple-500/10 shadow-[0_0_15px_rgba(153,69,255,0.4)] animate-pulse">
                 <span className="text-xl">🧨</span>
               </a>
               <div>
                 <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-emerald-400 tracking-wider">TNT HOUSE</h1>
-                <span className="text-[10px] text-purple-400 block font-bold tracking-widest">TOP NEW TOKENS + LIVE PRICE</span>
+                <span className="text-[10px] text-purple-400 block font-bold tracking-widest">TOP NEW TOKENS v1.1 + LIVE PRICE</span>
               </div>
             </div>
             
@@ -159,10 +159,10 @@ export default function TntHouse() {
                 </button>
                 {isBuyDropdownOpen && (
                   <div className="absolute right-0 mt-2 w-48 bg-slate-900 border border-purple-500/30 rounded-lg shadow-xl z-50 py-1 text-sm">
-                    <button onClick={() => { setIsBuyDropdownOpen(false); window.open(`https://jup.ag/swap?sell=So11111111111111111111111111111111111111112&buy=${MRDT_CA}`, '_blank'); }} className="w-full text-left px-4 py-2.5 hover:bg-purple-500/10 text-emerald-400 flex items-center gap-2 text-sm">
+                    <button onClick={handleLaunchJupiter} className="w-full text-left px-4 py-2.5 hover:bg-purple-500/10 text-emerald-400 flex items-center gap-2 text-sm">
                       <ExternalLink className="w-4 h-4" /> Jupiter Swap
                     </button>
-                    <button onClick={() => { setIsBuyDropdownOpen(false); window.open('https://raydium.io/liquidity/increase/?mode=add&pool_id=6cMTXZyCrnut7Lv39qt4dqEARbC2jbebvhzdCR1t2HEV', '_blank'); }} className="w-full text-left px-4 py-2.5 hover:bg-purple-500/10 text-emerald-400 flex items-center gap-2 text-sm">
+                    <button onClick={handleOpenRaydium} className="w-full text-left px-4 py-2.5 hover:bg-purple-500/10 text-emerald-400 flex items-center gap-2 text-sm">
                       <ExternalLink className="w-4 h-4" /> Raydium
                     </button>
                   </div>
@@ -181,7 +181,7 @@ export default function TntHouse() {
                   Взрываем скамы.<br />Запускаем гемы.
                 </h2>
                 <p className="text-slate-300 text-base leading-relaxed">
-                  Оплати аудит в $MRDT по текущему курсу → ИИ проверяет → Токен в таблице с оценкой.
+                  Оплати $MRDT по текущему курсу → ИИ проверяет → Токен в таблице.
                 </p>
               </div>
             </div>
@@ -215,20 +215,15 @@ export default function TntHouse() {
                   </tr>
                 </thead>
                 <tbody>
-                  <tr onClick={() => {}} className="border-b border-purple-500/30 bg-emerald-500/5 hover:bg-emerald-500/10 transition cursor-pointer">
+                  <tr className="border-b border-purple-500/30 bg-emerald-500/5 hover:bg-emerald-500/10 transition">
                     <td className="p-2 font-bold flex items-center gap-2">
                       <span className="text-lg">⚽️</span>
-                      <div>
-                        <span className="text-emerald-400 font-extrabold text-sm tracking-wider">$MRDT</span>
-                        <div className="text-[9px] text-slate-400">MARADONATOKEN</div>
-                      </div>
+                      <div><span className="text-emerald-400 font-extrabold text-sm tracking-wider">$MRDT</span><div className="text-[9px] text-slate-400">MARADONATOKEN</div></div>
                     </td>
                     <td className="p-2 font-mono text-emerald-400 font-bold">${mrdtPrice.toFixed(8)}</td>
                     <td className="p-2 font-mono text-emerald-400 font-bold">$13,000+</td>
                     <td className="p-2 text-center">
-                      <div className="inline-flex items-center justify-center w-14 h-7 rounded-full bg-emerald-500/20 border border-emerald-500 text-emerald-400 text-[11px] font-extrabold tracking-widest shadow-[0_0_10px_rgba(16,185,129,0.5)]">
-                        98
-                      </div>
+                      <div className="inline-flex items-center justify-center w-14 h-7 rounded-full bg-emerald-500/20 border border-emerald-500 text-emerald-400 text-[11px] font-extrabold tracking-widest shadow-[0_0_10px_rgba(16,185,129,0.5)]">98</div>
                     </td>
                   </tr>
 
@@ -236,18 +231,11 @@ export default function TntHouse() {
                     const score = getSafetyScore(token);
                     const style = getScoreStyle(score);
                     return (
-                      <tr key={i} onClick={() => {}} className="border-b border-purple-500/10 hover:bg-purple-500/5 transition cursor-pointer">
-                        <td className="p-2 font-bold">
-                          <span className="text-purple-400">${token.symbol}</span>
-                          <span className="text-[9px] text-slate-500 block font-normal truncate max-w-[120px]">{token.name}</span>
-                        </td>
+                      <tr key={i} className="border-b border-purple-500/10 hover:bg-purple-500/5 transition">
+                        <td className="p-2 font-bold"><span className="text-purple-400">${token.symbol}</span><span className="text-[9px] text-slate-500 block font-normal truncate max-w-[120px]">{token.name}</span></td>
                         <td className="p-2 font-mono text-slate-300">${token.price}</td>
                         <td className="p-2 font-mono text-slate-300">{formatNumber(token.liquidity)}</td>
-                        <td className="p-2 text-center">
-                          <div className={`inline-flex items-center justify-center w-14 h-7 rounded-full ${style.bg} ${style.border} ${style.color} text-[11px] font-extrabold tracking-widest ${style.glow}`}>
-                            {score}
-                          </div>
-                        </td>
+                        <td className="p-2 text-center"><div className={`inline-flex items-center justify-center w-14 h-7 rounded-full ${style.bg} ${style.border} ${style.color} text-[11px] font-extrabold tracking-widest ${style.glow}`}>{score}</div></td>
                       </tr>
                     );
                   })}
@@ -261,9 +249,7 @@ export default function TntHouse() {
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <div className="space-y-4">
               <h3 className="text-2xl font-black text-purple-400">Подай заявку на ИИ-Аудит</h3>
-              <p className="text-slate-300 text-sm leading-relaxed">
-                Оплата автоматически считается по текущему курсу $MRDT
-              </p>
+              <p className="text-slate-300 text-sm leading-relaxed">Оплата автоматически считается по текущему курсу $MRDT</p>
 
               <div className="mt-6 border-t border-purple-500/20 pt-4 space-y-3">
                 <h4 className="text-sm font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400 flex items-center gap-1.5">
@@ -287,7 +273,6 @@ export default function TntHouse() {
                     <span className="text-emerald-400 font-bold">≈ {getAmountForTier('vip').toLocaleString()} $MRDT</span>
                   </div>
                 </div>
-                <div className="text-[10px] text-zinc-500">Курс $MRDT обновляется автоматически</div>
               </div>
             </div>
 
@@ -338,7 +323,7 @@ export default function TntHouse() {
 
         <footer className="border-t border-purple-500/20 mt-12 py-6 bg-slate-950/60 backdrop-blur-lg">
           <div className="max-w-7xl mx-auto px-6 text-center space-y-2">
-            <div className="text-purple-400 font-bold text-sm tracking-widest">TNT HOUSE v1.2 • LIVE PRICE + SOLANA PAY</div>
+            <div className="text-purple-400 font-bold text-sm tracking-widest">TNT HOUSE v1.1 • SOLANA PAY + LIVE PRICE</div>
           </div>
         </footer>
       </div>
@@ -352,21 +337,15 @@ export default function TntHouse() {
           <div className="bg-gradient-to-r from-purple-600 to-emerald-500 p-4 flex items-center justify-between border-b border-purple-500/20">
             <div className="flex items-center gap-2">
               <span className="text-xl">🤖</span>
-              <div>
-                <h4 className="font-bold text-xs text-white">TNT AI INSPECTOR</h4>
-              </div>
+              <div><h4 className="font-bold text-xs text-white">TNT AI INSPECTOR</h4></div>
             </div>
-            <button onClick={() => setIsChatOpen(false)} className="text-white hover:text-slate-200">
-              <X className="w-4 h-4" />
-            </button>
+            <button onClick={() => setIsChatOpen(false)} className="text-white hover:text-slate-200"><X className="w-4 h-4" /></button>
           </div>
 
           <div className="flex-1 p-4 overflow-y-auto space-y-3 scrollbar-thin scrollbar-thumb-purple-500/20 text-xs">
             {chatMessages.map((msg, i) => (
               <div key={i} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[80%] rounded-lg p-2.5 leading-relaxed ${msg.sender === 'user' ? 'bg-purple-500/20 text-purple-200 border border-purple-500/30' : 'bg-slate-950 text-emerald-400 border border-emerald-500/30'}`}>
-                  {msg.text}
-                </div>
+                <div className={`max-w-[80%] rounded-lg p-2.5 leading-relaxed ${msg.sender === 'user' ? 'bg-purple-500/20 text-purple-200 border border-purple-500/30' : 'bg-slate-950 text-emerald-400 border border-emerald-500/30'}`}>{msg.text}</div>
               </div>
             ))}
             {isTyping && <div className="flex justify-start"><div className="bg-slate-950 text-emerald-400 border border-emerald-500/30 rounded-lg p-2.5 animate-pulse text-[11px]">TNT Inspector думает...</div></div>}
@@ -374,10 +353,8 @@ export default function TntHouse() {
           </div>
 
           <form onSubmit={handleSendChat} className="p-3 border-t border-purple-500/20 bg-slate-950 flex gap-2">
-            <input type="text" value={userMsg} onChange={(e) => setUserMsg(e.target.value)} placeholder="Спроси у ИИ..." className="flex-1 bg-slate-900 border border-purple-500/20 rounded px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" />
-            <button type="submit" className="bg-purple-500 hover:bg-purple-400 text-slate-950 px-3 rounded text-xs font-bold transition">
-              <Send className="w-3.5 h-3.5" />
-            </button>
+            <input type="text" value={userMsg} onChange={(e) => setUserMsg(e.target.value)} placeholder="Спроси у ИИ..." className="flex-1 bg-slate-909 border border-purple-500/20 rounded px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" />
+            <button type="submit" className="bg-purple-500 hover:bg-purple-400 text-slate-950 px-3 rounded text-xs font-bold transition"><Send className="w-3.5 h-3.5" /></button>
           </form>
         </div>
       )}
