@@ -9,9 +9,6 @@ import {
 const WALLET_ADDRESS = "AZyzUySu6HP9ocJYhZECG5syycYNV6ubTQKyfB2mDWgG";
 const MRDT_CA = "8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg";
 
-// GOOGLE SHEETS - ЗАМЕНИ НА СВОЙ SCRIPT ID
-const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/d/YOUR_DEPLOYMENT_ID/usercopy';
-
 export default function TntHouse() {
   const [tokens, setTokens] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -36,8 +33,7 @@ export default function TntHouse() {
   // Live AI Terminal Logs
   const [logs, setLogs] = useState([
     '[ИИ-Инспектор] Инициализация системы безопасности TNT House...',
-    '[СЕТЬ] Подключение к RPC узлам Solana завершено успешно.',
-    '[GOOGLE SHEETS] Синхронизация с облаком готова...'
+    '[СЕТЬ] Подключение к RPC узлам Solana завершено успешно.'
   ]);
 
   // TNT Security Blueprint Modal
@@ -91,10 +87,30 @@ export default function TntHouse() {
   }, []);
 
   const handleLaunchJupiter = () => {
-    window.open(
-      `https://jup.ag/swap?sell=So11111111111111111111111111111111111111112&buy=${MRDT_CA}`,
-      '_blank'
-    );
+    if (window.Jupiter) {
+      window.Jupiter.init({
+        displayMode: "modal",
+        mintAccounts: { 
+          input: 'So11111111111111111111111111111111111111112', 
+          output: MRDT_CA 
+        },
+        endpoint: "https://api.mainnet-beta.solana.com",
+        strictTokenList: false,
+        containerStyles: { zIndex: 100 },
+        formProps: {
+          fixedOutputMint: true,
+        },
+        platformFeeBps: 20,
+        feeAccounts: new Map([
+          [MRDT_CA, WALLET_ADDRESS]
+        ])
+      });
+    } else {
+      window.open(
+        `https://jup.ag/swap?inputMint=So11111111111111111111111111111111111111112&outputMint=${MRDT_CA}`,
+        '_blank'
+      );
+    }
   };
 
   const handleOpenRaydium = () => {
@@ -124,8 +140,6 @@ export default function TntHouse() {
       'ИИ-Агент: Сканирование завершено. Уровень угрозы: НИЗКИЙ.',
       'Анализ холдеров: скрытых бандлов не обнаружено.',
       'Подключение к API DexScreener.',
-      '[GOOGLE SHEETS] Новая заявка синхронизирована в облако ✓',
-      'VIP-проект MARADONATOKEN ($MRDT) проверен. Безопасность: 100%.',
       'Мониторинг "окопов" запущен. Ищем новые гемы...'
     ];
 
@@ -344,7 +358,7 @@ export default function TntHouse() {
                 </button>
                 
                 {isBuyDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-slate-900 border border-purple-500/30 rounded-lg shadow-xl z-50 py-1 text-sm">
+                  <div className="absolute right-0 mt-2 w-48 bg-slate-909 border border-purple-500/30 rounded-lg shadow-xl z-50 py-1 text-sm">
                     <button onClick={handleLaunchJupiter} className="w-full text-left px-4 py-2.5 hover:bg-purple-500/10 text-emerald-400 flex items-center gap-2 text-sm">
                       <ExternalLink className="w-4 h-4" /> Jupiter Swap
                     </button>
@@ -378,7 +392,7 @@ export default function TntHouse() {
 
               <div className="grid grid-cols-3 gap-4 mt-8">
                 {pillars.map((item, i) => (
-                  <div key={i} className="bg-slate-900/50 border border-purple-500/20 rounded-lg p-3 text-center hover:border-purple-500/60 transition duration-300 shadow-md">
+                  <div key={i} className="bg-slate-909/50 border border-purple-500/20 rounded-lg p-3 text-center hover:border-purple-500/60 transition duration-300 shadow-md">
                     <item.icon className={`w-5 h-5 ${item.color} mx-auto mb-1`} />
                     <div className="text-[11px] font-bold text-slate-200">{item.label}</div>
                     <div className="text-[9px] text-slate-400 font-mono">{item.desc}</div>
@@ -410,7 +424,7 @@ export default function TntHouse() {
 
         {/* Table with Safety Score */}
         <section className="max-w-7xl mx-auto px-6 py-6">
-          <div className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 backdrop-blur-md p-6 shadow-[0_0_25px_rgba(153,69,255,0.2)]">
+          <div className="border-2 border-purple-500/30 rounded-lg bg-slate-909/40 backdrop-blur-md p-6 shadow-[0_0_25px_rgba(153,69,255,0.2)]">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400 flex items-center gap-2">
@@ -532,15 +546,15 @@ export default function TntHouse() {
                     <span className="text-slate-300">🎁 Первые 3 токена</span>
                     <span className="text-emerald-400 font-bold">БЕСПЛАТНО</span>
                   </div>
-                  <div className="flex justify-between p-2.5 bg-slate-900 border border-purple-500/10 rounded-lg">
+                  <div className="flex justify-between p-2.5 bg-slate-909 border border-purple-500/10 rounded-lg">
                     <span className="text-slate-300">🔍 Базовый ИИ-Аудит (Очередь 24ч)</span>
                     <span className="text-emerald-400 font-bold">$10 в $MRDT ≈ {getAmountForTier('basic').toLocaleString()} $MRDT</span>
                   </div>
-                  <div className="flex justify-between p-2.5 bg-slate-900 border border-purple-500/10 rounded-lg">
+                  <div className="flex justify-between p-2.5 bg-slate-909 border border-purple-500/10 rounded-lg">
                     <span className="text-slate-300">⚡ Быстрый Листинг (За 5 минут)</span>
                     <span className="text-emerald-400 font-bold">$40 в $MRDT ≈ {getAmountForTier('fast').toLocaleString()} $MRDT</span>
                   </div>
-                  <div className="flex justify-between p-2.5 bg-slate-900 border border-purple-500/10 rounded-lg">
+                  <div className="flex justify-between p-2.5 bg-slate-909 border border-purple-500/10 rounded-lg">
                     <span className="text-slate-300">👑 VIP-Буст (Баннер на главную 24ч)</span>
                     <span className="text-emerald-400 font-bold">$120 в $MRDT ≈ {getAmountForTier('vip').toLocaleString()} $MRDT</span>
                   </div>
@@ -548,7 +562,7 @@ export default function TntHouse() {
               </div>
             </div>
 
-            <div className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 p-6 backdrop-blur-md">
+            <div className="border-2 border-purple-500/30 rounded-lg bg-slate-909/40 p-6 backdrop-blur-md">
               <form onSubmit={handleFormSubmit} className="space-y-4">
                 <div>
                   <label className="block text-purple-400 text-xs font-bold mb-1.5">Название проекта</label>
@@ -679,7 +693,7 @@ export default function TntHouse() {
               </div>
 
               {/* Foundation */}
-              <div className="bg-slate-900/60 border border-purple-500/20 rounded-xl p-5">
+              <div className="bg-slate-909/60 border border-purple-500/20 rounded-xl p-5">
                 <div className="flex items-center gap-2 mb-3 text-emerald-400">
                   <div className="w-2 h-2 bg-emerald-400 rounded-full"></div>
                   <div className="font-bold tracking-wider text-sm">🧱 ФУНДАМЕНТ (Mint & Freeze)</div>
@@ -718,7 +732,7 @@ export default function TntHouse() {
 
       {/* AI Chat Popup */}
       {isChatOpen && (
-        <div className="fixed bottom-24 right-6 w-80 md:w-96 h-[450px] bg-slate-900 border-2 border-purple-500 rounded-xl shadow-[0_0_30px_rgba(153,69,255,0.4)] flex flex-col overflow-hidden z-50 font-mono">
+        <div className="fixed bottom-24 right-6 w-80 md:w-96 h-[450px] bg-slate-909 border-2 border-purple-500 rounded-xl shadow-[0_0_30px_rgba(153,69,255,0.4)] flex flex-col overflow-hidden z-50 font-mono">
           <div className="bg-gradient-to-r from-purple-600 to-emerald-500 p-4 flex items-center justify-between border-b border-purple-500/20">
             <div className="flex items-center gap-2">
               <span className="text-xl">🤖</span>
@@ -750,7 +764,7 @@ export default function TntHouse() {
               value={userMsg} 
               onChange={(e) => setUserMsg(e.target.value)} 
               placeholder="Спроси у ИИ..." 
-              className="flex-1 bg-slate-900 border border-purple-500/20 rounded px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" 
+              className="flex-1 bg-slate-909 border border-purple-500/20 rounded px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" 
             />
             <button type="submit" className="bg-purple-500 hover:bg-purple-400 text-slate-950 px-3 rounded text-xs font-bold transition">
               <Send className="w-3.5 h-3.5" />
