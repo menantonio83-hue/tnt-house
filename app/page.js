@@ -137,7 +137,7 @@ export default function TntHouse() {
         <p className="text-xl text-zinc-400">Оплати $MRDT → ИИ проверяет → Токен в таблице с оценкой</p>
       </div>
 
-      {/* AI Terminal */}
+      {/* AI Scanner Terminal */}
       <div className="max-w-5xl mx-auto px-6 mb-10">
         <div className="bg-zinc-950 border border-purple-500/30 rounded-2xl p-5">
           <div className="flex items-center gap-2 mb-2 text-purple-400"><Sparkles className="w-4 h-4" /> AI SCANNER LIVE</div>
@@ -178,7 +178,7 @@ export default function TntHouse() {
         </div>
       </div>
 
-      {/* Form */}
+      {/* Form Section */}
       <div className="max-w-2xl mx-auto px-6 pb-16">
         <div className="bg-zinc-950 border border-purple-500/30 rounded-3xl p-8">
           <div className="text-center mb-8">
@@ -217,8 +217,16 @@ export default function TntHouse() {
         </div>
       </div>
 
+      {/* Whale Club */}
+      <div className="max-w-5xl mx-auto px-6 pb-16">
+        <div className="bg-gradient-to-r from-purple-500/10 to-emerald-500/10 border border-purple-500/30 rounded-3xl p-10 text-center">
+          <div className="text-3xl font-black mb-3">🐋 TNT WHALE CLUB (DAO)</div>
+          <p className="text-zinc-300 mb-6">Держи $MRDT и получи доступ к закрытому чату. Первым узнавай о новых гемах!</p>
+          <a href="https://t.me/tnt_house2026" target="_blank" className="inline-block bg-purple-600 hover:bg-purple-500 px-8 py-3 rounded-2xl font-bold">Вступить в VIP-Клуб →</a>
+        </div>
+      </div>
+
       <div className="text-center text-xs text-zinc-500 pb-10">Powered by $MRDT • Solana Pay • AI Audits</div>
     </div>
   );
 }
-// Force new Vercel build - updated 2026-06-16
