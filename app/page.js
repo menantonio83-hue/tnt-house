@@ -14,6 +14,7 @@ const MRDT_MINT = new PublicKey(MRDT_CA);
 const RECIPIENT_WALLET = new PublicKey(WALLET_ADDRESS);
 const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
 const MRDT_DECIMALS = 6;
+
 const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
 const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey('ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL');
 
@@ -27,10 +28,10 @@ const getRecipientTokenAccount = async () => {
 // --------------------------------------------------------
 
 export default function TntHouse() {
+  // ---------- ВСЕ ОРИГИНАЛЬНЫЕ СТЕЙТЫ ----------
   const [tokens, setTokens] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Forms States
   const [formData, setFormData] = useState({ projectName: '', ca: '', email: '' });
   const [bannerFormData, setBannerFormData] = useState({ tokenName: '', bannerImg: '', desc: '', days: '1' });
 
@@ -43,13 +44,9 @@ export default function TntHouse() {
   const [isSending, setIsSending] = useState(false);
   const [isBannerSending, setIsBannerSending] = useState(false);
 
-  // VIP Banner State
   const [activeBanner, setActiveBanner] = useState(null);
-
-  // Buy Dropdown
   const [isBuyDropdownOpen, setIsBuyDropdownOpen] = useState(false);
 
-  // AI Chat states
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState([
     { sender: 'bot', text: 'Привет! Я ИИ-Инспектор TNT House. Спроси меня про любой контракт или токен $MRDT. ⚽️' }
@@ -57,24 +54,22 @@ export default function TntHouse() {
   const [userMsg, setUserMsg] = useState('');
   const [isTyping, setIsTyping] = useState(false);
 
-  // Live AI Terminal Logs
   const [logs, setLogs] = useState([
     '[ИИ-Инспектор] Инициализация системы безопасности TNT House...',
     '[СЕТЬ] Подключение к RPC узлам Solana завершено успешно.'
   ]);
 
-  // TNT Security Blueprint Modal
   const [isBlueprintOpen, setIsBlueprintOpen] = useState(false);
   const [selectedToken, setSelectedToken] = useState(null);
 
   const chatEndRef = useRef(null);
 
-  // New payment modal states
+  // Новые стейты для модалки оплаты
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [txSignature, setTxSignature] = useState('');
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [paymentError, setPaymentError] = useState('');
-  const [pendingAction, setPendingAction] = useState(null); // { type: 'audit' | 'banner', amount }
+  const [pendingAction, setPendingAction] = useState(null);
 
   // Pillars
   const pillars = [
@@ -83,7 +78,6 @@ export default function TntHouse() {
     { icon: Lock, label: 'DAO Лицензия', desc: 'Через $MRDT', color: 'text-purple-400' }
   ];
 
-  // Fallback tokens
   const fallbackTokens = [
     { name: 'Test Gem', symbol: 'TGEM', ca: '11111111111111111111111111111111', price: '0.00001234', liquidity: 45000, volume24h: 120000, priceChange24h: 8.5, verified: true, dexUrl: 'https://dexscreener.com', chain: 'solana' }
   ];
@@ -111,7 +105,7 @@ export default function TntHouse() {
     setTimeout(() => setSelectedToken(null), 300);
   };
 
-  // Load Jupiter script
+  // Jupiter скрипт
   useEffect(() => {
     const script = document.createElement('script');
     script.src = 'https://terminal.jup.ag/main-v3.js';
@@ -120,7 +114,7 @@ export default function TntHouse() {
     return () => { if (document.head.contains(script)) document.head.removeChild(script); };
   }, []);
 
-  // VIP Banner Auto-check Timer
+  // Баннер из localStorage
   useEffect(() => {
     const checkBannerStatus = () => {
       const storedBanner = localStorage.getItem('tnt_active_banner');
@@ -178,12 +172,12 @@ export default function TntHouse() {
     }
   };
 
-  // Live Logs Simulation
+  // Логи
   useEffect(() => {
     const logTemplates = [
       'Обнаружен новый пул на Raydium! Анализ ликвидности...',
       'Сканирование RugCheck: Mint Authority отключена ✓.',
-      'ИИ-Агент: Сканирование завершено. Уровень угроза: НИЗКИЙ.',
+      'ИИ-Агент: Сканирование завершено. Уровень угрозы: НИЗКИЙ.',
       'Анализ холдеров: скрытых бандлов не обнаружено.',
       'Подключение к API DexScreener.',
       'Мониторинг "окопов" запущен. Ищем новые гемы...'
@@ -196,7 +190,7 @@ export default function TntHouse() {
     return () => clearInterval(interval);
   }, []);
 
-  // Fetch tokens
+  // Загрузка токенов
   useEffect(() => {
     const fetchTokens = async () => {
       try {
@@ -212,10 +206,7 @@ export default function TntHouse() {
         const data = await response.json();
         if (data.pairs && data.pairs.length > 0) {
           const filtered = data.pairs
-            .filter(p => {
-              const mc = p.marketCap || 0;
-              return mc >= 1000 && mc <= 300000;
-            })
+            .filter(p => { const mc = p.marketCap || 0; return mc >= 1000 && mc <= 300000; })
             .slice(0, 9)
             .map(p => ({
               name: p.baseToken?.name || 'Unknown',
@@ -248,12 +239,10 @@ export default function TntHouse() {
     return () => clearInterval(interval);
   }, []);
 
-  // Auto scroll chat
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
 
-  // Live MRDT Price
   const [mrdtPrice, setMrdtPrice] = useState(0.000013);
   useEffect(() => {
     const fetchPrice = async () => {
@@ -281,7 +270,7 @@ export default function TntHouse() {
     return Math.round(usd / mrdtPrice);
   };
 
-  // ---------- НОВАЯ ПРОВЕРКА ОПЛАТЫ ----------
+  // ---------- ОПЛАТА: ПРОВЕРКА ТРАНЗАКЦИИ ----------
   const verifyPayment = async (signature, expectedAmount) => {
     try {
       const tx = await connection.getTransaction(signature, {
@@ -289,19 +278,23 @@ export default function TntHouse() {
         maxSupportedTransactionVersion: 0,
       });
       if (!tx) throw new Error('Транзакция не найдена');
+
       const recipientATA = await getRecipientTokenAccount();
       const postBalances = tx.meta?.postTokenBalances || [];
       const preBalances = tx.meta?.preTokenBalances || [];
+
       const ourPost = postBalances.find(
         (b) => b.mint === MRDT_CA && b.owner === WALLET_ADDRESS
       );
       if (!ourPost) throw new Error('Перевод не на ваш токен-аккаунт');
+
       const postAmt = BigInt(ourPost.uiTokenAmount.amount);
       const preOur = preBalances.find(
         (b) => b.mint === MRDT_CA && b.owner === WALLET_ADDRESS
       );
       const preAmt = preOur ? BigInt(preOur.uiTokenAmount.amount) : 0n;
       const diff = postAmt - preAmt;
+
       if (diff < BigInt(expectedAmount)) {
         throw new Error(`Недостаточная сумма: получено ${diff.toString()} минимальных единиц`);
       }
@@ -330,7 +323,7 @@ export default function TntHouse() {
       setError('Пожалуйста, заполни все поля формы!');
       return;
     }
-    handlePayAudit(); // открываем модалку оплаты
+    handlePayAudit();
   };
 
   const handleBannerSubmit = (e) => {
@@ -339,10 +332,10 @@ export default function TntHouse() {
       setBannerError('Укажите название и описание для баннера!');
       return;
     }
-    handlePayBanner(); // открываем модалку оплаты
+    handlePayBanner();
   };
 
-  // REAL AI Chat
+  // ИИ чат
   const handleSendChat = async (e) => {
     e.preventDefault();
     if (!userMsg.trim()) return;
@@ -370,10 +363,10 @@ export default function TntHouse() {
     return `$${num.toFixed(2)}`;
   };
 
-  // ---------- ПОЛНЫЙ ИНТЕРФЕЙС ----------
+  // ---------- UI ----------
   return (
     <div className="min-h-screen bg-black text-white font-sans">
-      {/* Верхний баннер (если активен) */}
+      {/* Верхний баннер */}
       {activeBanner && (
         <div className="bg-gradient-to-r from-purple-900 to-purple-700 p-4 text-center animate-pulse">
           <strong>{activeBanner.tokenName}</strong> — {activeBanner.desc}
@@ -594,7 +587,7 @@ export default function TntHouse() {
         </div>
       )}
 
-      {/* ИИ-Чат (кнопка и окно) */}
+      {/* ИИ-Чат кнопка и окно */}
       <button onClick={() => setIsChatOpen(!isChatOpen)} className="fixed bottom-5 right-5 bg-purple-600 p-4 rounded-full shadow-lg z-40 hover:bg-purple-700">
         <MessageSquare />
       </button>
@@ -618,7 +611,7 @@ export default function TntHouse() {
         </div>
       )}
 
-      {/* Лог-панель (снизу) */}
+      {/* Лог-панель */}
       <footer className="p-4 text-xs text-gray-500 border-t border-gray-800 mt-8 space-y-1">
         {logs.slice(-5).map((log, i) => <div key={i} className="font-mono">{log}</div>)}
       </footer>
