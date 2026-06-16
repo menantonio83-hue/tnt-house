@@ -82,7 +82,7 @@ export default function TntHouse() {
     setTimeout(() => setSelectedToken(null), 300);
   };
 
-  // Load Jupiter script
+  // Load Jupiter script (оставляем, но не используем как основной способ)
   useEffect(() => {
     const script = document.createElement('script');
     script.src = 'https://terminal.jup.ag/main-v3.js';
@@ -91,32 +91,14 @@ export default function TntHouse() {
     return () => { if (document.head.contains(script)) document.head.removeChild(script); };
   }, []);
 
+  // Jupiter теперь всегда открывает прямую ссылку (более стабильно)
   const handleLaunchJupiter = () => {
-    if (window.Jupiter) {
-      window.Jupiter.init({
-        displayMode: "modal",
-        mintAccounts: { 
-          input: 'So11111111111111111111111111111111111111112', 
-          output: MRDT_CA 
-        },
-        endpoint: "https://api.mainnet-beta.solana.com",
-        strictTokenList: false,
-        containerStyles: { zIndex: 100 },
-        formProps: {
-          fixedOutputMint: true,
-        },
-        platformFeeBps: 20,
-        feeAccounts: new Map([
-          [MRDT_CA, WALLET_ADDRESS]
-        ])
-      });
-    } else {
-      // Обновлённая ссылка Jupiter Swap (sell SOL → buy $MRDT)
-      window.open(
-        'https://jup.ag/swap?sell=So11111111111111111111111111111111111111112&buy=8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg',
-        '_blank'
-      );
-    }
+    // Прямая ссылка на Jupiter Swap (sell SOL → buy $MRDT)
+    // Это самый стабильный способ на данный момент
+    window.open(
+      'https://jup.ag/swap?sell=So11111111111111111111111111111111111111112&buy=8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg',
+      '_blank'
+    );
   };
 
   const handleOpenRaydium = () => {
