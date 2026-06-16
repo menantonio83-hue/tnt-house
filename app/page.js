@@ -221,3 +221,4 @@ export default function TntHouse() {
     </div>
   );
 }
+// Force new Vercel build - updated 2026-06-16
