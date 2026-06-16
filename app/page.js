@@ -716,7 +716,6 @@ export default function TntHouse() {
                         onChange={(e) => setBannerFormData({...bannerFormData, bannerImg: e.target.value})} 
                         placeholder="🚀 или ссылка на картинку" 
                         className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" 
-                      />
                     </div>
                   </div>
                   <div>
@@ -947,3 +946,5 @@ export default function TntHouse() {
     </div>
   );
 }
+
+// Version 1.6 - Forced redeploy at 2026-06-16 20:45 CEST
