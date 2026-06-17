@@ -5,9 +5,13 @@ import {
   TrendingUp, Shield, Lock, Zap, Send, MessageSquare, X, 
   RefreshCw, AlertCircle, Sparkles, ExternalLink, ChevronDown, Download, Image
 } from 'lucide-react';
+import { Connection, PublicKey, Transaction } from '@solana/web3.js';
+import { getAssociatedTokenAddress, createTransferInstruction, getAccount } from '@solana/spl-token';
 
-const WALLET_ADDRESS = "AZyzUySu6HP9ocJYhZECG5syycYNV6ubTQKyfB2mDWgG";
+// Адреса
+const WALLET_ADDRESS = "Ev6oXBXo6qyoaT5wypJ2Umxch91F7cFvE1SarYLaUn8Z";
 const MRDT_CA = "8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg";
+const MRDT_DECIMALS = 6;
 
 export default function TntHouse() {
   const [tokens, setTokens] = useState([]);
@@ -50,6 +54,9 @@ export default function TntHouse() {
   const [isBlueprintOpen, setIsBlueprintOpen] = useState(false);
   const [selectedToken, setSelectedToken] = useState(null);
 
+  // Banner wallet modal
+  const [showBannerWalletModal, setShowBannerWalletModal] = useState(false);
+
   const chatEndRef = useRef(null);
 
   // Pillars
@@ -68,7 +75,7 @@ export default function TntHouse() {
     if (!token) return 75;
     if (token.symbol === 'MRDT' || token.symbol === 'MRDT VIP') return 98;
     const hash = token.symbol.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
-    return Math.max(85, Math.min(97, hash % 12 + 85)); // Делаем безопасную оценку для добавленных пользователем
+    return Math.max(85, Math.min(97, hash % 12 + 85));
   };
 
   const getScoreStyle = (score) => {
@@ -87,15 +94,6 @@ export default function TntHouse() {
     setTimeout(() => setSelectedToken(null), 300);
   };
 
-  // Load Jupiter script
-  useEffect(() => {
-    const script = document.createElement('script');
-    script.src = 'https://terminal.jup.ag/main-v3.js';
-    script.async = true;
-    document.head.appendChild(script);
-    return () => { if (document.head.contains(script)) document.head.removeChild(script); };
-  }, []);
-
   // VIP Banner Auto-check Timer
   useEffect(() => {
     const checkBannerStatus = () => {
@@ -111,28 +109,13 @@ export default function TntHouse() {
       }
     };
     checkBannerStatus();
-    const interval = setInterval(checkBannerStatus, 10000); // Проверка каждые 10 сек
+    const interval = setInterval(checkBannerStatus, 10000);
     return () => clearInterval(interval);
   }, []);
 
   const handleLaunchJupiter = () => {
-    if (window.Jupiter) {
-      window.Jupiter.init({
-        displayMode: "modal",
-        mintAccounts: { 
-          input: 'So11111111111111111111111111111111111111112', 
-          output: MRDT_CA 
-        },
-        endpoint: "https://api.mainnet-beta.solana.com",
-        strictTokenList: false,
-        containerStyles: { zIndex: 100 },
-        formProps: { fixedOutputMint: true },
-        platformFeeBps: 20,
-        feeAccounts: new Map([[MRDT_CA, WALLET_ADDRESS]])
-      });
-    } else {
-      window.open(`https://jup.ag/swap?inputMint=So11111111111111111111111111111111111111112&outputMint=${MRDT_CA}`, '_blank');
-    }
+    const url = 'https://jup.ag/swap?sell=So11111111111111111111111111111111111111112&buy=8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg';
+    window.open(url, '_blank');
   };
 
   const handleOpenRaydium = () => {
@@ -236,8 +219,9 @@ export default function TntHouse() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
 
-  // Live MRDT Price
+  // Live MRDT Price + price loading state
   const [mrdtPrice, setMrdtPrice] = useState(0.000013);
+  const [priceLoading, setPriceLoading] = useState(true);
 
   useEffect(() => {
     const fetchPrice = async () => {
@@ -249,6 +233,7 @@ export default function TntHouse() {
           if (price > 0) setMrdtPrice(price);
         }
       } catch (e) {}
+      setPriceLoading(false);
     };
     fetchPrice();
     const interval = setInterval(fetchPrice, 60000);
@@ -265,7 +250,7 @@ export default function TntHouse() {
     return Math.round(usd / mrdtPrice);
   };
 
-  // ACTION 1: Submit Token Audit Form & Inject into Table
+  // Form submit for Audit (unchanged)
   const handleFormSubmit = async (e) => {
     e.preventDefault();
     if (!formData.projectName || !formData.ca || !formData.email) {
@@ -278,7 +263,6 @@ export default function TntHouse() {
     const label = encodeURIComponent(`TNT House ${selectedTier}`);
     const msg = encodeURIComponent(`Аудит: ${formData.projectName}`);
     
-    // Solana Pay Redirect Simulation
     const payUrl = `solana:${WALLET_ADDRESS}?amount=${amount}&spl-token=${MRDT_CA}&label=${label}&message=${msg}`;
     window.location.href = payUrl;
 
@@ -306,39 +290,94 @@ export default function TntHouse() {
     }, 1500);
   };
 
-  // ACTION 2: Submit VIP Banner Form & Automate Switching
-  const handleBannerSubmit = async (e) => {
+  // REAL BANNER PAYMENT – универсально для Phantom и Solflare
+  const handleBannerWalletSelect = async (walletType) => {
+    setShowBannerWalletModal(false);
+    setIsBannerSending(true);
+    setBannerError('');
+
+    if (!window.solana) {
+      setBannerError('Установите Phantom или Solflare. Попробуйте перезагрузить страницу.');
+      setIsBannerSending(false);
+      return;
+    }
+
+    try {
+      const resp = await window.solana.connect();
+      const senderPublicKey = new PublicKey(resp.publicKey.toString());
+
+      const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
+      const mint = new PublicKey(MRDT_CA);
+
+      // Получаем ATA отправителя
+      const fromAta = await getAssociatedTokenAddress(mint, senderPublicKey);
+      try {
+        await getAccount(connection, fromAta);
+      } catch {
+        throw new Error('У вашего кошелька нет ATA для $MRDT. Сначала получите $MRDT на свой кошелёк через BUY $MRDT.');
+      }
+
+      // ATA получателя
+      const toPublicKey = new PublicKey(WALLET_ADDRESS);
+      const toAta = await getAssociatedTokenAddress(mint, toPublicKey);
+
+      // Сумма в минимальных единицах (decimals = 6)
+      const amountUsd = bannerFormData.days === '2' ? 35 : bannerFormData.days === '6' ? 100 : 20;
+      const amountTokens = Math.round(amountUsd / mrdtPrice);
+      const lamportsAmount = amountTokens * Math.pow(10, MRDT_DECIMALS);
+
+      // Создаём инструкцию перевода
+      const transferInstruction = createTransferInstruction(
+        fromAta,
+        toAta,
+        senderPublicKey,
+        lamportsAmount
+      );
+
+      const transaction = new Transaction().add(transferInstruction);
+      transaction.feePayer = senderPublicKey;
+      transaction.recentBlockhash = (await connection.getRecentBlockhash()).blockhash;
+
+      // Отправляем и подписываем
+      const signedTx = await window.solana.signAndSendTransaction(transaction);
+      const signature = signedTx.signature;
+
+      const confirmation = await connection.confirmTransaction(signature, 'confirmed');
+
+      if (confirmation) {
+        // Успех – сохраняем баннер
+        const durationMs = parseInt(bannerFormData.days) * 24 * 60 * 60 * 1000;
+        const bannerData = {
+          tokenName: bannerFormData.tokenName.toUpperCase(),
+          bannerImg: bannerFormData.bannerImg || '🪙',
+          desc: bannerFormData.desc,
+          expiresAt: Date.now() + durationMs,
+        };
+        localStorage.setItem('tnt_active_banner', JSON.stringify(bannerData));
+        setActiveBanner(bannerData);
+        setBannerSubmitted(true);
+        setBannerFormData({ tokenName: '', bannerImg: '', desc: '', days: '1' });
+        setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] [👑 VIP] Транзакция подтверждена! Баннер ${bannerData.tokenName} активен ${bannerFormData.days} дн.`]);
+        setTimeout(() => setBannerSubmitted(false), 5000);
+      } else {
+        throw new Error('Транзакция не подтверждена. Попробуйте ещё раз.');
+      }
+    } catch (err) {
+      console.error("Banner payment error:", err);
+      setBannerError(err.message || 'Ошибка при оплате. Попробуйте снова.');
+    } finally {
+      setIsBannerSending(false);
+    }
+  };
+
+  // Banner submit – открывает модалку выбора
+  const handleBannerSubmit = (e) => {
     e.preventDefault();
     if (!bannerFormData.tokenName || !bannerFormData.desc) {
       setBannerError('Укажите название и описание для баннера!');
       return;
     }
-    setIsBannerSending(true);
-
-    const amount = getAmountForBanner(bannerFormData.days);
-    const label = encodeURIComponent(`TNT Banner ${bannerFormData.days} Days`);
-    const msg = encodeURIComponent(`Реклама: ${bannerFormData.tokenName}`);
-
-    window.location.href = `solana:${WALLET_ADDRESS}?amount=${amount}&spl-token=${MRDT_CA}&label=${label}&message=${msg}`;
-
-    setTimeout(() => {
-      const durationMs = parseInt(bannerFormData.days) * 24 * 60 * 60 * 1000;
-      const bannerData = {
-        tokenName: bannerFormData.tokenName.toUpperCase(),
-        bannerImg: bannerFormData.bannerImg || '🪙',
-        desc: bannerFormData.desc,
-        expiresAt: Date.now() + durationMs
-      };
-
-      localStorage.setItem('tnt_active_banner', JSON.stringify(bannerData));
-      setActiveBanner(bannerData);
-      setBannerSubmitted(true);
-      setBannerFormData({ tokenName: '', bannerImg: '', desc: '', days: '1' });
-      setBannerError('');
-      setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] [👑 VIP] Размещен рекламный баннер токена ${bannerData.tokenName} на ${bannerFormData.days} дн.`]);
-      setIsBannerSending(false);
-      setTimeout(() => setBannerSubmitted(false), 5000);
-    }, 1500);
+    setShowBannerWalletModal(true);
   };
 
   // REAL AI Chat
@@ -436,10 +475,9 @@ export default function TntHouse() {
           </div>
         </header>
 
-        {/* AUTOMATED VIP ADVERTISING BANNER */}
+        {/* VIP Banner Section */}
         <section className="max-w-7xl mx-auto px-6 pt-6">
           {activeBanner ? (
-            /* Оплаченный баннер рекламодателя */
             <div className="border border-purple-500/40 rounded-2xl p-4 bg-gradient-to-r from-black via-purple-950/20 to-black flex flex-col sm:flex-row items-center justify-between gap-4 shadow-[0_0_20px_rgba(168,85,247,0.2)] animate-pulse">
               <div className="flex items-center gap-4">
                 <span className="text-3xl bg-purple-500/10 p-2 rounded-xl border border-purple-500/20">
@@ -456,7 +494,6 @@ export default function TntHouse() {
               </button>
             </div>
           ) : (
-            /* Дефолтный баннер нашего собственного токена $MRDT */
             <div onClick={scrollToForm} className="cursor-pointer border border-purple-500/30 rounded-2xl p-4 bg-gradient-to-r from-black via-purple-950/10 to-black flex flex-col sm:flex-row items-center justify-between gap-4 shadow-[0_0_15px_rgba(153,69,255,0.1)] hover:border-purple-500/60 transition">
               <div className="flex items-center gap-4">
                 <span className="text-3xl bg-purple-500/10 p-2 rounded-xl border border-purple-500/20">⚽️</span>
@@ -626,13 +663,13 @@ export default function TntHouse() {
           </div>
         </section>
 
-        {/* Form Section with Pricing & Automatic Forms */}
+        {/* Order Forms Section */}
         <section id="orderFormsSection" className="max-w-7xl mx-auto px-6 py-8">
           <div className="grid md:grid-cols-2 gap-12 items-start">
             
-            {/* LEFT SIDE: FORMS INTERACTION */}
+            {/* LEFT SIDE: FORMS */}
             <div className="space-y-8">
-              {/* FORM 1: AI AUDIT & LISTING */}
+              {/* FORM 1: AI AUDIT (unchanged) */}
               <div className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 p-6 backdrop-blur-md">
                 <h3 className="text-lg font-black text-purple-400 mb-2 flex items-center gap-2">🔍 ЗАКАЗАТЬ ИИ-ИНСПЕКЦИЮ</h3>
                 <p className="text-slate-400 text-xs mb-4">Авто-добавление в таблицу и выгрузка в Google Sheets облако.</p>
@@ -665,9 +702,9 @@ export default function TntHouse() {
                       onChange={(e) => setSelectedTier(e.target.value)}
                       className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white focus:border-purple-500 focus:outline-none transition font-mono"
                     >
-                      <option value="basic">Базовый Аудит (24ч очереди) — $10 в $MRDT</option>
-                      <option value="fast">Быстрый Листинг (За 5 минут) — $40 в $MRDT</option>
-                      <option value="vip">VIP-Буст (Баннер на главную 24ч) — $120 в $MRDT</option>
+                      <option value="basic">Базовый Аудит (24ч очереди) — $10 {priceLoading ? '(расчёт…)' : `≈ ${getAmountForTier('basic').toLocaleString()} $MRDT`}</option>
+                      <option value="fast">Быстрый Листинг (5 мин) — $40 {priceLoading ? '(расчёт…)' : `≈ ${getAmountForTier('fast').toLocaleString()} $MRDT`}</option>
+                      <option value="vip">VIP-Буст (баннер 24ч) — $120 {priceLoading ? '(расчёт…)' : `≈ ${getAmountForTier('vip').toLocaleString()} $MRDT`}</option>
                     </select>
                   </div>
                   <div>
@@ -691,7 +728,7 @@ export default function TntHouse() {
                 </form>
               </div>
 
-              {/* FORM 2: AUTOMATED BANNER BUYER */}
+              {/* FORM 2: BANNER BUYER (with file upload and wallet modal) */}
               <div className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 p-6 backdrop-blur-md">
                 <h3 className="text-lg font-black text-purple-400 mb-2 flex items-center gap-2">👑 КУПИТЬ VIP-БАННЕР НА ГЛАВНУЮ</h3>
                 <p className="text-slate-400 text-xs mb-4">Полностью автоматическая замена рекламного места на ваш токен.</p>
@@ -709,14 +746,27 @@ export default function TntHouse() {
                       />
                     </div>
                     <div>
-                      <label className="block text-purple-400 text-[11px] font-bold mb-1">Эмодзи или URL логотипа</label>
-                      <input 
-                        type="text" 
-                        value={bannerFormData.bannerImg} 
-                        onChange={(e) => setBannerFormData({...bannerFormData, bannerImg: e.target.value})} 
-                        placeholder="🚀 или ссылка на картинку" 
-                        className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" 
+                      <label className="block text-purple-400 text-[11px] font-bold mb-1">Загрузите изображение</label>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onload = (event) => {
+                              setBannerFormData({...bannerFormData, bannerImg: event.target.result});
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                        className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-bold file:bg-purple-500 file:text-white hover:file:bg-purple-400"
                       />
+                      {bannerFormData.bannerImg && (
+                        <div className="mt-1">
+                          <img src={bannerFormData.bannerImg} alt="preview" className="w-16 h-16 object-cover rounded-lg border border-purple-500/30" />
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div>
@@ -736,9 +786,9 @@ export default function TntHouse() {
                       onChange={(e) => setBannerFormData({...bannerFormData, days: e.target.value})}
                       className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white focus:border-purple-500 focus:outline-none transition font-mono"
                     >
-                      <option value="1">1 День — 20$ (~ {getAmountForBanner('1').toLocaleString()} $MRDT)</option>
-                      <option value="2">2 Дня — 35$ (~ {getAmountForBanner('2').toLocaleString()} $MRDT)</option>
-                      <option value="6">6 Дней — 100$ (~ {getAmountForBanner('6').toLocaleString()} $MRDT)</option>
+                      <option value="1">1 День — 20$ {priceLoading ? '(расчёт…)' : `(~ ${getAmountForBanner('1').toLocaleString()} $MRDT)`}</option>
+                      <option value="2">2 Дня — 35$ {priceLoading ? '(расчёт…)' : `(~ ${getAmountForBanner('2').toLocaleString()} $MRDT)`}</option>
+                      <option value="6">6 Дней — 100$ {priceLoading ? '(расчёт…)' : `(~ ${getAmountForBanner('6').toLocaleString()} $MRDT)`}</option>
                     </select>
                   </div>
                   <button 
@@ -746,19 +796,19 @@ export default function TntHouse() {
                     disabled={isBannerSending}
                     className="w-full bg-gradient-to-r from-emerald-400 to-purple-500 hover:from-emerald-300 hover:to-purple-400 text-slate-950 font-black py-2.5 rounded text-xs transition flex items-center justify-center gap-1.5 shadow-[0_0_15px_rgba(52,211,153,0.3)] disabled:opacity-50"
                   >
-                    <Zap className="w-3.5 h-3.5" /> {isBannerSending ? 'ОБРАБОТКА ТРАНЗАКЦИИ...' : 'ОПЛАТИТЬ И РАЗМЕСТИТЬ БАННЕР'}
+                    <Zap className="w-3.5 h-3.5" /> {isBannerSending ? 'ОТПРАВКА ТРАНЗАКЦИИ...' : 'ОПЛАТИТЬ И РАЗМЕСТИТЬ БАННЕР'}
                   </button>
-                  {bannerSubmitted && <div className="p-3 bg-emerald-950/40 border border-emerald-500/30 rounded text-emerald-300 text-xs text-center font-bold">✓ Реклама успешно активирована! Главный баннер сайта обновлен.</div>}
+                  {bannerSubmitted && <div className="p-3 bg-emerald-950/40 border border-emerald-500/30 rounded text-emerald-300 text-xs text-center font-bold">✓ Баннер успешно активирован! Транзакция подтверждена.</div>}
                   {bannerError && <div className="p-3 bg-red-950/40 border border-red-500/30 rounded text-red-300 text-xs text-center">{bannerError}</div>}
                 </form>
               </div>
             </div>
 
-            {/* RIGHT SIDE: PRICING TRACKER BOARD */}
+            {/* RIGHT SIDE: PRICING */}
             <div className="space-y-4 bg-slate-900/20 border-2 border-purple-500/20 rounded-xl p-6">
               <h3 className="text-xl font-black text-purple-400">Информация для инвесторов</h3>
               <p className="text-slate-300 text-xs leading-relaxed">
-                Все платежи за листинги и автоматические баннеры на сайте принимаются строго в экосистеме Solana на наш официальный кошелек.
+                Все платежи за листинги и автоматические баннеры на сайте принимаются строго в экосистеме Solana на наш официальный кошелёк.
               </p>
 
               <div className="mt-6 space-y-3">
@@ -772,23 +822,23 @@ export default function TntHouse() {
                   </div>
                   <div className="flex justify-between p-2.5 bg-slate-950 border border-purple-500/10 rounded-lg">
                     <span className="text-slate-300">🔍 Базовый ИИ-Аудит</span>
-                    <span className="text-emerald-400 font-bold">$10 ≈ {getAmountForTier('basic').toLocaleString()} $MRDT</span>
+                    <span className="text-emerald-400 font-bold">$10 ≈ {priceLoading ? '...' : getAmountForTier('basic').toLocaleString()} $MRDT</span>
                   </div>
                   <div className="flex justify-between p-2.5 bg-slate-950 border border-purple-500/10 rounded-lg">
                     <span className="text-slate-300">⚡ Быстрый Листинг (5 мин)</span>
-                    <span className="text-emerald-400 font-bold">$40 ≈ {getAmountForTier('fast').toLocaleString()} $MRDT</span>
+                    <span className="text-emerald-400 font-bold">$40 ≈ {priceLoading ? '...' : getAmountForTier('fast').toLocaleString()} $MRDT</span>
                   </div>
                   <div className="flex justify-between p-2.5 bg-slate-950 border border-purple-500/10 rounded-lg">
                     <span className="text-slate-300">👑 Рекламный Баннер (1 день)</span>
-                    <span className="text-emerald-400 font-bold">$20 ≈ {getAmountForBanner('1').toLocaleString()} $MRDT</span>
+                    <span className="text-emerald-400 font-bold">$20 ≈ {priceLoading ? '...' : getAmountForBanner('1').toLocaleString()} $MRDT</span>
                   </div>
                   <div className="flex justify-between p-2.5 bg-slate-950 border border-purple-500/10 rounded-lg">
                     <span className="text-slate-300">👑 Рекламный Баннер (2 дня)</span>
-                    <span className="text-emerald-400 font-bold">$35 ≈ {getAmountForBanner('2').toLocaleString()} $MRDT</span>
+                    <span className="text-emerald-400 font-bold">$35 ≈ {priceLoading ? '...' : getAmountForBanner('2').toLocaleString()} $MRDT</span>
                   </div>
                   <div className="flex justify-between p-2.5 bg-slate-950 border border-purple-500/10 rounded-lg">
                     <span className="text-slate-300">👑 Рекламный Баннер (6 дней)</span>
-                    <span className="text-emerald-400 font-bold">$100 ≈ {getAmountForBanner('6').toLocaleString()} $MRDT</span>
+                    <span className="text-emerald-400 font-bold">$100 ≈ {priceLoading ? '...' : getAmountForBanner('6').toLocaleString()} $MRDT</span>
                   </div>
                 </div>
               </div>
@@ -820,6 +870,61 @@ export default function TntHouse() {
           </div>
         </footer>
       </div>
+
+      {/* Banner Wallet Modal (Phantom, Solflare, BUY $MRDT) */}
+      {showBannerWalletModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+          <div className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-md p-6 shadow-[0_0_40px_rgba(168,85,247,0.25)]">
+            <h3 className="text-lg font-black text-white mb-2 text-center">Выберите способ оплаты</h3>
+            <p className="text-slate-400 text-xs text-center mb-6">
+              Баннер будет активирован после подтверждения транзакции
+            </p>
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={() => handleBannerWalletSelect('phantom')}
+                className="flex items-center gap-3 w-full bg-gradient-to-r from-purple-500/20 to-purple-500/10 border border-purple-500/30 rounded-xl p-3 hover:bg-purple-500/20 transition"
+              >
+                <span className="text-2xl">👻</span>
+                <div className="text-left">
+                  <div className="font-bold text-white text-sm">Phantom</div>
+                  <div className="text-xs text-slate-400">Самый популярный кошелёк Solana</div>
+                </div>
+              </button>
+              <button
+                onClick={() => handleBannerWalletSelect('solflare')}
+                className="flex items-center gap-3 w-full bg-gradient-to-r from-emerald-500/20 to-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 hover:bg-emerald-500/20 transition"
+              >
+                <span className="text-2xl">🔥</span>
+                <div className="text-left">
+                  <div className="font-bold text-white text-sm">Solflare</div>
+                  <div className="text-xs text-slate-400">Надёжный некастодиальный кошелёк</div>
+                </div>
+              </button>
+              <div className="border-t border-purple-500/20 pt-3">
+                <button
+                  onClick={() => {
+                    setShowBannerWalletModal(false);
+                    handleLaunchJupiter();
+                  }}
+                  className="flex items-center gap-3 w-full bg-gradient-to-r from-yellow-500/20 to-yellow-500/10 border border-yellow-500/30 rounded-xl p-3 hover:bg-yellow-500/20 transition"
+                >
+                <span className="text-2xl">💰</span>
+                <div className="text-left">
+                  <div className="font-bold text-white text-sm">BUY $MRDT</div>
+                  <div className="text-xs text-slate-400">Купите токены $MRDT перед оплатой</div>
+                </div>
+              </button>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowBannerWalletModal(false)}
+              className="w-full mt-4 text-xs text-slate-500 hover:text-white transition"
+            >
+              Отмена
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Floating AI Chat Button */}
       <button 
