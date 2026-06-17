@@ -265,7 +265,6 @@ export default function TntHouse() {
       const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
       const mintPubkey = new PublicKey(ca);
 
-      // Получаем Mint информацию
       const mintInfo = await getMint(connection, mintPubkey);
       const mintAuthority = mintInfo.mintAuthority ? 'Enabled' : 'Revoked ✓';
       const freezeAuthority = mintInfo.freezeAuthority ? 'Enabled' : 'Revoked ✓';
@@ -273,7 +272,6 @@ export default function TntHouse() {
       setLogs(prev => [...prev, `[${timestamp()}] [✅] Mint Authority: ${mintAuthority}`]);
       setLogs(prev => [...prev, `[${timestamp()}] [✅] Freeze Authority: ${freezeAuthority}`]);
 
-      // Получаем топ-10 холдеров
       setLogs(prev => [...prev, `[${timestamp()}] [⏳] Загрузка топ-холдеров...`]);
       const largestAccounts = await connection.getTokenLargestAccounts(mintPubkey);
       const totalSupply = Number(mintInfo.supply);
@@ -282,7 +280,6 @@ export default function TntHouse() {
       
       setLogs(prev => [...prev, `[${timestamp()}] [✅] Топ-10 холдеров: ${top10Percent.toFixed(2)}%`]);
 
-      // Получаем информацию о ликвидности через DexScreener
       setLogs(prev => [...prev, `[${timestamp()}] [⏳] Анализ пулов ликвидности...`]);
       let liquidityUSD = 0;
       let lpLocked = 'Неизвестно';
@@ -302,7 +299,6 @@ export default function TntHouse() {
       
       setLogs(prev => [...prev, `[${timestamp()}] [✅] Ликвидность: $${liquidityUSD.toLocaleString()}`]);
 
-      // Формируем результат
       const result = {
         mintAuthority,
         freezeAuthority,
@@ -374,10 +370,8 @@ export default function TntHouse() {
       if (confirmation) {
         setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] [✅] Транзакция подтверждена! Запускаем анализ...`]);
 
-        // Запускаем реальный ончейн-анализ
         const result = await analyzeTokenOnChain(formData.ca);
 
-        // Добавляем токен в таблицу
         const newToken = {
           name: formData.projectName.toUpperCase(),
           symbol: formData.projectName.slice(0, 4).toUpperCase() || 'NEW',
@@ -394,7 +388,6 @@ export default function TntHouse() {
         setSubmitted(true);
         setFormData({ projectName: '', ca: '', telegram: '' });
 
-        // Открываем модалку с результатами аудита
         setSelectedToken({
           symbol: result.symbol,
           name: formData.projectName.toUpperCase(),
@@ -492,7 +485,6 @@ export default function TntHouse() {
     }
   };
 
-  // Submit handlers – now just open modals
   const handleFormSubmit = (e) => {
     e.preventDefault();
     if (!formData.projectName || !formData.ca || !formData.telegram) {
@@ -511,7 +503,6 @@ export default function TntHouse() {
     setShowBannerWalletModal(true);
   };
 
-  // REAL AI Chat
   const handleSendChat = async (e) => {
     e.preventDefault();
     if (!userMsg.trim()) return;
@@ -574,7 +565,7 @@ export default function TntHouse() {
               </a>
               <div>
                 <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-emerald-400 tracking-wider">TNT HOUSE</h1>
-                <span className="text-[10px] text-purple-400 block font-bold tracking-widest">TOP NEW TOKENS v1.4</span>
+                <span className="text-[10px] text-purple-400 block font-bold tracking-widest">TOP NEW TOKENS + GOOGLE SHEETS v1.0</span>
               </div>
             </div>
             
@@ -612,7 +603,7 @@ export default function TntHouse() {
             <div className="border border-purple-500/40 rounded-2xl p-4 bg-gradient-to-r from-black via-purple-950/20 to-black flex flex-col sm:flex-row items-center justify-between gap-4 shadow-[0_0_20px_rgba(168,85,247,0.2)] animate-pulse">
               <div className="flex items-center gap-4">
                 <span className="text-3xl bg-purple-500/10 p-2 rounded-xl border border-purple-500/20">
-                  {activeBanner.bannerImg && activeBanner.bannerImg.startsWith('http') ? <img src={activeBanner.bannerImg} alt="logo" className="w-8 h-8 rounded-full object-cover"/> : (activeBanner.bannerImg || '🪙')}
+                  {activeBanner.bannerImg && activeBanner.bannerImg.startsWith('http') ? <img src={activeBanner.bannerImg} alt="logo" className="w-8 h-8 rounded-full object-cover"/> : activeBanner.bannerImg}
                 </span>
                 <div>
                   <span className="bg-purple-500 text-white font-black text-[9px] px-2 py-0.5 rounded tracking-widest block w-max mb-1">🔥 VIP БУСТ</span>
@@ -983,7 +974,7 @@ export default function TntHouse() {
             <div className="absolute top-0 right-0 w-40 h-40 bg-purple-500/10 rounded-full blur-3xl"></div>
             <div className="relative z-10 max-w-2xl">
               <h3 className="text-2xl font-black text-purple-400 mb-2">🐋 TNT WHALE CLUB (DAO)</h3>
-              <p className="text-slate-300 text-sm leading-relaxed mb-5">Держи $MRDT и получи доступ к закрытому Telegram чату.</p>
+              <p className="text-slate-300 text-sm leading-relaxed mb-5">Держи $MRDT и получи доступ к закрытому Telegram чату. Первым узнавай о новых гемах!</p>
               <a href="https://t.me/tnt_house2026" target="_blank" rel="noopener noreferrer" className="inline-block bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-400 hover:to-purple-500 text-white font-bold py-2.5 px-6 rounded text-xs transition duration-300 shadow-md shadow-purple-500/30">
                 Вступить в VIP-Клуб →
               </a>
@@ -994,9 +985,9 @@ export default function TntHouse() {
         {/* Footer */}
         <footer className="border-t border-purple-500/20 mt-12 py-6 bg-slate-950/60 backdrop-blur-lg">
           <div className="max-w-7xl mx-auto px-6 text-center space-y-2">
-            <div className="text-purple-400 font-bold text-sm tracking-widest">TNT HOUSE v1.4</div>
-            <div className="text-slate-400 text-xs">Powered by $MRDT • Real On-Chain Payments + AI Audits</div>
-            <div className="text-slate-500 text-[10px]">Built with Next.js + Tailwind CSS • DexScreener + Solana RPC</div>
+            <div className="text-purple-400 font-bold text-sm tracking-widest">TNT HOUSE + GOOGLE SHEETS v1.0</div>
+            <div className="text-slate-400 text-xs">Powered by $MRDT • AI Audits • Google Drive Cloud ☁️</div>
+            <div className="text-slate-500 text-[10px]">Built with Next.js + Tailwind CSS • DexScreener + Google Sheets APIs • Admin Wallet Integrated</div>
           </div>
         </footer>
       </div>
@@ -1007,7 +998,7 @@ export default function TntHouse() {
           <div className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-md p-6 shadow-[0_0_40px_rgba(168,85,247,0.25)]">
             <h3 className="text-lg font-black text-white mb-2 text-center">Выберите способ оплаты</h3>
             <p className="text-slate-400 text-xs text-center mb-6">
-              Оплата в $MRDT за ИИ-инспекцию + реальный анализ
+              Оплата в $MRDT за ИИ-инспекцию
             </p>
             <div className="flex flex-col gap-3">
               <button
@@ -1197,7 +1188,7 @@ export default function TntHouse() {
                   </div>
                 </>
               ) : (
-                <div className="text-slate-400 text-center py-8">Загрузите данные аудита, выбрав токен из таблицы.</div>
+                <div className="text-slate-400 text-center py-8">Выберите токен из таблицы, чтобы увидеть его Blueprint.</div>
               )}
             </div>
 
@@ -1209,6 +1200,14 @@ export default function TntHouse() {
           </div>
         </div>
       )}
+
+      {/* Floating AI Chat Button */}
+      <button 
+        onClick={() => setIsChatOpen(!isChatOpen)} 
+        className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-tr from-purple-500 to-emerald-400 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(153,69,255,0.5)] hover:scale-105 transition duration-300 z-50 animate-bounce"
+      >
+        {isChatOpen ? <X className="w-6 h-6 text-slate-950" /> : <MessageSquare className="w-6 h-6 text-slate-950" />}
+      </button>
 
       {/* AI Chat Popup */}
       {isChatOpen && (
