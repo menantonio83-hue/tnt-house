@@ -1046,7 +1046,7 @@ export default function TntHouse() {
                 <span className="text-2xl">🔥</span>
                 <div className="text-left">
                   <div className="font-bold text-white text-sm">Solflare</div>
-                  <div className="text-xs text-slate-400">Надёжный некастodiальный кошелёк</div>
+                  <div className="text-xs text-slate-400">Надёжный некаstodiальный кошелёк</div>
                 </div>
               </button>
               <div className="border-t border-purple-500/20 pt-3">
@@ -1101,7 +1101,7 @@ export default function TntHouse() {
                 <span className="text-2xl">🔥</span>
                 <div className="text-left">
                   <div className="font-bold text-white text-sm">Solflare</div>
-                  <div className="text-xs text-slate-400">Надёжный некастodiальный кошелёк</div>
+                  <div className="text-xs text-slate-400">Надёжный некаstodiальный кошелёк</div>
                 </div>
               </button>
               <div className="border-t border-purple-500/20 pt-3">
