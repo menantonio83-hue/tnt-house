@@ -239,7 +239,6 @@ export default function TntHouse() {
     return Math.round(usd / mrdtPrice);
   };
 
-  // ---- On-chain analysis ----
   const analyzeTokenOnChain = async (ca, projectName) => {
     const timestamp = () => new Date().toLocaleTimeString();
     setLogs(prev => [...prev, `[${timestamp()}] [🔍] Начало анализа токена: ${ca.slice(0,6)}...`]);
@@ -293,7 +292,6 @@ export default function TntHouse() {
     }
   };
 
-  // ---- Audit payment ----
   const handleAuditWalletSelect = async (walletType) => {
     setShowAuditWalletModal(false);
     setIsSending(true);
@@ -383,7 +381,6 @@ export default function TntHouse() {
     }
   };
 
-  // ---- Banner payment ----
   const handleBannerWalletSelect = async (walletType) => {
     setShowBannerWalletModal(false);
     setIsBannerSending(true);
@@ -623,16 +620,17 @@ export default function TntHouse() {
                 <RefreshCw className="w-2.5 h-2.5 animate-spin" /> Обновление каждые 5 мин
               </div>
             </div>
-            <div className="max-h/[260px] overflow-y-auto border border-purple-500/20 rounded-lg scrollbar-thin scrollbar-thumb-purple-500/30">
+            <div className="max-h/[320px] overflow-y-auto border border-purple-500/20 rounded-lg scrollbar-thin scrollbar-thumb-purple-500/30">
               <table className="w-full text-left border-collapse text/[9px]">
                 <thead>
                   <tr className="border-b border-purple-500/20 bg-purple-500/10 text-purple-400 font-bold sticky top-0 z-20 backdrop-blur-md">
-                    <th className="p-1">Токен</th>
-                    <th className="p-1">Цена</th>
-                    <th className="p-1">Ликв.</th>
-                    <th className="p-1">Объем/Изм.</th>
-                    <th className="p-1 text-center">Score</th>
-                    <th className="p-1 text-right">Действие</th>
+                    {/* Вертикальные заголовки — текст идёт сверху вниз, ширина колонок минимальная */}
+                    <th className="p-0.5 align-bottom" style={{ writingMode: 'vertical-lr', textOrientation: 'mixed', height: '60px', whiteSpace: 'nowrap' }}>Токен</th>
+                    <th className="p-0.5 align-bottom" style={{ writingMode: 'vertical-lr', textOrientation: 'mixed', height: '60px', whiteSpace: 'nowrap' }}>Цена</th>
+                    <th className="p-0.5 align-bottom" style={{ writingMode: 'vertical-lr', textOrientation: 'mixed', height: '60px', whiteSpace: 'nowrap' }}>Ликв</th>
+                    <th className="p-0.5 align-bottom" style={{ writingMode: 'vertical-lr', textOrientation: 'mixed', height: '60px', whiteSpace: 'nowrap' }}>Об/Изм</th>
+                    <th className="p-0.5 align-bottom text-center" style={{ writingMode: 'vertical-lr', textOrientation: 'mixed', height: '60px', whiteSpace: 'nowrap' }}>Оценка</th>
+                    <th className="p-0.5 align-bottom text-right" style={{ writingMode: 'vertical-lr', textOrientation: 'mixed', height: '60px', whiteSpace: 'nowrap' }}>Действ</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -673,6 +671,17 @@ export default function TntHouse() {
                       );
                     })
                   )}
+                  {/* 4 пустые строки (рамки) для будущих токенов — всего 6 слотов с MRDT и TGEM */}
+                  {[1,2,3,4].map((n) => (
+                    <tr key={`empty-${n}`} className="border-b border-purple-500/5 opacity-40">
+                      <td className="p-1 text-slate-600 text/[8px] italic">—</td>
+                      <td className="p-1 text-slate-600 text/[8px] italic">—</td>
+                      <td className="p-1 text-slate-600 text/[8px] italic">—</td>
+                      <td className="p-1 text-slate-600 text/[8px] italic">—</td>
+                      <td className="p-1 text-center text-slate-600 text/[8px] italic">—</td>
+                      <td className="p-1 text-right text-slate-600 text/[8px] italic">—</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
