@@ -538,7 +538,7 @@ export default function TntHouse() {
   return (
     <div className="min-h-screen bg-slate-950 text-white font-mono relative overflow-hidden pb-12">
       {/* Neon glows */}
-      <div className="absolute top-[-10%] left-[-10%] w/[500px] h/[500px] rounded-full bg-purple-600/10 blur/[120px] pointer-events-none"></div>
+      <div className="absolute top-[-10%] left-[-10%] w-[500px] h/[500px] rounded-full bg-purple-600/10 blur/[120px] pointer-events-none"></div>
       <div className="absolute bottom/[20%] right-[-10%] w/[500px] h/[500px] rounded-full bg-emerald-500/10 blur/[120px] pointer-events-none"></div>
 
       {/* Grid Background */}
@@ -641,7 +641,7 @@ export default function TntHouse() {
                   Взрываем скамы.<br />Запускаем гемы.
                 </h2>
                 <p className="text-slate-300 text-base leading-relaxed">
-                  Добро пожаловать в Дом Новых Токенов! Наш ИИ-агент сканирует блокчейн, а все заявки сохраняются в Google Sheets.
+                  Добро пожалово в Дом Новых Токенов! Наш ИИ-агент сканирует блокчейн, а все заявки сохраняются в Google Sheets.
                 </p>
               </div>
 
@@ -679,7 +679,7 @@ export default function TntHouse() {
 
         {/* Table */}
         <section className="max-w-7xl mx-auto px-6 py-6">
-          <div className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 backdrop-blur-md p-6 shadow/[0_0_25px_rgba(153,69,255,0.2)]">
+          <div className="border-2 border-purple-500/30 rounded-lg bg-slate-909/40 backdrop-blur-md p-6 shadow/[0_0_25px_rgba(153,69,255,0.2)]">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h3 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400 flex items-center gap-2">
@@ -790,7 +790,7 @@ export default function TntHouse() {
             {/* LEFT */}
             <div className="space-y-8">
               {/* FORM 1: AI AUDIT */}
-              <div className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 p-6 backdrop-blur-md">
+              <div className="border-2 border-purple-500/30 rounded-lg bg-slate-909/40 p-6 backdrop-blur-md">
                 <h3 className="text-lg font-black text-purple-400 mb-2 flex items-center gap-2">🔍 ЗАКАЗАТЬ ИИ-ИНСПЕКЦИЮ</h3>
                 <p className="text-slate-400 text-xs mb-4">Авто-добавление в таблицу и выгрузка в Google Sheets облако.</p>
                 
@@ -822,9 +822,9 @@ export default function TntHouse() {
                       onChange={(e) => setSelectedTier(e.target.value)}
                       className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white focus:border-purple-500 focus:outline-none transition font-mono"
                     >
-                      <option value="basic">Базовый Аудит (24ч очереди) — $10 {priceLoading ? '(расчёт…)' : `≈ ${getAmountForTier('basic').toLocaleString()} $MRDT`}</option>
+                      <option value="basic">Базовый Аудит (24h очереди) — $10 {priceLoading ? '(расчёт…)' : `≈ ${getAmountForTier('basic').toLocaleString()} $MRDT`}</option>
                       <option value="fast">Быстрый Листинг (5 мин) — $40 {priceLoading ? '(расчёт…)' : `≈ ${getAmountForTier('fast').toLocaleString()} $MRDT`}</option>
-                      <option value="vip">VIP-Буст (баннер 24ч) — $120 {priceLoading ? '(расчёт…)' : `≈ ${getAmountForTier('vip').toLocaleString()} $MRDT`}</option>
+                      <option value="vip">VIP-Буст (баннер 24h) — $120 {priceLoading ? '(расчёт…)' : `≈ ${getAmountForTier('vip').toLocaleString()} $MRDT`}</option>
                     </select>
                   </div>
                   <div>
@@ -849,7 +849,7 @@ export default function TntHouse() {
               </div>
 
               {/* FORM 2: BANNER */}
-              <div className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 p-6 backdrop-blur-md">
+              <div className="border-2 border-purple-500/30 rounded-lg bg-slate-909/40 p-6 backdrop-blur-md">
                 <h3 className="text-lg font-black text-purple-400 mb-2 flex items-center gap-2">👑 КУПИТЬ VIP-БАННЕР НА ГЛАВНУЮ</h3>
                 <p className="text-slate-400 text-xs mb-4">Полностью автоматическая замена рекламного места на ваш токен.</p>
                 
@@ -925,10 +925,10 @@ export default function TntHouse() {
             </div>
 
             {/* RIGHT */}
-            <div className="space-y-4 bg-slate-900/20 border-2 border-purple-500/20 rounded-xl p-6">
+            <div className="space-y-4 bg-slate-909/20 border-2 border-purple-500/20 rounded-xl p-6">
               <h3 className="text-xl font-black text-purple-400">Информация для инвесторов</h3>
-              <p className="text-slate-300 text-xs leading-relaxed">
-                Все платежи за листинги и автоматические баннеры на сайте принимаются строго в экосистеме Solana на наш официальный кошелёк.
+                <p className="text-slate-300 text-xs leading-relaxed">
+                Все платежы за листинги и автоматические баннеры на сайте принимаются строго в экосистеме Solana на наш официальный кошелёк.
               </p>
 
               <div className="mt-6 space-y-3">
@@ -972,7 +972,7 @@ export default function TntHouse() {
             <div className="absolute top-0 right-0 w-40 h-40 bg-purple-500/10 rounded-full blur-3xl"></div>
             <div className="relative z-10 max-w-2xl">
               <h3 className="text-2xl font-black text-purple-400 mb-2">🐋 TNT WHALE CLUB (DAO)</h3>
-              <p className="text-slate-300 text-sm leading-relaxed mb-5">Держи $MRDT и получи доступ к закрытому Telegram чату. Первым узнавай о новых гемах!</p>
+              <p className="text-slate-300 text-sm leading-relaxed mb-5">Держи $MRDT и получи доступ к закрытому Telegram чату. Первим узнавай о новых гемах!</p>
               <a href="https://t.me/tnt_house2026" target="_blank" rel="noopener noreferrer" className="inline-block bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-400 hover:to-purple-500 text-white font-bold py-2.5 px-6 rounded text-xs transition duration-300 shadow-md shadow-purple-500/30">
                 Вступить в VIP-Клуб →
               </a>
@@ -1046,7 +1046,7 @@ export default function TntHouse() {
                 <span className="text-2xl">🔥</span>
                 <div className="text-left">
                   <div className="font-bold text-white text-sm">Solflare</div>
-                  <div className="text-xs text-slate-400">Надёжный некаstodiальный кошелёк</div>
+                  <div className="text-xs text-slate-400">Надёжный некастodiальный кошелёк</div>
                 </div>
               </button>
               <div className="border-t border-purple-500/20 pt-3">
@@ -1130,18 +1130,100 @@ export default function TntHouse() {
         </div>
       )}
 
-      {/* Blueprint Modal (simplified) */}
+      {/* Blueprint Modal */}
       {isBlueprintOpen && (selectedToken || auditResult) && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z/[100] p-4" onClick={closeBlueprint}>
           <div className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-2xl max-h/[90vh] overflow-y-auto shadow/[0_0_40px_rgba(168,85,247,0.25)]" onClick={e => e.stopPropagation()}>
-            <div className="p-6">
-              <p className="text-white">TNT Security Blueprint content (same as before)</p>
+            <div className="sticky top-0 bg-slate-950 border-b border-purple-500/30 px-6 py-5 flex items-center justify-between z-10 rounded-t-2xl">
+              <div>
+                <div className="text-purple-400 text-xs tracking-[3px] font-bold">TNT HOUSE • AI INSPECTOR</div>
+                <div className="text-2xl font-black text-white tracking-tight">TNT Security Blueprint</div>
+              </div>
+              <button onClick={closeBlueprint} className="text-slate-400 hover:text-white transition">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-3xl">
+                  {auditResult ? (auditResult.symbol.includes('MRDT') ? '⚽️' : '🪙') : '🪙'}
+                </div>
+                <div>
+                  <div className="text-2xl font-black tracking-tighter">${auditResult ? auditResult.symbol : selectedToken.symbol}</div>
+                  <div className="text-sm text-slate-400 -mt-1">{auditResult ? auditResult.tokenName : selectedToken.name}</div>
+                </div>
+                <div className="ml-auto text-right">
+                  <div className="text/[10px] text-slate-500">TNT SAFETY SCORE</div>
+                  <div className={`text-4xl font-black tracking-tighter ${getScoreStyle(getSafetyScore(selectedToken || auditResult)).color}`}>
+                    {getSafetyScore(selectedToken || auditResult)}
+                  </div>
+                </div>
+              </div>
+
+              {auditResult ? (
+                <>
+                  <div className="bg-slate-909/60 border border-purple-500/20 rounded-xl p-5">
+                    <div className="flex items-center gap-2 mb-3 text-emerald-400">
+                      <div className="w-2 h-2 bg-emerald-400 rounded-full"></div>
+                      <div className="font-bold tracking-wider text-sm">🧱 ФУНДАМЕНТ (Mint & Freeze)</div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 text-sm">
+                      <div className="flex justify-between"><span className="text-slate-400">Mint Authority</span> <span className={auditResult.mintAuthority === 'Revoked ✓' ? 'text-emerald-400 font-mono' : 'text-red-400 font-mono'}>{auditResult.mintAuthority}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-400">Freeze Authority</span> <span className={auditResult.freezeAuthority === 'Revoked ✓' ? 'text-emerald-400 font-mono' : 'text-red-400 font-mono'}>{auditResult.freezeAuthority}</span></div>
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-909/60 border border-purple-500/20 rounded-xl p-5">
+                    <div className="flex items-center gap-2 mb-3 text-cyan-400">
+                      <div className="w-2 h-2 bg-cyan-400 rounded-full"></div>
+                      <div className="font-bold tracking-wider text-sm">📊 РАСПРЕДЕЛЕНИЕ ХОЛДЕРОВ</div>
+                    </div>
+                    <div className="grid grid-cols-1 gap-2 text-sm">
+                      <div className="flex justify-between"><span className="text-slate-400">Топ-10 холдеров</span> <span className="text-cyan-400 font-mono">{auditResult.top10Percent}%</span></div>
+                      <div className="flex justify-between"><span className="text-slate-400">Всего холдеров (уникальных)</span> <span className="text-cyan-400 font-mono">Недоступно через RPC</span></div>
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-909/60 border border-purple-500/20 rounded-xl p-5">
+                    <div className="flex items-center gap-2 mb-3 text-yellow-400">
+                      <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>
+                      <div className="font-bold tracking-wider text-sm">💰 ЛИКВИДНОСТЬ</div>
+                    </div>
+                    <div className="grid grid-cols-1 gap-2 text-sm">
+                      <div className="flex justify-between"><span className="text-slate-400">Ликвидность (USD)</span> <span className="text-yellow-400 font-mono">${auditResult.liquidityUSD.toLocaleString()}</span></div>
+                      <div className="flex justify-between"><span className="text-slate-400">LP заблокированы?</span> <span className="text-yellow-400 font-mono">{auditResult.lpLocked}</span></div>
+                    </div>
+                  </div>
+
+                  <div className="bg-gradient-to-br from-purple-500/10 to-emerald-500/5 border border-purple-500/30 rounded-xl p-5">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Sparkles className="w-4 h-4 text-purple-400" />
+                      <div className="font-bold tracking-wider text-sm text-purple-400">TNT VERDICT — ИИ ЗАКЛЮЧЕНИЕ</div>
+                    </div>
+                    <div className="text/[15px] leading-snug text-slate-200">
+                      {auditResult.mintAuthority === 'Revoked ✓' && auditResult.freezeAuthority === 'Revoked ✓'
+                        ? 'Бро, это железобетонный гем! Все ключевые риски отключены. ✅'
+                        : 'Обнаружены активные authority. Будьте осторожны, возможен риск.'
+                      }
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="text-slate-400 text-center py-8">Выберите токен из таблицы, чтобы увидеть его Blueprint.</div>
+              )}
+            </div>
+
+            <div className="border-t border-purple-500/30 px-6 py-4 flex justify-end gap-3 bg-slate-950 rounded-b-2xl">
+              <button onClick={closeBlueprint} className="px-5 py-2 text-sm rounded-lg border border-purple-500/40 hover:bg-purple-500/10 transition">
+                Закрыть
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* AI Chat */}
+      {/* Floating AI Chat Button */}
       <button 
         onClick={() => setIsChatOpen(!isChatOpen)} 
         className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-tr from-purple-500 to-emerald-400 rounded-full flex items-center justify-center shadow/[0_0_20px_rgba(153,69,255,0.5)] hover:scale-105 transition duration-300 z-50 animate-bounce"
@@ -1149,8 +1231,9 @@ export default function TntHouse() {
         {isChatOpen ? <X className="w-6 h-6 text-slate-950" /> : <MessageSquare className="w-6 h-6 text-slate-950" />}
       </button>
 
+      {/* AI Chat Popup */}
       {isChatOpen && (
-        <div className="fixed bottom-24 right-6 w-80 md:w-96 h/[450px] bg-slate-900 border-2 border-purple-500 rounded-xl shadow/[0_0_30px_rgba(153,69,255,0.4)] flex flex-col overflow-hidden z-50 font-mono">
+        <div className="fixed bottom-24 right-6 w-80 md:w-96 h/[450px] bg-slate-909 border-2 border-purple-500 rounded-xl shadow/[0_0_30px_rgba(153,69,255,0.4)] flex flex-col overflow-hidden z-50 font-mono">
           <div className="bg-gradient-to-r from-purple-600 to-emerald-500 p-4 flex items-center justify-between border-b border-purple-500/20">
             <div className="flex items-center gap-2">
               <span className="text-xl">🤖</span>
@@ -1182,7 +1265,7 @@ export default function TntHouse() {
               value={userMsg} 
               onChange={(e) => setUserMsg(e.target.value)} 
               placeholder="Спроси у ИИ..." 
-              className="flex-1 bg-slate-900 border border-purple-500/20 rounded px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" 
+              className="flex-1 bg-slate-909 border border-purple-500/20 rounded px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" 
             />
             <button type="submit" className="bg-purple-500 hover:bg-purple-400 text-slate-950 px-3 rounded text-xs font-bold transition">
               <Send className="w-3.5 h-3.5" />
