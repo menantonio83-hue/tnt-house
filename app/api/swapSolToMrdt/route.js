@@ -1,6 +1,4 @@
-'use client';
-
-import { Connection, Keypair, PublicKey } from '@solana/web3.js';
+import { Connection, Keypair, VersionedTransaction } from '@solana/web3.js';
 import bs58 from 'bs58';
 
 export async function POST(request) {
@@ -23,7 +21,7 @@ export async function POST(request) {
     try {
       secretKey = bs58.decode(privateKeyBase58);
     } catch (e) {
-      return Response.json({ error: 'Invalid private key format' }, { status: 500 });
+      return Response.json({ error: 'Invalid private key format (must be base58)' }, { status: 500 });
     }
 
     const keypair = Keypair.fromSecretKey(secretKey);
@@ -41,7 +39,7 @@ export async function POST(request) {
     const quote = await quoteRes.json();
 
     if (!quote || quote.error) {
-      return Response.json({ error: 'No valid quote returned', details: quote }, { status: 500 });
+      return Response.json({ error: 'No valid quote returned from Jupiter', details: quote }, { status: 500 });
     }
 
     // 2. Get swap transaction from Jupiter
@@ -61,18 +59,18 @@ export async function POST(request) {
 
     if (!swapRes.ok) {
       const errText = await swapRes.text();
-      return Response.json({ error: 'Failed to get swap transaction', details: errText }, { status: 500 });
+      return Response.json({ error: 'Failed to get swap transaction from Jupiter', details: errText }, { status: 500 });
     }
 
     const swapData = await swapRes.json();
 
     if (!swapData.swapTransaction) {
-      return Response.json({ error: 'No swapTransaction in response' }, { status: 500 });
+      return Response.json({ error: 'No swapTransaction returned from Jupiter' }, { status: 500 });
     }
 
-    // 3. Deserialize VersionedTransaction and sign
+    // 3. Deserialize VersionedTransaction and sign with server keypair
     const transactionBuffer = Buffer.from(swapData.swapTransaction, 'base64');
-    const transaction = VersionedTransaction.deserialize(transactionBuffer);  // Note: need to import VersionedTransaction
+    const transaction = VersionedTransaction.deserialize(transactionBuffer);
 
     transaction.sign([keypair]);
 
@@ -89,15 +87,14 @@ export async function POST(request) {
     return Response.json({
       success: true,
       signature,
-      amountOut: quote.outAmount,           // in smallest units (MRDT has 6 decimals)
-      amountOutUi: (quote.outAmount / 1_000_000).toFixed(6)  // human readable
+      amountOut: quote.outAmount,                    // raw amount (MRDT has 6 decimals)
+      amountOutUi: (Number(quote.outAmount) / 1_000_000).toFixed(6)  // human readable
     });
 
   } catch (error) {
     console.error('swapSolToMrdt error:', error);
     return Response.json({ 
-      error: error.message || 'Internal server error',
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined 
+      error: error.message || 'Internal server error' 
     }, { status: 500 });
   }
 }
