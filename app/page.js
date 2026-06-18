@@ -689,7 +689,7 @@ export default function TntHouse() {
                 <p className="text-slate-400 text/[10px] mt-0.5">Кликни на токен, чтобы открыть детальный "TNT Security Blueprint"</p>
               </div>
               <div className="hidden md:flex items-center gap-1 text/[9px] text-purple-400">
-                <RefreshCw className="w-2.5 h-2.5 animate-spin" /> Обновление каждые 5 мин
+                <RefreshWc className="w-2.5 h-2.5 animate-spin" /> Обновление каждые 5 мин
               </div>
             </div>
 
@@ -901,7 +901,7 @@ export default function TntHouse() {
                     <label className="block text-purple-400 text/[11px] font-bold mb-1">Срок размещения рекламы</label>
                     <select
                       value={bannerFormData.days}
-                      onChange={(e) => setBannerFormData({...bannerFormData, days: e.target.value})}
+                      onChange={(e) => setBannerFormData({...bannerFormData, days: e.target.value})
                       className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white focus:border-purple-500 focus:outline-none transition font-mono"
                     >
                       <option value="1">1 День — 20$ {priceLoading ? '(расчёт…)' : `(~ ${getAmountForBanner('1').toLocaleString()} $MRDT)`}</option>
