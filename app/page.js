@@ -846,7 +846,7 @@ export default function TntHouse() {
                 </form>
               </div>
 
-              {/* FORM 2: BANNER */}
+              {/* FORM 2: BANNER (исправлена ошибка с пропущенной скобкой) */}
               <div className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 p-6 backdrop-blur-md">
                 <h3 className="text-lg font-black text-purple-400 mb-2 flex items-center gap-2">👑 КУПИТЬ VIP-БАННЕР НА ГЛАВНУЮ</h3>
                 <p className="text-slate-400 text-xs mb-4">Полностью автоматическая замена рекламного места на ваш токен.</p>
