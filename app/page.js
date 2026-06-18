@@ -1,6 +1,17 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+// ============================================================
+// TntHouse.tsx — Version 1.2
+// Fixes:
+//   1. getRecentBlockhash() → getLatestBlockhash() (deprecated API)
+//   2. confirmation truthiness check → confirmation.value.err === null
+//   3. <form> in chat replaced with <div> + onKeyDown handler
+//   4. fallbackTokens moved outside component (stable reference)
+//   5. analyzeTokenOnChain now receives projectName as param (closure bug)
+//   6. TypeScript interfaces added for Token, Banner, ChatMessage
+// ============================================================
+
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   TrendingUp, Shield, Lock, Zap, Send, MessageSquare, X, 
   RefreshCw, AlertCircle, Sparkles, ExternalLink, ChevronDown, Download, Image
@@ -8,12 +19,67 @@ import {
 import { Connection, PublicKey, Transaction } from '@solana/web3.js';
 import { getAssociatedTokenAddress, createTransferInstruction, getAccount, getMint } from '@solana/spl-token';
 
+// ---- Constants ----
 const WALLET_ADDRESS = "Ev6oXBXo6qyoaT5wypJ2Umxch91F7cFvE1SarYLaUn8Z";
 const MRDT_CA = "8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg";
 const MRDT_DECIMALS = 6;
 
+// ---- TypeScript interfaces ----
+interface Token {
+  name: string;
+  symbol: string;
+  ca: string;
+  price: string;
+  liquidity: number;
+  volume24h: number;
+  priceChange24h: number;
+  verified: boolean;
+  dexUrl: string;
+  chain: string;
+}
+
+interface Banner {
+  tokenName: string;
+  bannerImg: string;
+  desc: string;
+  expiresAt: number;
+}
+
+interface ChatMessage {
+  sender: 'user' | 'bot';
+  text: string;
+}
+
+interface AuditResult {
+  mintAuthority: string;
+  freezeAuthority: string;
+  top10Percent: string;
+  totalSupply: string;
+  liquidityUSD: number;
+  lpLocked: string;
+  ca: string;
+  tokenName: string;
+  symbol: string;
+}
+
+// FIX #4: Moved outside component — stable reference, no re-creation on each render
+const FALLBACK_TOKENS: Token[] = [
+  {
+    name: 'Test Gem',
+    symbol: 'TGEM',
+    ca: '11111111111111111111111111111111',
+    price: '0.00001234',
+    liquidity: 45000,
+    volume24h: 120000,
+    priceChange24h: 8.5,
+    verified: true,
+    dexUrl: 'https://dexscreener.com',
+    chain: 'solana'
+  }
+];
+
 export default function TntHouse() {
-  const [tokens, setTokens] = useState([]);
+  const [tokens, setTokens] = useState<Token[]>([]);
   const [loading, setLoading] = useState(true);
   
   const [formData, setFormData] = useState({ projectName: '', ca: '', telegram: '' });
@@ -28,11 +94,12 @@ export default function TntHouse() {
   const [isSending, setIsSending] = useState(false);
   const [isBannerSending, setIsBannerSending] = useState(false);
   
-  const [activeBanner, setActiveBanner] = useState(null);
+  const [activeBanner, setActiveBanner] = useState<Banner | null>(null);
   const [isBuyDropdownOpen, setIsBuyDropdownOpen] = useState(false);
 
+  // FIX #6: Typed chat messages
   const [isChatOpen, setIsChatOpen] = useState(false);
-  const [chatMessages, setChatMessages] = useState([
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
     { sender: 'bot', text: 'Привет! Я ИИ-Инспектор TNT House. Спроси меня про любой контракт или токен $MRDT. ⚽️' }
   ]);
   const [userMsg, setUserMsg] = useState('');
@@ -44,13 +111,13 @@ export default function TntHouse() {
   ]);
 
   const [isBlueprintOpen, setIsBlueprintOpen] = useState(false);
-  const [selectedToken, setSelectedToken] = useState(null);
-  const [auditResult, setAuditResult] = useState(null);
+  const [selectedToken, setSelectedToken] = useState<Token | null>(null);
+  const [auditResult, setAuditResult] = useState<AuditResult | null>(null);
 
   const [showBannerWalletModal, setShowBannerWalletModal] = useState(false);
   const [showAuditWalletModal, setShowAuditWalletModal] = useState(false);
 
-  const chatEndRef = useRef(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   const pillars = [
     { icon: Shield, label: 'AI Аудит', desc: 'Проверка контрактов', color: 'text-purple-400' },
@@ -58,24 +125,21 @@ export default function TntHouse() {
     { icon: Lock, label: 'DAO Лицензия', desc: 'Через $MRDT', color: 'text-purple-400' }
   ];
 
-  const fallbackTokens = [
-    { name: 'Test Gem', symbol: 'TGEM', ca: '11111111111111111111111111111111', price: '0.00001234', liquidity: 45000, volume24h: 120000, priceChange24h: 8.5, verified: true, dexUrl: 'https://dexscreener.com', chain: 'solana' }
-  ];
-
-  const getSafetyScore = (token) => {
+  // ---- Safety score helpers ----
+  const getSafetyScore = (token: Token | AuditResult | null): number => {
     if (!token) return 75;
     if (token.symbol === 'MRDT' || token.symbol === 'MRDT VIP') return 98;
     const hash = token.symbol.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
     return Math.max(85, Math.min(97, hash % 12 + 85));
   };
 
-  const getScoreStyle = (score) => {
+  const getScoreStyle = (score: number) => {
     if (score >= 90) return { color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/50', label: 'Ironclad Safe ★', glow: 'shadow-[0_0_12px_rgba(16,185,129,0.6)]' };
     if (score >= 50) return { color: 'text-yellow-400', bg: 'bg-yellow-500/10', border: 'border-yellow-500/50', label: 'Pulsing Warning ⚠️', glow: 'shadow-[0_0_12px_rgba(234,179,8,0.5)]' };
     return { color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/50', label: 'Extreme Danger 🚨', glow: 'shadow-[0_0_12px_rgba(239,68,68,0.6)] animate-pulse' };
   };
 
-  const openTokenBlueprint = (token) => {
+  const openTokenBlueprint = (token: Token) => {
     setSelectedToken(token);
     setAuditResult(null);
     setIsBlueprintOpen(true);
@@ -89,11 +153,12 @@ export default function TntHouse() {
     }, 300);
   };
 
+  // ---- Banner expiry check ----
   useEffect(() => {
     const checkBannerStatus = () => {
       const storedBanner = localStorage.getItem('tnt_active_banner');
       if (storedBanner) {
-        const bannerData = JSON.parse(storedBanner);
+        const bannerData: Banner = JSON.parse(storedBanner);
         if (Date.now() < bannerData.expiresAt) {
           setActiveBanner(bannerData);
         } else {
@@ -107,6 +172,7 @@ export default function TntHouse() {
     return () => clearInterval(interval);
   }, []);
 
+  // ---- Jupiter / Raydium handlers ----
   const handleLaunchJupiter = () => {
     const url = 'https://jup.ag/swap?sell=So11111111111111111111111111111111111111112&buy=8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg';
     window.open(url, '_blank');
@@ -117,6 +183,7 @@ export default function TntHouse() {
     window.open('https://raydium.io/liquidity/increase/?mode=add&pool_id=6cMTXZyCrnut7Lv39qt4dqEARbC2jbebvhzdCR1t2HEV', '_blank');
   };
 
+  // ---- Wallet connect ----
   const handleConnectWallet = async () => {
     if (window.solana && window.solana.isPhantom) {
       try {
@@ -131,6 +198,7 @@ export default function TntHouse() {
     }
   };
 
+  // ---- AI terminal logs ----
   useEffect(() => {
     const logTemplates = [
       'Обнаружен новый пул на Raydium! Анализ ликвидности...',
@@ -150,6 +218,7 @@ export default function TntHouse() {
     return () => clearInterval(interval);
   }, []);
 
+  // ---- Fetch token list ----
   useEffect(() => {
     const fetchTokens = async () => {
       try {
@@ -167,13 +236,13 @@ export default function TntHouse() {
         const data = await response.json();
         
         if (data.pairs && data.pairs.length > 0) {
-          const filtered = data.pairs
-            .filter(p => { 
+          const filtered: Token[] = data.pairs
+            .filter((p: any) => { 
               const mc = p.marketCap || 0; 
               return mc >= 1000 && mc <= 300000; 
             })
             .slice(0, 9)
-            .map(p => ({
+            .map((p: any) => ({
               name: p.baseToken?.name || 'Unknown',
               symbol: p.baseToken?.symbol || '???',
               ca: p.baseToken?.address || '',
@@ -196,7 +265,8 @@ export default function TntHouse() {
         }
         throw new Error("No pairs");
       } catch (err) {
-        setTokens(fallbackTokens);
+        // FIX #4: Using stable constant instead of inline object
+        setTokens(FALLBACK_TOKENS);
         setLoading(false);
       }
     };
@@ -206,10 +276,12 @@ export default function TntHouse() {
     return () => clearInterval(interval);
   }, []);
 
+  // ---- Scroll chat to bottom ----
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
 
+  // ---- MRDT price feed ----
   const [mrdtPrice, setMrdtPrice] = useState(0.000013);
   const [priceLoading, setPriceLoading] = useState(true);
 
@@ -230,17 +302,19 @@ export default function TntHouse() {
     return () => clearInterval(interval);
   }, []);
 
-  const getAmountForTier = (tier) => {
+  // ---- Price calculation helpers ----
+  const getAmountForTier = (tier: string): number => {
     const usd = tier === 'fast' ? 40 : tier === 'vip' ? 120 : 10;
     return Math.round(usd / mrdtPrice);
   };
 
-  const getAmountForBanner = (days) => {
+  const getAmountForBanner = (days: string): number => {
     const usd = days === '2' ? 35 : days === '6' ? 100 : 20;
     return Math.round(usd / mrdtPrice);
   };
 
-  const analyzeTokenOnChain = async (ca) => {
+  // FIX #5: projectName passed as parameter to avoid stale closure bug
+  const analyzeTokenOnChain = async (ca: string, projectName: string): Promise<AuditResult> => {
     const timestamp = () => new Date().toLocaleTimeString();
     setLogs(prev => [...prev, `[${timestamp()}] [🔍] Начало анализа токена: ${ca.slice(0,6)}...`]);
 
@@ -259,7 +333,7 @@ export default function TntHouse() {
       const largestAccounts = await connection.getTokenLargestAccounts(mintPubkey);
       const totalSupply = Number(mintInfo.supply);
       const top10 = largestAccounts.value.slice(0, 10);
-      const top10Percent = top10.reduce((acc, acct) => acc + (Number(acct.amount) / totalSupply) * 100);
+      const top10Percent = top10.reduce((acc, acct) => acc + (Number(acct.amount) / totalSupply) * 100, 0);
       
       setLogs(prev => [...prev, `[${timestamp()}] [✅] Топ-10 холдеров: ${top10Percent.toFixed(2)}%`]);
 
@@ -282,7 +356,8 @@ export default function TntHouse() {
       
       setLogs(prev => [...prev, `[${timestamp()}] [✅] Ликвидность: $${liquidityUSD.toLocaleString()}`]);
 
-      const result = {
+      // FIX #5: Using passed projectName parameter instead of formData from closure
+      const result: AuditResult = {
         mintAuthority,
         freezeAuthority,
         top10Percent: top10Percent.toFixed(2),
@@ -290,19 +365,20 @@ export default function TntHouse() {
         liquidityUSD,
         lpLocked,
         ca,
-        tokenName: formData.projectName,
-        symbol: formData.projectName.slice(0, 4).toUpperCase()
+        tokenName: projectName,
+        symbol: projectName.slice(0, 4).toUpperCase()
       };
 
       setLogs(prev => [...prev, `[${timestamp()}] [🎉] Анализ завершён! Результаты готовы.`]);
       return result;
-    } catch (err) {
+    } catch (err: any) {
       setLogs(prev => [...prev, `[${timestamp()}] [❌] Ошибка анализа: ${err.message}`]);
       throw err;
     }
   };
 
-  const handleAuditWalletSelect = async (walletType) => {
+  // ---- Audit payment handler ----
+  const handleAuditWalletSelect = async (walletType: string) => {
     setShowAuditWalletModal(false);
     setIsSending(true);
     setError('');
@@ -312,6 +388,9 @@ export default function TntHouse() {
       setIsSending(false);
       return;
     }
+
+    // Snapshot form values before async operations to avoid stale closure
+    const currentFormData = { ...formData };
 
     try {
       const resp = await window.solana.connect();
@@ -342,28 +421,32 @@ export default function TntHouse() {
 
       const transaction = new Transaction().add(transferInstruction);
       transaction.feePayer = senderPublicKey;
-      transaction.recentBlockhash = (await connection.getRecentBlockhash()).blockhash;
+
+      // FIX #1: getRecentBlockhash() is deprecated — use getLatestBlockhash()
+      transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
 
       const signedTx = await window.solana.signAndSendTransaction(transaction);
       const signature = signedTx.signature;
 
       const confirmation = await connection.confirmTransaction(signature, 'confirmed');
 
-      if (confirmation) {
+      // FIX #2: confirmTransaction returns {value: {err: null}} — check .value.err
+      if (confirmation.value.err === null) {
         setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] [✅] Транзакция подтверждена! Запускаем анализ...`]);
 
-        const result = await analyzeTokenOnChain(formData.ca);
+        // FIX #5: Pass projectName explicitly
+        const result = await analyzeTokenOnChain(currentFormData.ca, currentFormData.projectName);
 
-        const newToken = {
-          name: formData.projectName.toUpperCase(),
-          symbol: formData.projectName.slice(0, 4).toUpperCase() || 'NEW',
-          ca: formData.ca,
+        const newToken: Token = {
+          name: currentFormData.projectName.toUpperCase(),
+          symbol: currentFormData.projectName.slice(0, 4).toUpperCase() || 'NEW',
+          ca: currentFormData.ca,
           price: (Math.random() * 0.00005 + 0.000001).toFixed(8),
           liquidity: result.liquidityUSD,
           volume24h: Math.floor(Math.random() * 90000) + 20000,
           priceChange24h: parseFloat((Math.random() * 40 - 10).toFixed(1)),
           verified: true,
-          dexUrl: `https://dexscreener.com/solana/${formData.ca}`,
+          dexUrl: `https://dexscreener.com/solana/${currentFormData.ca}`,
           chain: 'solana'
         };
         setTokens(prev => [newToken, ...prev]);
@@ -372,18 +455,22 @@ export default function TntHouse() {
 
         setSelectedToken({
           symbol: result.symbol,
-          name: formData.projectName.toUpperCase(),
-          ca: formData.ca,
+          name: currentFormData.projectName.toUpperCase(),
+          ca: currentFormData.ca,
           price: newToken.price,
           liquidity: result.liquidityUSD,
-          verified: true
+          volume24h: 0,
+          priceChange24h: 0,
+          verified: true,
+          dexUrl: `https://dexscreener.com/solana/${currentFormData.ca}`,
+          chain: 'solana'
         });
         setAuditResult(result);
         setIsBlueprintOpen(true);
 
         setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] [📋] Модалка аудита открыта для ${result.symbol}`]);
 
-        // ==== ОТПРАВКА В TELEGRAM ====
+        // Send Telegram notification
         fetch('/api/sendTelegram', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -402,7 +489,7 @@ export default function TntHouse() {
       } else {
         throw new Error('Транзакция не подтверждена. Попробуйте ещё раз.');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Audit payment error:", err);
       setError(err.message || 'Ошибка при оплате. Попробуйте снова.');
     } finally {
@@ -410,7 +497,8 @@ export default function TntHouse() {
     }
   };
 
-  const handleBannerWalletSelect = async (walletType) => {
+  // ---- Banner payment handler ----
+  const handleBannerWalletSelect = async (walletType: string) => {
     setShowBannerWalletModal(false);
     setIsBannerSending(true);
     setBannerError('');
@@ -420,6 +508,9 @@ export default function TntHouse() {
       setIsBannerSending(false);
       return;
     }
+
+    // Snapshot before async
+    const currentBannerData = { ...bannerFormData };
 
     try {
       const resp = await window.solana.connect();
@@ -438,7 +529,7 @@ export default function TntHouse() {
       const toPublicKey = new PublicKey(WALLET_ADDRESS);
       const toAta = await getAssociatedTokenAddress(mint, toPublicKey);
 
-      const amountUsd = bannerFormData.days === '2' ? 35 : bannerFormData.days === '6' ? 100 : 20;
+      const amountUsd = currentBannerData.days === '2' ? 35 : currentBannerData.days === '6' ? 100 : 20;
       const amountTokens = Math.round(amountUsd / mrdtPrice);
       const lamportsAmount = amountTokens * Math.pow(10, MRDT_DECIMALS);
 
@@ -451,31 +542,34 @@ export default function TntHouse() {
 
       const transaction = new Transaction().add(transferInstruction);
       transaction.feePayer = senderPublicKey;
-      transaction.recentBlockhash = (await connection.getRecentBlockhash()).blockhash;
+
+      // FIX #1: getRecentBlockhash() is deprecated — use getLatestBlockhash()
+      transaction.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
 
       const signedTx = await window.solana.signAndSendTransaction(transaction);
       const signature = signedTx.signature;
 
       const confirmation = await connection.confirmTransaction(signature, 'confirmed');
 
-      if (confirmation) {
-        const durationMs = parseInt(bannerFormData.days) * 24 * 60 * 60 * 1000;
-        const bannerData = {
-          tokenName: bannerFormData.tokenName.toUpperCase(),
-          bannerImg: bannerFormData.bannerImg || '🪙',
-          desc: bannerFormData.desc,
+      // FIX #2: Check confirmation.value.err instead of truthy object
+      if (confirmation.value.err === null) {
+        const durationMs = parseInt(currentBannerData.days) * 24 * 60 * 60 * 1000;
+        const bannerData: Banner = {
+          tokenName: currentBannerData.tokenName.toUpperCase(),
+          bannerImg: currentBannerData.bannerImg || '🪙',
+          desc: currentBannerData.desc,
           expiresAt: Date.now() + durationMs,
         };
         localStorage.setItem('tnt_active_banner', JSON.stringify(bannerData));
         setActiveBanner(bannerData);
         setBannerSubmitted(true);
         setBannerFormData({ tokenName: '', bannerImg: '', desc: '', days: '1' });
-        setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] [👑 VIP] Транзакция подтверждена! Баннер ${bannerData.tokenName} активен ${bannerFormData.days} дн.`]);
+        setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] [👑 VIP] Транзакция подтверждена! Баннер ${bannerData.tokenName} активен ${currentBannerData.days} дн.`]);
         setTimeout(() => setBannerSubmitted(false), 5000);
       } else {
         throw new Error('Транзакция не подтверждена. Попробуйте ещё раз.');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Banner payment error:", err);
       setBannerError(err.message || 'Ошибка при оплате. Попробуйте снова.');
     } finally {
@@ -483,7 +577,8 @@ export default function TntHouse() {
     }
   };
 
-  const handleFormSubmit = (e) => {
+  // ---- Form submit handlers ----
+  const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.projectName || !formData.ca || !formData.telegram) {
       setError('Пожалуйста, заполни все поля формы!');
@@ -492,7 +587,7 @@ export default function TntHouse() {
     setShowAuditWalletModal(true);
   };
 
-  const handleBannerSubmit = (e) => {
+  const handleBannerSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!bannerFormData.tokenName || !bannerFormData.desc) {
       setBannerError('Укажите название и описание для баннера!');
@@ -501,11 +596,11 @@ export default function TntHouse() {
     setShowBannerWalletModal(true);
   };
 
-  const handleSendChat = async (e) => {
-    e.preventDefault();
+  // FIX #3: Chat send — replaced <form> with div+onKeyDown; using this handler for both button click and Enter key
+  const handleSendChat = async () => {
     if (!userMsg.trim()) return;
 
-    const userMessage = { sender: 'user', text: userMsg };
+    const userMessage: ChatMessage = { sender: 'user', text: userMsg };
     setChatMessages(prev => [...prev, userMessage]);
     setUserMsg('');
     setIsTyping(true);
@@ -515,17 +610,18 @@ export default function TntHouse() {
         'Анализирую смарт-контракт... Структура выглядит чистой. Mint Authority отключена, ликвидность заблокирована. SAFE ✓',
         'Проверяю холдеров на InsightX... Бандлов не обнаружено. Распределение выглядит честным.',
         'Эй, $MRDT это 100% железобетонный гем! Фундамент залит навсегда. 🧱⚽️',
-        'Сканирую руgпулы через TrenchRadar... Никаких подозрительных активностей. Можешь спать спокойно.',
+        'Сканирую ругпулы через TrenchRadar... Никаких подозрительных активностей. Можешь спать спокойно.',
         'Проверяю комиссии... Всё честно. Никаких скрытых платежей разработчикам. ✓'
       ];
       
-      const botMessage = { sender: 'bot', text: responses[Math.floor(Math.random() * responses.length)] };
+      const botMessage: ChatMessage = { sender: 'bot', text: responses[Math.floor(Math.random() * responses.length)] };
       setChatMessages(prev => [...prev, botMessage]);
       setIsTyping(false);
     }, 1000);
   };
 
-  const formatNumber = (num) => {
+  // ---- Utility ----
+  const formatNumber = (num: number): string => {
     if (num >= 1e6) return `$${(num / 1e6).toFixed(1)}M`;
     if (num >= 1e3) return `$${(num / 1e3).toFixed(1)}K`;
     return `$${num.toFixed(0)}`;
@@ -535,11 +631,14 @@ export default function TntHouse() {
     document.getElementById('orderFormsSection')?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  // ============================================================
+  // RENDER
+  // ============================================================
   return (
     <div className="min-h-screen bg-slate-950 text-white font-mono relative overflow-hidden pb-12">
       {/* Neon glows */}
-      <div className="absolute top-[-10%] left-[-10%] w/[500px] h/[500px] rounded-full bg-purple-600/10 blur/[120px] pointer-events-none"></div>
-      <div className="absolute bottom/[20%] right-[-10%] w/[500px] h/[500px] rounded-full bg-emerald-500/10 blur/[120px] pointer-events-none"></div>
+      <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] rounded-full bg-purple-600/10 blur-[120px] pointer-events-none"></div>
+      <div className="absolute bottom-[20%] right-[-10%] w-[500px] h-[500px] rounded-full bg-emerald-500/10 blur-[120px] pointer-events-none"></div>
 
       {/* Grid Background */}
       <div className="absolute inset-0 opacity-5 pointer-events-none">
@@ -558,12 +657,12 @@ export default function TntHouse() {
         <header className="border-b border-purple-500/30 backdrop-blur-lg bg-slate-950/60 sticky top-0 z-50">
           <div className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <a href="https://t.me/tnt_house2026" target="_blank" rel="noopener noreferrer" className="w-10 h-10 border-2 border-purple-500 rounded-lg flex items-center justify-center bg-purple-500/10 shadow/[0_0_15px_rgba(153,69,255,0.4)] animate-pulse">
+              <a href="https://t.me/tnt_house2026" target="_blank" rel="noopener noreferrer" className="w-10 h-10 border-2 border-purple-500 rounded-lg flex items-center justify-center bg-purple-500/10 shadow-[0_0_15px_rgba(153,69,255,0.4)] animate-pulse">
                 <span className="text-xl">🧨</span>
               </a>
               <div>
                 <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-emerald-400 tracking-wider">TNT HOUSE</h1>
-                <span className="text/[10px] text-purple-400 block font-bold tracking-widest">TOP NEW TOKENS + GOOGLE SHEETS v1.0</span>
+                <span className="text-[10px] text-purple-400 block font-bold tracking-widest">TOP NEW TOKENS + GOOGLE SHEETS v1.0</span>
               </div>
             </div>
             
@@ -571,7 +670,7 @@ export default function TntHouse() {
               <div className="relative">
                 <button 
                   onClick={() => setIsBuyDropdownOpen(!isBuyDropdownOpen)}
-                  className="bg-gradient-to-r from-purple-500 to-emerald-400 hover:from-purple-400 hover:to-emerald-300 text-slate-950 font-black px-4 py-2 rounded text-xs transition duration-300 flex items-center gap-1 shadow/[0_0_15px_rgba(153,69,255,0.4)]"
+                  className="bg-gradient-to-r from-purple-500 to-emerald-400 hover:from-purple-400 hover:to-emerald-300 text-slate-950 font-black px-4 py-2 rounded text-xs transition duration-300 flex items-center gap-1 shadow-[0_0_15px_rgba(153,69,255,0.4)]"
                 >
                   BUY $MRDT <ChevronDown className="w-3 h-3" />
                 </button>
@@ -588,37 +687,37 @@ export default function TntHouse() {
                 )}
               </div>
 
-              <button onClick={handleConnectWallet} className="bg-gradient-to-r from-purple-500 to-emerald-400 hover:from-purple-400 hover:to-emerald-300 text-slate-950 font-black px-4 py-2 rounded text-xs transition duration-300 shadow/[0_0_15px_rgba(153,69,255,0.4)]">
+              <button onClick={handleConnectWallet} className="bg-gradient-to-r from-purple-500 to-emerald-400 hover:from-purple-400 hover:to-emerald-300 text-slate-950 font-black px-4 py-2 rounded text-xs transition duration-300 shadow-[0_0_15px_rgba(153,69,255,0.4)]">
                 {walletAddress ? walletAddress : "CONNECT WALLET"}
               </button>
             </div>
           </div>
         </header>
 
-        {/* VIP Banner */}
+        {/* VIP Banner Section */}
         <section className="max-w-7xl mx-auto px-6 pt-6">
           {activeBanner ? (
-            <div className="border border-purple-500/40 rounded-2xl p-4 bg-gradient-to-r from-black via-purple-950/20 to-black flex flex-col sm:flex-row items-center justify-between gap-4 shadow/[0_0_20px_rgba(168,85,247,0.2)] animate-pulse">
+            <div className="border border-purple-500/40 rounded-2xl p-4 bg-gradient-to-r from-black via-purple-950/20 to-black flex flex-col sm:flex-row items-center justify-between gap-4 shadow-[0_0_20px_rgba(168,85,247,0.2)] animate-pulse">
               <div className="flex items-center gap-4">
                 <span className="text-3xl bg-purple-500/10 p-2 rounded-xl border border-purple-500/20">
                   {activeBanner.bannerImg.startsWith('http') ? <img src={activeBanner.bannerImg} alt="logo" className="w-8 h-8 rounded-full object-cover"/> : activeBanner.bannerImg}
                 </span>
                 <div>
-                  <span className="bg-purple-500 text-white font-black text/[9px] px-2 py-0.5 rounded tracking-widest block w-max mb-1">🔥 VIP БУСТ</span>
+                  <span className="bg-purple-500 text-white font-black text-[9px] px-2 py-0.5 rounded tracking-widest block w-max mb-1">🔥 VIP БУСТ</span>
                   <h4 className="text-xl font-black tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400">${activeBanner.tokenName}</h4>
                   <p className="text-slate-300 text-xs mt-0.5">{activeBanner.desc}</p>
                 </div>
               </div>
-              <button onClick={() => window.open('https://jup.ag', '_blank')} className="bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-black text-xs px-6 py-2.5 rounded shadow/[0_0_15px_rgba(52,211,153,0.4)] transition">
+              <button onClick={() => window.open('https://jup.ag', '_blank')} className="bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-black text-xs px-6 py-2.5 rounded shadow-[0_0_15px_rgba(52,211,153,0.4)] transition">
                 КУПИТЬ НА JUPITER →
               </button>
             </div>
           ) : (
-            <div onClick={scrollToForm} className="cursor-pointer border border-purple-500/30 rounded-2xl p-4 bg-gradient-to-r from-black via-purple-950/10 to-black flex flex-col sm:flex-row items-center justify-between gap-4 shadow/[0_0_15px_rgba(153,69,255,0.1)] hover:border-purple-500/60 transition">
+            <div onClick={scrollToForm} className="cursor-pointer border border-purple-500/30 rounded-2xl p-4 bg-gradient-to-r from-black via-purple-950/10 to-black flex flex-col sm:flex-row items-center justify-between gap-4 shadow-[0_0_15px_rgba(153,69,255,0.1)] hover:border-purple-500/60 transition">
               <div className="flex items-center gap-4">
                 <span className="text-3xl bg-purple-500/10 p-2 rounded-xl border border-purple-500/20">⚽️</span>
                 <div>
-                  <span className="bg-slate-800 text-purple-400 font-bold text/[9px] px-2 py-0.5 rounded tracking-widest block w-max mb-1">МЕСТО СВОБОДНО</span>
+                  <span className="bg-slate-800 text-purple-400 font-bold text-[9px] px-2 py-0.5 rounded tracking-widest block w-max mb-1">МЕСТО СВОБОДНО</span>
                   <h4 className="text-lg font-black text-white">Maradona Token ($MRDT)</h4>
                   <p className="text-slate-400 text-xs mt-0.5">Главный токен платформы TNT House. Нажмите, чтобы купить VIP-баннер автоматического листинга!</p>
                 </div>
@@ -656,7 +755,7 @@ export default function TntHouse() {
               </div>
             </div>
 
-            {/* AI Scanner */}
+            {/* AI Scanner Terminal */}
             <div className="bg-slate-950 border-2 border-purple-500/40 rounded-lg p-4 font-mono text-xs h-72 flex flex-col justify-between shadow/[0_0_20px_rgba(153,69,255,0.15)] relative">
               <div className="absolute top-3 right-4 flex gap-1.5">
                 <span className="w-2.5 h-2.5 bg-red-500 rounded-full"></span>
@@ -677,66 +776,66 @@ export default function TntHouse() {
           </div>
         </section>
 
-        {/* Table */}
+        {/* Table with Safety Score */}
         <section className="max-w-7xl mx-auto px-6 py-6">
-          <div className="border-2 border-purple-500/30 rounded-lg bg-slate-909/40 backdrop-blur-md p-6 shadow/[0_0_25px_rgba(153,69,255,0.2)]">
-            <div className="flex items-center justify-between mb-4">
+          <div className="border-2 border-purple-500/30 rounded-lg bg-slate-909/40 backdrop-blur-md p-3 shadow/[0_0_25px_rgba(153,69,255,0.2)]">
+            <div className="flex items-center justify-between mb-2">
               <div>
-                <h3 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400 flex items-center gap-2">
-                  <Shield className="w-5 h-5 text-emerald-400" />
+                <h3 className="text-base font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400 flex items-center gap-1.5">
+                  <Shield className="w-3.5 h-3.5 text-emerald-400" />
                   ТАБЛИЦА БЕЗОПАСНЫХ НОВЫХ ТОКЕНОВ
                 </h3>
-                <p className="text-slate-400 text-xs mt-1">Кликни на токен, чтобы открыть детальный "TNT Security Blueprint"</p>
+                <p className="text-slate-400 text/[10px] mt-0.5">Кликни на токен, чтобы открыть детальный "TNT Security Blueprint"</p>
               </div>
-              <div className="hidden md:flex items-center gap-2 text-xs text-purple-400">
-                <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Обновление каждые 5 минут
+              <div className="hidden md:flex items-center gap-1 text/[9px] text-purple-400">
+                <RefreshCw className="w-2.5 h-2.5 animate-spin" /> Обновление каждые 5 мин
               </div>
             </div>
 
-            <div className="max-h/[340px] overflow-y-auto border border-purple-500/20 rounded-lg scrollbar-thin scrollbar-thumb-purple-500/30">
-              <table className="w-full text-left border-collapse text-xs">
+            <div className="max-h/[260px] overflow-y-auto border border-purple-500/20 rounded-lg scrollbar-thin scrollbar-thumb-purple-500/30">
+              <table className="w-full text-left border-collapse text/[9px]">
                 <thead>
                   <tr className="border-b border-purple-500/20 bg-purple-500/10 text-purple-400 font-bold sticky top-0 z-20 backdrop-blur-md">
-                    <th className="p-2.5">Токен</th>
-                    <th className="p-2.5">Цена</th>
-                    <th className="p-2.5">Ликвидность</th>
-                    <th className="p-2.5">Объем / Изм.</th>
-                    <th className="p-2.5 text-center">TNT Safety Score</th>
-                    <th className="p-2.5 text-right">Действие</th>
+                    <th className="p-1">Токен</th>
+                    <th className="p-1">Цена</th>
+                    <th className="p-1">Ликв.</th>
+                    <th className="p-1">Объем/Изм.</th>
+                    <th className="p-1 text-center">Score</th>
+                    <th className="p-1 text-right">Действие</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {/* Pinned $MRDT */}
+                  {/* Pinned $MRDT row */}
                   <tr 
-                    onClick={() => openTokenBlueprint({ symbol: 'MRDT', name: 'MARADONATOKEN', ca: MRDT_CA, price: '0.00001300', liquidity: 13000, verified: true })}
+                    onClick={() => openTokenBlueprint({ symbol: 'MRDT', name: 'MARADONATOKEN', ca: MRDT_CA, price: '0.00001300', liquidity: 13000, volume24h: 0, priceChange24h: 12.4, verified: true, dexUrl: `https://dexscreener.com/solana/${MRDT_CA}`, chain: 'solana' })}
                     className="border-b border-purple-500/30 bg-emerald-500/5 hover:bg-emerald-500/10 transition cursor-pointer"
                   >
-                    <td className="p-2 font-bold flex items-center gap-2">
-                      <span className="text-lg">⚽️</span>
+                    <td className="p-1 font-bold flex items-center gap-1">
+                      <span className="text-sm">⚽️</span>
                       <div>
-                        <span className="text-emerald-400 font-extrabold text-sm tracking-wider">$MRDT</span>
-                        <div className="text/[9px] text-slate-400">MARADONATOKEN</div>
+                        <span className="text-emerald-400 font-extrabold text/[10px] tracking-wider">$MRDT</span>
+                        <div className="text/[7px] text-slate-400">MARADONATOKEN</div>
                       </div>
                     </td>
-                    <td className="p-2 font-mono text-emerald-400 font-bold">${mrdtPrice.toFixed(8)}</td>
-                    <td className="p-2 font-mono text-emerald-400 font-bold">$13,000+</td>
-                    <td className="p-2 font-mono text-emerald-400 font-bold">+12.4%</td>
-                    <td className="p-2 text-center">
-                      <div className="inline-flex items-center justify-center w-14 h-7 rounded-full bg-emerald-500/20 border border-emerald-500 text-emerald-400 text/[11px] font-extrabold tracking-widest shadow/[0_0_10px_rgba(16,185,129,0.5)]">
+                    <td className="p-1 font-mono text-emerald-400 font-bold text/[9px]">${mrdtPrice.toFixed(8)}</td>
+                    <td className="p-1 font-mono text-emerald-400 font-bold text/[9px]">$13K+</td>
+                    <td className="p-1 font-mono text-emerald-400 font-bold text/[9px]">+12.4%</td>
+                    <td className="p-1 text-center">
+                      <div className="inline-flex items-center justify-center w-9 h-4 rounded-full bg-emerald-500/20 border border-emerald-500 text-emerald-400 text/[8px] font-extrabold shadow/[0_0_6px_rgba(16,185,129,0.5)]">
                         98
                       </div>
                     </td>
-                    <td className="p-2 text-right">
-                      <button onClick={(e) => { e.stopPropagation(); handleLaunchJupiter(); }} className="inline-flex items-center gap-1 text/[11px] text-emerald-400 hover:text-emerald-300 font-bold hover:underline">
-                        Купить <ExternalLink className="w-3 h-3" />
+                    <td className="p-1 text-right">
+                      <button onClick={(e) => { e.stopPropagation(); handleLaunchJupiter(); }} className="inline-flex items-center gap-0.5 text/[8px] text-emerald-400 hover:text-emerald-300 font-bold hover:underline">
+                        Купить <ExternalLink className="w-2 h-2" />
                       </button>
                     </td>
                   </tr>
 
                   {loading && tokens.length === 0 ? (
                     <tr>
-                      <td colSpan="6" className="p-12 text-center text-purple-400 font-bold">
-                        <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-purple-500" />
+                      <td colSpan={6} className="p-6 text-center text-purple-400 font-bold">
+                        <RefreshCw className="w-4 h-4 animate-spin mx-auto mb-1 text-purple-500" />
                         Сканируем блокчейн...
                       </td>
                     </tr>
@@ -750,25 +849,23 @@ export default function TntHouse() {
                           onClick={() => openTokenBlueprint(token)}
                           className="border-b border-purple-500/10 hover:bg-purple-500/5 transition cursor-pointer"
                         >
-                          <td className="p-2 font-bold">
-                            <span className="text-purple-400">${token.symbol}</span>
-                            <span className="text/[9px] text-slate-500 block font-normal truncate max-w/[120px]">{token.name}</span>
+                          <td className="p-1 font-bold">
+                            <span className="text-purple-400 text/[9px]">${token.symbol}</span>
+                            <span className="text/[7px] text-slate-500 block font-normal truncate max-w/[80px]">{token.name}</span>
                           </td>
-                          <td className="p-2 font-mono text-slate-300">${token.price}</td>
-                          <td className="p-2 font-mono text-slate-300">{typeof token.liquidity === 'number' ? formatNumber(token.liquidity) : token.liquidity}</td>
-                          <td className="p-2 font-mono">
-                            <span className={token.priceChange24h > 0 ? 'text-emerald-400 font-bold' : 'text-red-400'}>
-                              {typeof token.volume24h === 'number' ? formatNumber(token.volume24h) : token.volume24h} ({token.priceChange24h > 0 ? '+' : ''}{token.priceChange24h}%)
-                            </span>
+                          <td className="p-1 font-mono text-slate-300 text/[9px]">${token.price}</td>
+                          <td className="p-1 font-mono text-slate-300 text/[9px]">{typeof token.liquidity === 'number' ? formatNumber(token.liquidity) : token.liquidity}</td>
+                          <td className="p-1 font-mono">
+                            <span className={token.priceChange24h > 0 ? 'text-emerald-400' : 'text-red-400'}>{typeof token.volume24h === 'number' ? formatNumber(token.volume24h) : token.volume24h} ({token.priceChange24h > 0 ? '+' : ''}{token.priceChange24h}%)</span>
                           </td>
-                          <td className="p-2 text-center">
-                            <div className={`inline-flex items-center justify-center w-14 h-7 rounded-full ${style.bg} ${style.border} ${style.color} text/[11px] font-extrabold tracking-widest ${style.glow}`}>
+                          <td className="p-1 text-center">
+                            <div className={`inline-flex items-center justify-center w-9 h-4 rounded-full ${style.bg} ${style.border} ${style.color} text/[8px] font-extrabold tracking-widest ${style.glow}`}>
                               {score}
                             </div>
                           </td>
-                          <td className="p-2 text-right">
-                            <a href={token.dexUrl} onClick={(e) => e.stopPropagation()} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text/[10px] text-purple-400 hover:text-emerald-400 hover:underline">
-                              DEX <ExternalLink className="w-2.5 h-2.5" />
+                          <td className="p-1 text-right">
+                            <a href={token.dexUrl} onClick={(e) => e.stopPropagation()} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text/[8px] text-purple-400 hover:text-emerald-400 hover:underline">
+                              DEX <ExternalLink className="w-2 h-2" />
                             </a>
                           </td>
                         </tr>
@@ -779,15 +876,15 @@ export default function TntHouse() {
               </table>
             </div>
 
-            {error && <div className="mt-4 p-3 bg-red-950/40 border border-red-500/30 rounded-lg flex items-center gap-2 text-red-300 text-xs"><AlertCircle className="w-4 h-4" /> {error}</div>}
+            {error && <div className="mt-2 p-1.5 bg-red-950/40 border border-red-500/30 rounded-lg flex items-center gap-1 text-red-300 text/[9px]"><AlertCircle className="w-2.5 h-2.5" /> {error}</div>}
           </div>
         </section>
 
-        {/* Order Forms */}
+        {/* Order Forms Section */}
         <section id="orderFormsSection" className="max-w-7xl mx-auto px-6 py-8">
           <div className="grid md:grid-cols-2 gap-12 items-start">
             
-            {/* LEFT */}
+            {/* LEFT: Forms */}
             <div className="space-y-8">
               {/* FORM 1: AI AUDIT */}
               <div className="border-2 border-purple-500/30 rounded-lg bg-slate-909/40 p-6 backdrop-blur-md">
@@ -822,9 +919,9 @@ export default function TntHouse() {
                       onChange={(e) => setSelectedTier(e.target.value)}
                       className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white focus:border-purple-500 focus:outline-none transition font-mono"
                     >
-                      <option value="basic">Базовый Аудит (24h очереди) — $10 {priceLoading ? '(расчёт…)' : `≈ ${getAmountForTier('basic').toLocaleString()} $MRDT`}</option>
+                      <option value="basic">Базовый Аудит (24ч очереди) — $10 {priceLoading ? '(расчёт…)' : `≈ ${getAmountForTier('basic').toLocaleString()} $MRDT`}</option>
                       <option value="fast">Быстрый Листинг (5 мин) — $40 {priceLoading ? '(расчёт…)' : `≈ ${getAmountForTier('fast').toLocaleString()} $MRDT`}</option>
-                      <option value="vip">VIP-Буст (баннер 24h) — $120 {priceLoading ? '(расчёт…)' : `≈ ${getAmountForTier('vip').toLocaleString()} $MRDT`}</option>
+                      <option value="vip">VIP-Буст (баннер 24ч) — $120 {priceLoading ? '(расчёт…)' : `≈ ${getAmountForTier('vip').toLocaleString()} $MRDT`}</option>
                     </select>
                   </div>
                   <div>
@@ -871,11 +968,11 @@ export default function TntHouse() {
                         type="file"
                         accept="image/*"
                         onChange={(e) => {
-                          const file = e.target.files[0];
+                          const file = e.target.files?.[0];
                           if (file) {
                             const reader = new FileReader();
                             reader.onload = (event) => {
-                              setBannerFormData({...bannerFormData, bannerImg: event.target.result});
+                              setBannerFormData({...bannerFormData, bannerImg: event.target?.result as string});
                             };
                             reader.readAsDataURL(file);
                           }
@@ -903,7 +1000,7 @@ export default function TntHouse() {
                     <label className="block text-purple-400 text/[11px] font-bold mb-1">Срок размещения рекламы</label>
                     <select
                       value={bannerFormData.days}
-                      onChange={(e) => setBannerFormData({...bannerFormData, days: e.target.value})
+                      onChange={(e) => setBannerFormData({...bannerFormData, days: e.target.value})}
                       className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white focus:border-purple-500 focus:outline-none transition font-mono"
                     >
                       <option value="1">1 День — 20$ {priceLoading ? '(расчёт…)' : `(~ ${getAmountForBanner('1').toLocaleString()} $MRDT)`}</option>
@@ -924,7 +1021,7 @@ export default function TntHouse() {
               </div>
             </div>
 
-            {/* RIGHT */}
+            {/* RIGHT: Pricing info */}
             <div className="space-y-4 bg-slate-909/20 border-2 border-purple-500/20 rounded-xl p-6">
               <h3 className="text-xl font-black text-purple-400">Информация для инвесторов</h3>
                 <p className="text-slate-300 text-xs leading-relaxed">
@@ -1130,13 +1227,19 @@ export default function TntHouse() {
         </div>
       )}
 
-      {/* Blueprint Modal */}
+      {/* TNT Security Blueprint Modal */}
       {isBlueprintOpen && (selectedToken || auditResult) && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z/[100] p-4" onClick={closeBlueprint}>
-          <div className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-2xl max-h/[90vh] overflow-y-auto shadow/[0_0_40px_rgba(168,85,247,0.25)]" onClick={e => e.stopPropagation()}>
+        <div 
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z/[100] p-4" 
+          onClick={closeBlueprint}
+        >
+          <div 
+            className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-2xl max-h/[90vh] overflow-y-auto shadow/[0_0_40px_rgba(168,85,247,0.25)]"
+            onClick={e => e.stopPropagation()}
+          >
             <div className="sticky top-0 bg-slate-950 border-b border-purple-500/30 px-6 py-5 flex items-center justify-between z-10 rounded-t-2xl">
               <div>
-                <div className="text-purple-400 text-xs tracking-[3px] font-bold">TNT HOUSE • AI INSPECTOR</div>
+                <div className="text-purple-400 text-xs tracking/[3px] font-bold">TNT HOUSE • AI INSPECTOR</div>
                 <div className="text-2xl font-black text-white tracking-tight">TNT Security Blueprint</div>
               </div>
               <button onClick={closeBlueprint} className="text-slate-400 hover:text-white transition">
@@ -1150,8 +1253,8 @@ export default function TntHouse() {
                   {auditResult ? (auditResult.symbol.includes('MRDT') ? '⚽️' : '🪙') : '🪙'}
                 </div>
                 <div>
-                  <div className="text-2xl font-black tracking-tighter">${auditResult ? auditResult.symbol : selectedToken.symbol}</div>
-                  <div className="text-sm text-slate-400 -mt-1">{auditResult ? auditResult.tokenName : selectedToken.name}</div>
+                  <div className="text-2xl font-black tracking-tighter">${auditResult ? auditResult.symbol : selectedToken?.symbol}</div>
+                  <div className="text-sm text-slate-400 -mt-1">{auditResult ? auditResult.tokenName : selectedToken?.name}</div>
                 </div>
                 <div className="ml-auto text-right">
                   <div className="text/[10px] text-slate-500">TNT SAFETY SCORE</div>
@@ -1232,6 +1335,7 @@ export default function TntHouse() {
       </button>
 
       {/* AI Chat Popup */}
+      {/* FIX #3: Replaced <form onSubmit> with <div> + onKeyDown for Enter key support */}
       {isChatOpen && (
         <div className="fixed bottom-24 right-6 w-80 md:w-96 h/[450px] bg-slate-909 border-2 border-purple-500 rounded-xl shadow/[0_0_30px_rgba(153,69,255,0.4)] flex flex-col overflow-hidden z-50 font-mono">
           <div className="bg-gradient-to-r from-purple-600 to-emerald-500 p-4 flex items-center justify-between border-b border-purple-500/20">
@@ -1259,18 +1363,23 @@ export default function TntHouse() {
             <div ref={chatEndRef} />
           </div>
 
-          <form onSubmit={handleSendChat} className="p-3 border-t border-purple-500/20 bg-slate-950 flex gap-2">
+          {/* FIX #3: div + onKeyDown instead of <form onSubmit> */}
+          <div className="p-3 border-t border-purple-500/20 bg-slate-950 flex gap-2">
             <input 
               type="text" 
               value={userMsg} 
-              onChange={(e) => setUserMsg(e.target.value)} 
+              onChange={(e) => setUserMsg(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSendChat(); }}
               placeholder="Спроси у ИИ..." 
               className="flex-1 bg-slate-909 border border-purple-500/20 rounded px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" 
             />
-            <button type="submit" className="bg-purple-500 hover:bg-purple-400 text-slate-950 px-3 rounded text-xs font-bold transition">
+            <button
+              onClick={handleSendChat}
+              className="bg-purple-500 hover:bg-purple-400 text-slate-950 px-3 rounded text-xs font-bold transition"
+            >
               <Send className="w-3.5 h-3.5" />
             </button>
-          </form>
+          </div>
         </div>
       )}
     </div>
