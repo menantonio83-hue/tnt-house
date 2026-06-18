@@ -259,7 +259,7 @@ export default function TntHouse() {
       const largestAccounts = await connection.getTokenLargestAccounts(mintPubkey);
       const totalSupply = Number(mintInfo.supply);
       const top10 = largestAccounts.value.slice(0, 10);
-      const top10Percent = top10.reduce((acc, acct) => acc + (Number(acct.amount) / totalSupply) * 100, 0);
+      const top10Percent = top10.reduce((acc, acct) => acc + (Number(acct.amount) / totalSupply) * 100);
       
       setLogs(prev => [...prev, `[${timestamp()}] [✅] Топ-10 холдеров: ${top10Percent.toFixed(2)}%`]);
 
@@ -538,7 +538,7 @@ export default function TntHouse() {
   return (
     <div className="min-h-screen bg-slate-950 text-white font-mono relative overflow-hidden pb-12">
       {/* Neon glows */}
-      <div className="absolute top-[-10%] left-[-10%] w-[500px] h/[500px] rounded-full bg-purple-600/10 blur/[120px] pointer-events-none"></div>
+      <div className="absolute top-[-10%] left-[-10%] w/[500px] h/[500px] rounded-full bg-purple-600/10 blur/[120px] pointer-events-none"></div>
       <div className="absolute bottom/[20%] right-[-10%] w/[500px] h/[500px] rounded-full bg-emerald-500/10 blur/[120px] pointer-events-none"></div>
 
       {/* Grid Background */}
