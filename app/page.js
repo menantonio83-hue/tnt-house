@@ -538,7 +538,7 @@ export default function TntHouse() {
   return (
     <div className="min-h-screen bg-slate-950 text-white font-mono relative overflow-hidden pb-12">
       {/* Neon glows */}
-      <div className="absolute top-[-10%] left-[-10%] w-[500px] h/[500px] rounded-full bg-purple-600/10 blur/[120px] pointer-events-none"></div>
+      <div className="absolute top-[-10%] left-[-10%] w/[500px] h/[500px] rounded-full bg-purple-600/10 blur/[120px] pointer-events-none"></div>
       <div className="absolute bottom/[20%] right-[-10%] w/[500px] h/[500px] rounded-full bg-emerald-500/10 blur/[120px] pointer-events-none"></div>
 
       {/* Grid Background */}
@@ -577,7 +577,7 @@ export default function TntHouse() {
                 </button>
                 
                 {isBuyDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-slate-900 border border-purple-500/30 rounded-lg shadow-xl z-50 py-1 text-sm">
+                  <div className="absolute right-0 mt-2 w-48 bg-slate-909 border border-purple-500/30 rounded-lg shadow-xl z-50 py-1 text-sm">
                     <button onClick={handleLaunchJupiter} className="w-full text-left px-4 py-2.5 hover:bg-purple-500/10 text-emerald-400 flex items-center gap-2 text-sm">
                       <ExternalLink className="w-4 h-4" /> Jupiter Swap
                     </button>
@@ -647,7 +647,7 @@ export default function TntHouse() {
 
               <div className="grid grid-cols-3 gap-4 mt-8">
                 {pillars.map((item, i) => (
-                  <div key={i} className="bg-slate-900/50 border border-purple-500/20 rounded-lg p-3 text-center hover:border-purple-500/60 transition duration-300 shadow-md">
+                  <div key={i} className="bg-slate-909/50 border border-purple-500/20 rounded-lg p-3 text-center hover:border-purple-500/60 transition duration-300 shadow-md">
                     <item.icon className={`w-5 h-5 ${item.color} mx-auto mb-1`} />
                     <div className="text/[11px] font-bold text-slate-200">{item.label}</div>
                     <div className="text/[9px] text-slate-400 font-mono">{item.desc}</div>
@@ -1046,7 +1046,7 @@ export default function TntHouse() {
                 <span className="text-2xl">🔥</span>
                 <div className="text-left">
                   <div className="font-bold text-white text-sm">Solflare</div>
-                  <div className="text-xs text-slate-400">Надёжный некастodiальный кошелёк</div>
+                  <div className="text-xs text-slate-400">Надёжный некаstodiальный кошелёк</div>
                 </div>
               </button>
               <div className="border-t border-purple-500/20 pt-3">
