@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   TrendingUp, Shield, Lock, Zap, Send, MessageSquare, X, 
-  RefreshCw, AlertCircle, Sparkles, ExternalLink, ChevronDown, Download, Image
+  RefreshWc, AlertCircle, Sparkles, ExternalLink, ChevronDown, Download, Image
 } from 'lucide-react';
 import { Connection, PublicKey, Transaction } from '@solana/web3.js';
 import { getAssociatedTokenAddress, createTransferInstruction, getAccount, getMint } from '@solana/spl-token';
