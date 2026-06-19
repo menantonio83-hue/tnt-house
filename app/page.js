@@ -23,7 +23,6 @@ export default function TntHouse() {
   const [error, setError] = useState('');
   const [bannerError, setBannerError] = useState('');
   const [walletAddress, setWalletAddress] = useState('');
-  const [selectedTier, setSelectedTier] = useState('basic');
   const [isSending, setIsSending] = useState(false);
   const [isBannerSending, setIsBannerSending] = useState(false);
   const [activeBanner, setActiveBanner] = useState(null);
@@ -41,6 +40,28 @@ export default function TntHouse() {
   const chatEndRef = useRef(null);
   const [mrdtPrice, setMrdtPrice] = useState(0.000013);
   const [priceLoading, setPriceLoading] = useState(true);
+
+  // ===== NEW 2-STEP FORM STATE =====
+  const [step, setStep] = useState(1);
+  const [selectedPlan, setSelectedPlan] = useState('');
+  const [selectedCurrency, setSelectedCurrency] = useState('');
+
+  const SOL_PRICE_MOCK = 150; // 1 SOL = $150 (mock)
+  const plans = [
+    { value: 'basic', name: 'Базовый Аудит (24h)', price: 10, mrdt: '769 231' },
+    { value: 'express', name: 'Быстрый Листинг (5 min)', price: 40, mrdt: '3 076 923' },
+    { value: 'vip', name: 'VIP-Буст (баннер 24h)', price: 120, mrdt: '9 230 769' },
+  ];
+
+  const handlePayment = () => {
+    if (!selectedPlan || !selectedCurrency) {
+      alert('Выбери тариф и способ оплаты');
+      return;
+    }
+    const plan = plans.find(p => p.value === selectedPlan);
+    alert(`Оплата: ${plan.name} через ${selectedCurrency.toUpperCase()}. Сумма: $${plan.price}`);
+    // TODO: здесь будет реальная логика оплаты
+  };
 
   const pillars = [
     { icon: Shield, label: 'AI Аудит', desc: 'Проверка контрактов', color: 'text-purple-400' },
@@ -372,22 +393,102 @@ export default function TntHouse() {
               <div className="border-2 border-purple-500/30 rounded-lg bg-slate-909/40 p-6 backdrop-blur-md">
                 <h3 className="text-lg font-black text-purple-400 mb-2 flex items-center gap-2">🔍 ЗАКАЗАТЬ ИИ-ИНСПЕКЦИЮ</h3>
                 <p className="text-slate-400 text-xs mb-4">Авто-добавление в таблицу и выгрузка в Google Sheets.</p>
-                <form onSubmit={handleFormSubmit} className="space-y-4">
-                  <div><label className="block text-purple-400 text/[11px] font-bold mb-1">Название проекта / Тикер</label><input type="text" value={formData.projectName} onChange={e => setFormData({...formData,projectName:e.target.value})} placeholder="$MRDT" className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" /></div>
-                  <div><label className="block text-purple-400 text/[11px] font-bold mb-1">Contract Address (Solana)</label><input type="text" value={formData.ca} onChange={e => setFormData({...formData,ca:e.target.value})} placeholder="Адрес контракта" className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none font-mono" /></div>
-                  <div><label className="block text-purple-400 text/[11px] font-bold mb-1">Выберите Тариф</label>
-                    <select value={selectedTier} onChange={e => setSelectedTier(e.target.value)} className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white focus:border-purple-500 focus:outline-none font-mono">
-                      <option value="basic">Базовый Аудит (24h) — $10 {priceLoading?'(расчёт…)':`≈ ${getAmountForTier('basic').toLocaleString()} $MRDT`}</option>
-                      <option value="fast">Быстрый Листинг (5 min) — $40 {priceLoading?'(расчёт…)':`≈ ${getAmountForTier('fast').toLocaleString()} $MRDT`}</option>
-                      <option value="vip">VIP-Буст (баннер 24h) — $120 {priceLoading?'(расчёт…)':`≈ ${getAmountForTier('vip').toLocaleString()} $MRDT`}</option>
-                      <option value="sol">Оплатить в SOL (авто-выкуп $MRDT)</option>
-                    </select>
+
+                {/* ===== Двухшаговая форма ===== */}
+                {step === 1 ? (
+                  <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700/50">
+                    <h3 className="text-2xl font-bold text-white mb-4">Заказать ИИ-инспекцию</h3>
+                    <p className="text-gray-400 mb-6">Выбери тип проверки</p>
+                    <div className="space-y-3">
+                      {plans.map((plan) => (
+                        <label
+                          key={plan.value}
+                          className={`flex items-center p-4 rounded-xl cursor-pointer transition-all ${
+                            selectedPlan === plan.value
+                              ? 'bg-indigo-600/20 border border-indigo-500'
+                              : 'bg-gray-700/30 border border-gray-700 hover:border-indigo-400'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="plan"
+                            value={plan.value}
+                            checked={selectedPlan === plan.value}
+                            onChange={() => setSelectedPlan(plan.value)}
+                            className="w-5 h-5 text-indigo-600 focus:ring-indigo-500"
+                          />
+                          <div className="ml-4">
+                            <p className="text-white font-semibold">{plan.name}</p>
+                            <p className="text-sm text-gray-400">${plan.price} ≈ {plan.mrdt} $MRDT</p>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                    <button
+                      onClick={() => {
+                        if (!selectedPlan) return alert('Выбери тариф');
+                        setStep(2);
+                      }}
+                      disabled={!selectedPlan}
+                      className="mt-6 w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-3 rounded-xl font-semibold hover:opacity-90 transition disabled:opacity-40"
+                    >
+                      Далее →
+                    </button>
                   </div>
-                  <div><label className="block text-purple-400 text/[11px] font-bold mb-1">Телеграм для связи</label><input type="text" value={formData.telegram} onChange={e => setFormData({...formData,telegram:e.target.value})} placeholder="@username" className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" /></div>
-                  <button type="submit" disabled={isSending} className="w-full bg-gradient-to-r from-purple-500 to-emerald-400 hover:from-purple-400 hover:to-emerald-300 text-slate-950 font-black py-2.5 rounded text-xs transition flex items-center justify-center gap-1.5 shadow/[0_0_15px_rgba(153,69,255,0.3)] disabled:opacity-50"><Send className="w-3.5 h-3.5" /> {isSending?'ОТПРАВКА...':'ЗАПУСТИТЬ ИИ-ИНСПЕКЦИЮ'}</button>
-                  {submitted && <div className="p-3 bg-emerald-950/40 border border-emerald-500/30 rounded text-emerald-300 text-xs text-center font-bold">✓ Транзакция подтверждена! Токен добавлен.</div>}
-                </form>
+                ) : (
+                  <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700/50">
+                    <h3 className="text-2xl font-bold text-white mb-4">Выбери способ оплаты</h3>
+                    <p className="text-gray-400 mb-4">Выбран тариф: <span className="text-white font-semibold">{plans.find(p => p.value === selectedPlan)?.name}</span></p>
+                    <div className="space-y-3">
+                      {['mrdt', 'sol'].map((method) => (
+                        <label
+                          key={method}
+                          className={`flex items-center p-4 rounded-xl cursor-pointer transition-all ${
+                            selectedCurrency === method
+                              ? 'bg-indigo-600/20 border border-indigo-500'
+                              : 'bg-gray-700/30 border border-gray-700 hover:border-indigo-400'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="currency"
+                            value={method}
+                            checked={selectedCurrency === method}
+                            onChange={() => setSelectedCurrency(method)}
+                            className="w-5 h-5 text-indigo-600 focus:ring-indigo-500"
+                          />
+                          <div className="ml-4">
+                            <p className="text-white font-semibold">
+                              {method === 'mrdt' ? 'Оплатить в $MRDT' : 'Оплатить в SOL (авто-выкуп $MRDT)'}
+                            </p>
+                            {method === 'sol' && selectedPlan && (
+                              <p className="text-sm text-gray-400">
+                                Сумма: ≈ {(plans.find(p => p.value === selectedPlan)?.price / SOL_PRICE_MOCK).toFixed(4)} SOL
+                              </p>
+                            )}
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                    <div className="flex gap-3 mt-6">
+                      <button
+                        onClick={() => setStep(1)}
+                        className="flex-1 bg-gray-700 text-white py-3 rounded-xl font-semibold hover:bg-gray-600 transition"
+                      >
+                        ← Назад
+                      </button>
+                      <button
+                        onClick={handlePayment}
+                        disabled={!selectedCurrency}
+                        className="flex-1 bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-3 rounded-xl font-semibold hover:opacity-90 transition disabled:opacity-40"
+                      >
+                        Готово
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
+
               <div className="border-2 border-purple-500/30 rounded-lg bg-slate-909/40 p-6 backdrop-blur-md">
                 <h3 className="text-lg font-black text-purple-400 mb-2 flex items-center gap-2">👑 КУПИТЬ VIP-БАННЕР НА ГЛАВНУЮ</h3>
                 <p className="text-slate-400 text-xs mb-4">Полностью автоматическая замена рекламного места на ваш токен.</p>
@@ -470,7 +571,7 @@ export default function TntHouse() {
 
       {/* ===== МОДАЛЬНЫЕ ОКНА ПОВЕРХ ВСЕГО ===== */}
       {showAuditWalletModal && (
-        <div className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 z/[9999] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-md p-6 shadow-lg">
             <h3 className="text-lg font-black text-white mb-4">Выберите способ оплаты</h3>
             <button onClick={() => handleAuditWalletSelect('phantom')} className="block w-full bg-purple-500/20 border border-purple-500/30 rounded-xl p-3 mb-3">👻 Phantom</button>
