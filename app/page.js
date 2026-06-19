@@ -468,85 +468,48 @@ export default function TntHouse() {
         </footer>
       </div>
 
-      {/* МОДАЛЬНЫЕ ОКНА */}
+      {/* ===== МОДАЛЬНЫЕ ОКНА ПОВЕРХ ВСЕГО ===== */}
       {showAuditWalletModal && (
-        <div className="fixed inset-0 z/[9999] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-md p-6 shadow/[0_0_40px_rgba(168,85,247,0.25)]">
-            <h3 className="text-lg font-black text-white mb-2 text-center">Выберите способ оплаты</h3>
-            <p className="text-slate-400 text-xs text-center mb-6">Оплата в $MRDT за ИИ-инспекцию</p>
-            <div className="flex flex-col gap-3">
-              <button onClick={() => handleAuditWalletSelect('phantom')} className="flex items-center gap-3 w-full bg-gradient-to-r from-purple-500/20 to-purple-500/10 border border-purple-500/30 rounded-xl p-3 hover:bg-purple-500/20 transition"><span className="text-2xl">👻</span><div className="text-left"><div className="font-bold text-white text-sm">Phantom</div><div className="text-xs text-slate-400">Популярный кошелёk</div></div></button>
-              <button onClick={() => handleAuditWalletSelect('solflare')} className="flex items-center gap-3 w-full bg-gradient-to-r from-emerald-500/20 to-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 hover:bg-emerald-500/20 transition"><span className="text-2xl">🔥</span><div className="text-left"><div className="font-bold text-white text-sm">Solflare</div><div className="text-xs text-slate-400">Надёжный кошелёk</div></div></button>
-            </div>
-            <button onClick={() => setShowAuditWalletModal(false)} className="w-full mt-4 text-xs text-slate-500 hover:text-white transition">Отмена</button>
+        <div className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-md p-6 shadow-lg">
+            <h3 className="text-lg font-black text-white mb-4">Выберите способ оплаты</h3>
+            <button onClick={() => handleAuditWalletSelect('phantom')} className="block w-full bg-purple-500/20 border border-purple-500/30 rounded-xl p-3 mb-3">👻 Phantom</button>
+            <button onClick={() => handleAuditWalletSelect('solflare')} className="block w-full bg-emerald-500/20 border border-emerald-500/30 rounded-xl p-3 mb-4">🔥 Solflare</button>
+            <button onClick={() => setShowAuditWalletModal(false)} className="text-slate-400">Отмена</button>
           </div>
         </div>
       )}
 
       {showBannerWalletModal && (
         <div className="fixed inset-0 z/[9999] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-md p-6 shadow/[0_0_40px_rgba(168,85,247,0.25)]">
-            <h3 className="text-lg font-black text-white mb-2 text-center">Выберите способ оплаты</h3>
-            <p className="text-slate-400 text-xs text-center mb-6">Баннер активируется после подтверждения</p>
-            <div className="flex flex-col gap-3">
-              <button onClick={() => handleBannerWalletSelect('phantom')} className="flex items-center gap-3 w-full bg-gradient-to-r from-purple-500/20 to-purple-500/10 border border-purple-500/30 rounded-xl p-3 hover:bg-purple-500/20 transition"><span className="text-2xl">👻</span><div className="text-left"><div className="font-bold text-white text-sm">Phantom</div><div className="text-xs text-slate-400">Популярный кошелёk</div></div></button>
-              <button onClick={() => handleBannerWalletSelect('solflare')} className="flex items-center gap-3 w-full bg-gradient-to-r from-emerald-500/20 to-emerald-500/10 border border-emerald-500/30 rounded-xl p-3 hover:bg-emerald-500/20 transition"><span className="text-2xl">🔥</span><div className="text-left"><div className="font-bold text-white text-sm">Solflare</div><div className="text-xs text-slate-400">Надёжный кошелёk</div></div></button>
-            </div>
-            <button onClick={() => setShowBannerWalletModal(false)} className="w-full mt-4 text-xs text-slate-500 hover:text-white transition">Отмена</button>
+          <div className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-md p-6 shadow-lg">
+            <h3 className="text-lg font-black text-white mb-4">Выберите способ оплаты</h3>
+            <button onClick={() => handleBannerWalletSelect('phantom')} className="block w-full bg-purple-500/20 border border-purple-500/30 rounded-xl p-3 mb-3">👻 Phantom</button>
+            <button onClick={() => handleBannerWalletSelect('solflare')} className="block w-full bg-emerald-500/20 border border-emerald-500/30 rounded-xl p-3 mb-4">🔥 Solflare</button>
+            <button onClick={() => setShowBannerWalletModal(false)} className="text-slate-400">Отмена</button>
           </div>
         </div>
       )}
 
       {isBlueprintOpen && (selectedToken || auditResult) && (
         <div className="fixed inset-0 z/[9999] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={closeBlueprint}>
-          <div className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-2xl max-h/[90vh] overflow-y-auto shadow/[0_0_40px_rgba(168,85,247,0.25)]" onClick={e => e.stopPropagation()}>
-            <div className="sticky top-0 bg-slate-950 border-b border-purple-500/30 px-6 py-5 flex items-center justify-between z-10 rounded-t-2xl">
-              <div><div className="text-purple-400 text-xs tracking/[3px] font-bold">TNT HOUSE • AI INSPECTOR</div><div className="text-2xl font-black text-white tracking-tight">TNT Security Blueprint</div></div>
-              <button onClick={closeBlueprint} className="text-slate-400 hover:text-white transition"><X className="w-6 h-6" /></button>
-            </div>
-            <div className="p-6 space-y-6">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-3xl">{auditResult ? (auditResult.symbol.includes('MRDT') ? '⚽️' : '🪙') : '🪙'}</div>
-                <div><div className="text-2xl font-black tracking-tighter">${auditResult ? auditResult.symbol : selectedToken?.symbol}</div><div className="text-sm text-slate-400 -mt-1">{auditResult ? auditResult.tokenName : selectedToken?.name}</div></div>
-                <div className="ml-auto text-right"><div className="text/[10px] text-slate-500">TNT SAFETY SCORE</div><div className={`text-4xl font-black tracking-tighter ${getScoreStyle(getSafetyScore(selectedToken || auditResult)).color}`}>{getSafetyScore(selectedToken || auditResult)}</div></div>
+          <div className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-lg p-6 shadow-lg" onClick={e => e.stopPropagation()}>
+            <h2 className="text-2xl font-black text-white">TNT Security Blueprint</h2>
+            {auditResult ? (
+              <div className="mt-4 text-sm">
+                <p>Mint: {auditResult.mintAuthority}</p>
+                <p>Freeze: {auditResult.freezeAuthority}</p>
+                <p>LP: ${auditResult.liquidityUSD.toLocaleString()}</p>
               </div>
-              {auditResult ? (
-                <>
-                  <div className="bg-slate-909/60 border border-purple-500/20 rounded-xl p-5">
-                    <div className="flex items-center gap-2 mb-3 text-emerald-400"><div className="w-2 h-2 bg-emerald-400 rounded-full"></div><div className="font-bold tracking-wider text-sm">🧱 ФУНДАМЕНТ (Mint & Freeze)</div></div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 text-sm">
-                      <div className="flex justify-between"><span className="text-slate-400">Mint Authority</span><span className={auditResult.mintAuthority === 'Revoked ✓' ? 'text-emerald-400 font-mono' : 'text-red-400 font-mono'}>{auditResult.mintAuthority}</span></div>
-                      <div className="flex justify-between"><span className="text-slate-400">Freeze Authority</span><span className={auditResult.freezeAuthority === 'Revoked ✓' ? 'text-emerald-400 font-mono' : 'text-red-400 font-mono'}>{auditResult.freezeAuthority}</span></div>
-                    </div>
-                  </div>
-                  <div className="bg-slate-909/60 border border-purple-500/20 rounded-xl p-5">
-                    <div className="flex items-center gap-2 mb-3 text-cyan-400"><div className="w-2 h-2 bg-cyan-400 rounded-full"></div><div className="font-bold tracking-wider text-sm">📊 РАСПРЕДЕЛЕНИЕ ХОЛДЕРОВ</div></div>
-                    <div className="grid grid-cols-1 gap-2 text-sm"><div className="flex justify-between"><span className="text-slate-400">Топ-10 холдеров</span><span className="text-cyan-400 font-mono">{auditResult.top10Percent}%</span></div></div>
-                  </div>
-                  <div className="bg-slate-909/60 border border-purple-500/20 rounded-xl p-5">
-                    <div className="flex items-center gap-2 mb-3 text-yellow-400"><div className="w-2 h-2 bg-yellow-400 rounded-full"></div><div className="font-bold tracking-wider text-sm">💰 ЛИКВИДНОСТЬ</div></div>
-                    <div className="grid grid-cols-1 gap-2 text-sm">
-                      <div className="flex justify-between"><span className="text-slate-400">Ликвидность (USD)</span><span className="text-yellow-400 font-mono">${auditResult.liquidityUSD.toLocaleString()}</span></div>
-                      <div className="flex justify-between"><span className="text-slate-400">LP заблокированы?</span><span className="text-yellow-400 font-mono">{auditResult.lpLocked}</span></div>
-                    </div>
-                  </div>
-                  <div className="bg-gradient-to-br from-purple-500/10 to-emerald-500/5 border border-purple-500/30 rounded-xl p-5">
-                    <div className="flex items-center gap-2 mb-3"><Sparkles className="w-4 h-4 text-purple-400" /><div className="font-bold tracking-wider text-sm text-purple-400">TNT VERDICT — ИИ ЗАКЛЮЧЕНИЕ</div></div>
-                    <div className="text/[15px] leading-snug text-slate-200">{auditResult.mintAuthority === 'Revoked ✓' && auditResult.freezeAuthority === 'Revoked ✓' ? 'Бро, это железобетонный гем! ✅' : 'Обнаружены активные authority.'}</div>
-                  </div>
-                </>
-              ) : (
-                <div className="text-slate-400 text-center py-8">Выберите токен из таблицы.</div>
-              )}
-            </div>
-            <div className="border-t border-purple-500/30 px-6 py-4 flex justify-end gap-3 bg-slate-950 rounded-b-2xl">
-              <button onClick={closeBlueprint} className="px-5 py-2 text-sm rounded-lg border border-purple-500/40 hover:bg-purple-500/10 transition">Закрыть</button>
-            </div>
+            ) : (
+              <p className="mt-4 text-slate-400">Выберите токен</p>
+            )}
+            <button onClick={closeBlueprint} className="mt-4 text-slate-400">Закрыть</button>
           </div>
         </div>
       )}
 
-      {/* Чат */}
+      {/* ЧАТ */}
       <button onClick={() => setIsChatOpen(!isChatOpen)} className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-tr from-purple-500 to-emerald-400 rounded-full flex items-center justify-center shadow/[0_0_20px_rgba(153,69,255,0.5)] hover:scale-105 transition z-50 animate-bounce">
         {isChatOpen ? <X className="w-6 h-6 text-slate-950" /> : <MessageSquare className="w-6 h-6 text-slate-950" />}
       </button>
