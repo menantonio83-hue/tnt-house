@@ -47,6 +47,9 @@ export default function TntHouse() {
   const [selectedPlan, setSelectedPlan] = useState('');
   const [selectedCurrency, setSelectedCurrency] = useState('');
 
+  // ===== BANNER FORM STATE (restored) =====
+  const [bannerFormData, setBannerFormData] = useState({ tokenName: '', bannerImg: '', desc: '', days: '1' });
+
   const SOL_PRICE_MOCK = 150;
   const plans = [
     { value: 'basic', name: 'Базовый Аудит (24h)', price: 10, mrdt: '769 231' },
