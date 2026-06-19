@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Shield, Send, MessageSquare, X, RefreshCw, AlertCircle, Sparkles, ExternalLink, ChevronDown, Download, Zap, Lock, TrendingUp } from 'lucide-react';
-import { Connection, PublicKey, Transaction } from '@solana/web3.js';
+import { Connection, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { getAssociatedTokenAddress, createTransferInstruction, getAccount, getMint } from '@solana/spl-token';
 
 export const dynamic = 'force-dynamic';
@@ -47,7 +47,7 @@ export default function TntHouse() {
   const [selectedPlan, setSelectedPlan] = useState('');
   const [selectedCurrency, setSelectedCurrency] = useState('');
 
-  // ===== BANNER FORM STATE (restored) =====
+  // ===== BANNER FORM STATE =====
   const [bannerFormData, setBannerFormData] = useState({ tokenName: '', bannerImg: '', desc: '', days: '1' });
 
   const SOL_PRICE_MOCK = 150;
@@ -78,13 +78,88 @@ export default function TntHouse() {
     else if (step === 3) setStep(2);
   };
 
-  const handlePayment = () => {
-    if (!selectedCurrency) {
-      alert('Выбери способ оплаты');
+  // ===== REAL PAYMENT HANDLER (using window.solana / Phantom) =====
+  const handlePayment = async () => {
+    if (!selectedPlan || !selectedCurrency) {
+      alert('Выбери тариф и способ оплаты');
       return;
     }
+
     const plan = plans.find(p => p.value === selectedPlan);
-    alert(`Проект: ${formData.projectName}\nТариф: ${plan.name}\nОплата: ${selectedCurrency.toUpperCase()}\nСумма: $${plan.price}`);
+    if (!plan) return;
+
+    const usdAmount = plan.price;
+
+    if (!window.solana || !window.solana.isPhantom) {
+      alert('Установи Phantom Wallet');
+      return;
+    }
+
+    try {
+      // Connect wallet
+      const resp = await window.solana.connect();
+      const sender = new PublicKey(resp.publicKey.toString());
+
+      const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
+      const to = new PublicKey(WALLET_ADDRESS);
+
+      let tx = new Transaction();
+      let signature = '';
+
+      if (selectedCurrency === 'mrdt') {
+        // Pay with $MRDT
+        const mint = new PublicKey(MRDT_CA);
+        const fromAta = await getAssociatedTokenAddress(mint, sender);
+        const toAta = await getAssociatedTokenAddress(mint, to);
+
+        // Check if user has MRDT
+        try {
+          await getAccount(connection, fromAta);
+        } catch {
+          alert('У тебя нет токенов $MRDT на этом кошельке');
+          return;
+        }
+
+        const amount = Math.round(usdAmount / mrdtPrice) * 10 ** MRDT_DECIMALS;
+
+        tx.add(createTransferInstruction(fromAta, toAta, sender, amount));
+
+      } else if (selectedCurrency === 'sol') {
+        // Pay with SOL (mock rate for now)
+        const solAmount = usdAmount / SOL_PRICE_MOCK;
+        const lamports = Math.round(solAmount * LAMPORTS_PER_SOL);
+
+        tx.add(SystemProgram.transfer({
+          fromPubkey: sender,
+          toPubkey: to,
+          lamports,
+        }));
+      }
+
+      tx.feePayer = sender;
+      tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+
+      const signed = await window.solana.signAndSendTransaction(tx);
+      signature = signed.signature;
+
+      const confirmation = await connection.confirmTransaction(signature, 'confirmed');
+      if (confirmation.value.err) {
+        throw new Error('Транзакция не подтверждена');
+      }
+
+      // Success
+      alert(`✅ Оплата прошла! Signature: ${signature.slice(0, 8)}...`);
+
+      // Reset form
+      setStep(1);
+      setSelectedPlan('');
+      setSelectedCurrency('');
+      setFormData({ projectName: '', contractAddress: '', email: '' });
+
+    } catch (err) {
+      console.error(err);
+      alert(`❌ Ошибка оплаты: ${err.message || 'Что-то пошло не так'}`);
+    }
   };
 
   const pillars = [
@@ -539,7 +614,7 @@ export default function TntHouse() {
                               </p>
                               {method === 'sol' && selectedPlan && (
                                 <p className="text-sm text-gray-400">
-                                  Сумма: ≈ {(plans.find(p => p.value === selectedPlan)?.price / SOL_PRICE_MOCK).toFixed(4)} SOL
+                                  Сумма: ≈ ${(plan.price / SOL_PRICE_MOCK).toFixed(4)} SOL
                                 </p>
                               )}
                             </div>
