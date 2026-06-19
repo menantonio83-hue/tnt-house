@@ -16,8 +16,6 @@ const FALLBACK_TOKENS = [
 export default function TntHouse() {
   const [tokens, setTokens] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [formData, setFormData] = useState({ projectName: '', ca: '', telegram: '' });
-  const [bannerFormData, setBannerFormData] = useState({ tokenName: '', bannerImg: '', desc: '', days: '1' });
   const [submitted, setSubmitted] = useState(false);
   const [bannerSubmitted, setBannerSubmitted] = useState(false);
   const [error, setError] = useState('');
@@ -41,26 +39,47 @@ export default function TntHouse() {
   const [mrdtPrice, setMrdtPrice] = useState(0.000013);
   const [priceLoading, setPriceLoading] = useState(true);
 
-  // ===== NEW 2-STEP FORM STATE =====
+  // ===== 3-STEP FORM STATE =====
   const [step, setStep] = useState(1);
+  const [formData, setFormData] = useState({ projectName: '', contractAddress: '', email: '' });
   const [selectedPlan, setSelectedPlan] = useState('');
   const [selectedCurrency, setSelectedCurrency] = useState('');
 
-  const SOL_PRICE_MOCK = 150; // 1 SOL = $150 (mock)
+  const SOL_PRICE_MOCK = 150;
   const plans = [
     { value: 'basic', name: 'Базовый Аудит (24h)', price: 10, mrdt: '769 231' },
     { value: 'express', name: 'Быстрый Листинг (5 min)', price: 40, mrdt: '3 076 923' },
     { value: 'vip', name: 'VIP-Буст (баннер 24h)', price: 120, mrdt: '9 230 769' },
   ];
 
+  const handleNext = () => {
+    if (step === 1) {
+      if (!formData.projectName.trim() || !formData.contractAddress.trim() || !formData.email.trim()) {
+        alert('Заполни все поля');
+        return;
+      }
+      setStep(2);
+    } else if (step === 2) {
+      if (!selectedPlan) {
+        alert('Выбери тариф');
+        return;
+      }
+      setStep(3);
+    }
+  };
+
+  const handleBack = () => {
+    if (step === 2) setStep(1);
+    else if (step === 3) setStep(2);
+  };
+
   const handlePayment = () => {
-    if (!selectedPlan || !selectedCurrency) {
-      alert('Выбери тариф и способ оплаты');
+    if (!selectedCurrency) {
+      alert('Выбери способ оплаты');
       return;
     }
     const plan = plans.find(p => p.value === selectedPlan);
-    alert(`Оплата: ${plan.name} через ${selectedCurrency.toUpperCase()}. Сумма: $${plan.price}`);
-    // TODO: здесь будет реальная логика оплаты
+    alert(`Проект: ${formData.projectName}\nТариф: ${plan.name}\nОплата: ${selectedCurrency.toUpperCase()}\nСумма: $${plan.price}`);
   };
 
   const pillars = [
@@ -356,7 +375,7 @@ export default function TntHouse() {
                 <h3 className="text-base font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400 flex items-center gap-1.5"><Shield className="w-3.5 h-3.5 text-emerald-400" /> ТАБЛИЦА БЕЗОПАСНЫХ НОВЫХ ТОКЕНОВ</h3>
                 <p className="text-slate-400 text/[10px] mt-0.5">Кликни на токен для детального "TNT Security Blueprint"</p>
               </div>
-              <div className="hidden md:flex items-center gap-1 text/[9px] text-purple-400"><RefreshCw className="w-2.5 h-2.5 animate-spin" /> Обновление каждые 5 мин</div>
+              <div className="hidden md:flex items-center gap-1 text/[9px] text-purple-400"><RefreshWc className="w-2.5 h-2.5 animate-spin" /> Обновление каждые 5 мин</div>
             </div>
             <div className="max-h/[320px] overflow-y-auto border border-purple-500/20 rounded-lg scrollbar-thin scrollbar-thumb-purple-500/30">
               <table className="w-full text-left border-collapse text/[9px]">
@@ -377,7 +396,7 @@ export default function TntHouse() {
                     <td className="p-1 text-center"><div className="inline-flex items-center justify-center w-9 h-4 rounded-full bg-emerald-500/20 border border-emerald-500 text-emerald-400 text/[8px] font-extrabold shadow/[0_0_6px_rgba(16,185,129,0.5)]">98</div></td>
                     <td className="p-1 text-right"><button onClick={(e)=>{e.stopPropagation();handleLaunchJupiter();}} className="inline-flex items-center gap-0.5 text/[8px] text-emerald-400 hover:text-emerald-300 font-bold hover:underline">Купить <ExternalLink className="w-2 h-2" /></button></td>
                   </tr>
-                  {loading && tokens.length===0 ? (<tr><td colSpan={6} className="p-6 text-center text-purple-400 font-bold"><RefreshCw className="w-4 h-4 animate-spin mx-auto mb-1" />Сканируем блокчейn...</td></tr>) : (tokens.map((token,i) => { const score = getSafetyScore(token); const style = getScoreStyle(score); return (<tr key={i} onClick={() => openTokenBlueprint(token)} className="border-b border-purple-500/10 hover:bg-purple-500/5 transition cursor-pointer"><td className="p-1 font-bold"><span className="text-purple-400 text/[9px]">${token.symbol}</span><span className="text/[7px] text-slate-500 block font-normal truncate max-w/[80px]">{token.name}</span></td><td className="p-1 font-mono text-slate-300 text/[9px]">${token.price}</td><td className="p-1 font-mono text-slate-300 text/[9px]">{typeof token.liquidity === 'number' ? formatNumber(token.liquidity) : token.liquidity}</td><td className={`p-1 font-mono ${token.priceChange24h > 0 ? 'text-emerald-400' : 'text-red-400'}`}>{formatNumber(token.volume24h)} ({token.priceChange24h > 0 ? '+' : ''}{token.priceChange24h}%)</td><td className="p-1 text-center"><div className={`inline-flex items-center justify-center w-9 h-4 rounded-full ${style.bg} ${style.border} ${style.color} text/[8px] font-extrabold ${style.glow}`}>{score}</div></td><td className="p-1 text-right"><a href={token.dexUrl} onClick={(e)=>e.stopPropagation()} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text/[8px] text-purple-400 hover:text-emerald-400 hover:underline">DEX <ExternalLink className="w-2 h-2" /></a></td></tr>); }))}
+                  {loading && tokens.length===0 ? (<tr><td colSpan={6} className="p-6 text-center text-purple-400 font-bold"><RefreshWc className="w-4 h-4 animate-spin mx-auto mb-1" />Сканируем блокчейn...</td></tr>) : (tokens.map((token,i) => { const score = getSafetyScore(token); const style = getScoreStyle(score); return (<tr key={i} onClick={() => openTokenBlueprint(token)} className="border-b border-purple-500/10 hover:bg-purple-500/5 transition cursor-pointer"><td className="p-1 font-bold"><span className="text-purple-400 text/[9px]">${token.symbol}</span><span className="text/[7px] text-slate-500 block font-normal truncate max-w/[80px]">{token.name}</span></td><td className="p-1 font-mono text-slate-300 text/[9px]">${token.price}</td><td className="p-1 font-mono text-slate-300 text/[9px]">{typeof token.liquidity === 'number' ? formatNumber(token.liquidity) : token.liquidity}</td><td className={`p-1 font-mono ${token.priceChange24h > 0 ? 'text-emerald-400' : 'text-red-400'}`}>{formatNumber(token.volume24h)} ({token.priceChange24h > 0 ? '+' : ''}{token.priceChange24h}%)</td><td className="p-1 text-center"><div className={`inline-flex items-center justify-center w-9 h-4 rounded-full ${style.bg} ${style.border} ${style.color} text/[8px] font-extrabold ${style.glow}`}>{score}</div></td><td className="p-1 text-right"><a href={token.dexUrl} onClick={(e)=>e.stopPropagation()} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 text/[8px] text-purple-400 hover:text-emerald-400 hover:underline">DEX <ExternalLink className="w-2 h-2" /></a></td></tr>); }))}
                   {[1,2,3,4].map(n => (<tr key={`empty-${n}`} className="border-b border-purple-500/5 opacity-40"><td className="p-1 text-slate-600 text/[8px] italic">—</td><td className="p-1 text-slate-600 text/[8px] italic">—</td><td className="p-1 text-slate-600 text/[8px] italic">—</td><td className="p-1 text-slate-600 text/[8px] italic">—</td><td className="p-1 text-center text-slate-600 text/[8px] italic">—</td><td className="p-1 text-right text-slate-600 text/[8px] italic">—</td></tr>))}
                 </tbody>
               </table>
@@ -394,99 +413,152 @@ export default function TntHouse() {
                 <h3 className="text-lg font-black text-purple-400 mb-2 flex items-center gap-2">🔍 ЗАКАЗАТЬ ИИ-ИНСПЕКЦИЮ</h3>
                 <p className="text-slate-400 text-xs mb-4">Авто-добавление в таблицу и выгрузка в Google Sheets.</p>
 
-                {/* ===== Двухшаговая форма ===== */}
-                {step === 1 ? (
-                  <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700/50">
-                    <h3 className="text-2xl font-bold text-white mb-4">Заказать ИИ-инспекцию</h3>
-                    <p className="text-gray-400 mb-6">Выбери тип проверки</p>
-                    <div className="space-y-3">
-                      {plans.map((plan) => (
-                        <label
-                          key={plan.value}
-                          className={`flex items-center p-4 rounded-xl cursor-pointer transition-all ${
-                            selectedPlan === plan.value
-                              ? 'bg-indigo-600/20 border border-indigo-500'
-                              : 'bg-gray-700/30 border border-gray-700 hover:border-indigo-400'
-                          }`}
-                        >
+                {/* ===== Трёхшаговая форма ===== */}
+                <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700/50 max-w-md mx-auto">
+                  {step === 1 && (
+                    <>
+                      <h3 className="text-2xl font-bold text-white mb-6">Заказать ИИ-инспекцию</h3>
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm text-gray-400 mb-1">Название проекта</label>
                           <input
-                            type="radio"
-                            name="plan"
-                            value={plan.value}
-                            checked={selectedPlan === plan.value}
-                            onChange={() => setSelectedPlan(plan.value)}
-                            className="w-5 h-5 text-indigo-600 focus:ring-indigo-500"
+                            type="text"
+                            placeholder="Твой токен..."
+                            value={formData.projectName}
+                            onChange={(e) => setFormData({ ...formData, projectName: e.target.value })}
+                            className="w-full p-3 bg-gray-700 border border-gray-600 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
                           />
-                          <div className="ml-4">
-                            <p className="text-white font-semibold">{plan.name}</p>
-                            <p className="text-sm text-gray-400">${plan.price} ≈ {plan.mrdt} $MRDT</p>
-                          </div>
-                        </label>
-                      ))}
-                    </div>
-                    <button
-                      onClick={() => {
-                        if (!selectedPlan) return alert('Выбери тариф');
-                        setStep(2);
-                      }}
-                      disabled={!selectedPlan}
-                      className="mt-6 w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-3 rounded-xl font-semibold hover:opacity-90 transition disabled:opacity-40"
-                    >
-                      Далее →
-                    </button>
-                  </div>
-                ) : (
-                  <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700/50">
-                    <h3 className="text-2xl font-bold text-white mb-4">Выбери способ оплаты</h3>
-                    <p className="text-gray-400 mb-4">Выбран тариф: <span className="text-white font-semibold">{plans.find(p => p.value === selectedPlan)?.name}</span></p>
-                    <div className="space-y-3">
-                      {['mrdt', 'sol'].map((method) => (
-                        <label
-                          key={method}
-                          className={`flex items-center p-4 rounded-xl cursor-pointer transition-all ${
-                            selectedCurrency === method
-                              ? 'bg-indigo-600/20 border border-indigo-500'
-                              : 'bg-gray-700/30 border border-gray-700 hover:border-indigo-400'
-                          }`}
-                        >
+                        </div>
+                        <div>
+                          <label className="block text-sm text-gray-400 mb-1">Contract Address (Solana)</label>
                           <input
-                            type="radio"
-                            name="currency"
-                            value={method}
-                            checked={selectedCurrency === method}
-                            onChange={() => setSelectedCurrency(method)}
-                            className="w-5 h-5 text-indigo-600 focus:ring-indigo-500"
+                            type="text"
+                            placeholder="Впиши адрес контракта..."
+                            value={formData.contractAddress}
+                            onChange={(e) => setFormData({ ...formData, contractAddress: e.target.value })}
+                            className="w-full p-3 bg-gray-700 border border-gray-600 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
                           />
-                          <div className="ml-4">
-                            <p className="text-white font-semibold">
-                              {method === 'mrdt' ? 'Оплатить в $MRDT' : 'Оплатить в SOL (авто-выкуп $MRDT)'}
-                            </p>
-                            {method === 'sol' && selectedPlan && (
-                              <p className="text-sm text-gray-400">
-                                Сумма: ≈ {(plans.find(p => p.value === selectedPlan)?.price / SOL_PRICE_MOCK).toFixed(4)} SOL
+                        </div>
+                        <div>
+                          <label className="block text-sm text-gray-400 mb-1">Email для связи</label>
+                          <input
+                            type="email"
+                            placeholder="your@email.com"
+                            value={formData.email}
+                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                            className="w-full p-3 bg-gray-700 border border-gray-600 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+                          />
+                        </div>
+                      </div>
+                      <button
+                        onClick={handleNext}
+                        className="mt-6 w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-3 rounded-xl font-semibold hover:opacity-90 transition"
+                      >
+                        Далее →
+                      </button>
+                    </>
+                  )}
+
+                  {step === 2 && (
+                    <>
+                      <h3 className="text-2xl font-bold text-white mb-4">Выбери тариф</h3>
+                      <div className="space-y-3">
+                        {plans.map((plan) => (
+                          <label
+                            key={plan.value}
+                            className={`flex items-center p-4 rounded-xl cursor-pointer transition-all ${
+                              selectedPlan === plan.value
+                                ? 'bg-indigo-600/20 border border-indigo-500'
+                                : 'bg-gray-700/30 border border-gray-700 hover:border-indigo-400'
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="plan"
+                              value={plan.value}
+                              checked={selectedPlan === plan.value}
+                              onChange={() => setSelectedPlan(plan.value)}
+                              className="w-5 h-5 text-indigo-600 focus:ring-indigo-500"
+                            />
+                            <div className="ml-4">
+                              <p className="text-white font-semibold">{plan.name}</p>
+                              <p className="text-sm text-gray-400">${plan.price} ≈ {plan.mrdt} $MRDT</p>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                      <div className="flex gap-3 mt-6">
+                        <button
+                          onClick={handleBack}
+                          className="flex-1 bg-gray-700 text-white py-3 rounded-xl font-semibold hover:bg-gray-600 transition"
+                        >
+                          ← Назад
+                        </button>
+                        <button
+                          onClick={handleNext}
+                          className="flex-1 bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-3 rounded-xl font-semibold hover:opacity-90 transition"
+                        >
+                          Далее →
+                        </button>
+                      </div>
+                    </>
+                  )}
+
+                  {step === 3 && (
+                    <>
+                      <h3 className="text-2xl font-bold text-white mb-4">Выбери способ оплаты</h3>
+                      <p className="text-gray-400 mb-4">
+                        Выбран тариф: <span className="text-white font-semibold">{plans.find(p => p.value === selectedPlan)?.name}</span>
+                      </p>
+                      <div className="space-y-3">
+                        {['mrdt', 'sol'].map((method) => (
+                          <label
+                            key={method}
+                            className={`flex items-center p-4 rounded-xl cursor-pointer transition-all ${
+                              selectedCurrency === method
+                                ? 'bg-indigo-600/20 border border-indigo-500'
+                                : 'bg-gray-700/30 border border-gray-700 hover:border-indigo-400'
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="currency"
+                              value={method}
+                              checked={selectedCurrency === method}
+                              onChange={() => setSelectedCurrency(method)}
+                              className="w-5 h-5 text-indigo-600 focus:ring-indigo-500"
+                            />
+                            <div className="ml-4">
+                              <p className="text-white font-semibold">
+                                {method === 'mrdt' ? 'Оплатить в $MRDT' : 'Оплатить в SOL (авто-выкуп $MRDT)'}
                               </p>
-                            )}
-                          </div>
-                        </label>
-                      ))}
-                    </div>
-                    <div className="flex gap-3 mt-6">
-                      <button
-                        onClick={() => setStep(1)}
-                        className="flex-1 bg-gray-700 text-white py-3 rounded-xl font-semibold hover:bg-gray-600 transition"
-                      >
-                        ← Назад
-                      </button>
-                      <button
-                        onClick={handlePayment}
-                        disabled={!selectedCurrency}
-                        className="flex-1 bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-3 rounded-xl font-semibold hover:opacity-90 transition disabled:opacity-40"
-                      >
-                        Готово
-                      </button>
-                    </div>
-                  </div>
-                )}
+                              {method === 'sol' && selectedPlan && (
+                                <p className="text-sm text-gray-400">
+                                  Сумма: ≈ {(plans.find(p => p.value === selectedPlan)?.price / SOL_PRICE_MOCK).toFixed(4)} SOL
+                                </p>
+                              )}
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                      <div className="flex gap-3 mt-6">
+                        <button
+                          onClick={handleBack}
+                          className="flex-1 bg-gray-700 text-white py-3 rounded-xl font-semibold hover:bg-gray-600 transition"
+                        >
+                          ← Назад
+                        </button>
+                        <button
+                          onClick={handlePayment}
+                          disabled={!selectedCurrency}
+                          className="flex-1 bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-3 rounded-xl font-semibold hover:opacity-90 transition disabled:opacity-40"
+                        >
+                          Запустить ИИ-инспекцию
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
 
               <div className="border-2 border-purple-500/30 rounded-lg bg-slate-909/40 p-6 backdrop-blur-md">
