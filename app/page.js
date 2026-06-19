@@ -423,7 +423,7 @@ export default function TntHouse() {
             </div>
             <div className="space-y-4 bg-slate-909/20 border-2 border-purple-500/20 rounded-xl p-6">
               <h3 className="text-xl font-black text-purple-400">Информация для инвесторов</h3>
-              <p className="text-slate-300 text-xs leading-relaxed">Все платежи принимаются в $MRDT.</p>
+              <p className="text-slate-300 text-xs leading-relaxed">Все платежы принимаются в $MRDT.</p>
               <div className="mt-6 space-y-3">
                 <h4 className="text-xs font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400 flex items-center gap-1.5"><Download className="w-4 h-4 text-purple-400 animate-pulse" /> ТЕКУЩАЯ СЕТКА ТАРИФОВ (В $MRDT):</h4>
                 <div className="grid grid-cols-1 gap-2 text-xs font-mono">
@@ -455,7 +455,7 @@ export default function TntHouse() {
         <footer className="border-t border-purple-500/20 mt-12 py-8 bg-slate-950/60 backdrop-blur-lg">
           <div className="max-w-7xl mx-auto px-6">
             <div className="flex flex-wrap items-center justify-center gap-8 mb-4">
-              <a href="https://x.com/Crypto_D10S", target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-white transition-colors"><svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></a>
+              <a href="https://x.com/Crypto_D10S" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-white transition-colors"><svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></a>
               <a href="https://t.me/D10S_Solana_Stadium" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-blue-400 transition-colors"><span className="text-2xl">✈️</span></a>
               <a href="https://www.maradonatoken-mrdt.xyz" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400 transition-colors"><ExternalLink className="w-6 h-6" /></a>
             </div>
