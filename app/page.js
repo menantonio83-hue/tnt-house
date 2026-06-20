@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Shield, Send, MessageSquare, X, RefreshCw, AlertCircle, Sparkles, ExternalLink, ChevronDown, Download, Zap, Lock, TrendingUp } from 'lucide-react';
+import { Shield, Send, MessageSquare, X, RefreshCw, AlertCircle, Sparkles, ExternalLink, ChevronDown, Download, Zap, Lock, TrendingUp, CheckCircle, XCircle } from 'lucide-react';
 import { Connection, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL, VersionedTransaction } from '@solana/web3.js';
 import { getAssociatedTokenAddress, createTransferInstruction, getAccount, getMint } from '@solana/spl-token';
 
@@ -40,7 +40,17 @@ export default function TntHouse() {
   const chatEndRef = useRef(null);
   const [mrdtPrice, setMrdtPrice] = useState(0.000013);
   const [priceLoading, setPriceLoading] = useState(true);
-  const [solPrice, setSolPrice] = useState(150); // real-time SOL price
+  const [solPrice, setSolPrice] = useState(150);
+
+  // Toast system
+  const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+
+  const showToast = (message, type = 'success') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => {
+      setToast({ show: false, message: '', type: 'success' });
+    }, 4200);
+  };
 
   // ===== 3-STEP FORM STATE =====
   const [step, setStep] = useState(1);
@@ -71,20 +81,20 @@ export default function TntHouse() {
       }
     };
     fetchSolPrice();
-    const interval = setInterval(fetchSolPrice, 60000); // refresh every minute
+    const interval = setInterval(fetchSolPrice, 60000);
     return () => clearInterval(interval);
   }, []);
 
   const handleNext = () => {
     if (step === 1) {
       if (!formData.projectName.trim() || !formData.contractAddress.trim() || !formData.email.trim()) {
-        alert('Заполни все поля');
+        showToast('Заполни все поля', 'error');
         return;
       }
       setStep(2);
     } else if (step === 2) {
       if (!selectedPlan) {
-        alert('Выбери тариф');
+        showToast('Выбери тариф', 'error');
         return;
       }
       setStep(3);
@@ -96,10 +106,10 @@ export default function TntHouse() {
     else if (step === 3) setStep(2);
   };
 
-  // ===== АВТОМАТИЧЕСКИЙ ВЫКУП $MRDT ЧЕРЕЗ JUPITER (Вариант Б) =====
+  // ===== АВТОМАТИЧЕСКИЙ ВЫКУП $MRDT ЧЕРЕЗ JUPITER =====
   const handlePayment = async () => {
     if (!selectedPlan || !selectedCurrency) {
-      alert('Выбери тариф и способ оплаты');
+      showToast('Выбери тариф и способ оплаты', 'error');
       return;
     }
 
@@ -107,7 +117,7 @@ export default function TntHouse() {
     if (!plan) return;
 
     if (!window.solana || !window.solana.isPhantom) {
-      alert('Установи Phantom Wallet');
+      showToast('Установи Phantom Wallet', 'error');
       return;
     }
 
@@ -120,7 +130,6 @@ export default function TntHouse() {
       let signature = '';
 
       if (selectedCurrency === 'mrdt') {
-        // === Прямая оплата в $MRDT ===
         const mint = new PublicKey(MRDT_CA);
         const fromAta = await getAssociatedTokenAddress(mint, sender);
         const toAta = await getAssociatedTokenAddress(mint, projectWallet);
@@ -128,7 +137,7 @@ export default function TntHouse() {
         try {
           await getAccount(connection, fromAta);
         } catch {
-          alert('У тебя нет токенов $MRDT на этом кошельке');
+          showToast('У тебя нет токенов $MRDT на этом кошельке', 'error');
           return;
         }
 
@@ -144,21 +153,18 @@ export default function TntHouse() {
         await connection.confirmTransaction(signature, 'confirmed');
 
       } else if (selectedCurrency === 'sol') {
-        // === АВТОМАТИЧЕСКИЙ ВЫКУП $MRDT ЧЕРЕЗ JUPITER ===
         const usdAmount = plan.price;
         const solAmount = usdAmount / solPrice;
         const amountLamports = Math.floor(solAmount * LAMPORTS_PER_SOL);
 
-        // 1. Получаем quote от Jupiter
         const quoteUrl = `https://quote-api.jup.ag/v6/quote?inputMint=So11111111111111111111111111111111111111112&outputMint=${MRDT_CA}&amount=${amountLamports}&slippageBps=150`;
         const quoteRes = await fetch(quoteUrl);
         const quote = await quoteRes.json();
 
         if (!quote || quote.error) {
-          throw new Error('Не удалось получить quote от Jupiter. Попробуй позже.');
+          throw new Error('Не удалось получить quote от Jupiter');
         }
 
-        // 2. Получаем swap transaction
         const swapRes = await fetch('https://quote-api.jup.ag/v6/swap', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -175,22 +181,16 @@ export default function TntHouse() {
           throw new Error('Jupiter не вернул транзакцию свопа');
         }
 
-        // 3. Десериализуем VersionedTransaction
         const swapTxBuf = Buffer.from(swapData.swapTransaction, 'base64');
         const transaction = VersionedTransaction.deserialize(swapTxBuf);
 
-        // 4. Подписываем через Phantom
         const signedTx = await window.solana.signTransaction(transaction);
-
-        // 5. Отправляем и подтверждаем
         signature = await connection.sendRawTransaction(signedTx.serialize());
         await connection.confirmTransaction(signature, 'confirmed');
       }
 
-      // Успех
-      alert(`✅ Оплата прошла! $MRDT отправлен проекту.\nSignature: ${signature.slice(0, 10)}...`);
+      showToast('Оплата прошла! $MRDT отправлен проекту', 'success');
 
-      // Сброс формы
       setStep(1);
       setSelectedPlan('');
       setSelectedCurrency('');
@@ -198,7 +198,7 @@ export default function TntHouse() {
 
     } catch (err) {
       console.error(err);
-      alert(`❌ Ошибка оплаты: ${err.message || 'Что-то пошло не так'}`);
+      showToast(err.message || 'Ошибка оплаты', 'error');
     }
   };
 
@@ -242,7 +242,7 @@ export default function TntHouse() {
   const handleConnectWallet = async () => {
     if (window.solana && window.solana.isPhantom) {
       try { const resp = await window.solana.connect(); setWalletAddress(resp.publicKey.toString().slice(0,4)+'...'+resp.publicKey.toString().slice(-4)); } catch (err) { console.error(err); }
-    } else alert("Phantom not found.");
+    } else showToast("Phantom not found.", 'error');
   };
 
   useEffect(() => {
@@ -418,6 +418,14 @@ export default function TntHouse() {
   // ====== RENDER ======
   return (
     <div className="min-h-screen bg-slate-950 text-white font-mono relative overflow-hidden pb-12">
+      {/* Toast Notification */}
+      {toast.show && (
+        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[99999] flex items-center gap-3 px-6 py-3.5 rounded-2xl shadow-2xl border text-sm font-medium transition-all duration-300 ${toast.type === 'success' ? 'bg-emerald-950 border-emerald-500/40 text-emerald-300' : 'bg-red-950 border-red-500/40 text-red-300'}`}>
+          {toast.type === 'success' ? <CheckCircle className="w-5 h-5 text-emerald-400" /> : <XCircle className="w-5 h-5 text-red-400" />}
+          <span>{toast.message}</span>
+        </div>
+      )}
+
       <div className="absolute top-[-10%] left-[-10%] w/[500px] h/[500px] rounded-full bg-purple-600/10 blur/[120px] pointer-events-none"></div>
       <div className="absolute bottom/[20%] right-[-10%] w/[500px] h/[500px] rounded-full bg-emerald-500/10 blur/[120px] pointer-events-none"></div>
       <div className="absolute inset-0 opacity-5 pointer-events-none">
