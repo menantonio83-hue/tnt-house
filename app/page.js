@@ -12,11 +12,9 @@ const MRDT_CA = "8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg";
 const MRDT_DECIMALS = 6;
 const SITE_URL = 'https://tnt-house.vercel.app';
 
-// Supabase config
 const SUPABASE_URL = 'https://pjtvjslcffuulsqxerpx.supabase.co';
 const SUPABASE_KEY = 'sb_publishable__gmhE8SE_blCu-v90fV2OQ_YmFCkfFU';
 
-// Save token to Supabase after successful payment
 async function saveTokenToSupabase(token) {
   try {
     var res = await fetch(SUPABASE_URL + '/rest/v1/listed_tokens', {
@@ -43,49 +41,28 @@ async function saveTokenToSupabase(token) {
         is_honeypot: token.isHoneypot || '—',
       }),
     });
-    if (!res.ok) {
-      var err = await res.text();
-      console.error('Supabase insert error:', err);
-    }
-  } catch(e) {
-    console.error('Supabase save failed:', e);
-  }
+    if (!res.ok) console.error('Supabase insert error:', await res.text());
+  } catch(e) { console.error('Supabase save failed:', e); }
 }
 
-// Load listed tokens from Supabase
 async function loadTokensFromSupabase() {
   try {
     var res = await fetch(SUPABASE_URL + '/rest/v1/listed_tokens?select=*&order=created_at.desc&limit=20', {
-      headers: {
-        'apikey': SUPABASE_KEY,
-        'Authorization': 'Bearer ' + SUPABASE_KEY,
-      },
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY },
     });
     if (!res.ok) return [];
     var data = await res.json();
     return data.map(function(row) {
       return {
-        name: row.name,
-        symbol: row.symbol,
-        ca: row.ca,
-        price: row.price,
-        liquidity: row.liquidity,
-        volume24h: row.volume24h,
-        priceChange24h: row.price_change_24h,
-        score: row.score,
-        verified: true,
-        dexUrl: row.dex_url,
-        chain: row.chain,
-        mintAuthority: row.mint_authority,
-        freezeAuthority: row.freeze_authority,
-        isHoneypot: row.is_honeypot,
-        fromSupabase: true,
+        name: row.name, symbol: row.symbol, ca: row.ca, price: row.price,
+        liquidity: row.liquidity, volume24h: row.volume24h,
+        priceChange24h: row.price_change_24h, score: row.score,
+        verified: true, dexUrl: row.dex_url, chain: row.chain,
+        mintAuthority: row.mint_authority, freezeAuthority: row.freeze_authority,
+        isHoneypot: row.is_honeypot, fromSupabase: true,
       };
     });
-  } catch(e) {
-    console.error('Supabase load failed:', e);
-    return [];
-  }
+  } catch(e) { console.error('Supabase load failed:', e); return []; }
 }
 
 const FALLBACK_TOKENS = [
@@ -107,6 +84,15 @@ const openInPhantom = (urlWithParams) => {
   var ref = encodeURIComponent(SITE_URL);
   window.location.href = 'https://phantom.app/ul/browse/' + encoded + '?ref=' + ref;
 };
+
+// Wait for Phantom to inject window.solana — up to 3 seconds
+async function waitForPhantom() {
+  for (var i = 0; i < 10; i++) {
+    if (window.solana && window.solana.isPhantom) return window.solana;
+    await new Promise(function(resolve) { setTimeout(resolve, 300); });
+  }
+  return null;
+}
 
 export default function TntHouse() {
   const [tokens, setTokens] = useState([]);
@@ -133,6 +119,7 @@ export default function TntHouse() {
   const [solPrice, setSolPrice] = useState(150);
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
   const [isPaymentLoading, setIsPaymentLoading] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState('');
 
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({ projectName: '', contractAddress: '', email: '' });
@@ -179,14 +166,14 @@ export default function TntHouse() {
       setStep(3);
       window.history.replaceState({}, '', window.location.pathname);
       if (isPhantomBrowser()) {
+        // Give Phantom extra time to fully inject before auto-pay
         setTimeout(function() {
           triggerPayment(pPlan, pCurrency, restoredForm);
-        }, 1500);
+        }, 2000);
       }
     }
   }, []);
 
-  // Fetch SOL price
   useEffect(function() {
     var fetchSolPrice = async function() {
       try {
@@ -229,18 +216,25 @@ export default function TntHouse() {
     openInPhantom(targetUrl);
   };
 
-  // Core payment + audit + save to Supabase
+  // Core payment with Phantom injection wait
   const triggerPayment = async function(planVal, currency, form) {
     var plan = plans.find(function(p) { return p.value === planVal; });
     if (!plan || !currency) return;
 
-    var solanaWin = window.solana;
-    if (!solanaWin || !solanaWin.isPhantom) {
-      showToast('Phantom не найден', 'error'); return;
+    setIsPaymentLoading(true);
+    setPaymentStatus('Ожидаем Phantom...');
+
+    // FIX v1.8: Wait up to 3s for Phantom to inject window.solana
+    var solanaWin = await waitForPhantom();
+    if (!solanaWin) {
+      showToast('Phantom не найден — обнови страницу и попробуй снова', 'error');
+      setIsPaymentLoading(false);
+      setPaymentStatus('');
+      return;
     }
 
-    setIsPaymentLoading(true);
     try {
+      setPaymentStatus('Подключаем кошелёк...');
       var resp = await solanaWin.connect();
       var sender = new PublicKey(resp.publicKey.toString());
       var connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
@@ -248,21 +242,26 @@ export default function TntHouse() {
       var signature = '';
 
       if (currency === 'mrdt') {
+        setPaymentStatus('Готовим транзакцию $MRDT...');
         var mint = new PublicKey(MRDT_CA);
         var fromAta = await getAssociatedTokenAddress(mint, sender);
         var toAta = await getAssociatedTokenAddress(mint, projectWallet);
         try { await getAccount(connection, fromAta); } catch(e) {
-          showToast('Нет $MRDT на кошельке', 'error'); setIsPaymentLoading(false); return;
+          showToast('Нет $MRDT на кошельке', 'error');
+          setIsPaymentLoading(false); setPaymentStatus(''); return;
         }
         var amount = Math.round(plan.price / mrdtPrice) * Math.pow(10, MRDT_DECIMALS);
         var tx = new Transaction().add(createTransferInstruction(fromAta, toAta, sender, amount));
         tx.feePayer = sender;
         tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+        setPaymentStatus('Подтверди в Phantom...');
         var signed = await solanaWin.signAndSendTransaction(tx);
         signature = signed.signature;
+        setPaymentStatus('Подтверждаем транзакцию...');
         await connection.confirmTransaction(signature, 'confirmed');
 
       } else if (currency === 'sol') {
+        setPaymentStatus('Получаем курс Jupiter...');
         var amountLamports = Math.floor((plan.price / solPrice) * LAMPORTS_PER_SOL);
         var projectAta = await getAssociatedTokenAddress(new PublicKey(MRDT_CA), projectWallet);
         var quoteRes = await fetch(
@@ -285,12 +284,16 @@ export default function TntHouse() {
         if (!swapData.swapTransaction) throw new Error('Jupiter не вернул транзакцию');
         var txBytes = Uint8Array.from(atob(swapData.swapTransaction), function(c) { return c.charCodeAt(0); });
         var transaction = VersionedTransaction.deserialize(txBytes);
+        setPaymentStatus('Подтверди в Phantom...');
         var signedTx = await solanaWin.signTransaction(transaction);
+        setPaymentStatus('Отправляем транзакцию...');
         signature = await connection.sendRawTransaction(signedTx.serialize());
+        setPaymentStatus('Подтверждаем транзакцию...');
         await connection.confirmTransaction(signature, 'confirmed');
       }
 
-      showToast('✅ Оплата прошла! Запускаем аудит токена...', 'success');
+      setPaymentStatus('Запускаем аудит токена...');
+      showToast('✅ Оплата прошла! Запускаем аудит...', 'success');
 
       // AI audit
       var auditData = { mintAuthority: '—', freezeAuthority: '—', isHoneypot: '—' };
@@ -325,8 +328,7 @@ export default function TntHouse() {
         liquidity: Math.floor(Math.random() * 100000 + 10000),
         volume24h: Math.floor(Math.random() * 90000 + 20000),
         priceChange24h: parseFloat((Math.random() * 40 - 10).toFixed(1)),
-        score: 95,
-        verified: true,
+        score: 95, verified: true,
         dexUrl: 'https://dexscreener.com/solana/' + form.contractAddress,
         chain: 'solana',
         mintAuthority: auditData.mintAuthority,
@@ -334,15 +336,12 @@ export default function TntHouse() {
         isHoneypot: auditData.isHoneypot,
       };
 
-      // Save to Supabase — works across all devices
+      setPaymentStatus('Сохраняем в базу данных...');
       await saveTokenToSupabase(newToken);
-
-      // Update local state
       setListedTokens(function(prev) { return [newToken].concat(prev); });
+
       showToast('✅ Аудит завершён! Токен добавлен в таблицу!', 'success');
-      setStep(1);
-      setSelectedPlan('');
-      setSelectedCurrency('');
+      setStep(1); setSelectedPlan(''); setSelectedCurrency('');
       setFormData({ projectName: '', contractAddress: '', email: '' });
 
     } catch(err) {
@@ -350,6 +349,7 @@ export default function TntHouse() {
       showToast(err.message || 'Ошибка оплаты', 'error');
     } finally {
       setIsPaymentLoading(false);
+      setPaymentStatus('');
     }
   };
 
@@ -369,8 +369,8 @@ export default function TntHouse() {
       openInPhantom(SITE_URL + '/');
       return;
     }
-    var solanaWin = window.solana;
-    if (solanaWin && solanaWin.isPhantom) {
+    var solanaWin = await waitForPhantom();
+    if (solanaWin) {
       try {
         var resp = await solanaWin.connect();
         var pk = resp.publicKey.toString();
@@ -434,7 +434,6 @@ export default function TntHouse() {
     return function() { clearInterval(i); };
   }, []);
 
-  // Fetch DexScreener tokens
   useEffect(function() {
     var fetchTokens = async function() {
       try {
@@ -459,9 +458,7 @@ export default function TntHouse() {
                 liquidity: (p.liquidity && p.liquidity.usd) ? Math.round(p.liquidity.usd) : 0,
                 volume24h: (p.volume && p.volume.h24) ? Math.round(p.volume.h24) : 0,
                 priceChange24h: (p.priceChange && p.priceChange.h24) || 0,
-                verified: true,
-                dexUrl: p.url || '',
-                chain: p.chainId || 'solana',
+                verified: true, dexUrl: p.url || '', chain: p.chainId || 'solana',
               };
             });
           if (filtered.length) {
@@ -518,8 +515,8 @@ export default function TntHouse() {
       openInPhantom(SITE_URL + '/');
       return;
     }
-    var solanaWin = window.solana;
-    if (!solanaWin) { setBannerError('Установите Phantom.'); setIsBannerSending(false); return; }
+    var solanaWin = await waitForPhantom();
+    if (!solanaWin) { setBannerError('Phantom не найден.'); setIsBannerSending(false); return; }
     var current = Object.assign({}, bannerFormData);
     try {
       var resp = await solanaWin.connect();
@@ -550,9 +547,7 @@ export default function TntHouse() {
       setTimeout(function() { setBannerSubmitted(false); }, 5000);
     } catch(err) {
       setBannerError(err.message || 'Ошибка оплаты.');
-    } finally {
-      setIsBannerSending(false);
-    }
+    } finally { setIsBannerSending(false); }
   };
 
   const handleBannerSubmit = function(e) {
@@ -564,8 +559,7 @@ export default function TntHouse() {
   const handleSendChat = function() {
     if (!userMsg.trim()) return;
     setChatMessages(function(prev) { return prev.concat([{ sender: 'user', text: userMsg }]); });
-    setUserMsg('');
-    setIsTyping(true);
+    setUserMsg(''); setIsTyping(true);
     setTimeout(function() {
       var replies = ['Структура чистая. SAFE ✓', 'Бандлов нет.', '$MRDT — гем!', 'Ругпулов не обнаружено.', 'Комиссии честные.'];
       setChatMessages(function(prev) { return prev.concat([{ sender: 'bot', text: replies[Math.floor(Math.random() * replies.length)] }]); });
@@ -584,15 +578,13 @@ export default function TntHouse() {
     if (el) el.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // Merge DexScreener tokens + Supabase listed tokens for table
-  var allTableTokens = listedTokens.concat(tokens);
-
   var isMobile = typeof window !== 'undefined' && isMobileBrowser();
   var inPhantom = typeof window !== 'undefined' && isPhantomBrowser();
 
   return (
     <div className="min-h-screen bg-slate-950 text-white font-mono relative overflow-hidden pb-12">
 
+      {/* Toast */}
       {toast.show && (
         <div className={'fixed bottom-6 left-1/2 -translate-x-1/2 z-[99999] flex items-center gap-3 px-6 py-3.5 rounded-2xl shadow-2xl border text-sm font-medium transition-all duration-300 ' + (toast.type === 'success' ? 'bg-emerald-950 border-emerald-500/40 text-emerald-300' : 'bg-red-950 border-red-500/40 text-red-300')}>
           {toast.type === 'success' ? <CheckCircle className="w-5 h-5 text-emerald-400" /> : <XCircle className="w-5 h-5 text-red-400" />}
@@ -600,11 +592,13 @@ export default function TntHouse() {
         </div>
       )}
 
+      {/* Payment overlay with live status */}
       {isPaymentLoading && (
-        <div className="fixed inset-0 z-[99998] bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center gap-4">
+        <div className="fixed inset-0 z-[99998] bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center gap-4 px-6">
           <RefreshCw className="w-10 h-10 text-purple-400 animate-spin" />
-          <p className="text-white font-bold text-lg">Обрабатываем транзакцию...</p>
-          <p className="text-slate-400 text-sm">Подтверди в Phantom</p>
+          <p className="text-white font-bold text-lg text-center">Обрабатываем транзакцию...</p>
+          {paymentStatus && <p className="text-purple-300 text-sm text-center">{paymentStatus}</p>}
+          <p className="text-slate-500 text-xs text-center">Не закрывай страницу</p>
         </div>
       )}
 
@@ -626,7 +620,7 @@ export default function TntHouse() {
               <a href="https://t.me/tnt_house2026" target="_blank" rel="noopener noreferrer" className="w-10 h-10 border-2 border-purple-500 rounded-lg flex items-center justify-center bg-purple-500/10 shadow-[0_0_15px_rgba(153,69,255,0.4)] animate-pulse"><span className="text-xl">🧨</span></a>
               <div>
                 <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-emerald-400 tracking-wider">TNT HOUSE</h1>
-                <span className="text-[10px] text-purple-400 block font-bold tracking-widest">TOP NEW TOKENS v1.7</span>
+                <span className="text-[10px] text-purple-400 block font-bold tracking-widest">TOP NEW TOKENS v1.8</span>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -716,7 +710,7 @@ export default function TntHouse() {
           </div>
         </section>
 
-        {/* TOKEN TABLE — shows Supabase listed tokens + DexScreener tokens */}
+        {/* TOKEN TABLE */}
         <section className="max-w-7xl mx-auto px-6 py-6">
           <div className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 backdrop-blur-md p-3 shadow-[0_0_25px_rgba(153,69,255,0.2)]">
             <div className="flex items-center justify-between mb-2">
@@ -748,7 +742,7 @@ export default function TntHouse() {
                     <td className="p-1 text-right"><button onClick={function(e) { e.stopPropagation(); handleLaunchJupiter(); }} className="text-[8px] text-emerald-400 hover:text-emerald-300 font-bold hover:underline inline-flex items-center gap-0.5">Купить <ExternalLink className="w-2 h-2" /></button></td>
                   </tr>
 
-                  {/* Listed tokens from Supabase (paid audits) — shown first with verified badge */}
+                  {/* Supabase listed tokens — paid audits */}
                   {listedTokens.map(function(token, i) {
                     var score = getSafetyScore(token);
                     var style = getScoreStyle(score);
@@ -757,7 +751,7 @@ export default function TntHouse() {
                         <td className="p-1">
                           <div className="flex items-center gap-1">
                             <span className="text-emerald-400 text-[9px] font-bold">${token.symbol}</span>
-                            <span className="text-[6px] bg-emerald-500/20 text-emerald-400 px-1 rounded font-bold">✓</span>
+                            <span className="text-[6px] bg-emerald-500/20 text-emerald-400 px-1 rounded font-bold">AI✓</span>
                           </div>
                           <span className="text-[7px] text-slate-500 block truncate max-w-[80px]">{token.name}</span>
                         </td>
@@ -814,7 +808,7 @@ export default function TntHouse() {
                 {isMobile && !inPhantom && (
                   <div className="mb-4 p-3 bg-purple-950/40 border border-purple-500/40 rounded-xl text-xs text-purple-300 flex items-start gap-2">
                     <span className="text-base">👻</span>
-                    <span>Кнопка оплаты откроет Phantom App с вашими данными — просто подтверди транзакцию.</span>
+                    <span>Открой этот сайт в браузере Phantom App → введи <strong>tnt-house.vercel.app</strong> → заполни форму и нажми оплатить.</span>
                   </div>
                 )}
 
@@ -830,6 +824,7 @@ export default function TntHouse() {
                       <button onClick={handleNext} className="mt-6 w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-3 rounded-xl font-semibold hover:opacity-90 transition">Далее →</button>
                     </>
                   )}
+
                   {step === 2 && (
                     <>
                       <h3 className="text-2xl font-bold text-white mb-4">Выбери тариф</h3>
@@ -849,6 +844,7 @@ export default function TntHouse() {
                       </div>
                     </>
                   )}
+
                   {step === 3 && (
                     <>
                       <h3 className="text-2xl font-bold text-white mb-4">Выбери способ оплаты</h3>
@@ -871,7 +867,7 @@ export default function TntHouse() {
                         <button onClick={handlePayment} disabled={!selectedCurrency || isPaymentLoading} className="flex-1 bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-3 rounded-xl font-semibold hover:opacity-90 transition disabled:opacity-40 flex items-center justify-center gap-2">
                           {isPaymentLoading
                             ? <><RefreshCw className="w-4 h-4 animate-spin" /> Обработка...</>
-                            : (isMobile && !inPhantom ? '👻 Открыть в Phantom' : 'Запустить ИИ-инспекцию')}
+                            : 'Запустить ИИ-инспекцию'}
                         </button>
                       </div>
                     </>
@@ -954,7 +950,7 @@ export default function TntHouse() {
               <a href="https://www.maradonatoken-mrdt.xyz" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400 transition-colors"><ExternalLink className="w-6 h-6" /></a>
             </div>
             <div className="text-center space-y-1">
-              <div className="text-purple-400 font-bold text-sm tracking-widest">TNT HOUSE v1.7</div>
+              <div className="text-purple-400 font-bold text-sm tracking-widest">TNT HOUSE v1.8</div>
               <div className="text-slate-400 text-xs">Powered by $MRDT • AI Audits • Supabase ☁️</div>
               <div className="text-slate-500 text-[10px]">Built with Next.js + Tailwind CSS • DexScreener + Supabase</div>
             </div>
@@ -1019,4 +1015,4 @@ export default function TntHouse() {
       )}
     </div>
   );
-                      }
+                                       }
