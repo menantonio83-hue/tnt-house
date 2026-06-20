@@ -106,7 +106,7 @@ export default function TntHouse() {
     else if (step === 3) setStep(2);
   };
 
-  // ===== АВТОМАТИЧЕСКИЙ ВЫКУП $MRDT ЧЕРЕЗ JUPITER =====
+  // ===== АВТОМАТИЧЕСКИЙ ВЫКУП $MRDT ЧЕРЕЗ JUPITER (с отправкой сразу на кошелёк проекта) =====
   const handlePayment = async () => {
     if (!selectedPlan || !selectedCurrency) {
       showToast('Выбери тариф и способ оплаты', 'error');
@@ -157,6 +157,10 @@ export default function TntHouse() {
         const solAmount = usdAmount / solPrice;
         const amountLamports = Math.floor(solAmount * LAMPORTS_PER_SOL);
 
+        // Получаем ATA проекта для $MRDT (должен быть создан заранее)
+        const projectAta = await getAssociatedTokenAddress(new PublicKey(MRDT_CA), projectWallet);
+
+        // 1. Quote
         const quoteUrl = `https://quote-api.jup.ag/v6/quote?inputMint=So11111111111111111111111111111111111111112&outputMint=${MRDT_CA}&amount=${amountLamports}&slippageBps=150`;
         const quoteRes = await fetch(quoteUrl);
         const quote = await quoteRes.json();
@@ -165,6 +169,7 @@ export default function TntHouse() {
           throw new Error('Не удалось получить quote от Jupiter');
         }
 
+        // 2. Swap с указанием, куда отправить выходные токены
         const swapRes = await fetch('https://quote-api.jup.ag/v6/swap', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -172,6 +177,7 @@ export default function TntHouse() {
             quoteResponse: quote,
             userPublicKey: sender.toBase58(),
             wrapAndUnwrapSol: true,
+            destinationTokenAccount: projectAta.toBase58(), // <-- КЛЮЧЕВАЯ СТРОКА
           }),
         });
 
@@ -189,7 +195,7 @@ export default function TntHouse() {
         await connection.confirmTransaction(signature, 'confirmed');
       }
 
-      showToast('Оплата прошла! $MRDT отправлен проекту', 'success');
+      showToast('Оплата прошла! $MRDT отправлен на кошелёк проекта', 'success');
 
       setStep(1);
       setSelectedPlan('');
