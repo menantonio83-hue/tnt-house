@@ -131,7 +131,7 @@ export default function TntHouse() {
 
       if (selectedCurrency === 'mrdt') {
         const mint = new PublicKey(MRDT_CA);
-        const fromAta = getAssociatedTokenAddress(mint, sender); // sync
+        const fromAta = getAssociatedTokenAddress(mint, sender);
         const toAta = getAssociatedTokenAddress(mint, projectWallet);
 
         try {
@@ -157,8 +157,7 @@ export default function TntHouse() {
         const solAmount = usdAmount / solPrice;
         const amountLamports = Math.floor(solAmount * LAMPORTS_PER_SOL);
 
-        // Получаем ATA проекта для $MRDT
-        const projectAta = getAssociatedTokenAddress(new PublicKey(MRDT_CA), projectWallet); // sync
+        const projectAta = getAssociatedTokenAddress(new PublicKey(MRDT_CA), projectWallet);
 
         // 1. Quote
         const quoteUrl = `https://quote-api.jup.ag/v6/quote?inputMint=So11111111111111111111111111111111111111112&outputMint=${MRDT_CA}&amount=${amountLamports}&slippageBps=150`;
@@ -169,7 +168,7 @@ export default function TntHouse() {
           throw new Error('Не удалось получить quote от Jupiter');
         }
 
-        // 2. Swap с указанием получателя
+        // 2. Swap
         const swapRes = await fetch('https://quote-api.jup.ag/v6/swap', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -187,8 +186,9 @@ export default function TntHouse() {
           throw new Error('Jupiter не вернул транзакцию свопа (возможно, ATA проекта не создан)');
         }
 
-        const swapTxBuf = Buffer.from(swapData.swapTransaction, 'base64');
-        const transaction = VersionedTransaction.deserialize(swapTxBuf);
+        // Безопасная конвертация base64 → Uint8Array (вместо Buffer)
+        const txBytes = Uint8Array.from(atob(swapData.swapTransaction), c => c.charCodeAt(0));
+        const transaction = VersionedTransaction.deserialize(txBytes);
 
         const signedTx = await window.solana.signTransaction(transaction);
         signature = await connection.sendRawTransaction(signedTx.serialize());
@@ -203,7 +203,7 @@ export default function TntHouse() {
       setFormData({ projectName: '', contractAddress: '', email: '' });
 
     } catch (err) {
-      console.error(err);
+      console.error('Payment error:', err);
       showToast(err.message || 'Ошибка оплаты', 'error');
     }
   };
