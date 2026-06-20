@@ -40,6 +40,7 @@ export default function TntHouse() {
   const chatEndRef = useRef(null);
   const [mrdtPrice, setMrdtPrice] = useState(0.000013);
   const [priceLoading, setPriceLoading] = useState(true);
+  const [solPrice, setSolPrice] = useState(150); // real-time SOL price
 
   // ===== 3-STEP FORM STATE =====
   const [step, setStep] = useState(1);
@@ -50,12 +51,29 @@ export default function TntHouse() {
   // ===== BANNER FORM STATE =====
   const [bannerFormData, setBannerFormData] = useState({ tokenName: '', bannerImg: '', desc: '', days: '1' });
 
-  const SOL_PRICE_MOCK = 150;
   const plans = [
     { value: 'basic', name: 'Базовый Аудит (24h)', price: 10, mrdt: '769 231' },
     { value: 'express', name: 'Быстрый Листинг (5 min)', price: 40, mrdt: '3 076 923' },
     { value: 'vip', name: 'VIP-Буст (баннер 24h)', price: 120, mrdt: '9 230 769' },
   ];
+
+  // Fetch real SOL price from Jupiter
+  useEffect(() => {
+    const fetchSolPrice = async () => {
+      try {
+        const res = await fetch('https://price.jup.ag/v6/price?ids=SOL');
+        const data = await res.json();
+        if (data?.data?.SOL?.price) {
+          setSolPrice(data.data.SOL.price);
+        }
+      } catch (e) {
+        console.log('Using fallback SOL price');
+      }
+    };
+    fetchSolPrice();
+    const interval = setInterval(fetchSolPrice, 60000); // refresh every minute
+    return () => clearInterval(interval);
+  }, []);
 
   const handleNext = () => {
     if (step === 1) {
@@ -128,7 +146,7 @@ export default function TntHouse() {
       } else if (selectedCurrency === 'sol') {
         // === АВТОМАТИЧЕСКИЙ ВЫКУП $MRDT ЧЕРЕЗ JUPITER ===
         const usdAmount = plan.price;
-        const solAmount = usdAmount / SOL_PRICE_MOCK; // TODO: заменить на реальный курс
+        const solAmount = usdAmount / solPrice;
         const amountLamports = Math.floor(solAmount * LAMPORTS_PER_SOL);
 
         // 1. Получаем quote от Jupiter
@@ -148,7 +166,6 @@ export default function TntHouse() {
             quoteResponse: quote,
             userPublicKey: sender.toBase58(),
             wrapAndUnwrapSol: true,
-            // destinationTokenAccount: projectWallet.toBase58(), // можно добавить, если нужно
           }),
         });
 
@@ -637,7 +654,7 @@ export default function TntHouse() {
                               </p>
                               {method === 'sol' && selectedPlan && (
                                 <p className="text-sm text-gray-400">
-                                  Сумма: ≈ ${(plan.price / SOL_PRICE_MOCK).toFixed(4)} SOL
+                                  Сумма: ≈ ${((plan.price / solPrice)).toFixed(4)} SOL
                                 </p>
                               )}
                             </div>
