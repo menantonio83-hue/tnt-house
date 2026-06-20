@@ -21,21 +21,21 @@ const isMobileBrowser = () => {
   return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 };
 
-// Detect Phantom in-app browser
+// Detect Phantom in-app browser — pure JS, no TypeScript cast
 const isPhantomBrowser = () => {
   if (typeof window === 'undefined') return false;
-  return !!(window as any).solana?.isPhantom;
+  return !!(window.solana && window.solana.isPhantom);
 };
 
 export default function TntHouse() {
-  const [tokens, setTokens] = useState<any[]>([]);
+  const [tokens, setTokens] = useState([]);
   const [loading, setLoading] = useState(true);
   const [bannerSubmitted, setBannerSubmitted] = useState(false);
   const [error, setError] = useState('');
   const [bannerError, setBannerError] = useState('');
   const [walletAddress, setWalletAddress] = useState('');
   const [isBannerSending, setIsBannerSending] = useState(false);
-  const [activeBanner, setActiveBanner] = useState<any>(null);
+  const [activeBanner, setActiveBanner] = useState(null);
   const [isBuyDropdownOpen, setIsBuyDropdownOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState([{ sender: 'bot', text: 'Привет! Я ИИ-Инспектор TNT House. Спроси меня про любой контракт или токен $MRDT. ⚽️' }]);
@@ -43,9 +43,9 @@ export default function TntHouse() {
   const [isTyping, setIsTyping] = useState(false);
   const [logs, setLogs] = useState(['[ИИ-Инспектор] Инициализация системы безопасности TNT House...', '[СЕТЬ] Подключение к RPC узлам Solana завершено успешно.']);
   const [isBlueprintOpen, setIsBlueprintOpen] = useState(false);
-  const [selectedToken, setSelectedToken] = useState<any>(null);
+  const [selectedToken, setSelectedToken] = useState(null);
   const [showBannerWalletModal, setShowBannerWalletModal] = useState(false);
-  const chatEndRef = useRef<HTMLDivElement>(null);
+  const chatEndRef = useRef(null);
   const [mrdtPrice, setMrdtPrice] = useState(0.000013);
   const [priceLoading, setPriceLoading] = useState(true);
   const [solPrice, setSolPrice] = useState(150);
@@ -66,12 +66,12 @@ export default function TntHouse() {
 
   const currentPlan = plans.find(p => p.value === selectedPlan);
 
-  const showToast = (message: string, type = 'success') => {
+  const showToast = (message, type = 'success') => {
     setToast({ show: true, message, type });
     setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 4200);
   };
 
-  // ── Read URL params on mount and auto-trigger payment if in Phantom browser ──
+  // Read URL params on mount and auto-trigger payment if inside Phantom browser
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
@@ -82,18 +82,14 @@ export default function TntHouse() {
     const pCurrency = params.get('pCurrency');
 
     if (pName && pCA && pPlan && pCurrency) {
-      // Restore form state
       const restoredForm = { projectName: pName, contractAddress: pCA, email: pEmail || '' };
       setFormData(restoredForm);
       setSelectedPlan(pPlan);
       setSelectedCurrency(pCurrency);
       setStep(3);
-
-      // Clean URL without reload
-      const cleanUrl = window.location.pathname;
-      window.history.replaceState({}, '', cleanUrl);
-
-      // Auto-trigger payment if we're inside Phantom browser
+      // Clean URL
+      window.history.replaceState({}, '', window.location.pathname);
+      // Auto-pay if inside Phantom browser
       if (isPhantomBrowser()) {
         setTimeout(() => {
           triggerPayment(pPlan, pCurrency, restoredForm);
@@ -108,7 +104,9 @@ export default function TntHouse() {
       try {
         const res = await fetch('https://price.jup.ag/v6/price?ids=SOL');
         const data = await res.json();
-        if (data?.data?.SOL?.price) setSolPrice(data.data.SOL.price);
+        if (data && data.data && data.data.SOL && data.data.SOL.price) {
+          setSolPrice(data.data.SOL.price);
+        }
       } catch {}
     };
     fetchSolPrice();
@@ -133,8 +131,8 @@ export default function TntHouse() {
     else if (step === 3) setStep(2);
   };
 
-  // ── Build Phantom deeplink with all form data in URL params ──────────────────
-  const redirectToPhantom = (planVal: string, currency: string, form: typeof formData) => {
+  // Build Phantom deeplink with form data in URL params
+  const redirectToPhantom = (planVal, currency, form) => {
     const base = window.location.origin + window.location.pathname;
     const params = new URLSearchParams({
       pName: form.projectName,
@@ -143,23 +141,22 @@ export default function TntHouse() {
       pPlan: planVal,
       pCurrency: currency,
     });
-    const targetUrl = `${base}?${params.toString()}`;
+    const targetUrl = base + '?' + params.toString();
     const encoded = encodeURIComponent(targetUrl);
-
-    // Try native deeplink first, fall back to universal link
-    window.location.href = `phantom://v1/browse/${encoded}?ref=${encoded}`;
+    window.location.href = 'phantom://v1/browse/' + encoded + '?ref=' + encoded;
     setTimeout(() => {
-      window.location.replace(`https://phantom.app/ul/browse/${encoded}?ref=${encoded}`);
+      window.location.replace('https://phantom.app/ul/browse/' + encoded + '?ref=' + encoded);
     }, 1200);
   };
 
-  // ── Core payment logic (used both manually and auto) ─────────────────────────
-  const triggerPayment = async (planVal: string, currency: string, form: typeof formData) => {
+  // Core payment logic
+  const triggerPayment = async (planVal, currency, form) => {
     const plan = plans.find(p => p.value === planVal);
     if (!plan || !currency) return;
 
-    const solanaWin = (window as any).solana;
-    if (!solanaWin?.isPhantom) {
+    // Pure JS window.solana access — no TypeScript cast needed
+    const solanaWin = window.solana;
+    if (!solanaWin || !solanaWin.isPhantom) {
       showToast('Phantom не найден', 'error'); return;
     }
 
@@ -175,8 +172,8 @@ export default function TntHouse() {
         const mint = new PublicKey(MRDT_CA);
         const fromAta = await getAssociatedTokenAddress(mint, sender);
         const toAta = await getAssociatedTokenAddress(mint, projectWallet);
-        try { await getAccount(connection, fromAta); } catch { showToast('Нет $MRDT на кошельке', 'error'); return; }
-        const amount = Math.round(plan.price / mrdtPrice) * 10 ** MRDT_DECIMALS;
+        try { await getAccount(connection, fromAta); } catch { showToast('Нет $MRDT на кошельке', 'error'); setIsPaymentLoading(false); return; }
+        const amount = Math.round(plan.price / mrdtPrice) * Math.pow(10, MRDT_DECIMALS);
         const tx = new Transaction().add(createTransferInstruction(fromAta, toAta, sender, amount));
         tx.feePayer = sender;
         tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
@@ -187,12 +184,20 @@ export default function TntHouse() {
       } else if (currency === 'sol') {
         const amountLamports = Math.floor((plan.price / solPrice) * LAMPORTS_PER_SOL);
         const projectAta = await getAssociatedTokenAddress(new PublicKey(MRDT_CA), projectWallet);
-        const quoteRes = await fetch(`https://quote-api.jup.ag/v6/quote?inputMint=So11111111111111111111111111111111111111112&outputMint=${MRDT_CA}&amount=${amountLamports}&slippageBps=150`);
+        const quoteRes = await fetch(
+          'https://quote-api.jup.ag/v6/quote?inputMint=So11111111111111111111111111111111111111112&outputMint=' + MRDT_CA + '&amount=' + amountLamports + '&slippageBps=150'
+        );
         const quote = await quoteRes.json();
         if (!quote || quote.error) throw new Error('Не удалось получить quote от Jupiter');
         const swapRes = await fetch('https://quote-api.jup.ag/v6/swap', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ quoteResponse: quote, userPublicKey: sender.toBase58(), wrapAndUnwrapSol: true, destinationTokenAccount: projectAta.toBase58() }),
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            quoteResponse: quote,
+            userPublicKey: sender.toBase58(),
+            wrapAndUnwrapSol: true,
+            destinationTokenAccount: projectAta.toBase58(),
+          }),
         });
         const swapData = await swapRes.json();
         if (!swapData.swapTransaction) throw new Error('Jupiter не вернул транзакцию');
@@ -206,11 +211,11 @@ export default function TntHouse() {
       showToast('✅ Оплата прошла! Запускаем проверку токена...', 'success');
 
       // Run AI audit
-      let auditData: any = { mintAuthority: '—', freezeAuthority: '—', isHoneypot: '—' };
+      let auditData = { mintAuthority: '—', freezeAuthority: '—', isHoneypot: '—' };
       try {
-        const auditRes = await fetch(`https://api.gopluslabs.io/api/v1/token_security/1?contract_addresses=${form.contractAddress}`);
+        const auditRes = await fetch('https://api.gopluslabs.io/api/v1/token_security/1?contract_addresses=' + form.contractAddress);
         const auditJson = await auditRes.json();
-        if (auditJson.code === 1 && auditJson.result?.[form.contractAddress]) {
+        if (auditJson.code === 1 && auditJson.result && auditJson.result[form.contractAddress]) {
           const a = auditJson.result[form.contractAddress];
           auditData = {
             mintAuthority: a.mint_authority === '' ? 'Отозвана ✓' : 'Активна (риск)',
@@ -238,17 +243,23 @@ export default function TntHouse() {
         liquidity: Math.floor(Math.random() * 100000 + 10000),
         volume24h: Math.floor(Math.random() * 90000 + 20000),
         priceChange24h: parseFloat((Math.random() * 40 - 10).toFixed(1)),
-        score: 95, verified: true,
-        dexUrl: `https://dexscreener.com/solana/${form.contractAddress}`,
-        chain: 'solana', ...auditData,
+        score: 95,
+        verified: true,
+        dexUrl: 'https://dexscreener.com/solana/' + form.contractAddress,
+        chain: 'solana',
+        mintAuthority: auditData.mintAuthority,
+        freezeAuthority: auditData.freezeAuthority,
+        isHoneypot: auditData.isHoneypot,
       };
 
       setTokens(prev => [newToken, ...prev]);
       showToast('✅ Проверка завершена! Токен в таблице!', 'success');
-      setStep(1); setSelectedPlan(''); setSelectedCurrency('');
+      setStep(1);
+      setSelectedPlan('');
+      setSelectedCurrency('');
       setFormData({ projectName: '', contractAddress: '', email: '' });
 
-    } catch (err: any) {
+    } catch (err) {
       console.error('Payment error:', err);
       showToast(err.message || 'Ошибка оплаты', 'error');
     } finally {
@@ -256,30 +267,27 @@ export default function TntHouse() {
     }
   };
 
-  // ── Button handler ────────────────────────────────────────────────────────────
+  // Button handler — decides: redirect to Phantom or pay directly
   const handlePayment = () => {
     if (!selectedPlan || !selectedCurrency) {
       showToast('Выбери тариф и способ оплаты', 'error'); return;
     }
-    // Mobile outside Phantom → redirect with params in URL
     if (isMobileBrowser() && !isPhantomBrowser()) {
       redirectToPhantom(selectedPlan, selectedCurrency, formData);
       return;
     }
-    // Desktop or Phantom browser → pay directly
     triggerPayment(selectedPlan, selectedCurrency, formData);
   };
 
   const handleConnectWallet = async () => {
     if (isMobileBrowser() && !isPhantomBrowser()) {
-      // Just open Phantom app home on mobile
       const url = encodeURIComponent(window.location.href);
-      window.location.href = `phantom://v1/browse/${url}?ref=${url}`;
-      setTimeout(() => window.location.replace(`https://phantom.app/ul/browse/${url}?ref=${url}`), 1200);
+      window.location.href = 'phantom://v1/browse/' + url + '?ref=' + url;
+      setTimeout(() => window.location.replace('https://phantom.app/ul/browse/' + url + '?ref=' + url), 1200);
       return;
     }
-    const solanaWin = (window as any).solana;
-    if (solanaWin?.isPhantom) {
+    const solanaWin = window.solana;
+    if (solanaWin && solanaWin.isPhantom) {
       try {
         const resp = await solanaWin.connect();
         const pk = resp.publicKey.toString();
@@ -296,21 +304,21 @@ export default function TntHouse() {
     { icon: Lock, label: 'DAO Лицензия', desc: 'Через $MRDT', color: 'text-purple-400' }
   ];
 
-  const getSafetyScore = (token: any) => {
+  const getSafetyScore = (token) => {
     if (!token) return 75;
     if (token.symbol === 'MRDT') return 98;
     if (token.score) return token.score;
-    const hash = token.symbol.split('').reduce((a: number, b: string) => a + b.charCodeAt(0), 0);
+    const hash = token.symbol.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
     return Math.max(85, Math.min(97, hash % 12 + 85));
   };
 
-  const getScoreStyle = (score: number) => {
+  const getScoreStyle = (score) => {
     if (score >= 90) return { color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/50', glow: 'shadow-[0_0_12px_rgba(16,185,129,0.6)]' };
     if (score >= 50) return { color: 'text-yellow-400', bg: 'bg-yellow-500/10', border: 'border-yellow-500/50', glow: 'shadow-[0_0_12px_rgba(234,179,8,0.5)]' };
     return { color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/50', glow: 'shadow-[0_0_12px_rgba(239,68,68,0.6)] animate-pulse' };
   };
 
-  const openTokenBlueprint = (token: any) => { setSelectedToken(token); setIsBlueprintOpen(true); };
+  const openTokenBlueprint = (token) => { setSelectedToken(token); setIsBlueprintOpen(true); };
   const closeBlueprint = () => { setIsBlueprintOpen(false); setTimeout(() => setSelectedToken(null), 300); };
 
   useEffect(() => {
@@ -336,46 +344,64 @@ export default function TntHouse() {
     const templates = ['Обнаружен новый пул на Raydium!', 'Mint Authority отключена ✓.', 'Уровень угрозы: НИЗКИЙ.', 'Бандлов не обнаружено.', 'Подключение к DexScreener.', 'Ищем новые гемы...'];
     const i = setInterval(() => {
       const t = templates[Math.floor(Math.random() * templates.length)];
-      setLogs(prev => [...prev.slice(-12), `[${new Date().toLocaleTimeString()}] ${t}`]);
+      setLogs(prev => [...prev.slice(-12), '[' + new Date().toLocaleTimeString() + '] ' + t]);
     }, 4200);
     return () => clearInterval(i);
   }, []);
 
   useEffect(() => {
-    const fetch_ = async () => {
+    const fetchTokens = async () => {
       try {
         setLoading(true);
         const cached = localStorage.getItem('tnt_cached_tokens');
         const time = localStorage.getItem('tnt_cached_time');
-        if (cached && time && Date.now() - parseInt(time) < 120000) { setTokens(JSON.parse(cached)); setLoading(false); return; }
+        if (cached && time && Date.now() - parseInt(time) < 120000) {
+          setTokens(JSON.parse(cached)); setLoading(false); return;
+        }
         const res = await fetch('https://api.dexscreener.com/latest/dex/tokens/So11111111111111111111111111111111111111112?limit=30');
         const data = await res.json();
-        if (data.pairs?.length) {
-          const filtered = data.pairs.filter((p: any) => (p.marketCap || 0) >= 1000 && (p.marketCap || 0) <= 300000).slice(0, 9).map((p: any) => ({
-            name: p.baseToken?.name || 'Unknown', symbol: p.baseToken?.symbol || '???', ca: p.baseToken?.address || '',
-            price: p.priceUsd ? parseFloat(p.priceUsd).toFixed(8) : '0',
-            liquidity: p.liquidity?.usd ? Math.round(p.liquidity.usd) : 0,
-            volume24h: p.volume?.h24 ? Math.round(p.volume.h24) : 0,
-            priceChange24h: p.priceChange?.h24 || 0, verified: true, dexUrl: p.url || '', chain: p.chainId || 'solana',
-          }));
-          if (filtered.length) { setTokens(filtered); localStorage.setItem('tnt_cached_tokens', JSON.stringify(filtered)); localStorage.setItem('tnt_cached_time', Date.now().toString()); setLoading(false); return; }
+        if (data.pairs && data.pairs.length) {
+          const filtered = data.pairs
+            .filter(p => (p.marketCap || 0) >= 1000 && (p.marketCap || 0) <= 300000)
+            .slice(0, 9)
+            .map(p => ({
+              name: (p.baseToken && p.baseToken.name) || 'Unknown',
+              symbol: (p.baseToken && p.baseToken.symbol) || '???',
+              ca: (p.baseToken && p.baseToken.address) || '',
+              price: p.priceUsd ? parseFloat(p.priceUsd).toFixed(8) : '0',
+              liquidity: (p.liquidity && p.liquidity.usd) ? Math.round(p.liquidity.usd) : 0,
+              volume24h: (p.volume && p.volume.h24) ? Math.round(p.volume.h24) : 0,
+              priceChange24h: (p.priceChange && p.priceChange.h24) || 0,
+              verified: true,
+              dexUrl: p.url || '',
+              chain: p.chainId || 'solana',
+            }));
+          if (filtered.length) {
+            setTokens(filtered);
+            localStorage.setItem('tnt_cached_tokens', JSON.stringify(filtered));
+            localStorage.setItem('tnt_cached_time', Date.now().toString());
+            setLoading(false); return;
+          }
         }
         throw new Error('No pairs');
       } catch { setTokens(FALLBACK_TOKENS); setLoading(false); }
     };
-    fetch_();
-    const i = setInterval(fetch_, 5 * 60 * 1000);
+    fetchTokens();
+    const i = setInterval(fetchTokens, 5 * 60 * 1000);
     return () => clearInterval(i);
   }, []);
 
-  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chatMessages]);
+  useEffect(() => { chatEndRef.current && chatEndRef.current.scrollIntoView({ behavior: 'smooth' }); }, [chatMessages]);
 
   useEffect(() => {
     const fetchPrice = async () => {
       try {
-        const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${MRDT_CA}`);
+        const res = await fetch('https://api.dexscreener.com/latest/dex/tokens/' + MRDT_CA);
         const data = await res.json();
-        if (data.pairs?.length) { const p = parseFloat(data.pairs[0].priceUsd); if (p > 0) setMrdtPrice(p); }
+        if (data.pairs && data.pairs.length) {
+          const p = parseFloat(data.pairs[0].priceUsd);
+          if (p > 0) setMrdtPrice(p);
+        }
       } catch {}
       setPriceLoading(false);
     };
@@ -384,21 +410,29 @@ export default function TntHouse() {
     return () => clearInterval(i);
   }, []);
 
-  const getAmountForTier = (tier: string) => { const usd = tier === 'fast' ? 40 : tier === 'vip' ? 120 : 10; return Math.round(usd / mrdtPrice); };
-  const getAmountForBanner = (days: string) => { const usd = days === '2' ? 35 : days === '6' ? 100 : 20; return Math.round(usd / mrdtPrice); };
+  const getAmountForTier = (tier) => {
+    const usd = tier === 'fast' ? 40 : tier === 'vip' ? 120 : 10;
+    return Math.round(usd / mrdtPrice);
+  };
+  const getAmountForBanner = (days) => {
+    const usd = days === '2' ? 35 : days === '6' ? 100 : 20;
+    return Math.round(usd / mrdtPrice);
+  };
 
   const handleBannerWalletSelect = async () => {
-    setShowBannerWalletModal(false); setIsBannerSending(true); setBannerError('');
+    setShowBannerWalletModal(false);
+    setIsBannerSending(true);
+    setBannerError('');
     if (isMobileBrowser() && !isPhantomBrowser()) {
       setIsBannerSending(false);
       const url = encodeURIComponent(window.location.href);
-      window.location.href = `phantom://v1/browse/${url}?ref=${url}`;
-      setTimeout(() => window.location.replace(`https://phantom.app/ul/browse/${url}?ref=${url}`), 1200);
+      window.location.href = 'phantom://v1/browse/' + url + '?ref=' + url;
+      setTimeout(() => window.location.replace('https://phantom.app/ul/browse/' + url + '?ref=' + url), 1200);
       return;
     }
-    const solanaWin = (window as any).solana;
+    const solanaWin = window.solana;
     if (!solanaWin) { setBannerError('Установите Phantom.'); setIsBannerSending(false); return; }
-    const current = { ...bannerFormData };
+    const current = Object.assign({}, bannerFormData);
     try {
       const resp = await solanaWin.connect();
       const sender = new PublicKey(resp.publicKey.toString());
@@ -409,22 +443,31 @@ export default function TntHouse() {
       const to = new PublicKey(WALLET_ADDRESS);
       const toAta = await getAssociatedTokenAddress(mint, to);
       const usd = current.days === '2' ? 35 : current.days === '6' ? 100 : 20;
-      const amount = Math.round(usd / mrdtPrice) * 10 ** MRDT_DECIMALS;
+      const amount = Math.round(usd / mrdtPrice) * Math.pow(10, MRDT_DECIMALS);
       const tx = new Transaction().add(createTransferInstruction(fromAta, toAta, sender, amount));
       tx.feePayer = sender;
       tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
       const signed = await solanaWin.signAndSendTransaction(tx);
       await connection.confirmTransaction(signed.signature, 'confirmed');
-      const banner = { tokenName: current.tokenName.toUpperCase(), bannerImg: current.bannerImg || '🪙', desc: current.desc, expiresAt: Date.now() + parseInt(current.days) * 86400000 };
+      const banner = {
+        tokenName: current.tokenName.toUpperCase(),
+        bannerImg: current.bannerImg || '🪙',
+        desc: current.desc,
+        expiresAt: Date.now() + parseInt(current.days) * 86400000,
+      };
       localStorage.setItem('tnt_active_banner', JSON.stringify(banner));
-      setActiveBanner(banner); setBannerSubmitted(true);
+      setActiveBanner(banner);
+      setBannerSubmitted(true);
       setBannerFormData({ tokenName: '', bannerImg: '', desc: '', days: '1' });
       setTimeout(() => setBannerSubmitted(false), 5000);
-    } catch (err: any) { setBannerError(err.message || 'Ошибка оплаты.'); }
-    finally { setIsBannerSending(false); }
+    } catch (err) {
+      setBannerError(err.message || 'Ошибка оплаты.');
+    } finally {
+      setIsBannerSending(false);
+    }
   };
 
-  const handleBannerSubmit = (e: React.FormEvent) => {
+  const handleBannerSubmit = (e) => {
     e.preventDefault();
     if (!bannerFormData.tokenName || !bannerFormData.desc) { setBannerError('Укажите название и описание.'); return; }
     setShowBannerWalletModal(true);
@@ -433,7 +476,8 @@ export default function TntHouse() {
   const handleSendChat = () => {
     if (!userMsg.trim()) return;
     setChatMessages(prev => [...prev, { sender: 'user', text: userMsg }]);
-    setUserMsg(''); setIsTyping(true);
+    setUserMsg('');
+    setIsTyping(true);
     setTimeout(() => {
       const replies = ['Структура чистая. SAFE ✓', 'Бандлов нет.', '$MRDT — гем!', 'Ругпулов не обнаружено.', 'Комиссии честные.'];
       setChatMessages(prev => [...prev, { sender: 'bot', text: replies[Math.floor(Math.random() * replies.length)] }]);
@@ -441,13 +485,16 @@ export default function TntHouse() {
     }, 1000);
   };
 
-  const formatNumber = (num: number) => {
-    if (num >= 1e6) return `$${(num / 1e6).toFixed(1)}M`;
-    if (num >= 1e3) return `$${(num / 1e3).toFixed(1)}K`;
-    return `$${num.toFixed(0)}`;
+  const formatNumber = (num) => {
+    if (num >= 1e6) return '$' + (num / 1e6).toFixed(1) + 'M';
+    if (num >= 1e3) return '$' + (num / 1e3).toFixed(1) + 'K';
+    return '$' + num.toFixed(0);
   };
 
-  const scrollToForm = () => document.getElementById('orderFormsSection')?.scrollIntoView({ behavior: 'smooth' });
+  const scrollToForm = () => {
+    const el = document.getElementById('orderFormsSection');
+    if (el) el.scrollIntoView({ behavior: 'smooth' });
+  };
 
   const isMobile = typeof window !== 'undefined' && isMobileBrowser();
   const inPhantom = typeof window !== 'undefined' && isPhantomBrowser();
@@ -456,7 +503,7 @@ export default function TntHouse() {
     <div className="min-h-screen bg-slate-950 text-white font-mono relative overflow-hidden pb-12">
       {/* Toast */}
       {toast.show && (
-        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[99999] flex items-center gap-3 px-6 py-3.5 rounded-2xl shadow-2xl border text-sm font-medium transition-all duration-300 ${toast.type === 'success' ? 'bg-emerald-950 border-emerald-500/40 text-emerald-300' : 'bg-red-950 border-red-500/40 text-red-300'}`}>
+        <div className={'fixed bottom-6 left-1/2 -translate-x-1/2 z-[99999] flex items-center gap-3 px-6 py-3.5 rounded-2xl shadow-2xl border text-sm font-medium transition-all duration-300 ' + (toast.type === 'success' ? 'bg-emerald-950 border-emerald-500/40 text-emerald-300' : 'bg-red-950 border-red-500/40 text-red-300')}>
           {toast.type === 'success' ? <CheckCircle className="w-5 h-5 text-emerald-400" /> : <XCircle className="w-5 h-5 text-red-400" />}
           <span>{toast.message}</span>
         </div>
@@ -488,7 +535,7 @@ export default function TntHouse() {
               <a href="https://t.me/tnt_house2026" target="_blank" rel="noopener noreferrer" className="w-10 h-10 border-2 border-purple-500 rounded-lg flex items-center justify-center bg-purple-500/10 shadow-[0_0_15px_rgba(153,69,255,0.4)] animate-pulse"><span className="text-xl">🧨</span></a>
               <div>
                 <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-emerald-400 tracking-wider">TNT HOUSE</h1>
-                <span className="text-[10px] text-purple-400 block font-bold tracking-widest">TOP NEW TOKENS v1.4</span>
+                <span className="text-[10px] text-purple-400 block font-bold tracking-widest">TOP NEW TOKENS v1.5</span>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -513,7 +560,11 @@ export default function TntHouse() {
           {activeBanner ? (
             <div className="border border-purple-500/40 rounded-2xl p-4 bg-gradient-to-r from-black via-purple-950/20 to-black flex flex-col sm:flex-row items-center justify-between gap-4 shadow-[0_0_20px_rgba(168,85,247,0.2)]">
               <div className="flex items-center gap-4">
-                <span className="text-3xl bg-purple-500/10 p-2 rounded-xl border border-purple-500/20">{typeof activeBanner.bannerImg === 'string' && activeBanner.bannerImg.startsWith('http') ? <img src={activeBanner.bannerImg} alt="logo" className="w-8 h-8 rounded-full object-cover" /> : activeBanner.bannerImg}</span>
+                <span className="text-3xl bg-purple-500/10 p-2 rounded-xl border border-purple-500/20">
+                  {typeof activeBanner.bannerImg === 'string' && activeBanner.bannerImg.startsWith('http')
+                    ? <img src={activeBanner.bannerImg} alt="logo" className="w-8 h-8 rounded-full object-cover" />
+                    : activeBanner.bannerImg}
+                </span>
                 <div>
                   <span className="bg-purple-500 text-white font-black text-[9px] px-2 py-0.5 rounded tracking-widest block w-max mb-1">🔥 VIP БУСТ</span>
                   <h4 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400">${activeBanner.tokenName}</h4>
@@ -532,7 +583,10 @@ export default function TntHouse() {
                   <p className="text-slate-400 text-xs mt-0.5">Главный токен платформы TNT House. Нажмите, чтобы купить VIP-баннер!</p>
                 </div>
               </div>
-              <div className="text-right"><div className="text-emerald-400 font-black text-sm">VIP-Буст от $20/день</div><div className="text-[10px] text-slate-500">Оплата в $MRDT</div></div>
+              <div className="text-right">
+                <div className="text-emerald-400 font-black text-sm">VIP-Буст от $20/день</div>
+                <div className="text-[10px] text-slate-500">Оплата в $MRDT</div>
+              </div>
             </div>
           )}
         </section>
@@ -549,7 +603,7 @@ export default function TntHouse() {
               <div className="grid grid-cols-3 gap-4 mt-8">
                 {pillars.map((item, i) => (
                   <div key={i} className="bg-slate-900/50 border border-purple-500/20 rounded-lg p-3 text-center hover:border-purple-500/60 transition">
-                    <item.icon className={`w-5 h-5 ${item.color} mx-auto mb-1`} />
+                    <item.icon className={'w-5 h-5 ' + item.color + ' mx-auto mb-1'} />
                     <div className="text-[11px] font-bold text-slate-200">{item.label}</div>
                     <div className="text-[9px] text-slate-400">{item.desc}</div>
                   </div>
@@ -582,38 +636,44 @@ export default function TntHouse() {
                 <thead>
                   <tr className="border-b border-purple-500/20 bg-purple-500/10 text-purple-400 font-bold sticky top-0 z-20 backdrop-blur-md">
                     {['Токен','Цена','Ликв','Об/Изм','Оценка','Действ'].map((h, i) => (
-                      <th key={i} className={`p-0.5 align-bottom ${i === 4 ? 'text-center' : i === 5 ? 'text-right' : ''}`} style={{ writingMode: 'vertical-lr', textOrientation: 'mixed', height: '60px', whiteSpace: 'nowrap' }}>{h}</th>
+                      <th key={i} className={'p-0.5 align-bottom' + (i === 4 ? ' text-center' : i === 5 ? ' text-right' : '')} style={{ writingMode: 'vertical-lr', textOrientation: 'mixed', height: '60px', whiteSpace: 'nowrap' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  <tr onClick={() => openTokenBlueprint({ symbol: 'MRDT', name: 'MARADONATOKEN', ca: MRDT_CA, price: mrdtPrice.toFixed(8), liquidity: 13000, volume24h: 0, priceChange24h: 12.4, verified: true, dexUrl: `https://dexscreener.com/solana/${MRDT_CA}`, chain: 'solana' })} className="border-b border-purple-500/30 bg-emerald-500/5 hover:bg-emerald-500/10 transition cursor-pointer">
+                  <tr onClick={() => openTokenBlueprint({ symbol: 'MRDT', name: 'MARADONATOKEN', ca: MRDT_CA, price: mrdtPrice.toFixed(8), liquidity: 13000, volume24h: 0, priceChange24h: 12.4, verified: true, dexUrl: 'https://dexscreener.com/solana/' + MRDT_CA, chain: 'solana' })} className="border-b border-purple-500/30 bg-emerald-500/5 hover:bg-emerald-500/10 transition cursor-pointer">
                     <td className="p-1 font-bold flex items-center gap-1"><span className="text-sm">⚽️</span><div><span className="text-emerald-400 font-extrabold text-[10px]">$MRDT</span><div className="text-[7px] text-slate-400">MARADONATOKEN</div></div></td>
                     <td className="p-1 font-mono text-emerald-400 font-bold text-[9px]">${mrdtPrice.toFixed(8)}</td>
                     <td className="p-1 font-mono text-emerald-400 font-bold text-[9px]">$13K+</td>
                     <td className="p-1 font-mono text-emerald-400 font-bold text-[9px]">+12.4%</td>
                     <td className="p-1 text-center"><div className="inline-flex items-center justify-center w-9 h-4 rounded-full bg-emerald-500/20 border border-emerald-500 text-emerald-400 text-[8px] font-extrabold shadow-[0_0_6px_rgba(16,185,129,0.5)]">98</div></td>
-                    <td className="p-1 text-right"><button onClick={e => { e.stopPropagation(); handleLaunchJupiter(); }} className="text-[8px] text-emerald-400 hover:text-emerald-300 font-bold hover:underline flex items-center gap-0.5">Купить <ExternalLink className="w-2 h-2" /></button></td>
+                    <td className="p-1 text-right"><button onClick={e => { e.stopPropagation(); handleLaunchJupiter(); }} className="text-[8px] text-emerald-400 hover:text-emerald-300 font-bold hover:underline inline-flex items-center gap-0.5">Купить <ExternalLink className="w-2 h-2" /></button></td>
                   </tr>
                   {loading && tokens.length === 0 ? (
                     <tr><td colSpan={6} className="p-6 text-center text-purple-400 font-bold"><RefreshCw className="w-4 h-4 animate-spin mx-auto mb-1" />Сканируем...</td></tr>
                   ) : tokens.map((token, i) => {
-                    const score = getSafetyScore(token); const style = getScoreStyle(score);
+                    const score = getSafetyScore(token);
+                    const style = getScoreStyle(score);
                     return (
                       <tr key={i} onClick={() => openTokenBlueprint(token)} className="border-b border-purple-500/10 hover:bg-purple-500/5 transition cursor-pointer">
                         <td className="p-1"><span className="text-purple-400 text-[9px] font-bold">${token.symbol}</span><span className="text-[7px] text-slate-500 block truncate max-w-[80px]">{token.name}</span></td>
                         <td className="p-1 font-mono text-slate-300 text-[9px]">${token.price}</td>
                         <td className="p-1 font-mono text-slate-300 text-[9px]">{typeof token.liquidity === 'number' ? formatNumber(token.liquidity) : token.liquidity}</td>
-                        <td className={`p-1 font-mono text-[9px] ${token.priceChange24h > 0 ? 'text-emerald-400' : 'text-red-400'}`}>{formatNumber(token.volume24h)} ({token.priceChange24h > 0 ? '+' : ''}{token.priceChange24h}%)</td>
-                        <td className="p-1 text-center"><div className={`inline-flex items-center justify-center w-9 h-4 rounded-full ${style.bg} ${style.border} ${style.color} text-[8px] font-extrabold ${style.glow}`}>{score}</div></td>
+                        <td className={'p-1 font-mono text-[9px] ' + (token.priceChange24h > 0 ? 'text-emerald-400' : 'text-red-400')}>{formatNumber(token.volume24h)} ({token.priceChange24h > 0 ? '+' : ''}{token.priceChange24h}%)</td>
+                        <td className="p-1 text-center"><div className={'inline-flex items-center justify-center w-9 h-4 rounded-full ' + style.bg + ' ' + style.border + ' ' + style.color + ' text-[8px] font-extrabold ' + style.glow}>{score}</div></td>
                         <td className="p-1 text-right"><a href={token.dexUrl} onClick={e => e.stopPropagation()} target="_blank" rel="noopener noreferrer" className="text-[8px] text-purple-400 hover:text-emerald-400 inline-flex items-center gap-0.5">DEX <ExternalLink className="w-2 h-2" /></a></td>
                       </tr>
                     );
                   })}
-                  {[1,2,3,4].map(n => <tr key={`e${n}`} className="border-b border-purple-500/5 opacity-40">{[...Array(6)].map((_,i) => <td key={i} className="p-1 text-slate-600 text-[8px] italic">—</td>)}</tr>)}
+                  {[1,2,3,4].map(n => (
+                    <tr key={'e' + n} className="border-b border-purple-500/5 opacity-40">
+                      {[0,1,2,3,4,5].map(i => <td key={i} className="p-1 text-slate-600 text-[8px] italic">—</td>)}
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
+            {error && <div className="mt-2 p-1.5 bg-red-950/40 border border-red-500/30 rounded-lg flex items-center gap-1 text-red-300 text-[9px]"><AlertCircle className="w-2.5 h-2.5" /> {error}</div>}
           </div>
         </section>
 
@@ -622,12 +682,11 @@ export default function TntHouse() {
           <div className="grid md:grid-cols-2 gap-12 items-start">
             <div className="space-y-8">
 
-              {/* AI Inspection multi-step form */}
+              {/* AI Inspection form */}
               <div className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 p-6 backdrop-blur-md">
                 <h3 className="text-lg font-black text-purple-400 mb-2 flex items-center gap-2">🔍 ЗАКАЗАТЬ ИИ-ИНСПЕКЦИЮ</h3>
                 <p className="text-slate-400 text-xs mb-4">Авто-добавление в таблицу.</p>
 
-                {/* Mobile hint */}
                 {isMobile && !inPhantom && (
                   <div className="mb-4 p-3 bg-purple-950/40 border border-purple-500/40 rounded-xl text-xs text-purple-300 flex items-start gap-2">
                     <span className="text-base">👻</span>
@@ -640,9 +699,9 @@ export default function TntHouse() {
                     <>
                       <h3 className="text-2xl font-bold text-white mb-6">Заказать ИИ-инспекцию</h3>
                       <div className="space-y-4">
-                        <div><label className="block text-sm text-gray-400 mb-1">Название проекта</label><input type="text" placeholder="Твой токен..." value={formData.projectName} onChange={e => setFormData({ ...formData, projectName: e.target.value })} className="w-full p-3 bg-gray-700 border border-gray-600 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500" /></div>
-                        <div><label className="block text-sm text-gray-400 mb-1">Contract Address (Solana)</label><input type="text" placeholder="Впиши адрес контракта..." value={formData.contractAddress} onChange={e => setFormData({ ...formData, contractAddress: e.target.value })} className="w-full p-3 bg-gray-700 border border-gray-600 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500" /></div>
-                        <div><label className="block text-sm text-gray-400 mb-1">Email для связи</label><input type="email" placeholder="your@email.com" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} className="w-full p-3 bg-gray-700 border border-gray-600 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500" /></div>
+                        <div><label className="block text-sm text-gray-400 mb-1">Название проекта</label><input type="text" placeholder="Твой токен..." value={formData.projectName} onChange={e => setFormData(Object.assign({}, formData, { projectName: e.target.value }))} className="w-full p-3 bg-gray-700 border border-gray-600 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500" /></div>
+                        <div><label className="block text-sm text-gray-400 mb-1">Contract Address (Solana)</label><input type="text" placeholder="Впиши адрес контракта..." value={formData.contractAddress} onChange={e => setFormData(Object.assign({}, formData, { contractAddress: e.target.value }))} className="w-full p-3 bg-gray-700 border border-gray-600 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500" /></div>
+                        <div><label className="block text-sm text-gray-400 mb-1">Email для связи</label><input type="email" placeholder="your@email.com" value={formData.email} onChange={e => setFormData(Object.assign({}, formData, { email: e.target.value }))} className="w-full p-3 bg-gray-700 border border-gray-600 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500" /></div>
                       </div>
                       <button onClick={handleNext} className="mt-6 w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-3 rounded-xl font-semibold hover:opacity-90 transition">Далее →</button>
                     </>
@@ -653,7 +712,7 @@ export default function TntHouse() {
                       <h3 className="text-2xl font-bold text-white mb-4">Выбери тариф</h3>
                       <div className="space-y-3">
                         {plans.map(plan => (
-                          <label key={plan.value} className={`flex items-center p-4 rounded-xl cursor-pointer transition-all ${selectedPlan === plan.value ? 'bg-indigo-600/20 border border-indigo-500' : 'bg-gray-700/30 border border-gray-700 hover:border-indigo-400'}`}>
+                          <label key={plan.value} className={'flex items-center p-4 rounded-xl cursor-pointer transition-all ' + (selectedPlan === plan.value ? 'bg-indigo-600/20 border border-indigo-500' : 'bg-gray-700/30 border border-gray-700 hover:border-indigo-400')}>
                             <input type="radio" name="plan" value={plan.value} checked={selectedPlan === plan.value} onChange={() => setSelectedPlan(plan.value)} className="w-5 h-5 text-indigo-600" />
                             <div className="ml-4"><p className="text-white font-semibold">{plan.name}</p><p className="text-sm text-gray-400">${plan.price} ≈ {plan.mrdt} $MRDT</p></div>
                           </label>
@@ -669,10 +728,10 @@ export default function TntHouse() {
                   {step === 3 && (
                     <>
                       <h3 className="text-2xl font-bold text-white mb-4">Выбери способ оплаты</h3>
-                      <p className="text-gray-400 mb-4">Тариф: <span className="text-white font-semibold">{currentPlan?.name}</span></p>
+                      <p className="text-gray-400 mb-4">Тариф: <span className="text-white font-semibold">{currentPlan && currentPlan.name}</span></p>
                       <div className="space-y-3">
                         {['mrdt', 'sol'].map(method => (
-                          <label key={method} className={`flex items-center p-4 rounded-xl cursor-pointer transition-all ${selectedCurrency === method ? 'bg-indigo-600/20 border border-indigo-500' : 'bg-gray-700/30 border border-gray-700 hover:border-indigo-400'}`}>
+                          <label key={method} className={'flex items-center p-4 rounded-xl cursor-pointer transition-all ' + (selectedCurrency === method ? 'bg-indigo-600/20 border border-indigo-500' : 'bg-gray-700/30 border border-gray-700 hover:border-indigo-400')}>
                             <input type="radio" name="currency" value={method} checked={selectedCurrency === method} onChange={() => setSelectedCurrency(method)} className="w-5 h-5 text-indigo-600" />
                             <div className="ml-4">
                               <p className="text-white font-semibold">{method === 'mrdt' ? 'Оплатить в $MRDT' : 'Оплатить в SOL (авто-выкуп)'}</p>
@@ -688,7 +747,9 @@ export default function TntHouse() {
                           disabled={!selectedCurrency || isPaymentLoading}
                           className="flex-1 bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-3 rounded-xl font-semibold hover:opacity-90 transition disabled:opacity-40 flex items-center justify-center gap-2"
                         >
-                          {isPaymentLoading ? <><RefreshCw className="w-4 h-4 animate-spin" /> Обработка...</> : isMobile && !inPhantom ? '👻 Открыть в Phantom' : 'Запустить ИИ-инспекцию'}
+                          {isPaymentLoading
+                            ? <><RefreshCw className="w-4 h-4 animate-spin" /> Обработка...</>
+                            : (isMobile && !inPhantom ? '👻 Открыть в Phantom' : 'Запустить ИИ-инспекцию')}
                         </button>
                       </div>
                     </>
@@ -699,19 +760,19 @@ export default function TntHouse() {
               {/* Banner form */}
               <div className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 p-6 backdrop-blur-md">
                 <h3 className="text-lg font-black text-purple-400 mb-2 flex items-center gap-2">👑 КУПИТЬ VIP-БАННЕР НА ГЛАВНУЮ</h3>
-                <p className="text-slate-400 text-xs mb-4">Полностью автоматическая замена рекламного места на ваш токен.</p>
+                <p className="text-slate-400 text-xs mb-4">Полностью автоматическая замена рекламного места.</p>
                 <form onSubmit={handleBannerSubmit} className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
-                    <div><label className="block text-purple-400 text-[11px] font-bold mb-1">Имя токена / Тикер</label><input type="text" value={bannerFormData.tokenName} onChange={e => setBannerFormData({ ...bannerFormData, tokenName: e.target.value })} placeholder="SOLANA" className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" /></div>
-                    <div><label className="block text-purple-400 text-[11px] font-bold mb-1">Загрузите изображение</label><input type="file" accept="image/*" onChange={e => { const f = e.target.files?.[0]; if (f) { const r = new FileReader(); r.onload = ev => setBannerFormData({ ...bannerFormData, bannerImg: ev.target?.result as string }); r.readAsDataURL(f); }}} className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-bold file:bg-purple-500 file:text-white hover:file:bg-purple-400" /></div>
+                    <div><label className="block text-purple-400 text-[11px] font-bold mb-1">Имя токена / Тикер</label><input type="text" value={bannerFormData.tokenName} onChange={e => setBannerFormData(Object.assign({}, bannerFormData, { tokenName: e.target.value }))} placeholder="SOLANA" className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" /></div>
+                    <div><label className="block text-purple-400 text-[11px] font-bold mb-1">Загрузите изображение</label><input type="file" accept="image/*" onChange={e => { const f = e.target.files && e.target.files[0]; if (f) { const r = new FileReader(); r.onload = ev => setBannerFormData(Object.assign({}, bannerFormData, { bannerImg: ev.target.result })); r.readAsDataURL(f); }}} className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-bold file:bg-purple-500 file:text-white hover:file:bg-purple-400" /></div>
                   </div>
-                  <div><label className="block text-purple-400 text-[11px] font-bold mb-1">Краткий рекламный слоган</label><input type="text" value={bannerFormData.desc} onChange={e => setBannerFormData({ ...bannerFormData, desc: e.target.value })} placeholder="Самый быстрый мемкоин..." className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" /></div>
+                  <div><label className="block text-purple-400 text-[11px] font-bold mb-1">Краткий рекламный слоган</label><input type="text" value={bannerFormData.desc} onChange={e => setBannerFormData(Object.assign({}, bannerFormData, { desc: e.target.value }))} placeholder="Самый быстрый мемкоин..." className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" /></div>
                   <div>
                     <label className="block text-purple-400 text-[11px] font-bold mb-1">Срок размещения</label>
-                    <select value={bannerFormData.days} onChange={e => setBannerFormData({ ...bannerFormData, days: e.target.value })} className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white focus:border-purple-500 focus:outline-none font-mono">
-                      <option value="1">1 День — 20$ {priceLoading ? '(расчёт…)' : `(~ ${getAmountForBanner('1').toLocaleString()} $MRDT)`}</option>
-                      <option value="2">2 Дня — 35$ {priceLoading ? '(расчёт…)' : `(~ ${getAmountForBanner('2').toLocaleString()} $MRDT)`}</option>
-                      <option value="6">6 Дней — 100$ {priceLoading ? '(расчёт…)' : `(~ ${getAmountForBanner('6').toLocaleString()} $MRDT)`}</option>
+                    <select value={bannerFormData.days} onChange={e => setBannerFormData(Object.assign({}, bannerFormData, { days: e.target.value }))} className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white focus:border-purple-500 focus:outline-none font-mono">
+                      <option value="1">1 День — 20$ {priceLoading ? '(расчёт…)' : '(~ ' + getAmountForBanner('1').toLocaleString() + ' $MRDT)'}</option>
+                      <option value="2">2 Дня — 35$ {priceLoading ? '(расчёт…)' : '(~ ' + getAmountForBanner('2').toLocaleString() + ' $MRDT)'}</option>
+                      <option value="6">6 Дней — 100$ {priceLoading ? '(расчёт…)' : '(~ ' + getAmountForBanner('6').toLocaleString() + ' $MRDT)'}</option>
                     </select>
                   </div>
                   <button type="submit" disabled={isBannerSending} className="w-full bg-gradient-to-r from-emerald-400 to-purple-500 hover:from-emerald-300 hover:to-purple-400 text-slate-950 font-black py-2.5 rounded text-xs transition flex items-center justify-center gap-1.5 disabled:opacity-50">
@@ -732,14 +793,14 @@ export default function TntHouse() {
                 <div className="grid grid-cols-1 gap-2 text-xs font-mono">
                   {[
                     ['🎁 Первые 3 токена', 'БЕСПЛАТНО'],
-                    ['🔍 Базовый ИИ-Аудит', `$10 ≈ ${priceLoading ? '...' : getAmountForTier('basic').toLocaleString()} $MRDT`],
-                    ['⚡ Быстрый Листинг', `$40 ≈ ${priceLoading ? '...' : getAmountForTier('fast').toLocaleString()} $MRDT`],
-                    ['👑 Баннер (1 день)', `$20 ≈ ${priceLoading ? '...' : getAmountForBanner('1').toLocaleString()} $MRDT`],
-                    ['👑 Баннер (2 дня)', `$35 ≈ ${priceLoading ? '...' : getAmountForBanner('2').toLocaleString()} $MRDT`],
-                    ['👑 Баннер (6 дней)', `$100 ≈ ${priceLoading ? '...' : getAmountForBanner('6').toLocaleString()} $MRDT`],
-                  ].map(([label, val], i) => (
-                    <div key={i} className={`flex justify-between p-2.5 border rounded-lg ${i === 0 ? 'bg-purple-500/10 border-purple-500/20' : 'bg-slate-950 border-purple-500/10'}`}>
-                      <span className="text-slate-300">{label}</span><span className="text-emerald-400 font-bold">{val}</span>
+                    ['🔍 Базовый ИИ-Аудит', '$10 ≈ ' + (priceLoading ? '...' : getAmountForTier('basic').toLocaleString()) + ' $MRDT'],
+                    ['⚡ Быстрый Листинг', '$40 ≈ ' + (priceLoading ? '...' : getAmountForTier('fast').toLocaleString()) + ' $MRDT'],
+                    ['👑 Баннер (1 день)', '$20 ≈ ' + (priceLoading ? '...' : getAmountForBanner('1').toLocaleString()) + ' $MRDT'],
+                    ['👑 Баннер (2 дня)', '$35 ≈ ' + (priceLoading ? '...' : getAmountForBanner('2').toLocaleString()) + ' $MRDT'],
+                    ['👑 Баннер (6 дней)', '$100 ≈ ' + (priceLoading ? '...' : getAmountForBanner('6').toLocaleString()) + ' $MRDT'],
+                  ].map((row, i) => (
+                    <div key={i} className={'flex justify-between p-2.5 border rounded-lg ' + (i === 0 ? 'bg-purple-500/10 border-purple-500/20' : 'bg-slate-950 border-purple-500/10')}>
+                      <span className="text-slate-300">{row[0]}</span><span className="text-emerald-400 font-bold">{row[1]}</span>
                     </div>
                   ))}
                 </div>
@@ -769,7 +830,7 @@ export default function TntHouse() {
               <a href="https://www.maradonatoken-mrdt.xyz" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400 transition-colors"><ExternalLink className="w-6 h-6" /></a>
             </div>
             <div className="text-center space-y-1">
-              <div className="text-purple-400 font-bold text-sm tracking-widest">TNT HOUSE v1.4</div>
+              <div className="text-purple-400 font-bold text-sm tracking-widest">TNT HOUSE v1.5</div>
               <div className="text-slate-400 text-xs">Powered by $MRDT • AI Audits ☁️</div>
               <div className="text-slate-500 text-[10px]">Built with Next.js + Tailwind CSS • DexScreener API</div>
             </div>
@@ -818,8 +879,8 @@ export default function TntHouse() {
           </div>
           <div className="flex-1 p-4 overflow-y-auto space-y-3 text-xs">
             {chatMessages.map((msg, i) => (
-              <div key={i} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[80%] rounded-lg p-2.5 leading-relaxed ${msg.sender === 'user' ? 'bg-purple-500/20 text-purple-200 border border-purple-500/30' : 'bg-slate-950 text-emerald-400 border border-emerald-500/30'}`}>{msg.text}</div>
+              <div key={i} className={'flex ' + (msg.sender === 'user' ? 'justify-end' : 'justify-start')}>
+                <div className={'max-w-[80%] rounded-lg p-2.5 leading-relaxed ' + (msg.sender === 'user' ? 'bg-purple-500/20 text-purple-200 border border-purple-500/30' : 'bg-slate-950 text-emerald-400 border border-emerald-500/30')}>{msg.text}</div>
               </div>
             ))}
             {isTyping && <div className="flex justify-start"><div className="bg-slate-950 text-emerald-400 border border-emerald-500/30 rounded-lg p-2.5 animate-pulse text-[11px]">Думаю...</div></div>}
@@ -833,4 +894,4 @@ export default function TntHouse() {
       )}
     </div>
   );
-  }
+            }
