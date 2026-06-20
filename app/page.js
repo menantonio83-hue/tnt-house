@@ -131,8 +131,8 @@ export default function TntHouse() {
 
       if (selectedCurrency === 'mrdt') {
         const mint = new PublicKey(MRDT_CA);
-        const fromAta = await getAssociatedTokenAddress(mint, sender);
-        const toAta = await getAssociatedTokenAddress(mint, projectWallet);
+        const fromAta = getAssociatedTokenAddress(mint, sender); // sync
+        const toAta = getAssociatedTokenAddress(mint, projectWallet);
 
         try {
           await getAccount(connection, fromAta);
@@ -157,8 +157,8 @@ export default function TntHouse() {
         const solAmount = usdAmount / solPrice;
         const amountLamports = Math.floor(solAmount * LAMPORTS_PER_SOL);
 
-        // Получаем ATA проекта для $MRDT (должен быть создан заранее)
-        const projectAta = await getAssociatedTokenAddress(new PublicKey(MRDT_CA), projectWallet);
+        // Получаем ATA проекта для $MRDT
+        const projectAta = getAssociatedTokenAddress(new PublicKey(MRDT_CA), projectWallet); // sync
 
         // 1. Quote
         const quoteUrl = `https://quote-api.jup.ag/v6/quote?inputMint=So11111111111111111111111111111111111111112&outputMint=${MRDT_CA}&amount=${amountLamports}&slippageBps=150`;
@@ -169,7 +169,7 @@ export default function TntHouse() {
           throw new Error('Не удалось получить quote от Jupiter');
         }
 
-        // 2. Swap с указанием, куда отправить выходные токены
+        // 2. Swap с указанием получателя
         const swapRes = await fetch('https://quote-api.jup.ag/v6/swap', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -177,14 +177,14 @@ export default function TntHouse() {
             quoteResponse: quote,
             userPublicKey: sender.toBase58(),
             wrapAndUnwrapSol: true,
-            destinationTokenAccount: projectAta.toBase58(), // <-- КЛЮЧЕВАЯ СТРОКА
+            destinationTokenAccount: projectAta.toBase58(),
           }),
         });
 
         const swapData = await swapRes.json();
 
         if (!swapData.swapTransaction) {
-          throw new Error('Jupiter не вернул транзакцию свопа');
+          throw new Error('Jupiter не вернул транзакцию свопа (возможно, ATA проекта не создан)');
         }
 
         const swapTxBuf = Buffer.from(swapData.swapTransaction, 'base64');
@@ -336,10 +336,10 @@ export default function TntHouse() {
       const sender = new PublicKey(resp.publicKey.toString());
       const connection = new Connection('https://api.mainnet-beta.solana.com','confirmed');
       const mint = new PublicKey(MRDT_CA);
-      const fromAta = await getAssociatedTokenAddress(mint, sender);
+      const fromAta = getAssociatedTokenAddress(mint, sender);
       await getAccount(connection, fromAta).catch(() => { throw new Error('Нет $MRDT.'); });
       const to = new PublicKey(WALLET_ADDRESS);
-      const toAta = await getAssociatedTokenAddress(mint, to);
+      const toAta = getAssociatedTokenAddress(mint, to);
       const amount = getAmountForTier(selectedTier) * 10**MRDT_DECIMALS;
       const tx = new Transaction().add(createTransferInstruction(fromAta, toAta, sender, amount));
       tx.feePayer = sender;
@@ -379,10 +379,10 @@ export default function TntHouse() {
       const sender = new PublicKey(resp.publicKey.toString());
       const connection = new Connection('https://api.mainnet-beta.solana.com','confirmed');
       const mint = new PublicKey(MRDT_CA);
-      const fromAta = await getAssociatedTokenAddress(mint, sender);
+      const fromAta = getAssociatedTokenAddress(mint, sender);
       await getAccount(connection, fromAta).catch(() => { throw new Error('Нет $MRDT.'); });
       const to = new PublicKey(WALLET_ADDRESS);
-      const toAta = await getAssociatedTokenAddress(mint, to);
+      const toAta = getAssociatedTokenAddress(mint, to);
       const usd = current.days==='2'?35:current.days==='6'?100:20;
       const amount = Math.round(usd/mrdtPrice) * 10**MRDT_DECIMALS;
       const tx = new Transaction().add(createTransferInstruction(fromAta, toAta, sender, amount));
