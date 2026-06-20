@@ -1,7 +1,16 @@
+import React, { useMemo } from 'react';
+import '@solana/wallet-adapter-react-ui/styles.css';
+
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body style={{ margin: 0, background: 'black', color: 'white' }}>{children}</body>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <script src="https://cdn.tailwindcss.com"></script>
+      </head>
+      <body style={{ margin: 0, backgroundColor: '#000', color: '#fff' }}>
+        {children}
+      </body>
     </html>
   );
 }
