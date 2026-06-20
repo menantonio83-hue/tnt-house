@@ -78,7 +78,7 @@ export default function TntHouse() {
     else if (step === 3) setStep(2);
   };
 
-  // ===== REAL PAYMENT HANDLER (using window.solana / Phantom) =====
+  // ===== АВТОМАТИЧЕСКИЙ ВЫКУП $MRDT ЧЕРЕЗ JUPITER (Вариант Б) =====
   const handlePayment = async () => {
     if (!selectedPlan || !selectedCurrency) {
       alert('Выбери тариф и способ оплаты');
@@ -88,31 +88,25 @@ export default function TntHouse() {
     const plan = plans.find(p => p.value === selectedPlan);
     if (!plan) return;
 
-    const usdAmount = plan.price;
-
     if (!window.solana || !window.solana.isPhantom) {
       alert('Установи Phantom Wallet');
       return;
     }
 
     try {
-      // Connect wallet
       const resp = await window.solana.connect();
       const sender = new PublicKey(resp.publicKey.toString());
-
       const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
-      const to = new PublicKey(WALLET_ADDRESS);
+      const projectWallet = new PublicKey(WALLET_ADDRESS);
 
-      let tx = new Transaction();
       let signature = '';
 
       if (selectedCurrency === 'mrdt') {
-        // Pay with $MRDT
+        // === Прямая оплата в $MRDT ===
         const mint = new PublicKey(MRDT_CA);
         const fromAta = await getAssociatedTokenAddress(mint, sender);
-        const toAta = await getAssociatedTokenAddress(mint, to);
+        const toAta = await getAssociatedTokenAddress(mint, projectWallet);
 
-        // Check if user has MRDT
         try {
           await getAccount(connection, fromAta);
         } catch {
@@ -120,37 +114,66 @@ export default function TntHouse() {
           return;
         }
 
-        const amount = Math.round(usdAmount / mrdtPrice) * 10 ** MRDT_DECIMALS;
+        const amount = Math.round(plan.price / mrdtPrice) * 10 ** MRDT_DECIMALS;
 
-        tx.add(createTransferInstruction(fromAta, toAta, sender, amount));
+        const tx = new Transaction().add(createTransferInstruction(fromAta, toAta, sender, amount));
+        tx.feePayer = sender;
+        tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+
+        const signed = await window.solana.signAndSendTransaction(tx);
+        signature = signed.signature;
+
+        await connection.confirmTransaction(signature, 'confirmed');
 
       } else if (selectedCurrency === 'sol') {
-        // Pay with SOL (mock rate for now)
-        const solAmount = usdAmount / SOL_PRICE_MOCK;
-        const lamports = Math.round(solAmount * LAMPORTS_PER_SOL);
+        // === АВТОМАТИЧЕСКИЙ ВЫКУП $MRDT ЧЕРЕЗ JUPITER ===
+        const usdAmount = plan.price;
+        const solAmount = usdAmount / SOL_PRICE_MOCK; // TODO: заменить на реальный курс
+        const amountLamports = Math.floor(solAmount * LAMPORTS_PER_SOL);
 
-        tx.add(SystemProgram.transfer({
-          fromPubkey: sender,
-          toPubkey: to,
-          lamports,
-        }));
+        // 1. Получаем quote от Jupiter
+        const quoteUrl = `https://quote-api.jup.ag/v6/quote?inputMint=So11111111111111111111111111111111111111112&outputMint=${MRDT_CA}&amount=${amountLamports}&slippageBps=150`;
+        const quoteRes = await fetch(quoteUrl);
+        const quote = await quoteRes.json();
+
+        if (!quote || quote.error) {
+          throw new Error('Не удалось получить quote от Jupiter. Попробуй позже.');
+        }
+
+        // 2. Получаем swap transaction
+        const swapRes = await fetch('https://quote-api.jup.ag/v6/swap', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            quoteResponse: quote,
+            userPublicKey: sender.toBase58(),
+            wrapAndUnwrapSol: true,
+            // destinationTokenAccount: projectWallet.toBase58(), // можно добавить, если нужно
+          }),
+        });
+
+        const swapData = await swapRes.json();
+
+        if (!swapData.swapTransaction) {
+          throw new Error('Jupiter не вернул транзакцию свопа');
+        }
+
+        // 3. Десериализуем VersionedTransaction
+        const swapTxBuf = Buffer.from(swapData.swapTransaction, 'base64');
+        const transaction = VersionedTransaction.deserialize(swapTxBuf);
+
+        // 4. Подписываем через Phantom
+        const signedTx = await window.solana.signTransaction(transaction);
+
+        // 5. Отправляем и подтверждаем
+        signature = await connection.sendRawTransaction(signedTx.serialize());
+        await connection.confirmTransaction(signature, 'confirmed');
       }
 
-      tx.feePayer = sender;
-      tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+      // Успех
+      alert(`✅ Оплата прошла! $MRDT отправлен проекту.\nSignature: ${signature.slice(0, 10)}...`);
 
-      const signed = await window.solana.signAndSendTransaction(tx);
-      signature = signed.signature;
-
-      const confirmation = await connection.confirmTransaction(signature, 'confirmed');
-      if (confirmation.value.err) {
-        throw new Error('Транзакция не подтверждена');
-      }
-
-      // Success
-      alert(`✅ Оплата прошла! Signature: ${signature.slice(0, 8)}...`);
-
-      // Reset form
+      // Сброс формы
       setStep(1);
       setSelectedPlan('');
       setSelectedCurrency('');
