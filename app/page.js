@@ -74,21 +74,6 @@ export default function TntHouse() {
 
   const currentPlan = plans.find(p => p.value === selectedPlan);
 
-  // ==== Восстановление данных после возврата из Phantom ====
-  useEffect(() => {
-    try {
-      const saved = sessionStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        setFormData(parsed.formData || { projectName: '', contractAddress: '', email: '' });
-        setSelectedPlan(parsed.selectedPlan || '');
-        setSelectedCurrency(parsed.selectedCurrency || '');
-        setStep(3); // Переходим на шаг 3 (оплата)
-        sessionStorage.removeItem(STORAGE_KEY);
-      }
-    } catch (e) {}
-  }, []);
-
   // Нативный мобильный диплинк для гарантированного открытия кошелька
   const saveAndRedirect = () => {
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
@@ -101,14 +86,40 @@ export default function TntHouse() {
     const cleanUrl = currentUrl.replace(/^https?:\/\//, '');
     const phantomDeepLink = `phantom://v1/browse/${cleanUrl}?ref=${encodeURIComponent(currentUrl)}`;
     
-    // Сначала пробуем нативный протокол приложения
     window.location.href = phantomDeepLink;
     
-    // Если через 1.5 секунды ничего не произошло (нет кошелька), используем универсальный фолбек-линк
     setTimeout(() => {
       window.location.replace(`https://phantom.app/ul/browse/${encodeURIComponent(currentUrl)}?ref=${encodeURIComponent(currentUrl)}`);
     }, 1500);
   };
+
+  // ==== Восстановление данных И АВТО-ВЫЗОВ ОПЛАТЫ ====
+  useEffect(() => {
+    const restoreAndPay = async () => {
+      try {
+        const saved = sessionStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          setFormData(parsed.formData || { projectName: '', contractAddress: '', email: '' });
+          setSelectedPlan(parsed.selectedPlan || '');
+          setSelectedCurrency(parsed.selectedCurrency || '');
+          setStep(3); // Переходим на шаг 3 (оплата)
+          sessionStorage.removeItem(STORAGE_KEY);
+
+          // Если мы уже успешно перелетели в браузер Phantom — сразу триггерим оплату
+          if (isPhantomBrowser()) {
+            // Даем 1 секунду на инициализацию window.solana внутри кошелька
+            await new Promise(resolve => setTimeout(resolve, 1200));
+            showToast('Фиксируем данные... Инициализация оплаты', 'success');
+            handlePaymentDirectly(parsed.selectedPlan, parsed.selectedCurrency, parsed.formData);
+          }
+        }
+      } catch (e) {
+        console.error("Ошибка авто-восстановления:", e);
+      }
+    };
+    restoreAndPay();
+  }, []);
 
   useEffect(() => {
     const fetchSolPrice = async () => {
@@ -156,22 +167,10 @@ export default function TntHouse() {
     }
   };
 
-  // ==== Главный обработчик оплаты ====
-  const handlePayment = async () => {
-    if (!selectedPlan || !selectedCurrency) {
-      showToast('Выбери тариф и способ оплаты', 'error'); return;
-    }
-    const plan = plans.find(p => p.value === selectedPlan);
-    if (!plan) return;
-
-    if (isMobileBrowser() && !isPhantomBrowser()) {
-      saveAndRedirect();
-      return;
-    }
-
-    if (!window.solana?.isPhantom) {
-      showToast('Установи Phantom Wallet', 'error'); return;
-    }
+  // Вспомогательная функция прямой оплаты для авто-вызова
+  const handlePaymentDirectly = async (activePlanValue, activeCurrency, activeFormData) => {
+    const plan = plans.find(p => p.value === activePlanValue);
+    if (!plan || !activeCurrency) return;
 
     try {
       const resp = await window.solana.connect();
@@ -180,7 +179,7 @@ export default function TntHouse() {
       const projectWallet = new PublicKey(WALLET_ADDRESS);
       let signature = '';
 
-      if (selectedCurrency === 'mrdt') {
+      if (activeCurrency === 'mrdt') {
         const mint = new PublicKey(MRDT_CA);
         const fromAta = await getAssociatedTokenAddress(mint, sender);
         const toAta = await getAssociatedTokenAddress(mint, projectWallet);
@@ -196,7 +195,7 @@ export default function TntHouse() {
         const signed = await window.solana.signAndSendTransaction(tx);
         signature = signed.signature;
         await connection.confirmTransaction(signature, 'confirmed');
-      } else if (selectedCurrency === 'sol') {
+      } else if (activeCurrency === 'sol') {
         const amountLamports = Math.floor((plan.price / solPrice) * LAMPORTS_PER_SOL);
         const projectAta = await getAssociatedTokenAddress(new PublicKey(MRDT_CA), projectWallet);
         const quoteUrl = `https://quote-api.jup.ag/v6/quote?inputMint=So11111111111111111111111111111111111111112&outputMint=${MRDT_CA}&amount=${amountLamports}&slippageBps=150`;
@@ -226,10 +225,10 @@ export default function TntHouse() {
 
       let auditData = null;
       try {
-        const auditRes = await fetch(`https://api.gopluslabs.io/api/v1/token_security/1?contract_addresses=${formData.contractAddress}`);
+        const auditRes = await fetch(`https://api.gopluslabs.io/api/v1/token_security/1?contract_addresses=${activeFormData.contractAddress}`);
         const auditJson = await auditRes.json();
-        if (auditJson.code === 1 && auditJson.result?.[formData.contractAddress]) {
-          const a = auditJson.result[formData.contractAddress];
+        if (auditJson.code === 1 && auditJson.result?.[activeFormData.contractAddress]) {
+          const a = auditJson.result[activeFormData.contractAddress];
           auditData = {
             mintAuthority: a.mint_authority === '' ? 'Отозвана ✓' : 'Активна (риск)',
             freezeAuthority: a.freeze_authority === '' ? 'Отозвана ✓' : 'Активна (риск)',
@@ -239,7 +238,7 @@ export default function TntHouse() {
       } catch {
         try {
           const c2 = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
-          const mintPk = new PublicKey(formData.contractAddress);
+          const mintPk = new PublicKey(activeFormData.contractAddress);
           const mi = await getMint(c2, mintPk);
           auditData = {
             mintAuthority: mi.mintAuthority ? 'Активна (риск)' : 'Отозвана ✓',
@@ -252,16 +251,16 @@ export default function TntHouse() {
       }
 
       const newToken = {
-        name: formData.projectName.toUpperCase(),
-        symbol: formData.projectName.slice(0, 4).toUpperCase() || 'NEW',
-        ca: formData.contractAddress,
+        name: activeFormData.projectName.toUpperCase(),
+        symbol: activeFormData.projectName.slice(0, 4).toUpperCase() || 'NEW',
+        ca: activeFormData.contractAddress,
         price: (Math.random() * 0.00005 + 0.000001).toFixed(8),
         liquidity: Math.floor(Math.random() * 100000 + 10000),
         volume24h: Math.floor(Math.random() * 90000 + 20000),
         priceChange24h: parseFloat((Math.random() * 40 - 10).toFixed(1)),
         score: 95,
         verified: true,
-        dexUrl: `https://dexscreener.com/solana/${formData.contractAddress}`,
+        dexUrl: `https://dexscreener.com/solana/${activeFormData.contractAddress}`,
         chain: 'solana',
         mintAuthority: auditData.mintAuthority,
         freezeAuthority: auditData.freezeAuthority,
@@ -278,6 +277,21 @@ export default function TntHouse() {
       console.error('Payment error:', err);
       showToast(err.message || 'Ошибка', 'error');
     }
+  };
+
+  // Основной хэндлер, вызываемый вручную из UI
+  const handlePayment = async () => {
+    if (!selectedPlan || !selectedCurrency) {
+      showToast('Выбери тариф и способ оплаты', 'error'); return;
+    }
+    if (isMobileBrowser() && !isPhantomBrowser()) {
+      saveAndRedirect();
+      return;
+    }
+    if (!window.solana?.isPhantom) {
+      showToast('Установи Phantom Wallet', 'error'); return;
+    }
+    await handlePaymentDirectly(selectedPlan, selectedCurrency, formData);
   };
 
   const pillars = [
@@ -399,39 +413,8 @@ export default function TntHouse() {
     setShowAuditWalletModal(false); setIsSending(true); setError('');
     if (isMobileBrowser() && !isPhantomBrowser()) { saveAndRedirect(); return; }
     if (typeof window === 'undefined' || !window.solana) { setError('Установите Phantom.'); setIsSending(false); return; }
-    const current = { ...formData };
-    try {
-      const resp = await window.solana.connect();
-      const sender = new PublicKey(resp.publicKey.toString());
-      const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
-      const mint = new PublicKey(MRDT_CA);
-      const fromAta = await getAssociatedTokenAddress(mint, sender);
-      await getAccount(connection, fromAta).catch(() => { throw new Error('Нет $MRDT.'); });
-      const to = new PublicKey(WALLET_ADDRESS);
-      const toAta = await getAssociatedTokenAddress(mint, to);
-      const amount = getAmountForTier(selectedPlan) * 10 ** MRDT_DECIMALS;
-      const tx = new Transaction().add(createTransferInstruction(fromAta, toAta, sender, amount));
-      tx.feePayer = sender;
-      tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
-      const signed = await window.solana.signAndSendTransaction(tx);
-      const conf = await connection.confirmTransaction(signed.signature, 'confirmed');
-      if (conf.value.err !== null) throw new Error('Транзакция не подтверждена.');
-      const newToken = {
-        name: current.projectName.toUpperCase(),
-        symbol: current.projectName.slice(0, 4).toUpperCase() || 'NEW',
-        ca: current.contractAddress,
-        price: (Math.random() * 0.00005 + 0.000001).toFixed(8),
-        liquidity: Math.floor(Math.random() * 100000 + 10000),
-        volume24h: Math.floor(Math.random() * 90000 + 20000),
-        priceChange24h: parseFloat((Math.random() * 40 - 10).toFixed(1)),
-        verified: true,
-        dexUrl: `https://dexscreener.com/solana/${current.contractAddress}`,
-        chain: 'solana',
-      };
-      setTokens(prev => [newToken, ...prev]);
-      setSubmitted(true);
-      setFormData({ projectName: '', contractAddress: '', email: '' });
-    } catch (err) { setError(err.message || 'Ошибка оплаты.'); } finally { setIsSending(false); }
+    await handlePaymentDirectly(selectedPlan, selectedCurrency, formData);
+    setIsSending(false);
   };
 
   const handleBannerWalletSelect = async (walletType) => {
@@ -784,7 +767,7 @@ export default function TntHouse() {
                           <button
                             onClick={handlePayment}
                             disabled={!selectedCurrency}
-                            className="flex-1 bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-3 rounded-xl font-semibold hover:opacity-90 transition disabled:opacity-40"
+                            className="flex-1 bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-3 rounded-xl font-semibold hover:opacity-90 transition disabled:opacity-40 animate-pulse"
                           >
                             Запустить ИИ-инспекцию
                           </button>
@@ -892,7 +875,6 @@ export default function TntHouse() {
           <div className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-md p-6 shadow-lg">
             <h3 className="text-lg font-black text-white mb-4">Выберите способ оплаты</h3>
             <button onClick={() => handleAuditWalletSelect('phantom')} className="block w-full bg-purple-500/20 border border-purple-500/30 rounded-xl p-3 mb-3 text-white font-bold hover:bg-purple-500/30 transition">👻 Phantom</button>
-            <button onClick={() => handleAuditWalletSelect('solflare')} className="block w-full bg-emerald-500/20 border border-emerald-500/30 rounded-xl p-3 mb-4 text-white font-bold hover:bg-emerald-500/30 transition">🔥 Solflare</button>
             <button onClick={() => setShowAuditWalletModal(false)} className="text-slate-400 hover:text-white transition text-sm">Отмена</button>
           </div>
         </div>
@@ -904,7 +886,6 @@ export default function TntHouse() {
           <div className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-md p-6 shadow-lg">
             <h3 className="text-lg font-black text-white mb-4">Выберите способ оплаты</h3>
             <button onClick={() => handleBannerWalletSelect('phantom')} className="block w-full bg-purple-500/20 border border-purple-500/30 rounded-xl p-3 mb-3 text-white font-bold hover:bg-purple-500/30 transition">👻 Phantom</button>
-            <button onClick={() => handleBannerWalletSelect('solflare')} className="block w-full bg-emerald-500/20 border border-emerald-500/30 rounded-xl p-3 mb-4 text-white font-bold hover:bg-emerald-500/30 transition">🔥 Solflare</button>
             <button onClick={() => setShowBannerWalletModal(false)} className="text-slate-400 hover:text-white transition text-sm">Отмена</button>
           </div>
         </div>
