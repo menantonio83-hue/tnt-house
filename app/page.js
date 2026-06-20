@@ -27,10 +27,12 @@ const isPhantomBrowser = () => {
   return !!(window.solana?.isPhantom);
 };
 
-// ── Open Phantom deeplink for mobile users ───────────────────────────────────
+// ── Open Phantom deeplink for mobile users (мгновенный редирект) ───────────
 const openPhantomDeeplink = (currentUrl) => {
   const encoded = encodeURIComponent(currentUrl);
-  window.location.href = `https://phantom.app/ul/browse/${encoded}?ref=${encoded}`;
+  window.location.replace(
+    `https://phantom.app/ul/browse/${encoded}?ref=${encoded}`
+  );
 };
 
 export default function TntHouse() {
@@ -78,7 +80,6 @@ export default function TntHouse() {
     { value: 'vip', name: 'VIP-Буст (баннер 24h)', price: 120, mrdt: '9 230 769' },
   ];
 
-  // Current plan derived from selectedPlan — used in render (step 3)
   const currentPlan = plans.find(p => p.value === selectedPlan);
 
   useEffect(() => {
@@ -113,7 +114,6 @@ export default function TntHouse() {
 
   // ── Connect wallet (header button) ──────────────────────────────────────────
   const handleConnectWallet = async () => {
-    // Mobile: redirect to Phantom app
     if (isMobileBrowser() && !isPhantomBrowser()) {
       openPhantomDeeplink(window.location.href);
       return;
@@ -129,24 +129,25 @@ export default function TntHouse() {
     }
   };
 
-  // ── Main payment handler ─────────────────────────────────────────────────────
+  // ── Main payment handler (исправлен: без setTimeout, прямой редирект) ─────
   const handlePayment = async () => {
     if (!selectedPlan || !selectedCurrency) {
-      showToast('Выбери тариф и способ оплаты', 'error'); return;
+      showToast('Выбери тариф и способ оплаты', 'error');
+      return;
     }
     const plan = plans.find(p => p.value === selectedPlan);
     if (!plan) return;
 
-    // Mobile without Phantom in-app browser → redirect to Phantom app
+    // Мобильный вне Phantom → мгновенный редирект
     if (isMobileBrowser() && !isPhantomBrowser()) {
-      showToast('Открываем Phantom App...', 'success');
-      setTimeout(() => openPhantomDeeplink(window.location.href), 800);
+      openPhantomDeeplink(window.location.href);
       return;
     }
 
-    // Desktop or Phantom in-app browser: check extension
+    // Десктоп или Phantom in-app браузер
     if (!window.solana?.isPhantom) {
-      showToast('Установи Phantom Wallet', 'error'); return;
+      showToast('Установи Phantom Wallet', 'error');
+      return;
     }
 
     try {
@@ -160,7 +161,12 @@ export default function TntHouse() {
         const mint = new PublicKey(MRDT_CA);
         const fromAta = await getAssociatedTokenAddress(mint, sender);
         const toAta = await getAssociatedTokenAddress(mint, projectWallet);
-        try { await getAccount(connection, fromAta); } catch { showToast('Нет $MRDT на кошельке', 'error'); return; }
+        try {
+          await getAccount(connection, fromAta);
+        } catch {
+          showToast('Нет $MRDT на кошельке', 'error');
+          return;
+        }
         const amount = Math.round(plan.price / mrdtPrice) * 10 ** MRDT_DECIMALS;
         const tx = new Transaction().add(createTransferInstruction(fromAta, toAta, sender, amount));
         tx.feePayer = sender;
@@ -168,7 +174,6 @@ export default function TntHouse() {
         const signed = await window.solana.signAndSendTransaction(tx);
         signature = signed.signature;
         await connection.confirmTransaction(signature, 'confirmed');
-
       } else if (selectedCurrency === 'sol') {
         const amountLamports = Math.floor((plan.price / solPrice) * LAMPORTS_PER_SOL);
         const projectAta = await getAssociatedTokenAddress(new PublicKey(MRDT_CA), projectWallet);
@@ -197,7 +202,7 @@ export default function TntHouse() {
 
       showToast('✅ Оплата прошла! Запускаем проверку токена...', 'success');
 
-      // Run AI audit post-payment
+      // AI audit
       let auditData = null;
       try {
         const auditRes = await fetch(`https://api.gopluslabs.io/api/v1/token_security/1?contract_addresses=${formData.contractAddress}`);
@@ -248,7 +253,6 @@ export default function TntHouse() {
       setSelectedPlan('');
       setSelectedCurrency('');
       setFormData({ projectName: '', contractAddress: '', email: '' });
-
     } catch (err) {
       console.error('Payment error:', err);
       showToast(err.message || 'Ошибка', 'error');
@@ -370,7 +374,7 @@ export default function TntHouse() {
   const getAmountForTier = (tier) => { const usd = tier === 'fast' ? 40 : tier === 'vip' ? 120 : 10; return Math.round(usd / mrdtPrice); };
   const getAmountForBanner = (days) => { const usd = days === '2' ? 35 : days === '6' ? 100 : 20; return Math.round(usd / mrdtPrice); };
 
-  // Handle legacy audit wallet modal
+  // Legacy audit wallet modal (оставлено для совместимости)
   const handleAuditWalletSelect = async (walletType) => {
     setShowAuditWalletModal(false); setIsSending(true); setError('');
     if (typeof window === 'undefined' || !window.solana) { setError('Установите Phantom.'); setIsSending(false); return; }
@@ -409,18 +413,14 @@ export default function TntHouse() {
     } catch (err) { setError(err.message || 'Ошибка оплаты.'); } finally { setIsSending(false); }
   };
 
-  // Handle banner payment via Phantom
   const handleBannerWalletSelect = async (walletType) => {
     setShowBannerWalletModal(false); setIsBannerSending(true); setBannerError('');
-
-    // Mobile redirect
     if (isMobileBrowser() && !isPhantomBrowser()) {
       setBannerError('');
       setIsBannerSending(false);
       openPhantomDeeplink(window.location.href);
       return;
     }
-
     if (typeof window === 'undefined' || !window.solana) { setBannerError('Установите Phantom.'); setIsBannerSending(false); return; }
     const current = { ...bannerFormData };
     try {
@@ -686,15 +686,13 @@ export default function TntHouse() {
               <div className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 p-6 backdrop-blur-md">
                 <h3 className="text-lg font-black text-purple-400 mb-2 flex items-center gap-2">🔍 ЗАКАЗАТЬ ИИ-ИНСПЕКЦИЮ</h3>
                 <p className="text-slate-400 text-xs mb-4">Авто-добавление в таблицу и выгрузка в Google Sheets.</p>
-
-                {/* Mobile notice when not in Phantom browser */}
+                {/* Mobile notice */}
                 {isMobileBrowser() && !isPhantomBrowser() && (
                   <div className="mb-4 p-3 bg-purple-950/40 border border-purple-500/40 rounded-xl text-xs text-purple-300 flex items-start gap-2">
                     <span className="text-lg">👻</span>
-                    <span>На мобильном откройте этот сайт через <strong>Phantom App → Browser</strong>, чтобы оплатить напрямую. Кнопка "Оплатить" перенаправит вас туда.</span>
+                    <span>На мобильном откройте этот сайт через <strong>Phantom App → Browser</strong>, чтобы оплатить напрямую. Кнопка ниже перенаправит вас туда.</span>
                   </div>
                 )}
-
                 <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700/50 max-w-md mx-auto">
                   {step === 1 && (
                     <>
@@ -716,7 +714,6 @@ export default function TntHouse() {
                       <button onClick={handleNext} className="mt-6 w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-3 rounded-xl font-semibold hover:opacity-90 transition">Далее →</button>
                     </>
                   )}
-
                   {step === 2 && (
                     <>
                       <h3 className="text-2xl font-bold text-white mb-4">Выбери тариф</h3>
@@ -737,7 +734,6 @@ export default function TntHouse() {
                       </div>
                     </>
                   )}
-
                   {step === 3 && (
                     <>
                       <h3 className="text-2xl font-bold text-white mb-4">Выбери способ оплаты</h3>
@@ -757,23 +753,14 @@ export default function TntHouse() {
                       </div>
                       <div className="flex gap-3 mt-6">
                         <button onClick={handleBack} className="flex-1 bg-gray-700 text-white py-3 rounded-xl font-semibold hover:bg-gray-600 transition">← Назад</button>
-                        {/* Mobile: show "Open Phantom" button; Desktop: normal payment */}
-                        {isMobileBrowser() && !isPhantomBrowser() ? (
-                          <button
-                            onClick={() => openPhantomDeeplink(window.location.href)}
-                            className="flex-1 bg-gradient-to-r from-purple-500 to-indigo-600 text-white py-3 rounded-xl font-semibold hover:opacity-90 transition flex items-center justify-center gap-2"
-                          >
-                            👻 Открыть в Phantom
-                          </button>
-                        ) : (
-                          <button
-                            onClick={handlePayment}
-                            disabled={!selectedCurrency}
-                            className="flex-1 bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-3 rounded-xl font-semibold hover:opacity-90 transition disabled:opacity-40"
-                          >
-                            Запустить ИИ-инспекцию
-                          </button>
-                        )}
+                        {/* Единая кнопка оплаты (handlePayment сам определит, редиректить или нет) */}
+                        <button
+                          onClick={handlePayment}
+                          disabled={!selectedCurrency}
+                          className="flex-1 bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-3 rounded-xl font-semibold hover:opacity-90 transition disabled:opacity-40"
+                        >
+                          Запустить ИИ-инспекцию
+                        </button>
                       </div>
                     </>
                   )}
@@ -871,7 +858,7 @@ export default function TntHouse() {
         </footer>
       </div>
 
-      {/* Audit wallet modal */}
+      {/* Audit wallet modal (legacy) */}
       {showAuditWalletModal && (
         <div className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-md p-6 shadow-lg">
