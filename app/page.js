@@ -10,8 +10,83 @@ export const dynamic = 'force-dynamic';
 const WALLET_ADDRESS = "Ev6oXBXo6qyoaT5wypJ2Umxch91F7cFvE1SarYLaUn8Z";
 const MRDT_CA = "8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg";
 const MRDT_DECIMALS = 6;
-// Hardcoded production domain for reliable Phantom deeplinks
 const SITE_URL = 'https://tnt-house.vercel.app';
+
+// Supabase config
+const SUPABASE_URL = 'https://pjtvjslcffuulsqxerpx.supabase.co';
+const SUPABASE_KEY = 'sb_publishable__gmhE8SE_blCu-v90fV2OQ_YmFCkfFU';
+
+// Save token to Supabase after successful payment
+async function saveTokenToSupabase(token) {
+  try {
+    var res = await fetch(SUPABASE_URL + '/rest/v1/listed_tokens', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY,
+        'Prefer': 'return=minimal',
+      },
+      body: JSON.stringify({
+        name: token.name,
+        symbol: token.symbol,
+        ca: token.ca,
+        price: token.price,
+        liquidity: token.liquidity,
+        volume24h: token.volume24h,
+        price_change_24h: token.priceChange24h,
+        score: token.score || 95,
+        dex_url: token.dexUrl,
+        chain: token.chain || 'solana',
+        mint_authority: token.mintAuthority || '—',
+        freeze_authority: token.freezeAuthority || '—',
+        is_honeypot: token.isHoneypot || '—',
+      }),
+    });
+    if (!res.ok) {
+      var err = await res.text();
+      console.error('Supabase insert error:', err);
+    }
+  } catch(e) {
+    console.error('Supabase save failed:', e);
+  }
+}
+
+// Load listed tokens from Supabase
+async function loadTokensFromSupabase() {
+  try {
+    var res = await fetch(SUPABASE_URL + '/rest/v1/listed_tokens?select=*&order=created_at.desc&limit=20', {
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY,
+      },
+    });
+    if (!res.ok) return [];
+    var data = await res.json();
+    return data.map(function(row) {
+      return {
+        name: row.name,
+        symbol: row.symbol,
+        ca: row.ca,
+        price: row.price,
+        liquidity: row.liquidity,
+        volume24h: row.volume24h,
+        priceChange24h: row.price_change_24h,
+        score: row.score,
+        verified: true,
+        dexUrl: row.dex_url,
+        chain: row.chain,
+        mintAuthority: row.mint_authority,
+        freezeAuthority: row.freeze_authority,
+        isHoneypot: row.is_honeypot,
+        fromSupabase: true,
+      };
+    });
+  } catch(e) {
+    console.error('Supabase load failed:', e);
+    return [];
+  }
+}
 
 const FALLBACK_TOKENS = [
   { name: 'Test Gem', symbol: 'TGEM', ca: '11111111111111111111111111111111', price: '0.00001234', liquidity: 45000, volume24h: 120000, priceChange24h: 8.5, verified: true, dexUrl: 'https://dexscreener.com', chain: 'solana' }
@@ -27,15 +102,15 @@ const isPhantomBrowser = () => {
   return !!(window.solana && window.solana.isPhantom);
 };
 
-// Open site inside Phantom in-app browser using universal link
 const openInPhantom = (urlWithParams) => {
-  const encoded = encodeURIComponent(urlWithParams);
-  const ref = encodeURIComponent(SITE_URL);
+  var encoded = encodeURIComponent(urlWithParams);
+  var ref = encodeURIComponent(SITE_URL);
   window.location.href = 'https://phantom.app/ul/browse/' + encoded + '?ref=' + ref;
 };
 
 export default function TntHouse() {
   const [tokens, setTokens] = useState([]);
+  const [listedTokens, setListedTokens] = useState([]);
   const [loading, setLoading] = useState(true);
   const [bannerSubmitted, setBannerSubmitted] = useState(false);
   const [error, setError] = useState('');
@@ -79,7 +154,14 @@ export default function TntHouse() {
     setTimeout(function() { setToast({ show: false, message: '', type: 'success' }); }, 4200);
   };
 
-  // Read URL params on mount — restore form and auto-pay if inside Phantom
+  // Load listed tokens from Supabase on mount
+  useEffect(function() {
+    loadTokensFromSupabase().then(function(data) {
+      if (data.length > 0) setListedTokens(data);
+    });
+  }, []);
+
+  // Read URL params — restore form and auto-pay if inside Phantom
   useEffect(function() {
     if (typeof window === 'undefined') return;
     var params = new URLSearchParams(window.location.search);
@@ -95,9 +177,7 @@ export default function TntHouse() {
       setSelectedPlan(pPlan);
       setSelectedCurrency(pCurrency);
       setStep(3);
-      // Clean URL without reload
       window.history.replaceState({}, '', window.location.pathname);
-      // Auto-trigger payment if we landed inside Phantom browser
       if (isPhantomBrowser()) {
         setTimeout(function() {
           triggerPayment(pPlan, pCurrency, restoredForm);
@@ -112,14 +192,12 @@ export default function TntHouse() {
       try {
         var res = await fetch('https://price.jup.ag/v6/price?ids=SOL');
         var data = await res.json();
-        if (data && data.data && data.data.SOL && data.data.SOL.price) {
-          setSolPrice(data.data.SOL.price);
-        }
+        if (data && data.data && data.data.SOL && data.data.SOL.price) setSolPrice(data.data.SOL.price);
       } catch(e) {}
     };
     fetchSolPrice();
-    var interval = setInterval(fetchSolPrice, 60000);
-    return function() { clearInterval(interval); };
+    var i = setInterval(fetchSolPrice, 60000);
+    return function() { clearInterval(i); };
   }, []);
 
   const handleNext = function() {
@@ -139,7 +217,6 @@ export default function TntHouse() {
     else if (step === 3) setStep(2);
   };
 
-  // Redirect to Phantom with all form data encoded in URL params
   const redirectToPhantom = function(planVal, currency, form) {
     var params = new URLSearchParams({
       pName: form.projectName,
@@ -148,12 +225,11 @@ export default function TntHouse() {
       pPlan: planVal,
       pCurrency: currency,
     });
-    // Use hardcoded SITE_URL — window.location can be unreliable during redirect
     var targetUrl = SITE_URL + '/?' + params.toString();
     openInPhantom(targetUrl);
   };
 
-  // Core payment execution
+  // Core payment + audit + save to Supabase
   const triggerPayment = async function(planVal, currency, form) {
     var plan = plans.find(function(p) { return p.value === planVal; });
     if (!plan || !currency) return;
@@ -175,12 +251,8 @@ export default function TntHouse() {
         var mint = new PublicKey(MRDT_CA);
         var fromAta = await getAssociatedTokenAddress(mint, sender);
         var toAta = await getAssociatedTokenAddress(mint, projectWallet);
-        try {
-          await getAccount(connection, fromAta);
-        } catch(e) {
-          showToast('Нет $MRDT на кошельке', 'error');
-          setIsPaymentLoading(false);
-          return;
+        try { await getAccount(connection, fromAta); } catch(e) {
+          showToast('Нет $MRDT на кошельке', 'error'); setIsPaymentLoading(false); return;
         }
         var amount = Math.round(plan.price / mrdtPrice) * Math.pow(10, MRDT_DECIMALS);
         var tx = new Transaction().add(createTransferInstruction(fromAta, toAta, sender, amount));
@@ -218,9 +290,9 @@ export default function TntHouse() {
         await connection.confirmTransaction(signature, 'confirmed');
       }
 
-      showToast('✅ Оплата прошла! Запускаем проверку...', 'success');
+      showToast('✅ Оплата прошла! Запускаем аудит токена...', 'success');
 
-      // Run AI audit after payment
+      // AI audit
       var auditData = { mintAuthority: '—', freezeAuthority: '—', isHoneypot: '—' };
       try {
         var auditRes = await fetch('https://api.gopluslabs.io/api/v1/token_security/1?contract_addresses=' + form.contractAddress);
@@ -262,8 +334,12 @@ export default function TntHouse() {
         isHoneypot: auditData.isHoneypot,
       };
 
-      setTokens(function(prev) { return [newToken].concat(prev); });
-      showToast('✅ Токен добавлен в таблицу!', 'success');
+      // Save to Supabase — works across all devices
+      await saveTokenToSupabase(newToken);
+
+      // Update local state
+      setListedTokens(function(prev) { return [newToken].concat(prev); });
+      showToast('✅ Аудит завершён! Токен добавлен в таблицу!', 'success');
       setStep(1);
       setSelectedPlan('');
       setSelectedCurrency('');
@@ -277,7 +353,6 @@ export default function TntHouse() {
     }
   };
 
-  // Main payment button handler
   const handlePayment = function() {
     if (!selectedPlan || !selectedCurrency) {
       showToast('Выбери тариф и способ оплаты', 'error'); return;
@@ -291,7 +366,6 @@ export default function TntHouse() {
 
   const handleConnectWallet = async function() {
     if (isMobileBrowser() && !isPhantomBrowser()) {
-      // Open Phantom browser on site home — hardcoded URL
       openInPhantom(SITE_URL + '/');
       return;
     }
@@ -330,7 +404,6 @@ export default function TntHouse() {
   const openTokenBlueprint = function(token) { setSelectedToken(token); setIsBlueprintOpen(true); };
   const closeBlueprint = function() { setIsBlueprintOpen(false); setTimeout(function() { setSelectedToken(null); }, 300); };
 
-  // Check active banner from localStorage
   useEffect(function() {
     var check = function() {
       try {
@@ -352,7 +425,6 @@ export default function TntHouse() {
   };
   const handleOpenRaydium = function() { setIsBuyDropdownOpen(false); window.open('https://raydium.io', '_blank'); };
 
-  // Rotating AI log messages
   useEffect(function() {
     var templates = ['Обнаружен новый пул на Raydium!', 'Mint Authority отключена ✓.', 'Уровень угрозы: НИЗКИЙ.', 'Бандлов не обнаружено.', 'Подключение к DexScreener.', 'Ищем новые гемы...'];
     var i = setInterval(function() {
@@ -362,7 +434,7 @@ export default function TntHouse() {
     return function() { clearInterval(i); };
   }, []);
 
-  // Fetch token list
+  // Fetch DexScreener tokens
   useEffect(function() {
     var fetchTokens = async function() {
       try {
@@ -411,7 +483,6 @@ export default function TntHouse() {
     if (chatEndRef.current) chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
 
-  // Fetch MRDT price
   useEffect(function() {
     var fetchPrice = async function() {
       try {
@@ -438,19 +509,15 @@ export default function TntHouse() {
     return Math.round(usd / mrdtPrice);
   };
 
-  // Banner payment handler
   const handleBannerWalletSelect = async function() {
     setShowBannerWalletModal(false);
     setIsBannerSending(true);
     setBannerError('');
-
     if (isMobileBrowser() && !isPhantomBrowser()) {
       setIsBannerSending(false);
-      // Open Phantom on site home — user fills banner form again inside Phantom
       openInPhantom(SITE_URL + '/');
       return;
     }
-
     var solanaWin = window.solana;
     if (!solanaWin) { setBannerError('Установите Phantom.'); setIsBannerSending(false); return; }
     var current = Object.assign({}, bannerFormData);
@@ -517,13 +584,15 @@ export default function TntHouse() {
     if (el) el.scrollIntoView({ behavior: 'smooth' });
   };
 
+  // Merge DexScreener tokens + Supabase listed tokens for table
+  var allTableTokens = listedTokens.concat(tokens);
+
   var isMobile = typeof window !== 'undefined' && isMobileBrowser();
   var inPhantom = typeof window !== 'undefined' && isPhantomBrowser();
 
   return (
     <div className="min-h-screen bg-slate-950 text-white font-mono relative overflow-hidden pb-12">
 
-      {/* Toast notification */}
       {toast.show && (
         <div className={'fixed bottom-6 left-1/2 -translate-x-1/2 z-[99999] flex items-center gap-3 px-6 py-3.5 rounded-2xl shadow-2xl border text-sm font-medium transition-all duration-300 ' + (toast.type === 'success' ? 'bg-emerald-950 border-emerald-500/40 text-emerald-300' : 'bg-red-950 border-red-500/40 text-red-300')}>
           {toast.type === 'success' ? <CheckCircle className="w-5 h-5 text-emerald-400" /> : <XCircle className="w-5 h-5 text-red-400" />}
@@ -531,7 +600,6 @@ export default function TntHouse() {
         </div>
       )}
 
-      {/* Payment processing overlay */}
       {isPaymentLoading && (
         <div className="fixed inset-0 z-[99998] bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center gap-4">
           <RefreshCw className="w-10 h-10 text-purple-400 animate-spin" />
@@ -540,7 +608,6 @@ export default function TntHouse() {
         </div>
       )}
 
-      {/* Background glows */}
       <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] rounded-full bg-purple-600/10 blur-[120px] pointer-events-none" />
       <div className="absolute bottom-[20%] right-[-10%] w-[500px] h-[500px] rounded-full bg-emerald-500/10 blur-[120px] pointer-events-none" />
       <div className="absolute inset-0 opacity-5 pointer-events-none">
@@ -552,23 +619,19 @@ export default function TntHouse() {
 
       <div className="relative z-10">
 
-        {/* ── HEADER ── */}
+        {/* HEADER */}
         <header className="border-b border-purple-500/30 backdrop-blur-lg bg-slate-950/60 sticky top-0 z-50">
           <div className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <a href="https://t.me/tnt_house2026" target="_blank" rel="noopener noreferrer" className="w-10 h-10 border-2 border-purple-500 rounded-lg flex items-center justify-center bg-purple-500/10 shadow-[0_0_15px_rgba(153,69,255,0.4)] animate-pulse">
-                <span className="text-xl">🧨</span>
-              </a>
+              <a href="https://t.me/tnt_house2026" target="_blank" rel="noopener noreferrer" className="w-10 h-10 border-2 border-purple-500 rounded-lg flex items-center justify-center bg-purple-500/10 shadow-[0_0_15px_rgba(153,69,255,0.4)] animate-pulse"><span className="text-xl">🧨</span></a>
               <div>
                 <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-emerald-400 tracking-wider">TNT HOUSE</h1>
-                <span className="text-[10px] text-purple-400 block font-bold tracking-widest">TOP NEW TOKENS v1.6</span>
+                <span className="text-[10px] text-purple-400 block font-bold tracking-widest">TOP NEW TOKENS v1.7</span>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <div className="relative">
-                <button onClick={function() { setIsBuyDropdownOpen(!isBuyDropdownOpen); }} className="bg-gradient-to-r from-purple-500 to-emerald-400 hover:from-purple-400 hover:to-emerald-300 text-slate-950 font-black px-4 py-2 rounded text-xs transition flex items-center gap-1 shadow-[0_0_15px_rgba(153,69,255,0.4)]">
-                  BUY $MRDT <ChevronDown className="w-3 h-3" />
-                </button>
+                <button onClick={function() { setIsBuyDropdownOpen(!isBuyDropdownOpen); }} className="bg-gradient-to-r from-purple-500 to-emerald-400 hover:from-purple-400 hover:to-emerald-300 text-slate-950 font-black px-4 py-2 rounded text-xs transition flex items-center gap-1 shadow-[0_0_15px_rgba(153,69,255,0.4)]">BUY $MRDT <ChevronDown className="w-3 h-3" /></button>
                 {isBuyDropdownOpen && (
                   <div className="absolute right-0 mt-2 w-48 bg-slate-950 border border-purple-500/30 rounded-lg shadow-xl z-50 py-1">
                     <button onClick={handleLaunchJupiter} className="w-full text-left px-4 py-2.5 hover:bg-purple-500/10 text-emerald-400 flex items-center gap-2 text-sm"><ExternalLink className="w-4 h-4" /> Jupiter Swap</button>
@@ -583,7 +646,7 @@ export default function TntHouse() {
           </div>
         </header>
 
-        {/* ── VIP BANNER SLOT ── */}
+        {/* VIP BANNER */}
         <section className="max-w-7xl mx-auto px-6 pt-6">
           {activeBanner ? (
             <div className="border border-purple-500/40 rounded-2xl p-4 bg-gradient-to-r from-black via-purple-950/20 to-black flex flex-col sm:flex-row items-center justify-between gap-4 shadow-[0_0_20px_rgba(168,85,247,0.2)]">
@@ -619,7 +682,7 @@ export default function TntHouse() {
           )}
         </section>
 
-        {/* ── HERO ── */}
+        {/* HERO */}
         <section className="max-w-7xl mx-auto px-6 py-12">
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <div className="space-y-6">
@@ -642,22 +705,18 @@ export default function TntHouse() {
             </div>
             <div className="bg-slate-950 border-2 border-purple-500/40 rounded-lg p-4 font-mono text-xs h-72 flex flex-col justify-between shadow-[0_0_20px_rgba(153,69,255,0.15)] relative">
               <div className="absolute top-3 right-4 flex gap-1.5">
-                <span className="w-2.5 h-2.5 bg-red-500 rounded-full" />
-                <span className="w-2.5 h-2.5 bg-yellow-500 rounded-full" />
-                <span className="w-2.5 h-2.5 bg-green-500 rounded-full" />
+                <span className="w-2.5 h-2.5 bg-red-500 rounded-full" /><span className="w-2.5 h-2.5 bg-yellow-500 rounded-full" /><span className="w-2.5 h-2.5 bg-green-500 rounded-full" />
               </div>
-              <div className="text-purple-400 font-bold border-b border-purple-500/20 pb-2 mb-2 flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 animate-spin" /> AI SCANNER
-              </div>
+              <div className="text-purple-400 font-bold border-b border-purple-500/20 pb-2 mb-2 flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5 animate-spin" /> AI SCANNER + SUPABASE</div>
               <div className="flex-1 overflow-y-auto space-y-1.5 text-emerald-400">
                 {logs.map(function(log, i) { return <div key={i} className="text-[11px]">{log}</div>; })}
               </div>
-              <div className="text-[10px] text-slate-500 border-t border-purple-500/20 pt-2 mt-2">Status: SCANNING...</div>
+              <div className="text-[10px] text-slate-500 border-t border-purple-500/20 pt-2 mt-2">Status: SCANNING & SYNCING...</div>
             </div>
           </div>
         </section>
 
-        {/* ── TOKEN SAFETY TABLE ── */}
+        {/* TOKEN TABLE — shows Supabase listed tokens + DexScreener tokens */}
         <section className="max-w-7xl mx-auto px-6 py-6">
           <div className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 backdrop-blur-md p-3 shadow-[0_0_25px_rgba(153,69,255,0.2)]">
             <div className="flex items-center justify-between mb-2">
@@ -667,9 +726,7 @@ export default function TntHouse() {
                 </h3>
                 <p className="text-slate-400 text-[10px] mt-0.5">Кликни на токен для TNT Security Blueprint</p>
               </div>
-              <div className="hidden md:flex items-center gap-1 text-[9px] text-purple-400">
-                <RefreshCw className="w-2.5 h-2.5 animate-spin" /> 5 мин
-              </div>
+              <div className="hidden md:flex items-center gap-1 text-[9px] text-purple-400"><RefreshCw className="w-2.5 h-2.5 animate-spin" /> Live</div>
             </div>
             <div className="max-h-[320px] overflow-y-auto border border-purple-500/20 rounded-lg">
               <table className="w-full text-left border-collapse text-[9px]">
@@ -681,27 +738,46 @@ export default function TntHouse() {
                   </tr>
                 </thead>
                 <tbody>
-                  {/* Pinned $MRDT row */}
+                  {/* Pinned MRDT */}
                   <tr onClick={function() { openTokenBlueprint({ symbol: 'MRDT', name: 'MARADONATOKEN', ca: MRDT_CA, price: mrdtPrice.toFixed(8), liquidity: 13000, volume24h: 0, priceChange24h: 12.4, verified: true, dexUrl: 'https://dexscreener.com/solana/' + MRDT_CA, chain: 'solana' }); }} className="border-b border-purple-500/30 bg-emerald-500/5 hover:bg-emerald-500/10 transition cursor-pointer">
-                    <td className="p-1 font-bold flex items-center gap-1">
-                      <span className="text-sm">⚽️</span>
-                      <div><span className="text-emerald-400 font-extrabold text-[10px]">$MRDT</span><div className="text-[7px] text-slate-400">MARADONATOKEN</div></div>
-                    </td>
+                    <td className="p-1 font-bold flex items-center gap-1"><span className="text-sm">⚽️</span><div><span className="text-emerald-400 font-extrabold text-[10px]">$MRDT</span><div className="text-[7px] text-slate-400">MARADONATOKEN</div></div></td>
                     <td className="p-1 font-mono text-emerald-400 font-bold text-[9px]">${mrdtPrice.toFixed(8)}</td>
                     <td className="p-1 font-mono text-emerald-400 font-bold text-[9px]">$13K+</td>
                     <td className="p-1 font-mono text-emerald-400 font-bold text-[9px]">+12.4%</td>
                     <td className="p-1 text-center"><div className="inline-flex items-center justify-center w-9 h-4 rounded-full bg-emerald-500/20 border border-emerald-500 text-emerald-400 text-[8px] font-extrabold shadow-[0_0_6px_rgba(16,185,129,0.5)]">98</div></td>
-                    <td className="p-1 text-right">
-                      <button onClick={function(e) { e.stopPropagation(); handleLaunchJupiter(); }} className="text-[8px] text-emerald-400 hover:text-emerald-300 font-bold hover:underline inline-flex items-center gap-0.5">Купить <ExternalLink className="w-2 h-2" /></button>
-                    </td>
+                    <td className="p-1 text-right"><button onClick={function(e) { e.stopPropagation(); handleLaunchJupiter(); }} className="text-[8px] text-emerald-400 hover:text-emerald-300 font-bold hover:underline inline-flex items-center gap-0.5">Купить <ExternalLink className="w-2 h-2" /></button></td>
                   </tr>
+
+                  {/* Listed tokens from Supabase (paid audits) — shown first with verified badge */}
+                  {listedTokens.map(function(token, i) {
+                    var score = getSafetyScore(token);
+                    var style = getScoreStyle(score);
+                    return (
+                      <tr key={'sb-' + i} onClick={function() { openTokenBlueprint(token); }} className="border-b border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10 transition cursor-pointer">
+                        <td className="p-1">
+                          <div className="flex items-center gap-1">
+                            <span className="text-emerald-400 text-[9px] font-bold">${token.symbol}</span>
+                            <span className="text-[6px] bg-emerald-500/20 text-emerald-400 px-1 rounded font-bold">✓</span>
+                          </div>
+                          <span className="text-[7px] text-slate-500 block truncate max-w-[80px]">{token.name}</span>
+                        </td>
+                        <td className="p-1 font-mono text-slate-300 text-[9px]">${token.price}</td>
+                        <td className="p-1 font-mono text-slate-300 text-[9px]">{typeof token.liquidity === 'number' ? formatNumber(token.liquidity) : token.liquidity}</td>
+                        <td className={'p-1 font-mono text-[9px] ' + (token.priceChange24h > 0 ? 'text-emerald-400' : 'text-red-400')}>{formatNumber(token.volume24h)} ({token.priceChange24h > 0 ? '+' : ''}{token.priceChange24h}%)</td>
+                        <td className="p-1 text-center"><div className={'inline-flex items-center justify-center w-9 h-4 rounded-full ' + style.bg + ' ' + style.border + ' ' + style.color + ' text-[8px] font-extrabold ' + style.glow}>{score}</div></td>
+                        <td className="p-1 text-right"><a href={token.dexUrl} onClick={function(e) { e.stopPropagation(); }} target="_blank" rel="noopener noreferrer" className="text-[8px] text-purple-400 hover:text-emerald-400 inline-flex items-center gap-0.5">DEX <ExternalLink className="w-2 h-2" /></a></td>
+                      </tr>
+                    );
+                  })}
+
+                  {/* DexScreener tokens */}
                   {loading && tokens.length === 0 ? (
                     <tr><td colSpan={6} className="p-6 text-center text-purple-400 font-bold"><RefreshCw className="w-4 h-4 animate-spin mx-auto mb-1" />Сканируем...</td></tr>
                   ) : tokens.map(function(token, i) {
                     var score = getSafetyScore(token);
                     var style = getScoreStyle(score);
                     return (
-                      <tr key={i} onClick={function() { openTokenBlueprint(token); }} className="border-b border-purple-500/10 hover:bg-purple-500/5 transition cursor-pointer">
+                      <tr key={'dx-' + i} onClick={function() { openTokenBlueprint(token); }} className="border-b border-purple-500/10 hover:bg-purple-500/5 transition cursor-pointer">
                         <td className="p-1"><span className="text-purple-400 text-[9px] font-bold">${token.symbol}</span><span className="text-[7px] text-slate-500 block truncate max-w-[80px]">{token.name}</span></td>
                         <td className="p-1 font-mono text-slate-300 text-[9px]">${token.price}</td>
                         <td className="p-1 font-mono text-slate-300 text-[9px]">{typeof token.liquidity === 'number' ? formatNumber(token.liquidity) : token.liquidity}</td>
@@ -711,6 +787,7 @@ export default function TntHouse() {
                       </tr>
                     );
                   })}
+
                   {[1,2,3,4].map(function(n) {
                     return (
                       <tr key={'e' + n} className="border-b border-purple-500/5 opacity-40">
@@ -725,48 +802,34 @@ export default function TntHouse() {
           </div>
         </section>
 
-        {/* ── ORDER FORMS ── */}
+        {/* ORDER FORMS */}
         <section id="orderFormsSection" className="max-w-7xl mx-auto px-6 py-8">
           <div className="grid md:grid-cols-2 gap-12 items-start">
             <div className="space-y-8">
 
-              {/* AI Inspection multi-step form */}
               <div className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 p-6 backdrop-blur-md">
                 <h3 className="text-lg font-black text-purple-400 mb-2 flex items-center gap-2">🔍 ЗАКАЗАТЬ ИИ-ИНСПЕКЦИЮ</h3>
-                <p className="text-slate-400 text-xs mb-4">Авто-добавление в таблицу безопасных токенов.</p>
+                <p className="text-slate-400 text-xs mb-4">После оплаты токен сохраняется в БД и виден всем посетителям.</p>
 
                 {isMobile && !inPhantom && (
                   <div className="mb-4 p-3 bg-purple-950/40 border border-purple-500/40 rounded-xl text-xs text-purple-300 flex items-start gap-2">
                     <span className="text-base">👻</span>
-                    <span>Кнопка оплаты откроет Phantom App с вашими данными — просто подтверди транзакцию внутри.</span>
+                    <span>Кнопка оплаты откроет Phantom App с вашими данными — просто подтверди транзакцию.</span>
                   </div>
                 )}
 
                 <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700/50 max-w-md mx-auto">
-
-                  {/* Step 1 — Project info */}
                   {step === 1 && (
                     <>
                       <h3 className="text-2xl font-bold text-white mb-6">Заказать ИИ-инспекцию</h3>
                       <div className="space-y-4">
-                        <div>
-                          <label className="block text-sm text-gray-400 mb-1">Название проекта</label>
-                          <input type="text" placeholder="Твой токен..." value={formData.projectName} onChange={function(e) { setFormData(Object.assign({}, formData, { projectName: e.target.value })); }} className="w-full p-3 bg-gray-700 border border-gray-600 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500" />
-                        </div>
-                        <div>
-                          <label className="block text-sm text-gray-400 mb-1">Contract Address (Solana)</label>
-                          <input type="text" placeholder="Впиши адрес контракта..." value={formData.contractAddress} onChange={function(e) { setFormData(Object.assign({}, formData, { contractAddress: e.target.value })); }} className="w-full p-3 bg-gray-700 border border-gray-600 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500" />
-                        </div>
-                        <div>
-                          <label className="block text-sm text-gray-400 mb-1">Email для связи</label>
-                          <input type="email" placeholder="your@email.com" value={formData.email} onChange={function(e) { setFormData(Object.assign({}, formData, { email: e.target.value })); }} className="w-full p-3 bg-gray-700 border border-gray-600 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500" />
-                        </div>
+                        <div><label className="block text-sm text-gray-400 mb-1">Название проекта</label><input type="text" placeholder="Твой токен..." value={formData.projectName} onChange={function(e) { setFormData(Object.assign({}, formData, { projectName: e.target.value })); }} className="w-full p-3 bg-gray-700 border border-gray-600 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500" /></div>
+                        <div><label className="block text-sm text-gray-400 mb-1">Contract Address (Solana)</label><input type="text" placeholder="Впиши адрес контракта..." value={formData.contractAddress} onChange={function(e) { setFormData(Object.assign({}, formData, { contractAddress: e.target.value })); }} className="w-full p-3 bg-gray-700 border border-gray-600 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500" /></div>
+                        <div><label className="block text-sm text-gray-400 mb-1">Email для связи</label><input type="email" placeholder="your@email.com" value={formData.email} onChange={function(e) { setFormData(Object.assign({}, formData, { email: e.target.value })); }} className="w-full p-3 bg-gray-700 border border-gray-600 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500" /></div>
                       </div>
                       <button onClick={handleNext} className="mt-6 w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-3 rounded-xl font-semibold hover:opacity-90 transition">Далее →</button>
                     </>
                   )}
-
-                  {/* Step 2 — Plan selection */}
                   {step === 2 && (
                     <>
                       <h3 className="text-2xl font-bold text-white mb-4">Выбери тариф</h3>
@@ -775,10 +838,7 @@ export default function TntHouse() {
                           return (
                             <label key={plan.value} className={'flex items-center p-4 rounded-xl cursor-pointer transition-all ' + (selectedPlan === plan.value ? 'bg-indigo-600/20 border border-indigo-500' : 'bg-gray-700/30 border border-gray-700 hover:border-indigo-400')}>
                               <input type="radio" name="plan" value={plan.value} checked={selectedPlan === plan.value} onChange={function() { setSelectedPlan(plan.value); }} className="w-5 h-5 text-indigo-600" />
-                              <div className="ml-4">
-                                <p className="text-white font-semibold">{plan.name}</p>
-                                <p className="text-sm text-gray-400">${plan.price} ≈ {plan.mrdt} $MRDT</p>
-                              </div>
+                              <div className="ml-4"><p className="text-white font-semibold">{plan.name}</p><p className="text-sm text-gray-400">${plan.price} ≈ {plan.mrdt} $MRDT</p></div>
                             </label>
                           );
                         })}
@@ -789,8 +849,6 @@ export default function TntHouse() {
                       </div>
                     </>
                   )}
-
-                  {/* Step 3 — Payment method */}
                   {step === 3 && (
                     <>
                       <h3 className="text-2xl font-bold text-white mb-4">Выбери способ оплаты</h3>
@@ -810,11 +868,7 @@ export default function TntHouse() {
                       </div>
                       <div className="flex gap-3 mt-6">
                         <button onClick={handleBack} className="flex-1 bg-gray-700 text-white py-3 rounded-xl font-semibold hover:bg-gray-600 transition">← Назад</button>
-                        <button
-                          onClick={handlePayment}
-                          disabled={!selectedCurrency || isPaymentLoading}
-                          className="flex-1 bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-3 rounded-xl font-semibold hover:opacity-90 transition disabled:opacity-40 flex items-center justify-center gap-2"
-                        >
+                        <button onClick={handlePayment} disabled={!selectedCurrency || isPaymentLoading} className="flex-1 bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-3 rounded-xl font-semibold hover:opacity-90 transition disabled:opacity-40 flex items-center justify-center gap-2">
                           {isPaymentLoading
                             ? <><RefreshCw className="w-4 h-4 animate-spin" /> Обработка...</>
                             : (isMobile && !inPhantom ? '👻 Открыть в Phantom' : 'Запустить ИИ-инспекцию')}
@@ -825,32 +879,16 @@ export default function TntHouse() {
                 </div>
               </div>
 
-              {/* Banner order form */}
+              {/* Banner form */}
               <div className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 p-6 backdrop-blur-md">
                 <h3 className="text-lg font-black text-purple-400 mb-2 flex items-center gap-2">👑 КУПИТЬ VIP-БАННЕР НА ГЛАВНУЮ</h3>
                 <p className="text-slate-400 text-xs mb-4">Автоматическая замена рекламного места на ваш токен.</p>
                 <form onSubmit={handleBannerSubmit} className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-purple-400 text-[11px] font-bold mb-1">Имя токена / Тикер</label>
-                      <input type="text" value={bannerFormData.tokenName} onChange={function(e) { setBannerFormData(Object.assign({}, bannerFormData, { tokenName: e.target.value })); }} placeholder="SOLANA" className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" />
-                    </div>
-                    <div>
-                      <label className="block text-purple-400 text-[11px] font-bold mb-1">Загрузите изображение</label>
-                      <input type="file" accept="image/*" onChange={function(e) {
-                        var f = e.target.files && e.target.files[0];
-                        if (f) {
-                          var r = new FileReader();
-                          r.onload = function(ev) { setBannerFormData(Object.assign({}, bannerFormData, { bannerImg: ev.target.result })); };
-                          r.readAsDataURL(f);
-                        }
-                      }} className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-bold file:bg-purple-500 file:text-white hover:file:bg-purple-400" />
-                    </div>
+                    <div><label className="block text-purple-400 text-[11px] font-bold mb-1">Имя токена / Тикер</label><input type="text" value={bannerFormData.tokenName} onChange={function(e) { setBannerFormData(Object.assign({}, bannerFormData, { tokenName: e.target.value })); }} placeholder="SOLANA" className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" /></div>
+                    <div><label className="block text-purple-400 text-[11px] font-bold mb-1">Загрузите изображение</label><input type="file" accept="image/*" onChange={function(e) { var f = e.target.files && e.target.files[0]; if (f) { var r = new FileReader(); r.onload = function(ev) { setBannerFormData(Object.assign({}, bannerFormData, { bannerImg: ev.target.result })); }; r.readAsDataURL(f); }}} className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-bold file:bg-purple-500 file:text-white hover:file:bg-purple-400" /></div>
                   </div>
-                  <div>
-                    <label className="block text-purple-400 text-[11px] font-bold mb-1">Краткий рекламный слоган</label>
-                    <input type="text" value={bannerFormData.desc} onChange={function(e) { setBannerFormData(Object.assign({}, bannerFormData, { desc: e.target.value })); }} placeholder="Самый быстрый мемкоин..." className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" />
-                  </div>
+                  <div><label className="block text-purple-400 text-[11px] font-bold mb-1">Краткий рекламный слоган</label><input type="text" value={bannerFormData.desc} onChange={function(e) { setBannerFormData(Object.assign({}, bannerFormData, { desc: e.target.value })); }} placeholder="Самый быстрый мемкоин..." className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" /></div>
                   <div>
                     <label className="block text-purple-400 text-[11px] font-bold mb-1">Срок размещения</label>
                     <select value={bannerFormData.days} onChange={function(e) { setBannerFormData(Object.assign({}, bannerFormData, { days: e.target.value })); }} className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white focus:border-purple-500 focus:outline-none font-mono">
@@ -868,14 +906,12 @@ export default function TntHouse() {
               </div>
             </div>
 
-            {/* Investor info / pricing */}
+            {/* Investor info */}
             <div className="space-y-4 bg-slate-900/20 border-2 border-purple-500/20 rounded-xl p-6">
               <h3 className="text-xl font-black text-purple-400">Информация для инвесторов</h3>
-              <p className="text-slate-300 text-xs leading-relaxed">Все платежи принимаются в $MRDT.</p>
+              <p className="text-slate-300 text-xs leading-relaxed">Все платежи принимаются в $MRDT. После оплаты токен сохраняется в базе данных и виден всем посетителям сайта.</p>
               <div className="mt-6 space-y-3">
-                <h4 className="text-xs font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400 flex items-center gap-1.5">
-                  <Download className="w-4 h-4 text-purple-400 animate-pulse" /> ТЕКУЩАЯ СЕТКА ТАРИФОВ:
-                </h4>
+                <h4 className="text-xs font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400 flex items-center gap-1.5"><Download className="w-4 h-4 text-purple-400 animate-pulse" /> ТЕКУЩАЯ СЕТКА ТАРИФОВ:</h4>
                 <div className="grid grid-cols-1 gap-2 text-xs font-mono">
                   {[
                     ['🎁 Первые 3 токена', 'БЕСПЛАТНО'],
@@ -887,8 +923,7 @@ export default function TntHouse() {
                   ].map(function(row, i) {
                     return (
                       <div key={i} className={'flex justify-between p-2.5 border rounded-lg ' + (i === 0 ? 'bg-purple-500/10 border-purple-500/20' : 'bg-slate-950 border-purple-500/10')}>
-                        <span className="text-slate-300">{row[0]}</span>
-                        <span className="text-emerald-400 font-bold">{row[1]}</span>
+                        <span className="text-slate-300">{row[0]}</span><span className="text-emerald-400 font-bold">{row[1]}</span>
                       </div>
                     );
                   })}
@@ -898,7 +933,7 @@ export default function TntHouse() {
           </div>
         </section>
 
-        {/* ── WHALE CLUB ── */}
+        {/* WHALE CLUB */}
         <section className="max-w-7xl mx-auto px-6 py-6">
           <div className="relative bg-gradient-to-r from-purple-500/10 via-transparent to-emerald-500/10 border-2 border-purple-500/30 rounded-lg p-10 overflow-hidden">
             <div className="absolute top-0 right-0 w-40 h-40 bg-purple-500/10 rounded-full blur-3xl" />
@@ -910,26 +945,24 @@ export default function TntHouse() {
           </div>
         </section>
 
-        {/* ── FOOTER ── */}
+        {/* FOOTER */}
         <footer className="border-t border-purple-500/20 mt-12 py-8 bg-slate-950/60 backdrop-blur-lg">
           <div className="max-w-7xl mx-auto px-6">
             <div className="flex flex-wrap items-center justify-center gap-8 mb-4">
-              <a href="https://x.com/Crypto_D10S" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-white transition-colors">
-                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>
-              </a>
+              <a href="https://x.com/Crypto_D10S" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-white transition-colors"><svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg></a>
               <a href="https://t.me/D10S_Solana_Stadium" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-blue-400 transition-colors"><span className="text-2xl">✈️</span></a>
               <a href="https://www.maradonatoken-mrdt.xyz" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400 transition-colors"><ExternalLink className="w-6 h-6" /></a>
             </div>
             <div className="text-center space-y-1">
-              <div className="text-purple-400 font-bold text-sm tracking-widest">TNT HOUSE v1.6</div>
-              <div className="text-slate-400 text-xs">Powered by $MRDT • AI Audits ☁️</div>
-              <div className="text-slate-500 text-[10px]">Built with Next.js + Tailwind CSS • DexScreener API</div>
+              <div className="text-purple-400 font-bold text-sm tracking-widest">TNT HOUSE v1.7</div>
+              <div className="text-slate-400 text-xs">Powered by $MRDT • AI Audits • Supabase ☁️</div>
+              <div className="text-slate-500 text-[10px]">Built with Next.js + Tailwind CSS • DexScreener + Supabase</div>
             </div>
           </div>
         </footer>
       </div>
 
-      {/* ── BANNER WALLET MODAL ── */}
+      {/* BANNER MODAL */}
       {showBannerWalletModal && (
         <div className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-md p-6 shadow-lg">
@@ -940,7 +973,7 @@ export default function TntHouse() {
         </div>
       )}
 
-      {/* ── BLUEPRINT MODAL ── */}
+      {/* BLUEPRINT MODAL */}
       {isBlueprintOpen && selectedToken && (
         <div className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={closeBlueprint}>
           <div className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-lg p-6 shadow-lg" onClick={function(e) { e.stopPropagation(); }}>
@@ -956,22 +989,15 @@ export default function TntHouse() {
         </div>
       )}
 
-      {/* ── CHAT BUTTON ── */}
+      {/* CHAT */}
       <button onClick={function() { setIsChatOpen(!isChatOpen); }} className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-tr from-purple-500 to-emerald-400 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(153,69,255,0.5)] hover:scale-105 transition z-50 animate-bounce">
         {isChatOpen ? <X className="w-6 h-6 text-slate-950" /> : <MessageSquare className="w-6 h-6 text-slate-950" />}
       </button>
 
-      {/* ── CHAT WIDGET ── */}
       {isChatOpen && (
         <div className="fixed bottom-24 right-6 w-80 md:w-96 h-[450px] bg-slate-900 border-2 border-purple-500 rounded-xl shadow-[0_0_30px_rgba(153,69,255,0.4)] flex flex-col overflow-hidden z-50 font-mono">
           <div className="bg-gradient-to-r from-purple-600 to-emerald-500 p-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-xl">🤖</span>
-              <div>
-                <h4 className="font-bold text-xs text-white">TNT AI INSPECTOR</h4>
-                <span className="text-[9px] text-slate-100 font-bold tracking-widest">Trench Agent D10S</span>
-              </div>
-            </div>
+            <div className="flex items-center gap-2"><span className="text-xl">🤖</span><div><h4 className="font-bold text-xs text-white">TNT AI INSPECTOR</h4><span className="text-[9px] text-slate-100 font-bold tracking-widest">Trench Agent D10S</span></div></div>
             <button onClick={function() { setIsChatOpen(false); }} className="text-white"><X className="w-4 h-4" /></button>
           </div>
           <div className="flex-1 p-4 overflow-y-auto space-y-3 text-xs">
@@ -993,4 +1019,4 @@ export default function TntHouse() {
       )}
     </div>
   );
-            }
+                      }
