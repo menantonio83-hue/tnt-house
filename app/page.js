@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Shield, Send, MessageSquare, X, RefreshCw, AlertCircle, Sparkles, ExternalLink, ChevronDown, Download, Zap, Lock, CheckCircle, XCircle } from 'lucide-react';
-import { Connection, PublicKey, Transaction, LAMPORTS_PER_SOL, VersionedTransaction } from '@solana/web3.js';
-import { getAssociatedTokenAddress, createTransferInstruction, getAccount, getMint } from '@solana/spl-token';
+import { Connection, PublicKey, Transaction, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { getAssociatedTokenAddress, createTransferInstruction, getAccount } from '@solana/spl-token';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,13 +11,51 @@ const WALLET_ADDRESS = "Ev6oXBXo6qyoaT5wypJ2Umxch91F7cFvE1SarYLaUn8Z";
 const MRDT_CA = "8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg";
 const MRDT_DECIMALS = 6;
 const SITE_URL = 'https://tnt-house.vercel.app';
-
 const SUPABASE_URL = 'https://pjtvjslcffuulsqxerpx.supabase.co';
 const SUPABASE_KEY = 'sb_publishable__gmhE8SE_blCu-v90fV2OQ_YmFCkfFU';
 
+// Build Solana Pay deeplink for SPL token transfer
+// Format: solana:<recipient>?amount=<amount>&spl-token=<mint>&label=<label>&message=<msg>
+function buildSolanaPayLink(amountTokens, label, message) {
+  var recipient = WALLET_ADDRESS;
+  var mint = MRDT_CA;
+  // Solana Pay uses decimal amount (not lamports)
+  var params = new URLSearchParams({
+    amount: amountTokens.toString(),
+    'spl-token': mint,
+    label: label || 'TNT House',
+    message: message || 'AI Inspection Payment',
+    memo: 'tnt-house-payment',
+  });
+  return 'solana:' + recipient + '?' + params.toString();
+}
+
+// Open Solana Pay link in Phantom
+function openWithPhantom(solanaPayLink) {
+  var encoded = encodeURIComponent(solanaPayLink);
+  // Phantom universal link for Solana Pay
+  var phantomUrl = 'https://phantom.app/ul/v1/send?' + new URLSearchParams({
+    to: WALLET_ADDRESS,
+    deepLink: solanaPayLink,
+  }).toString();
+  window.location.href = 'phantom://v1/browse/' + encoded;
+  setTimeout(function() {
+    window.location.href = 'https://phantom.app/ul/browse/' + encoded + '?ref=' + encodeURIComponent(SITE_URL);
+  }, 500);
+}
+
+// Open Solana Pay link in Solflare
+function openWithSolflare(solanaPayLink) {
+  var encoded = encodeURIComponent(solanaPayLink);
+  window.location.href = 'solflare://v1/browse/' + encoded;
+  setTimeout(function() {
+    window.location.href = 'https://solflare.com/ul/v1/browse/' + encoded + '?ref=' + encodeURIComponent(SITE_URL);
+  }, 500);
+}
+
 async function saveTokenToSupabase(token) {
   try {
-    var res = await fetch(SUPABASE_URL + '/rest/v1/listed_tokens', {
+    await fetch(SUPABASE_URL + '/rest/v1/listed_tokens', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -26,22 +64,16 @@ async function saveTokenToSupabase(token) {
         'Prefer': 'return=minimal',
       },
       body: JSON.stringify({
-        name: token.name,
-        symbol: token.symbol,
-        ca: token.ca,
-        price: token.price,
-        liquidity: token.liquidity,
-        volume24h: token.volume24h,
-        price_change_24h: token.priceChange24h,
-        score: token.score || 95,
-        dex_url: token.dexUrl,
+        name: token.name, symbol: token.symbol, ca: token.ca,
+        price: token.price, liquidity: token.liquidity,
+        volume24h: token.volume24h, price_change_24h: token.priceChange24h,
+        score: token.score || 95, dex_url: token.dexUrl,
         chain: token.chain || 'solana',
         mint_authority: token.mintAuthority || '—',
         freeze_authority: token.freezeAuthority || '—',
         is_honeypot: token.isHoneypot || '—',
       }),
     });
-    if (!res.ok) console.error('Supabase insert error:', await res.text());
   } catch(e) { console.error('Supabase save failed:', e); }
 }
 
@@ -62,14 +94,27 @@ async function loadTokensFromSupabase() {
         isHoneypot: row.is_honeypot, fromSupabase: true,
       };
     });
-  } catch(e) { console.error('Supabase load failed:', e); return []; }
+  } catch(e) { return []; }
+}
+
+// Wait for wallet injection — up to 3 seconds
+async function waitForWallet(walletObj) {
+  for (var i = 0; i < 10; i++) {
+    if (walletObj && walletObj.isConnected !== undefined) return walletObj;
+    if (typeof window !== 'undefined') {
+      if (window.solana && window.solana.isPhantom) return window.solana;
+      if (window.solflare && window.solflare.isSolflare) return window.solflare;
+    }
+    await new Promise(function(r) { setTimeout(r, 300); });
+  }
+  return null;
 }
 
 const FALLBACK_TOKENS = [
   { name: 'Test Gem', symbol: 'TGEM', ca: '11111111111111111111111111111111', price: '0.00001234', liquidity: 45000, volume24h: 120000, priceChange24h: 8.5, verified: true, dexUrl: 'https://dexscreener.com', chain: 'solana' }
 ];
 
-const isMobileBrowser = () => {
+const isMobile = () => {
   if (typeof window === 'undefined') return false;
   return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 };
@@ -79,28 +124,20 @@ const isPhantomBrowser = () => {
   return !!(window.solana && window.solana.isPhantom);
 };
 
-const openInPhantom = (urlWithParams) => {
-  var encoded = encodeURIComponent(urlWithParams);
-  var ref = encodeURIComponent(SITE_URL);
-  window.location.href = 'https://phantom.app/ul/browse/' + encoded + '?ref=' + ref;
+const isSolflareBrowser = () => {
+  if (typeof window === 'undefined') return false;
+  return !!(window.solflare && window.solflare.isSolflare);
 };
 
-// Wait for Phantom to inject window.solana — up to 3 seconds
-async function waitForPhantom() {
-  for (var i = 0; i < 10; i++) {
-    if (window.solana && window.solana.isPhantom) return window.solana;
-    await new Promise(function(resolve) { setTimeout(resolve, 300); });
-  }
-  return null;
-}
+const isInWalletBrowser = () => isPhantomBrowser() || isSolflareBrowser();
 
 export default function TntHouse() {
   const [tokens, setTokens] = useState([]);
   const [listedTokens, setListedTokens] = useState([]);
   const [loading, setLoading] = useState(true);
   const [bannerSubmitted, setBannerSubmitted] = useState(false);
-  const [error, setError] = useState('');
   const [bannerError, setBannerError] = useState('');
+  const [error, setError] = useState('');
   const [walletAddress, setWalletAddress] = useState('');
   const [isBannerSending, setIsBannerSending] = useState(false);
   const [activeBanner, setActiveBanner] = useState(null);
@@ -113,6 +150,7 @@ export default function TntHouse() {
   const [isBlueprintOpen, setIsBlueprintOpen] = useState(false);
   const [selectedToken, setSelectedToken] = useState(null);
   const [showBannerWalletModal, setShowBannerWalletModal] = useState(false);
+  const [showPayWalletModal, setShowPayWalletModal] = useState(false);
   const chatEndRef = useRef(null);
   const [mrdtPrice, setMrdtPrice] = useState(0.000013);
   const [priceLoading, setPriceLoading] = useState(true);
@@ -120,6 +158,7 @@ export default function TntHouse() {
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
   const [isPaymentLoading, setIsPaymentLoading] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState('');
+  const [pendingWallet, setPendingWallet] = useState('');
 
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({ projectName: '', contractAddress: '', email: '' });
@@ -141,14 +180,13 @@ export default function TntHouse() {
     setTimeout(function() { setToast({ show: false, message: '', type: 'success' }); }, 4200);
   };
 
-  // Load listed tokens from Supabase on mount
   useEffect(function() {
     loadTokensFromSupabase().then(function(data) {
       if (data.length > 0) setListedTokens(data);
     });
   }, []);
 
-  // Read URL params — restore form and auto-pay if inside Phantom
+  // Read URL params on mount — restore form + auto-pay inside wallet browser
   useEffect(function() {
     if (typeof window === 'undefined') return;
     var params = new URLSearchParams(window.location.search);
@@ -157,6 +195,7 @@ export default function TntHouse() {
     var pEmail = params.get('pEmail');
     var pPlan = params.get('pPlan');
     var pCurrency = params.get('pCurrency');
+    var pWallet = params.get('pWallet');
 
     if (pName && pCA && pPlan && pCurrency) {
       var restoredForm = { projectName: pName, contractAddress: pCA, email: pEmail || '' };
@@ -165,25 +204,24 @@ export default function TntHouse() {
       setSelectedCurrency(pCurrency);
       setStep(3);
       window.history.replaceState({}, '', window.location.pathname);
-      if (isPhantomBrowser()) {
-        // Give Phantom extra time to fully inject before auto-pay
+      if (isInWalletBrowser()) {
         setTimeout(function() {
-          triggerPayment(pPlan, pCurrency, restoredForm);
+          triggerPayment(pPlan, pCurrency, restoredForm, pWallet || 'phantom');
         }, 2000);
       }
     }
   }, []);
 
   useEffect(function() {
-    var fetchSolPrice = async function() {
+    var fetch_ = async function() {
       try {
         var res = await fetch('https://price.jup.ag/v6/price?ids=SOL');
         var data = await res.json();
-        if (data && data.data && data.data.SOL && data.data.SOL.price) setSolPrice(data.data.SOL.price);
+        if (data && data.data && data.data.SOL) setSolPrice(data.data.SOL.price);
       } catch(e) {}
     };
-    fetchSolPrice();
-    var i = setInterval(fetchSolPrice, 60000);
+    fetch_();
+    var i = setInterval(fetch_, 60000);
     return function() { clearInterval(i); };
   }, []);
 
@@ -204,33 +242,56 @@ export default function TntHouse() {
     else if (step === 3) setStep(2);
   };
 
-  const redirectToPhantom = function(planVal, currency, form) {
+  // Redirect to wallet browser with all params in URL
+  const redirectToWallet = function(walletType, planVal, currency, form) {
     var params = new URLSearchParams({
       pName: form.projectName,
       pCA: form.contractAddress,
       pEmail: form.email,
       pPlan: planVal,
       pCurrency: currency,
+      pWallet: walletType,
     });
     var targetUrl = SITE_URL + '/?' + params.toString();
-    openInPhantom(targetUrl);
+    var encoded = encodeURIComponent(targetUrl);
+    var ref = encodeURIComponent(SITE_URL);
+
+    if (walletType === 'solflare') {
+      window.location.href = 'solflare://v1/browse/' + encoded;
+      setTimeout(function() {
+        window.location.href = 'https://solflare.com/ul/v1/browse/' + encoded + '?ref=' + ref;
+      }, 500);
+    } else {
+      // Phantom
+      window.location.href = 'phantom://v1/browse/' + encoded;
+      setTimeout(function() {
+        window.location.href = 'https://phantom.app/ul/browse/' + encoded + '?ref=' + ref;
+      }, 500);
+    }
   };
 
-  // Core payment with Phantom injection wait
-  const triggerPayment = async function(planVal, currency, form) {
+  // Core payment via wallet SDK
+  const triggerPayment = async function(planVal, currency, form, walletType) {
     var plan = plans.find(function(p) { return p.value === planVal; });
     if (!plan || !currency) return;
 
     setIsPaymentLoading(true);
-    setPaymentStatus('Ожидаем Phantom...');
+    setPaymentStatus('Ожидаем кошелёк...');
 
-    // FIX v1.8: Wait up to 3s for Phantom to inject window.solana
-    var solanaWin = await waitForPhantom();
+    // Get correct wallet object
+    var solanaWin = null;
+    for (var attempt = 0; attempt < 10; attempt++) {
+      if (walletType === 'solflare' && window.solflare && window.solflare.isSolflare) {
+        solanaWin = window.solflare; break;
+      } else if (window.solana && window.solana.isPhantom) {
+        solanaWin = window.solana; break;
+      }
+      await new Promise(function(r) { setTimeout(r, 300); });
+    }
+
     if (!solanaWin) {
-      showToast('Phantom не найден — обнови страницу и попробуй снова', 'error');
-      setIsPaymentLoading(false);
-      setPaymentStatus('');
-      return;
+      showToast('Кошелёк не найден — открой сайт в браузере Phantom или Solflare', 'error');
+      setIsPaymentLoading(false); setPaymentStatus(''); return;
     }
 
     try {
@@ -250,14 +311,14 @@ export default function TntHouse() {
           showToast('Нет $MRDT на кошельке', 'error');
           setIsPaymentLoading(false); setPaymentStatus(''); return;
         }
-        var amount = Math.round(plan.price / mrdtPrice) * Math.pow(10, MRDT_DECIMALS);
-        var tx = new Transaction().add(createTransferInstruction(fromAta, toAta, sender, amount));
+        var mrdtAmount = Math.round(plan.price / mrdtPrice) * Math.pow(10, MRDT_DECIMALS);
+        var tx = new Transaction().add(createTransferInstruction(fromAta, toAta, sender, mrdtAmount));
         tx.feePayer = sender;
         tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
-        setPaymentStatus('Подтверди в Phantom...');
+        setPaymentStatus('Подтверди в кошельке...');
         var signed = await solanaWin.signAndSendTransaction(tx);
         signature = signed.signature;
-        setPaymentStatus('Подтверждаем транзакцию...');
+        setPaymentStatus('Подтверждаем в сети...');
         await connection.confirmTransaction(signature, 'confirmed');
 
       } else if (currency === 'sol') {
@@ -282,13 +343,14 @@ export default function TntHouse() {
         });
         var swapData = await swapRes.json();
         if (!swapData.swapTransaction) throw new Error('Jupiter не вернул транзакцию');
+        var { VersionedTransaction } = await import('@solana/web3.js');
         var txBytes = Uint8Array.from(atob(swapData.swapTransaction), function(c) { return c.charCodeAt(0); });
         var transaction = VersionedTransaction.deserialize(txBytes);
-        setPaymentStatus('Подтверди в Phantom...');
+        setPaymentStatus('Подтверди в кошельке...');
         var signedTx = await solanaWin.signTransaction(transaction);
         setPaymentStatus('Отправляем транзакцию...');
         signature = await connection.sendRawTransaction(signedTx.serialize());
-        setPaymentStatus('Подтверждаем транзакцию...');
+        setPaymentStatus('Подтверждаем в сети...');
         await connection.confirmTransaction(signature, 'confirmed');
       }
 
@@ -311,6 +373,7 @@ export default function TntHouse() {
       } catch(e) {
         try {
           var c2 = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
+          var { getMint } = await import('@solana/spl-token');
           var mi = await getMint(c2, new PublicKey(form.contractAddress));
           auditData = {
             mintAuthority: mi.mintAuthority ? 'Активна (риск)' : 'Отозвана ✓',
@@ -339,7 +402,6 @@ export default function TntHouse() {
       setPaymentStatus('Сохраняем в базу данных...');
       await saveTokenToSupabase(newToken);
       setListedTokens(function(prev) { return [newToken].concat(prev); });
-
       showToast('✅ Аудит завершён! Токен добавлен в таблицу!', 'success');
       setStep(1); setSelectedPlan(''); setSelectedCurrency('');
       setFormData({ projectName: '', contractAddress: '', email: '' });
@@ -348,28 +410,41 @@ export default function TntHouse() {
       console.error('Payment error:', err);
       showToast(err.message || 'Ошибка оплаты', 'error');
     } finally {
-      setIsPaymentLoading(false);
-      setPaymentStatus('');
+      setIsPaymentLoading(false); setPaymentStatus('');
     }
   };
 
+  // Payment button click
   const handlePayment = function() {
     if (!selectedPlan || !selectedCurrency) {
       showToast('Выбери тариф и способ оплаты', 'error'); return;
     }
-    if (isMobileBrowser() && !isPhantomBrowser()) {
-      redirectToPhantom(selectedPlan, selectedCurrency, formData);
+    // Already inside wallet browser — pay directly
+    if (isInWalletBrowser()) {
+      var wType = isSolflareBrowser() ? 'solflare' : 'phantom';
+      triggerPayment(selectedPlan, selectedCurrency, formData, wType);
       return;
     }
-    triggerPayment(selectedPlan, selectedCurrency, formData);
+    // Mobile outside wallet — show wallet choice modal
+    if (isMobile()) {
+      setShowPayWalletModal(true);
+      return;
+    }
+    // Desktop — pay directly with whatever is available
+    triggerPayment(selectedPlan, selectedCurrency, formData, 'phantom');
+  };
+
+  const handleWalletChoice = function(walletType) {
+    setShowPayWalletModal(false);
+    redirectToWallet(walletType, selectedPlan, selectedCurrency, formData);
   };
 
   const handleConnectWallet = async function() {
-    if (isMobileBrowser() && !isPhantomBrowser()) {
-      openInPhantom(SITE_URL + '/');
+    if (isMobile() && !isInWalletBrowser()) {
+      setShowPayWalletModal(true);
       return;
     }
-    var solanaWin = await waitForPhantom();
+    var solanaWin = window.solana || window.solflare;
     if (solanaWin) {
       try {
         var resp = await solanaWin.connect();
@@ -377,7 +452,7 @@ export default function TntHouse() {
         setWalletAddress(pk.slice(0, 4) + '...' + pk.slice(-4));
       } catch(err) { console.error(err); }
     } else {
-      showToast('Phantom не найден. Установи расширение.', 'error');
+      showToast('Кошелёк не найден.', 'error');
     }
   };
 
@@ -506,17 +581,23 @@ export default function TntHouse() {
     return Math.round(usd / mrdtPrice);
   };
 
-  const handleBannerWalletSelect = async function() {
+  const handleBannerWalletSelect = async function(walletType) {
     setShowBannerWalletModal(false);
-    setIsBannerSending(true);
-    setBannerError('');
-    if (isMobileBrowser() && !isPhantomBrowser()) {
-      setIsBannerSending(false);
-      openInPhantom(SITE_URL + '/');
+    if (isMobile() && !isInWalletBrowser()) {
+      var encoded = encodeURIComponent(SITE_URL + '/');
+      var ref = encodeURIComponent(SITE_URL);
+      if (walletType === 'solflare') {
+        window.location.href = 'solflare://v1/browse/' + encoded;
+        setTimeout(function() { window.location.href = 'https://solflare.com/ul/v1/browse/' + encoded + '?ref=' + ref; }, 500);
+      } else {
+        window.location.href = 'phantom://v1/browse/' + encoded;
+        setTimeout(function() { window.location.href = 'https://phantom.app/ul/browse/' + encoded + '?ref=' + ref; }, 500);
+      }
       return;
     }
-    var solanaWin = await waitForPhantom();
-    if (!solanaWin) { setBannerError('Phantom не найден.'); setIsBannerSending(false); return; }
+    setIsBannerSending(true); setBannerError('');
+    var solanaWin = walletType === 'solflare' ? window.solflare : window.solana;
+    if (!solanaWin) { setBannerError('Кошелёк не найден.'); setIsBannerSending(false); return; }
     var current = Object.assign({}, bannerFormData);
     try {
       var resp = await solanaWin.connect();
@@ -541,8 +622,7 @@ export default function TntHouse() {
         expiresAt: Date.now() + parseInt(current.days) * 86400000,
       };
       localStorage.setItem('tnt_active_banner', JSON.stringify(banner));
-      setActiveBanner(banner);
-      setBannerSubmitted(true);
+      setActiveBanner(banner); setBannerSubmitted(true);
       setBannerFormData({ tokenName: '', bannerImg: '', desc: '', days: '1' });
       setTimeout(function() { setBannerSubmitted(false); }, 5000);
     } catch(err) {
@@ -578,8 +658,41 @@ export default function TntHouse() {
     if (el) el.scrollIntoView({ behavior: 'smooth' });
   };
 
-  var isMobile = typeof window !== 'undefined' && isMobileBrowser();
-  var inPhantom = typeof window !== 'undefined' && isPhantomBrowser();
+  // Wallet choice modal — reused for both payment and banner
+  const WalletModal = function({ onSelect, onClose, title }) {
+    return (
+      <div className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-md p-6 shadow-lg">
+          <h3 className="text-lg font-black text-white mb-2">{title || 'Выбери кошелёк'}</h3>
+          <p className="text-slate-400 text-xs mb-4">Выбери кошелёк для оплаты в $MRDT</p>
+          <button
+            onClick={function() { onSelect('phantom'); }}
+            className="block w-full bg-purple-500/20 border border-purple-500/40 rounded-xl p-4 mb-3 text-white font-bold hover:bg-purple-500/30 transition flex items-center gap-3"
+          >
+            <span className="text-2xl">👻</span>
+            <div className="text-left">
+              <div className="font-black text-purple-300">Phantom</div>
+              <div className="text-xs text-slate-400 font-normal">Самый популярный Solana кошелёк</div>
+            </div>
+          </button>
+          <button
+            onClick={function() { onSelect('solflare'); }}
+            className="block w-full bg-orange-500/10 border border-orange-500/30 rounded-xl p-4 mb-4 text-white font-bold hover:bg-orange-500/20 transition flex items-center gap-3"
+          >
+            <span className="text-2xl">🔥</span>
+            <div className="text-left">
+              <div className="font-black text-orange-300">Solflare</div>
+              <div className="text-xs text-slate-400 font-normal">Альтернативный Solana кошелёк</div>
+            </div>
+          </button>
+          <button onClick={onClose} className="text-slate-400 hover:text-white transition text-sm w-full text-center">Отмена</button>
+        </div>
+      </div>
+    );
+  };
+
+  var onMobile = typeof window !== 'undefined' && isMobile();
+  var inWallet = typeof window !== 'undefined' && isInWalletBrowser();
 
   return (
     <div className="min-h-screen bg-slate-950 text-white font-mono relative overflow-hidden pb-12">
@@ -592,7 +705,7 @@ export default function TntHouse() {
         </div>
       )}
 
-      {/* Payment overlay with live status */}
+      {/* Payment overlay */}
       {isPaymentLoading && (
         <div className="fixed inset-0 z-[99998] bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center gap-4 px-6">
           <RefreshCw className="w-10 h-10 text-purple-400 animate-spin" />
@@ -620,7 +733,7 @@ export default function TntHouse() {
               <a href="https://t.me/tnt_house2026" target="_blank" rel="noopener noreferrer" className="w-10 h-10 border-2 border-purple-500 rounded-lg flex items-center justify-center bg-purple-500/10 shadow-[0_0_15px_rgba(153,69,255,0.4)] animate-pulse"><span className="text-xl">🧨</span></a>
               <div>
                 <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-emerald-400 tracking-wider">TNT HOUSE</h1>
-                <span className="text-[10px] text-purple-400 block font-bold tracking-widest">TOP NEW TOKENS v1.8</span>
+                <span className="text-[10px] text-purple-400 block font-bold tracking-widest">TOP NEW TOKENS v1.9</span>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -665,7 +778,7 @@ export default function TntHouse() {
                 <div>
                   <span className="bg-slate-800 text-purple-400 font-bold text-[9px] px-2 py-0.5 rounded tracking-widest block w-max mb-1">МЕСТО СВОБОДНО</span>
                   <h4 className="text-lg font-black text-white">Maradona Token ($MRDT)</h4>
-                  <p className="text-slate-400 text-xs mt-0.5">Главный токен платформы TNT House. Нажмите, чтобы купить VIP-баннер!</p>
+                  <p className="text-slate-400 text-xs mt-0.5">Нажмите, чтобы купить VIP-баннер!</p>
                 </div>
               </div>
               <div className="text-right">
@@ -732,7 +845,6 @@ export default function TntHouse() {
                   </tr>
                 </thead>
                 <tbody>
-                  {/* Pinned MRDT */}
                   <tr onClick={function() { openTokenBlueprint({ symbol: 'MRDT', name: 'MARADONATOKEN', ca: MRDT_CA, price: mrdtPrice.toFixed(8), liquidity: 13000, volume24h: 0, priceChange24h: 12.4, verified: true, dexUrl: 'https://dexscreener.com/solana/' + MRDT_CA, chain: 'solana' }); }} className="border-b border-purple-500/30 bg-emerald-500/5 hover:bg-emerald-500/10 transition cursor-pointer">
                     <td className="p-1 font-bold flex items-center gap-1"><span className="text-sm">⚽️</span><div><span className="text-emerald-400 font-extrabold text-[10px]">$MRDT</span><div className="text-[7px] text-slate-400">MARADONATOKEN</div></div></td>
                     <td className="p-1 font-mono text-emerald-400 font-bold text-[9px]">${mrdtPrice.toFixed(8)}</td>
@@ -741,20 +853,11 @@ export default function TntHouse() {
                     <td className="p-1 text-center"><div className="inline-flex items-center justify-center w-9 h-4 rounded-full bg-emerald-500/20 border border-emerald-500 text-emerald-400 text-[8px] font-extrabold shadow-[0_0_6px_rgba(16,185,129,0.5)]">98</div></td>
                     <td className="p-1 text-right"><button onClick={function(e) { e.stopPropagation(); handleLaunchJupiter(); }} className="text-[8px] text-emerald-400 hover:text-emerald-300 font-bold hover:underline inline-flex items-center gap-0.5">Купить <ExternalLink className="w-2 h-2" /></button></td>
                   </tr>
-
-                  {/* Supabase listed tokens — paid audits */}
                   {listedTokens.map(function(token, i) {
-                    var score = getSafetyScore(token);
-                    var style = getScoreStyle(score);
+                    var score = getSafetyScore(token); var style = getScoreStyle(score);
                     return (
                       <tr key={'sb-' + i} onClick={function() { openTokenBlueprint(token); }} className="border-b border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10 transition cursor-pointer">
-                        <td className="p-1">
-                          <div className="flex items-center gap-1">
-                            <span className="text-emerald-400 text-[9px] font-bold">${token.symbol}</span>
-                            <span className="text-[6px] bg-emerald-500/20 text-emerald-400 px-1 rounded font-bold">AI✓</span>
-                          </div>
-                          <span className="text-[7px] text-slate-500 block truncate max-w-[80px]">{token.name}</span>
-                        </td>
+                        <td className="p-1"><div className="flex items-center gap-1"><span className="text-emerald-400 text-[9px] font-bold">${token.symbol}</span><span className="text-[6px] bg-emerald-500/20 text-emerald-400 px-1 rounded font-bold">AI✓</span></div><span className="text-[7px] text-slate-500 block truncate max-w-[80px]">{token.name}</span></td>
                         <td className="p-1 font-mono text-slate-300 text-[9px]">${token.price}</td>
                         <td className="p-1 font-mono text-slate-300 text-[9px]">{typeof token.liquidity === 'number' ? formatNumber(token.liquidity) : token.liquidity}</td>
                         <td className={'p-1 font-mono text-[9px] ' + (token.priceChange24h > 0 ? 'text-emerald-400' : 'text-red-400')}>{formatNumber(token.volume24h)} ({token.priceChange24h > 0 ? '+' : ''}{token.priceChange24h}%)</td>
@@ -763,13 +866,10 @@ export default function TntHouse() {
                       </tr>
                     );
                   })}
-
-                  {/* DexScreener tokens */}
                   {loading && tokens.length === 0 ? (
                     <tr><td colSpan={6} className="p-6 text-center text-purple-400 font-bold"><RefreshCw className="w-4 h-4 animate-spin mx-auto mb-1" />Сканируем...</td></tr>
                   ) : tokens.map(function(token, i) {
-                    var score = getSafetyScore(token);
-                    var style = getScoreStyle(score);
+                    var score = getSafetyScore(token); var style = getScoreStyle(score);
                     return (
                       <tr key={'dx-' + i} onClick={function() { openTokenBlueprint(token); }} className="border-b border-purple-500/10 hover:bg-purple-500/5 transition cursor-pointer">
                         <td className="p-1"><span className="text-purple-400 text-[9px] font-bold">${token.symbol}</span><span className="text-[7px] text-slate-500 block truncate max-w-[80px]">{token.name}</span></td>
@@ -781,13 +881,8 @@ export default function TntHouse() {
                       </tr>
                     );
                   })}
-
                   {[1,2,3,4].map(function(n) {
-                    return (
-                      <tr key={'e' + n} className="border-b border-purple-500/5 opacity-40">
-                        {[0,1,2,3,4,5].map(function(i) { return <td key={i} className="p-1 text-slate-600 text-[8px] italic">—</td>; })}
-                      </tr>
-                    );
+                    return <tr key={'e' + n} className="border-b border-purple-500/5 opacity-40">{[0,1,2,3,4,5].map(function(i) { return <td key={i} className="p-1 text-slate-600 text-[8px] italic">—</td>; })}</tr>;
                   })}
                 </tbody>
               </table>
@@ -804,13 +899,6 @@ export default function TntHouse() {
               <div className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 p-6 backdrop-blur-md">
                 <h3 className="text-lg font-black text-purple-400 mb-2 flex items-center gap-2">🔍 ЗАКАЗАТЬ ИИ-ИНСПЕКЦИЮ</h3>
                 <p className="text-slate-400 text-xs mb-4">После оплаты токен сохраняется в БД и виден всем посетителям.</p>
-
-                {isMobile && !inPhantom && (
-                  <div className="mb-4 p-3 bg-purple-950/40 border border-purple-500/40 rounded-xl text-xs text-purple-300 flex items-start gap-2">
-                    <span className="text-base">👻</span>
-                    <span>Открой этот сайт в браузере Phantom App → введи <strong>tnt-house.vercel.app</strong> → заполни форму и нажми оплатить.</span>
-                  </div>
-                )}
 
                 <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700/50 max-w-md mx-auto">
                   {step === 1 && (
@@ -867,7 +955,7 @@ export default function TntHouse() {
                         <button onClick={handlePayment} disabled={!selectedCurrency || isPaymentLoading} className="flex-1 bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-3 rounded-xl font-semibold hover:opacity-90 transition disabled:opacity-40 flex items-center justify-center gap-2">
                           {isPaymentLoading
                             ? <><RefreshCw className="w-4 h-4 animate-spin" /> Обработка...</>
-                            : 'Запустить ИИ-инспекцию'}
+                            : (onMobile && !inWallet ? '👛 Выбрать кошелёк' : 'Запустить ИИ-инспекцию')}
                         </button>
                       </div>
                     </>
@@ -905,7 +993,7 @@ export default function TntHouse() {
             {/* Investor info */}
             <div className="space-y-4 bg-slate-900/20 border-2 border-purple-500/20 rounded-xl p-6">
               <h3 className="text-xl font-black text-purple-400">Информация для инвесторов</h3>
-              <p className="text-slate-300 text-xs leading-relaxed">Все платежи принимаются в $MRDT. После оплаты токен сохраняется в базе данных и виден всем посетителям сайта.</p>
+              <p className="text-slate-300 text-xs leading-relaxed">Все платежи принимаются в $MRDT. После оплаты токен виден всем посетителям.</p>
               <div className="mt-6 space-y-3">
                 <h4 className="text-xs font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400 flex items-center gap-1.5"><Download className="w-4 h-4 text-purple-400 animate-pulse" /> ТЕКУЩАЯ СЕТКА ТАРИФОВ:</h4>
                 <div className="grid grid-cols-1 gap-2 text-xs font-mono">
@@ -950,23 +1038,30 @@ export default function TntHouse() {
               <a href="https://www.maradonatoken-mrdt.xyz" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400 transition-colors"><ExternalLink className="w-6 h-6" /></a>
             </div>
             <div className="text-center space-y-1">
-              <div className="text-purple-400 font-bold text-sm tracking-widest">TNT HOUSE v1.8</div>
+              <div className="text-purple-400 font-bold text-sm tracking-widest">TNT HOUSE v1.9</div>
               <div className="text-slate-400 text-xs">Powered by $MRDT • AI Audits • Supabase ☁️</div>
-              <div className="text-slate-500 text-[10px]">Built with Next.js + Tailwind CSS • DexScreener + Supabase</div>
+              <div className="text-slate-500 text-[10px]">Built with Next.js + Tailwind CSS • Phantom + Solflare</div>
             </div>
           </div>
         </footer>
       </div>
 
-      {/* BANNER MODAL */}
+      {/* WALLET CHOICE MODAL — для оплаты инспекции */}
+      {showPayWalletModal && (
+        <WalletModal
+          title="Выбери кошелёк для оплаты"
+          onSelect={handleWalletChoice}
+          onClose={function() { setShowPayWalletModal(false); }}
+        />
+      )}
+
+      {/* WALLET CHOICE MODAL — для баннера */}
       {showBannerWalletModal && (
-        <div className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-md p-6 shadow-lg">
-            <h3 className="text-lg font-black text-white mb-4">Оплата VIP-баннера</h3>
-            <button onClick={handleBannerWalletSelect} className="block w-full bg-purple-500/20 border border-purple-500/30 rounded-xl p-3 mb-3 text-white font-bold hover:bg-purple-500/30 transition">👻 Оплатить через Phantom</button>
-            <button onClick={function() { setShowBannerWalletModal(false); }} className="text-slate-400 hover:text-white transition text-sm">Отмена</button>
-          </div>
-        </div>
+        <WalletModal
+          title="Оплата VIP-баннера"
+          onSelect={handleBannerWalletSelect}
+          onClose={function() { setShowBannerWalletModal(false); }}
+        />
       )}
 
       {/* BLUEPRINT MODAL */}
@@ -1015,4 +1110,4 @@ export default function TntHouse() {
       )}
     </div>
   );
-                                       }
+  }
