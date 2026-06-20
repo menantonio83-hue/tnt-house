@@ -132,7 +132,6 @@ export default function TntHouse() {
     });
   }, []);
 
-  // АВТО-ОПЛАТА: Читаем параметры из URL и сразу выставляем счет в кошельке
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
@@ -150,7 +149,6 @@ export default function TntHouse() {
       setSelectedCurrency(pCurrency);
       setStep(3);
       
-      // Очищаем URL, чтобы при обновлении страницы транзакция не повторялась
       window.history.replaceState({}, '', window.location.pathname);
       
       if (isInWalletBrowser()) {
@@ -159,7 +157,6 @@ export default function TntHouse() {
           setPaymentStatus('Инициализация кошелька...');
           let wallet = null;
           
-          // Ждем пока кошелек инжектится (до 4 секунд)
           for (let i = 0; i < 10; i++) {
             if (pWallet === 'solflare' && window.solflare && window.solflare.isSolflare) { wallet = window.solflare; break; }
             else if (window.solana && window.solana.isPhantom) { wallet = window.solana; break; }
@@ -169,7 +166,7 @@ export default function TntHouse() {
           if (wallet) {
             try {
               setPaymentStatus('Запрос на подключение...');
-              await wallet.connect(); // Вызываем коннект
+              await wallet.connect();
               triggerPayment(pPlan, pCurrency, restoredForm, pWallet || 'phantom');
             } catch (e) {
               console.error(e);
@@ -216,7 +213,6 @@ export default function TntHouse() {
     else if (step === 3) setStep(2);
   };
 
-  // Перенаправление в Phantom / Solflare с параметрами для авто-оплаты
   const redirectToWallet = (walletType, planVal, currency, form) => {
     const params = new URLSearchParams({
       pName: form.projectName,
@@ -921,4 +917,32 @@ export default function TntHouse() {
                   <button type="submit" disabled={isBannerSending} className="w-full bg-gradient-to-r from-emerald-400 to-purple-500 hover:from-emerald-300 hover:to-purple-400 text-slate-950 font-black py-2.5 rounded text-xs transition flex items-center justify-center gap-1.5 disabled:opacity-50">
                     <Zap className="w-3.5 h-3.5" /> {isBannerSending ? 'ОТПРАВКА...' : 'ОПЛАТИТЬ И РАЗМЕСТИТЬ БАННЕР'}
                   </button>
-                  {bannerSubmitted && <div className="p-3 bg-emerald-950/40 border border-emerald-
+                  {bannerSubmitted && (
+                    <div className="p-3 mt-3 bg-emerald-950/40 border border-emerald-500 rounded text-emerald-400 text-sm text-center font-bold">
+                      Баннер успешно оплачен и отправлен на размещение!
+                    </div>
+                  )}
+                </form>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      {showBannerWalletModal && (
+        <WalletModal
+          onSelect={handleBannerWalletSelect}
+          onClose={() => setShowBannerWalletModal(false)}
+          title="Оплата VIP-Баннера"
+        />
+      )}
+      {showPayWalletModal && (
+        <WalletModal
+          onSelect={handleWalletChoice}
+          onClose={() => setShowPayWalletModal(false)}
+          title="Оплата ИИ-аудита"
+        />
+      )}
+    </div>
+  );
+}
