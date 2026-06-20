@@ -89,15 +89,25 @@ export default function TntHouse() {
     } catch (e) {}
   }, []);
 
-  // Сохранение данных перед редиректом
+  // Нативный мобильный диплинк для гарантированного открытия кошелька
   const saveAndRedirect = () => {
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
       formData,
       selectedPlan,
       selectedCurrency
     }));
-    const encoded = encodeURIComponent(window.location.href);
-    window.location.replace(`https://phantom.app/ul/browse/${encoded}?ref=${encoded}`);
+    
+    const currentUrl = window.location.href;
+    const cleanUrl = currentUrl.replace(/^https?:\/\//, '');
+    const phantomDeepLink = `phantom://v1/browse/${cleanUrl}?ref=${encodeURIComponent(currentUrl)}`;
+    
+    // Сначала пробуем нативный протокол приложения
+    window.location.href = phantomDeepLink;
+    
+    // Если через 1.5 секунды ничего не произошло (нет кошелька), используем универсальный фолбек-линк
+    setTimeout(() => {
+      window.location.replace(`https://phantom.app/ul/browse/${encodeURIComponent(currentUrl)}?ref=${encodeURIComponent(currentUrl)}`);
+    }, 1500);
   };
 
   useEffect(() => {
@@ -154,7 +164,6 @@ export default function TntHouse() {
     const plan = plans.find(p => p.value === selectedPlan);
     if (!plan) return;
 
-    // Мобильный вне Phantom => сохраняем и редиректим
     if (isMobileBrowser() && !isPhantomBrowser()) {
       saveAndRedirect();
       return;
@@ -215,7 +224,6 @@ export default function TntHouse() {
 
       showToast('✅ Оплата прошла! Запускаем проверку токена...', 'success');
 
-      // AI audit
       let auditData = null;
       try {
         const auditRes = await fetch(`https://api.gopluslabs.io/api/v1/token_security/1?contract_addresses=${formData.contractAddress}`);
@@ -272,7 +280,6 @@ export default function TntHouse() {
     }
   };
 
-  // ==== Остальные функции (pillars, getSafetyScore, openBlueprint, модалки, чат и т.д.) полностью из предыдущего кода ====
   const pillars = [
     { icon: Shield, label: 'AI Аудит', desc: 'Проверка контрактов', color: 'text-purple-400' },
     { icon: Zap, label: 'Микро-капы', desc: '$5K-$100K', color: 'text-emerald-400' },
@@ -388,7 +395,6 @@ export default function TntHouse() {
   const getAmountForTier = (tier) => { const usd = tier === 'fast' ? 40 : tier === 'vip' ? 120 : 10; return Math.round(usd / mrdtPrice); };
   const getAmountForBanner = (days) => { const usd = days === '2' ? 35 : days === '6' ? 100 : 20; return Math.round(usd / mrdtPrice); };
 
-  // Legacy audit wallet modal
   const handleAuditWalletSelect = async (walletType) => {
     setShowAuditWalletModal(false); setIsSending(true); setError('');
     if (isMobileBrowser() && !isPhantomBrowser()) { saveAndRedirect(); return; }
@@ -428,7 +434,6 @@ export default function TntHouse() {
     } catch (err) { setError(err.message || 'Ошибка оплаты.'); } finally { setIsSending(false); }
   };
 
-  // Banner payment
   const handleBannerWalletSelect = async (walletType) => {
     setShowBannerWalletModal(false); setIsBannerSending(true); setBannerError('');
     if (isMobileBrowser() && !isPhantomBrowser()) {
@@ -705,7 +710,7 @@ export default function TntHouse() {
                 {isMobileBrowser() && !isPhantomBrowser() && (
                   <div className="mb-4 p-3 bg-purple-950/40 border border-purple-500/40 rounded-xl text-xs text-purple-300 flex items-start gap-2">
                     <span className="text-lg">👻</span>
-                    <span>На мобильном откройте этот сайт через <strong>Phantom App → Browser</strong>, чтобы оплатить напрямую. Кнопка ниже перенаправит вас туда.</span>
+                    <span>На мобильном при нажатии на кнопку сайт принудительно откроет приложение **Phantom**, сохранив ваш выбранный тариф.</span>
                   </div>
                 )}
                 <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700/50 max-w-md mx-auto">
@@ -771,9 +776,9 @@ export default function TntHouse() {
                         {isMobileBrowser() && !isPhantomBrowser() ? (
                           <button
                             onClick={saveAndRedirect}
-                            className="flex-1 bg-gradient-to-r from-purple-500 to-indigo-600 text-white py-3 rounded-xl font-semibold hover:opacity-90 transition flex items-center justify-center gap-2"
+                            className="flex-1 bg-gradient-to-r from-purple-500 to-indigo-600 text-white py-3 rounded-xl font-semibold hover:opacity-90 transition flex items-center justify-center gap-2 animate-pulse"
                           >
-                            👻 Открыть в Phantom
+                            👻 Открыть в Phantom App
                           </button>
                         ) : (
                           <button
