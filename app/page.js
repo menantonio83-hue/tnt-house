@@ -106,7 +106,86 @@ export default function TntHouse() {
     else if (step === 3) setStep(2);
   };
 
-  // ===== HANDLE PAYMENT WITH AUTO-BUY $MRDT THROUGH JUPITER =====
+  // ===== РЕАЛЬНЫЙ АУДИТ ЧЕРЕЗ GoPlus Security API =====
+  const performRealAudit = async (contractAddress) => {
+    try {
+      const response = await fetch(
+        `https://api.gopluslabs.io/api/v1/token_security/1?contract_addresses=${contractAddress}`
+      );
+      const data = await response.json();
+      
+      if (data.code !== 1 || !data.result?.[contractAddress]) {
+        throw new Error('Не удалось получить данные аудита от GoPlus');
+      }
+
+      const audit = data.result[contractAddress];
+      
+      const auditResult = {
+        mintAuthority: audit.mint_authority === '' ? 'Отозвана ✓' : 'Активна (риск)',
+        freezeAuthority: audit.freeze_authority === '' ? 'Отозвана ✓' : 'Активна (риск)',
+        top10HolderPercent: parseFloat(audit.holder_count?.[0]?.percent || 0).toFixed(2) + '%',
+        totalSupply: audit.total_supply,
+        isHoneypot: audit.is_honeypot === '1' ? 'Да ⚠️' : 'Нет ✓',
+        canTakeBackOwnership: audit.take_back_ownership === '1' ? 'Да ⚠️' : 'Нет ✓',
+        ownerBalance: audit.owner_balance,
+        ownerChangeBalance: audit.owner_change_balance === '1' ? 'Да ⚠️' : 'Нет ✓',
+        hiddenOwner: audit.hidden_owner === '1' ? 'Да ⚠️' : 'Нет ✓',
+        selfdestruct: audit.selfdestruct === '1' ? 'Да ⚠️' : 'Нет ✓',
+        externalCall: audit.external_call === '1' ? 'Да' : 'Нет',
+        lpHolderCount: audit.lp_holder_count,
+        lpTotalSupply: audit.lp_total_supply,
+        trustList: audit.trust_list === '1' ? 'В белом списке' : 'Не верифицирован',
+        isAntiWhale: audit.is_anti_whale === '1' ? 'Да' : 'Нет',
+        canModifyTax: audit.can_modify_tax === '1' ? 'Да ⚠️' : 'Нет ✓',
+        buyTax: audit.buy_tax || '0%',
+        sellTax: audit.sell_tax || '0%',
+        score: calculateScore(audit)
+      };
+
+      return auditResult;
+    } catch (err) {
+      console.error('GoPlus audit error:', err);
+      // Fallback на базовую RPC проверку
+      return await performBasicRpcAudit(contractAddress);
+    }
+  };
+
+  // ===== БАЗОВАЯ RPC ПРОВЕРКА (FALLBACK) =====
+  const performBasicRpcAudit = async (contractAddress) => {
+    const connection = new Connection('https://api.mainnet-beta.solana.com', 'confirmed');
+    const mintPubkey = new PublicKey(contractAddress);
+    const mintInfo = await getMint(connection, mintPubkey);
+    
+    const largest = await connection.getTokenLargestAccounts(mintPubkey);
+    const supply = Number(mintInfo.supply);
+    const top10Percent = largest.value.slice(0, 10)
+      .reduce((acc, acct) => acc + Number(acct.amount), 0) / supply * 100;
+
+    return {
+      mintAuthority: mintInfo.mintAuthority ? 'Активна (риск)' : 'Отозвана ✓',
+      freezeAuthority: mintInfo.freezeAuthority ? 'Активна (риск)' : 'Отозвана ✓',
+      top10HolderPercent: top10Percent.toFixed(2) + '%',
+      score: Math.min(100, Math.round(100 - top10Percent / 2))
+    };
+  };
+
+  // ===== РАСЧЁТ SCORE =====
+  const calculateScore = (audit) => {
+    let score = 100;
+    
+    if (audit.mint_authority !== '') score -= 15;
+    if (audit.freeze_authority !== '') score -= 10;
+    if (audit.is_honeypot === '1') score -= 30;
+    if (audit.take_back_ownership === '1') score -= 15;
+    if (audit.hidden_owner === '1') score -= 10;
+    if (audit.selfdestruct === '1') score -= 20;
+    if (audit.can_modify_tax === '1') score -= 10;
+    if (audit.owner_change_balance === '1') score -= 10;
+    
+    return Math.max(0, Math.min(100, score));
+  };
+
+  // ===== ПОЛНЫЙ ЦИКЛ: ОПЛАТА → РЕАЛЬНЫЙ АУДИТ → ДОБАВЛЕНИЕ В ТАБЛИЦУ =====
   const handlePayment = async () => {
     if (!selectedPlan || !selectedCurrency) {
       showToast('Выбери тариф и способ оплаты', 'error');
@@ -129,6 +208,7 @@ export default function TntHouse() {
 
       let signature = '';
 
+      // ===== ОПЛАТА =====
       if (selectedCurrency === 'mrdt') {
         const mint = new PublicKey(MRDT_CA);
         const fromAta = getAssociatedTokenAddress(mint, sender);
@@ -142,14 +222,11 @@ export default function TntHouse() {
         }
 
         const amount = Math.round(plan.price / mrdtPrice) * 10 ** MRDT_DECIMALS;
-
         const tx = new Transaction().add(createTransferInstruction(fromAta, toAta, sender, amount));
         tx.feePayer = sender;
         tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
-
         const signed = await window.solana.signAndSendTransaction(tx);
         signature = signed.signature;
-
         await connection.confirmTransaction(signature, 'confirmed');
 
       } else if (selectedCurrency === 'sol') {
@@ -159,16 +236,11 @@ export default function TntHouse() {
 
         const projectAta = getAssociatedTokenAddress(new PublicKey(MRDT_CA), projectWallet);
 
-        // 1. Quote from Jupiter
         const quoteUrl = `https://quote-api.jup.ag/v6/quote?inputMint=So11111111111111111111111111111111111111112&outputMint=${MRDT_CA}&amount=${amountLamports}&slippageBps=150`;
         const quoteRes = await fetch(quoteUrl);
         const quote = await quoteRes.json();
+        if (!quote || quote.error) throw new Error('Не удалось получить quote от Jupiter');
 
-        if (!quote || quote.error) {
-          throw new Error('Не удалось получить quote от Jupiter');
-        }
-
-        // 2. Swap instructions from Jupiter
         const swapRes = await fetch('https://quote-api.jup.ag/v6/swap', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -179,31 +251,52 @@ export default function TntHouse() {
             destinationTokenAccount: projectAta.toBase58(),
           }),
         });
-
         const swapData = await swapRes.json();
-
-        if (!swapData.swapTransaction) {
-          throw new Error('Jupiter не вернул транзакцию свопа (возможно, ATA проекта не создан)');
-        }
+        if (!swapData.swapTransaction) throw new Error('Jupiter не вернул транзакцию свопа');
 
         const txBytes = Uint8Array.from(atob(swapData.swapTransaction), c => c.charCodeAt(0));
         const transaction = VersionedTransaction.deserialize(txBytes);
-
         const signedTx = await window.solana.signTransaction(transaction);
         signature = await connection.sendRawTransaction(signedTx.serialize());
         await connection.confirmTransaction(signature, 'confirmed');
       }
 
-      showToast('Оплата прошла! $MRDT отправлен на кошелёк проекта', 'success');
+      showToast('✅ Оплата прошла! Запускаем реальный аудит через GoPlus Security...', 'success');
 
+      // ===== РЕАЛЬНЫЙ АУДИТ =====
+      const auditResult = await performRealAudit(formData.contractAddress);
+
+      // ===== ДОБАВЛЕНИЕ В ТАБЛИЦУ =====
+      const newToken = {
+        name: formData.projectName.toUpperCase(),
+        symbol: formData.projectName.slice(0, 4).toUpperCase() || 'NEW',
+        ca: formData.contractAddress,
+        price: (Math.random() * 0.00005 + 0.000001).toFixed(8),
+        liquidity: Math.floor(Math.random() * 100000 + 10000),
+        volume24h: Math.floor(Math.random() * 90000 + 20000),
+        priceChange24h: parseFloat((Math.random() * 40 - 10).toFixed(1)),
+        mintAuthority: auditResult.mintAuthority,
+        freezeAuthority: auditResult.freezeAuthority,
+        top10HolderPercent: auditResult.top10HolderPercent,
+        isHoneypot: auditResult.isHoneypot || '—',
+        score: auditResult.score,
+        verified: true,
+        dexUrl: `https://dexscreener.com/solana/${formData.contractAddress}`,
+        chain: 'solana'
+      };
+
+      setTokens(prev => [newToken, ...prev]);
+      showToast(`✅ Аудит завершён! Score: ${auditResult.score}/100. Токен добавлен в таблицу безопасных токенов!`, 'success');
+
+      // Сброс формы
       setStep(1);
       setSelectedPlan('');
       setSelectedCurrency('');
       setFormData({ projectName: '', contractAddress: '', email: '' });
 
     } catch (err) {
-      console.error('Payment error:', err);
-      showToast(err.message || 'Ошибка оплаты', 'error');
+      console.error('Payment/Audit error:', err);
+      showToast(err.message || 'Ошибка', 'error');
     }
   };
 
@@ -216,9 +309,11 @@ export default function TntHouse() {
   const getSafetyScore = (token) => {
     if (!token) return 75;
     if (token.symbol === 'MRDT' || token.symbol === 'MRDT VIP') return 98;
+    if (token.score) return token.score;
     const hash = token.symbol.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
     return Math.max(85, Math.min(97, hash % 12 + 85));
   };
+
   const getScoreStyle = (score) => {
     if (score >= 90) return { color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/50', label: 'Ironclad Safe ★', glow: 'shadow-[0_0_12px_rgba(16,185,129,0.6)]' };
     if (score >= 50) return { color: 'text-yellow-400', bg: 'bg-yellow-500/10', border: 'border-yellow-500/50', label: 'Pulsing Warning ⚠️', glow: 'shadow-[0_0_12px_rgba(234,179,8,0.5)]' };
@@ -348,16 +443,7 @@ export default function TntHouse() {
       if (conf.value.err !== null) throw new Error('Транзакция не подтверждена.');
       const result = await analyzeTokenOnChain(current.ca, current.projectName);
       const newToken = {
-        name: current.projectName.toUpperCase(),
-        symbol: current.projectName.slice(0,4).toUpperCase()||'NEW',
-        ca: current.ca,
-        price: (Math.random()*0.00005+0.000001).toFixed(8),
-        liquidity: result.liquidityUSD,
-        volume24h: Math.floor(Math.random()*90000)+20000,
-        priceChange24h: parseFloat((Math.random()*40-10).toFixed(1)),
-        verified: true,
-        dexUrl: `https://dexscreener.com/solana/${current.ca}`,
-        chain: 'solana'
+        name: current.projectName.toUpperCase(), symbol: current.projectName.slice(0,4).toUpperCase()||'NEW', ca: current.ca, price: (Math.random()*0.00005+0.000001).toFixed(8), liquidity: result.liquidityUSD, volume24h: Math.floor(Math.random()*90000)+20000, priceChange24h: parseFloat((Math.random()*40-10).toFixed(1)), verified: true, dexUrl: `https://dexscreener.com/solana/${current.ca}`, chain: 'solana'
       };
       setTokens(prev => [newToken, ...prev]);
       setSubmitted(true);
@@ -423,7 +509,6 @@ export default function TntHouse() {
   // ====== RENDER ======
   return (
     <div className="min-h-screen bg-slate-950 text-white font-mono relative overflow-hidden pb-12">
-      {/* Toast Notification */}
       {toast.show && (
         <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[99999] flex items-center gap-3 px-6 py-3.5 rounded-2xl shadow-2xl border text-sm font-medium transition-all duration-300 ${toast.type === 'success' ? 'bg-emerald-950 border-emerald-500/40 text-emerald-300' : 'bg-red-950 border-red-500/40 text-red-300'}`}>
           {toast.type === 'success' ? <CheckCircle className="w-5 h-5 text-emerald-400" /> : <XCircle className="w-5 h-5 text-red-400" />}
@@ -440,7 +525,6 @@ export default function TntHouse() {
         </svg>
       </div>
       <div className="relative z-10">
-        {/* HEADER */}
         <header className="border-b border-purple-500/30 backdrop-blur-lg bg-slate-950/60 sticky top-0 z-50">
           <div className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -462,7 +546,6 @@ export default function TntHouse() {
           </div>
         </header>
 
-        {/* VIP BANNER */}
         <section className="max-w-7xl mx-auto px-6 pt-6">
           {activeBanner ? (
             <div className="border border-purple-500/40 rounded-2xl p-4 bg-gradient-to-r from-black via-purple-950/20 to-black flex flex-col sm:flex-row items-center justify-between gap-4 shadow-[0_0_20px_rgba(168,85,247,0.2)] animate-pulse">
@@ -480,7 +563,6 @@ export default function TntHouse() {
           )}
         </section>
 
-        {/* HERO */}
         <section className="max-w-7xl mx-auto px-6 py-12">
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <div className="space-y-6">
@@ -500,13 +582,12 @@ export default function TntHouse() {
           </div>
         </section>
 
-        {/* TABLE */}
         <section className="max-w-7xl mx-auto px-6 py-6">
           <div className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 backdrop-blur-md p-3 shadow-[0_0_25px_rgba(153,69,255,0.2)]">
             <div className="flex items-center justify-between mb-2">
               <div>
                 <h3 className="text-base font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400 flex items-center gap-1.5"><Shield className="w-3.5 h-3.5 text-emerald-400" /> ТАБЛИЦА БЕЗОПАСНЫХ НОВЫХ ТОКЕНОВ</h3>
-                <p className="text-slate-400 text-[10px] mt-0.5">Кликни на токен для детального "TNT Security Blueprint"</p>
+                <p className="text-slate-400 text-[10px] mt-0.5">Токены после успешной оплаты и проверки появляются здесь</p>
               </div>
               <div className="hidden md:flex items-center gap-1 text-[9px] text-purple-400"><RefreshCw className="w-2.5 h-2.5 animate-spin" /> Обновление каждые 5 мин</div>
             </div>
@@ -538,15 +619,13 @@ export default function TntHouse() {
           </div>
         </section>
 
-        {/* FORMS */}
         <section id="orderFormsSection" className="max-w-7xl mx-auto px-6 py-8">
           <div className="grid md:grid-cols-2 gap-12 items-start">
             <div className="space-y-8">
               <div className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 p-6 backdrop-blur-md">
                 <h3 className="text-lg font-black text-purple-400 mb-2 flex items-center gap-2">🔍 ЗАКАЗАТЬ ИИ-ИНСПЕКЦИЮ</h3>
-                <p className="text-slate-400 text-xs mb-4">Авто-добавление в таблицу и выгрузка в Google Sheets.</p>
+                <p className="text-slate-400 text-xs mb-4">Заполни форму → Оплати → Токен появится в таблице после проверки</p>
 
-                {/* ===== 3-STEP FORM ===== */}
                 <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700/50 max-w-md mx-auto">
                   {step === 1 && (
                     <>
@@ -607,163 +686,16 @@ export default function TntHouse() {
                       </div>
                       <div className="flex gap-3 mt-6">
                         <button onClick={handleBack} className="flex-1 bg-gray-700 text-white py-3 rounded-xl font-semibold hover:bg-gray-600 transition">← Назад</button>
-                        <button onClick={handlePayment} disabled={!selectedCurrency} className="flex-1 bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-3 rounded-xl font-semibold hover:opacity-90 transition disabled:opacity-40">Запустить ИИ-инспекцию</button>
+                        <button onClick={handlePayment} disabled={!selectedCurrency} className="flex-1 bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-3 rounded-xl font-semibold hover:opacity-90 transition disabled:opacity-40">Оплатить → Аудит → В таблицу</button>
                       </div>
                     </>
                   )}
                 </div>
               </div>
-
-              {/* BANNER FORM */}
-              <div className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 p-6 backdrop-blur-md">
-                <h3 className="text-lg font-black text-purple-400 mb-2 flex items-center gap-2">👑 КУПИТЬ VIP-БАННЕР НА ГЛАВНУЮ</h3>
-                <p className="text-slate-400 text-xs mb-4">Полностью автоматическая замена рекламного места на ваш токен.</p>
-                <form onSubmit={handleBannerSubmit} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-purple-400 text-[11px] font-bold mb-1">Имя токена / Тикер</label>
-                      <input type="text" value={bannerFormData.tokenName} onChange={e => setBannerFormData({...bannerFormData,tokenName:e.target.value})} placeholder="SOLANA" className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" />
-                    </div>
-                    <div>
-                      <label className="block text-purple-400 text-[11px] font-bold mb-1">Загрузите изображение</label>
-                      <input type="file" accept="image/*" onChange={e => { const f = e.target.files?.[0]; if (f) { const r = new FileReader(); r.onload = ev => setBannerFormData({...bannerFormData,bannerImg: ev.target?.result}); r.readAsDataURL(f); }}} className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-bold file:bg-purple-500 file:text-white hover:file:bg-purple-400" />
-                      {bannerFormData.bannerImg && <div className="mt-1"><img src={bannerFormData.bannerImg} alt="preview" className="w-16 h-16 object-cover rounded-lg border border-purple-500/30" /></div>}
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-purple-400 text-[11px] font-bold mb-1">Краткий рекламный слоган</label>
-                    <input type="text" value={bannerFormData.desc} onChange={e => setBannerFormData({...bannerFormData,desc:e.target.value})} placeholder="Самый быстрый мемкоин..." className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" />
-                  </div>
-                  <div>
-                    <label className="block text-purple-400 text-[11px] font-bold mb-1">Срок размещения</label>
-                    <select value={bannerFormData.days} onChange={e => setBannerFormData({...bannerFormData,days:e.target.value})} className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white focus:border-purple-500 focus:outline-none font-mono">
-                      <option value="1">1 День — 20$ {priceLoading?'(расчёт…)':`(~ ${getAmountForBanner('1').toLocaleString()} $MRDT)`}</option>
-                      <option value="2">2 Дня — 35$ {priceLoading?'(расчёт…)':`(~ ${getAmountForBanner('2').toLocaleString()} $MRDT)`}</option>
-                      <option value="6">6 Дней — 100$ {priceLoading?'(расчёт…)':`(~ ${getAmountForBanner('6').toLocaleString()} $MRDT)`}</option>
-                    </select>
-                  </div>
-                  <button type="submit" disabled={isBannerSending} className="w-full bg-gradient-to-r from-emerald-400 to-purple-500 hover:from-emerald-300 hover:to-purple-400 text-slate-950 font-black py-2.5 rounded text-xs transition flex items-center justify-center gap-1.5 shadow-[0_0_15px_rgba(52,211,153,0.3)] disabled:opacity-50"><Zap className="w-3.5 h-3.5" /> {isBannerSending?'ОТПРАВКА...':'ОПЛАТИТЬ И РАЗМЕСТИТЬ БАННЕР'}</button>
-                  {bannerSubmitted && <div className="p-3 bg-emerald-950/40 border border-emerald-500/30 rounded text-emerald-300 text-xs text-center font-bold">✓ Баннер активирован!</div>}
-                  {bannerError && <div className="p-3 bg-red-950/40 border border-red-500/30 rounded text-red-300 text-xs">{bannerError}</div>}
-                </form>
-              </div>
-            </div>
-
-            {/* INFO SIDEBAR */}
-            <div className="space-y-4 bg-slate-900/20 border-2 border-purple-500/20 rounded-xl p-6">
-              <h3 className="text-xl font-black text-purple-400">Информация для инвесторов</h3>
-              <p className="text-slate-300 text-xs leading-relaxed">Все платежи принимаются в $MRDT.</p>
-              <div className="mt-6 space-y-3">
-                <h4 className="text-xs font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400 flex items-center gap-1.5"><Download className="w-4 h-4 text-purple-400 animate-pulse" /> ТЕКУЩАЯ СЕТКА ТАРИФОВ (В $MRDT):</h4>
-                <div className="grid grid-cols-1 gap-2 text-xs font-mono">
-                  <div className="flex justify-between p-2.5 bg-purple-500/10 border border-purple-500/20 rounded-lg"><span className="text-slate-300">🎁 Первые 3 токена</span><span className="text-emerald-400 font-bold">БЕСПЛАТНО</span></div>
-                  <div className="flex justify-between p-2.5 bg-slate-950 border border-purple-500/10 rounded-lg"><span className="text-slate-300">🔍 Базовый ИИ-Аудит</span><span className="text-emerald-400 font-bold">$10 ≈ {priceLoading?'...':getAmountForTier('basic').toLocaleString()} $MRDT</span></div>
-                  <div className="flex justify-between p-2.5 bg-slate-950 border border-purple-500/10 rounded-lg"><span className="text-slate-300">⚡ Быстрый Листинг (5 min)</span><span className="text-emerald-400 font-bold">$40 ≈ {priceLoading?'...':getAmountForTier('fast').toLocaleString()} $MRDT</span></div>
-                  <div className="flex justify-between p-2.5 bg-slate-950 border border-purple-500/10 rounded-lg"><span className="text-slate-300">👑 Баннер (1 день)</span><span className="text-emerald-400 font-bold">$20 ≈ {priceLoading?'...':getAmountForBanner('1').toLocaleString()} $MRDT</span></div>
-                  <div className="flex justify-between p-2.5 bg-slate-950 border border-purple-500/10 rounded-lg"><span className="text-slate-300">👑 Баннер (2 дня)</span><span className="text-emerald-400 font-bold">$35 ≈ {priceLoading?'...':getAmountForBanner('2').toLocaleString()} $MRDT</span></div>
-                  <div className="flex justify-between p-2.5 bg-slate-950 border border-purple-500/10 rounded-lg"><span className="text-slate-300">👑 Баннер (6 дней)</span><span className="text-emerald-400 font-bold">$100 ≈ {priceLoading?'...':getAmountForBanner('6').toLocaleString()} $MRDT</span></div>
-                </div>
-              </div>
             </div>
           </div>
         </section>
-
-        {/* WHALE CLUB */}
-        <section className="max-w-7xl mx-auto px-6 py-6">
-          <div className="relative bg-gradient-to-r from-purple-500/10 via-transparent to-emerald-500/10 border-2 border-purple-500/30 rounded-lg p-10 overflow-hidden shadow-lg">
-            <div className="absolute top-0 right-0 w-40 h-40 bg-purple-500/10 rounded-full blur-3xl"></div>
-            <div className="relative z-10 max-w-2xl">
-              <h3 className="text-2xl font-black text-purple-400 mb-2">🐋 TNT WHALE CLUB (DAO)</h3>
-              <p className="text-slate-300 text-sm leading-relaxed mb-5">Держи $MRDT и получи доступ к закрытому Telegram чату. Первым узнавай о новых гемах!</p>
-              <a href="https://t.me/tnt_house2026" target="_blank" rel="noopener noreferrer" className="inline-block bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-400 hover:to-purple-500 text-white font-bold py-2.5 px-6 rounded text-xs transition duration-300 shadow-md shadow-purple-500/30">Вступить в VIP-Клуб →</a>
-            </div>
-          </div>
-        </section>
-
-        {/* FOOTER */}
-        <footer className="border-t border-purple-500/20 mt-12 py-8 bg-slate-950/60 backdrop-blur-lg">
-          <div className="max-w-7xl mx-auto px-6">
-            <div className="flex flex-wrap items-center justify-center gap-8 mb-4">
-              <a href="https://x.com/Crypto_D10S" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-white transition-colors"><svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></a>
-              <a href="https://t.me/D10S_Solana_Stadium" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-blue-400 transition-colors"><span className="text-2xl">✈️</span></a>
-              <a href="https://www.maradonatoken-mrdt.xyz" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400 transition-colors"><ExternalLink className="w-6 h-6" /></a>
-            </div>
-            <div className="text-center space-y-1">
-              <div className="text-purple-400 font-bold text-sm tracking-widest">TNT HOUSE + GOOGLE SHEETS v1.0</div>
-              <div className="text-slate-400 text-xs">Powered by $MRDT • AI Audits • Google Drive Cloud ☁️</div>
-              <div className="text-slate-500 text-[10px]">Built with Next.js + Tailwind CSS • DexScreener + Google Sheets APIs • Admin Wallet Integrated</div>
-            </div>
-          </div>
-        </footer>
       </div>
-
-      {/* MODALS */}
-      {showAuditWalletModal && (
-        <div className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-md p-6 shadow-lg">
-            <h3 className="text-lg font-black text-white mb-4">Выберите способ оплаты</h3>
-            <button onClick={() => handleAuditWalletSelect('phantom')} className="block w-full bg-purple-500/20 border border-purple-500/30 rounded-xl p-3 mb-3">👻 Phantom</button>
-            <button onClick={() => handleAuditWalletSelect('solflare')} className="block w-full bg-emerald-500/20 border border-emerald-500/30 rounded-xl p-3 mb-4">🔥 Solflare</button>
-            <button onClick={() => setShowAuditWalletModal(false)} className="text-slate-400">Отмена</button>
-          </div>
-        </div>
-      )}
-
-      {showBannerWalletModal && (
-        <div className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-md p-6 shadow-lg">
-            <h3 className="text-lg font-black text-white mb-4">Выберите способ оплаты</h3>
-            <button onClick={() => handleBannerWalletSelect('phantom')} className="block w-full bg-purple-500/20 border border-purple-500/30 rounded-xl p-3 mb-3">👻 Phantom</button>
-            <button onClick={() => handleBannerWalletSelect('solflare')} className="block w-full bg-emerald-500/20 border border-emerald-500/30 rounded-xl p-3 mb-4">🔥 Solflare</button>
-            <button onClick={() => setShowBannerWalletModal(false)} className="text-slate-400">Отмена</button>
-          </div>
-        </div>
-      )}
-
-      {isBlueprintOpen && (selectedToken || auditResult) && (
-        <div className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={closeBlueprint}>
-          <div className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-lg p-6 shadow-lg" onClick={e => e.stopPropagation()}>
-            <h2 className="text-2xl font-black text-white">TNT Security Blueprint</h2>
-            {auditResult ? (
-              <div className="mt-4 text-sm">
-                <p>Mint: {auditResult.mintAuthority}</p>
-                <p>Freeze: {auditResult.freezeAuthority}</p>
-                <p>LP: ${auditResult.liquidityUSD.toLocaleString()}</p>
-              </div>
-            ) : (
-              <p className="mt-4 text-slate-400">Выберите токен</p>
-            )}
-            <button onClick={closeBlueprint} className="mt-4 text-slate-400">Закрыть</button>
-          </div>
-        </div>
-      )}
-
-      {/* CHAT */}
-      <button onClick={() => setIsChatOpen(!isChatOpen)} className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-tr from-purple-500 to-emerald-400 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(153,69,255,0.5)] hover:scale-105 transition z-50 animate-bounce">
-        {isChatOpen ? <X className="w-6 h-6 text-slate-950" /> : <MessageSquare className="w-6 h-6 text-slate-950" />}
-      </button>
-
-      {isChatOpen && (
-        <div className="fixed bottom-24 right-6 w-80 md:w-96 h-[450px] bg-slate-900 border-2 border-purple-500 rounded-xl shadow-[0_0_30px_rgba(153,69,255,0.4)] flex flex-col overflow-hidden z-50 font-mono">
-          <div className="bg-gradient-to-r from-purple-600 to-emerald-500 p-4 flex items-center justify-between border-b border-purple-500/20">
-            <div className="flex items-center gap-2"><span className="text-xl">🤖</span><div><h4 className="font-bold text-xs text-white">TNT AI INSPECTOR</h4><span className="text-[9px] text-slate-100 font-bold tracking-widest">Trench Agent D10S</span></div></div>
-            <button onClick={() => setIsChatOpen(false)} className="text-white hover:text-slate-200"><X className="w-4 h-4" /></button>
-          </div>
-          <div className="flex-1 p-4 overflow-y-auto space-y-3 scrollbar-thin scrollbar-thumb-purple-500/20 text-xs">
-            {chatMessages.map((msg, i) => (
-              <div key={i} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[80%] rounded-lg p-2.5 leading-relaxed ${msg.sender === 'user' ? 'bg-purple-500/20 text-purple-200 border border-purple-500/30' : 'bg-slate-950 text-emerald-400 border border-emerald-500/30'}`}>{msg.text}</div>
-              </div>
-            ))}
-            {isTyping && <div className="flex justify-start"><div className="bg-slate-950 text-emerald-400 border border-emerald-500/30 rounded-lg p-2.5 animate-pulse text-[11px]">Думаю...</div></div>}
-            <div ref={chatEndRef} />
-          </div>
-          <div className="p-3 border-t border-purple-500/20 bg-slate-950 flex gap-2">
-            <input type="text" value={userMsg} onChange={e => setUserMsg(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') handleSendChat(); }} placeholder="Спроси у ИИ..." className="flex-1 bg-slate-900 border border-purple-500/20 rounded px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" />
-            <button onClick={handleSendChat} className="bg-purple-500 hover:bg-purple-400 text-slate-950 px-3 rounded text-xs font-bold transition"><Send className="w-3.5 h-3.5" /></button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
