@@ -15,25 +15,17 @@ const FALLBACK_TOKENS = [
   { name: 'Test Gem', symbol: 'TGEM', ca: '11111111111111111111111111111111', price: '0.00001234', liquidity: 45000, volume24h: 120000, priceChange24h: 8.5, verified: true, dexUrl: 'https://dexscreener.com', chain: 'solana' }
 ];
 
-// ── Detect mobile browser (not Phantom in-app browser) ──────────────────────
 const isMobileBrowser = () => {
   if (typeof window === 'undefined') return false;
   return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 };
 
-// ── Check if running inside Phantom's in-app browser ────────────────────────
 const isPhantomBrowser = () => {
   if (typeof window === 'undefined') return false;
   return !!(window.solana?.isPhantom);
 };
 
-// ── Open Phantom deeplink for mobile users (мгновенный редирект) ───────────
-const openPhantomDeeplink = (currentUrl) => {
-  const encoded = encodeURIComponent(currentUrl);
-  window.location.replace(
-    `https://phantom.app/ul/browse/${encoded}?ref=${encoded}`
-  );
-};
+const STORAGE_KEY = 'tnt_payment_draft';
 
 export default function TntHouse() {
   const [tokens, setTokens] = useState([]);
@@ -82,6 +74,32 @@ export default function TntHouse() {
 
   const currentPlan = plans.find(p => p.value === selectedPlan);
 
+  // ==== Восстановление данных после возврата из Phantom ====
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setFormData(parsed.formData || { projectName: '', contractAddress: '', email: '' });
+        setSelectedPlan(parsed.selectedPlan || '');
+        setSelectedCurrency(parsed.selectedCurrency || '');
+        setStep(3); // Переходим на шаг 3 (оплата)
+        sessionStorage.removeItem(STORAGE_KEY);
+      }
+    } catch (e) {}
+  }, []);
+
+  // Сохранение данных перед редиректом
+  const saveAndRedirect = () => {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
+      formData,
+      selectedPlan,
+      selectedCurrency
+    }));
+    const encoded = encodeURIComponent(window.location.href);
+    window.location.replace(`https://phantom.app/ul/browse/${encoded}?ref=${encoded}`);
+  };
+
   useEffect(() => {
     const fetchSolPrice = async () => {
       try {
@@ -112,10 +130,9 @@ export default function TntHouse() {
     else if (step === 3) setStep(2);
   };
 
-  // ── Connect wallet (header button) ──────────────────────────────────────────
   const handleConnectWallet = async () => {
     if (isMobileBrowser() && !isPhantomBrowser()) {
-      openPhantomDeeplink(window.location.href);
+      saveAndRedirect();
       return;
     }
     if (typeof window !== 'undefined' && window.solana?.isPhantom) {
@@ -129,25 +146,22 @@ export default function TntHouse() {
     }
   };
 
-  // ── Main payment handler (исправлен: без setTimeout, прямой редирект) ─────
+  // ==== Главный обработчик оплаты ====
   const handlePayment = async () => {
     if (!selectedPlan || !selectedCurrency) {
-      showToast('Выбери тариф и способ оплаты', 'error');
-      return;
+      showToast('Выбери тариф и способ оплаты', 'error'); return;
     }
     const plan = plans.find(p => p.value === selectedPlan);
     if (!plan) return;
 
-    // Мобильный вне Phantom → мгновенный редирект
+    // Мобильный вне Phantom => сохраняем и редиректим
     if (isMobileBrowser() && !isPhantomBrowser()) {
-      openPhantomDeeplink(window.location.href);
+      saveAndRedirect();
       return;
     }
 
-    // Десктоп или Phantom in-app браузер
     if (!window.solana?.isPhantom) {
-      showToast('Установи Phantom Wallet', 'error');
-      return;
+      showToast('Установи Phantom Wallet', 'error'); return;
     }
 
     try {
@@ -164,8 +178,7 @@ export default function TntHouse() {
         try {
           await getAccount(connection, fromAta);
         } catch {
-          showToast('Нет $MRDT на кошельке', 'error');
-          return;
+          showToast('Нет $MRDT на кошельке', 'error'); return;
         }
         const amount = Math.round(plan.price / mrdtPrice) * 10 ** MRDT_DECIMALS;
         const tx = new Transaction().add(createTransferInstruction(fromAta, toAta, sender, amount));
@@ -259,6 +272,7 @@ export default function TntHouse() {
     }
   };
 
+  // ==== Остальные функции (pillars, getSafetyScore, openBlueprint, модалки, чат и т.д.) полностью из предыдущего кода ====
   const pillars = [
     { icon: Shield, label: 'AI Аудит', desc: 'Проверка контрактов', color: 'text-purple-400' },
     { icon: Zap, label: 'Микро-капы', desc: '$5K-$100K', color: 'text-emerald-400' },
@@ -374,9 +388,10 @@ export default function TntHouse() {
   const getAmountForTier = (tier) => { const usd = tier === 'fast' ? 40 : tier === 'vip' ? 120 : 10; return Math.round(usd / mrdtPrice); };
   const getAmountForBanner = (days) => { const usd = days === '2' ? 35 : days === '6' ? 100 : 20; return Math.round(usd / mrdtPrice); };
 
-  // Legacy audit wallet modal (оставлено для совместимости)
+  // Legacy audit wallet modal
   const handleAuditWalletSelect = async (walletType) => {
     setShowAuditWalletModal(false); setIsSending(true); setError('');
+    if (isMobileBrowser() && !isPhantomBrowser()) { saveAndRedirect(); return; }
     if (typeof window === 'undefined' || !window.solana) { setError('Установите Phantom.'); setIsSending(false); return; }
     const current = { ...formData };
     try {
@@ -413,12 +428,13 @@ export default function TntHouse() {
     } catch (err) { setError(err.message || 'Ошибка оплаты.'); } finally { setIsSending(false); }
   };
 
+  // Banner payment
   const handleBannerWalletSelect = async (walletType) => {
     setShowBannerWalletModal(false); setIsBannerSending(true); setBannerError('');
     if (isMobileBrowser() && !isPhantomBrowser()) {
       setBannerError('');
       setIsBannerSending(false);
-      openPhantomDeeplink(window.location.href);
+      saveAndRedirect();
       return;
     }
     if (typeof window === 'undefined' || !window.solana) { setBannerError('Установите Phantom.'); setIsBannerSending(false); return; }
@@ -686,7 +702,6 @@ export default function TntHouse() {
               <div className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 p-6 backdrop-blur-md">
                 <h3 className="text-lg font-black text-purple-400 mb-2 flex items-center gap-2">🔍 ЗАКАЗАТЬ ИИ-ИНСПЕКЦИЮ</h3>
                 <p className="text-slate-400 text-xs mb-4">Авто-добавление в таблицу и выгрузка в Google Sheets.</p>
-                {/* Mobile notice */}
                 {isMobileBrowser() && !isPhantomBrowser() && (
                   <div className="mb-4 p-3 bg-purple-950/40 border border-purple-500/40 rounded-xl text-xs text-purple-300 flex items-start gap-2">
                     <span className="text-lg">👻</span>
@@ -753,14 +768,22 @@ export default function TntHouse() {
                       </div>
                       <div className="flex gap-3 mt-6">
                         <button onClick={handleBack} className="flex-1 bg-gray-700 text-white py-3 rounded-xl font-semibold hover:bg-gray-600 transition">← Назад</button>
-                        {/* Единая кнопка оплаты (handlePayment сам определит, редиректить или нет) */}
-                        <button
-                          onClick={handlePayment}
-                          disabled={!selectedCurrency}
-                          className="flex-1 bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-3 rounded-xl font-semibold hover:opacity-90 transition disabled:opacity-40"
-                        >
-                          Запустить ИИ-инспекцию
-                        </button>
+                        {isMobileBrowser() && !isPhantomBrowser() ? (
+                          <button
+                            onClick={saveAndRedirect}
+                            className="flex-1 bg-gradient-to-r from-purple-500 to-indigo-600 text-white py-3 rounded-xl font-semibold hover:opacity-90 transition flex items-center justify-center gap-2"
+                          >
+                            👻 Открыть в Phantom
+                          </button>
+                        ) : (
+                          <button
+                            onClick={handlePayment}
+                            disabled={!selectedCurrency}
+                            className="flex-1 bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-3 rounded-xl font-semibold hover:opacity-90 transition disabled:opacity-40"
+                          >
+                            Запустить ИИ-инспекцию
+                          </button>
+                        )}
                       </div>
                     </>
                   )}
@@ -858,7 +881,7 @@ export default function TntHouse() {
         </footer>
       </div>
 
-      {/* Audit wallet modal (legacy) */}
+      {/* Audit wallet modal */}
       {showAuditWalletModal && (
         <div className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-md p-6 shadow-lg">
