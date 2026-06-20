@@ -28,7 +28,7 @@ const isPhantomBrowser = () => {
 };
 
 // ── Open Phantom deeplink for mobile users ───────────────────────────────────
-const openPhantomDeeplink = (currentUrl: string) => {
+const openPhantomDeeplink = (currentUrl) => {
   const encoded = encodeURIComponent(currentUrl);
   window.location.href = `https://phantom.app/ul/browse/${encoded}?ref=${encoded}`;
 };
@@ -950,4 +950,4 @@ export default function TntHouse() {
       )}
     </div>
   );
-    }
+}
