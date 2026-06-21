@@ -82,25 +82,23 @@ export default function TntHouse() {
   var [priceLoading, setPriceLoading] = useState(true);
   var [toast, setToast] = useState({ show: false, message: '', type: 'success' });
   var [error, setError] = useState('');
+  var [copied, setCopied] = useState(false);
 
-  // Form state
   var [formData, setFormData] = useState({ projectName: '', contractAddress: '', email: '' });
   var [selectedTier, setSelectedTier] = useState('basic');
   var [selectedCurrency, setSelectedCurrency] = useState('mrdt');
 
-  // Banner form state
   var [bannerFormData, setBannerFormData] = useState({ tokenName: '', bannerImg: '', desc: '', days: '1' });
   var [bannerCurrency, setBannerCurrency] = useState('mrdt');
   var [bannerSubmitted, setBannerSubmitted] = useState(false);
   var [bannerError, setBannerError] = useState('');
 
-  // Invoice modal state
   var [showInvoice, setShowInvoice] = useState(false);
   var [showBannerInvoice, setShowBannerInvoice] = useState(false);
   var [invoiceData, setInvoiceData] = useState(null);
+  var [bannerInvoiceData, setBannerInvoiceData] = useState(null);
   var [showWalletModal, setShowWalletModal] = useState(false);
   var [showBannerWalletModal, setShowBannerWalletModal] = useState(false);
-  var [copied, setCopied] = useState(false);
 
   var tierNames = { basic: 'Базовый Аудит (24h)', fast: 'Быстрый Листинг (5 min)', vip: 'VIP-Буст (баннер 24h)' };
   var tierPrices = { basic: 10, fast: 40, vip: 120 };
@@ -246,7 +244,7 @@ export default function TntHouse() {
     return function() { clearInterval(i); };
   }, []);
 
-  // Step 1: show invoice on site
+  // Step 1: validate and show invoice on screen
   var handleFormSubmit = function(e) {
     e.preventDefault();
     if (!formData.projectName || !formData.contractAddress || !formData.email) {
@@ -268,9 +266,11 @@ export default function TntHouse() {
 
   var handleBannerFormSubmit = function(e) {
     e.preventDefault();
-    if (!bannerFormData.tokenName || !bannerFormData.desc) { setBannerError('Укажите название и описание.'); return; }
+    if (!bannerFormData.tokenName || !bannerFormData.desc) {
+      setBannerError('Укажите название и описание.'); return;
+    }
     var usd = bannerFormData.days === '2' ? 35 : bannerFormData.days === '6' ? 100 : 20;
-    setInvoiceData({
+    setBannerInvoiceData({
       type: 'banner',
       tokenName: bannerFormData.tokenName,
       days: bannerFormData.days,
@@ -282,7 +282,7 @@ export default function TntHouse() {
     setShowBannerInvoice(true);
   };
 
-  // Step 2: from invoice — open wallet modal
+  // Step 2: from invoice open wallet modal
   var handleInvoicePay = function() {
     setShowInvoice(false);
     setShowWalletModal(true);
@@ -293,22 +293,20 @@ export default function TntHouse() {
     setShowBannerWalletModal(true);
   };
 
-  // Step 3: open Phantom/Solflare with Solana Pay
-  var openSolanaPay = function(wallet, isBanner) {
-    var inv = invoiceData;
-    var currency = inv.currency;
-    var label = isBanner
-      ? encodeURIComponent('TNT Banner ' + (inv.days || '1') + 'd')
-      : encodeURIComponent('TNT House ' + (inv.tierName || 'Audit'));
-    var message = isBanner
-      ? encodeURIComponent('VIP Banner: ' + (inv.tokenName || ''))
-      : encodeURIComponent('Audit: ' + (inv.projectName || '') + ' CA: ' + (inv.contractAddress || ''));
-    var payUrl = '';
-    if (currency === 'sol') {
-      payUrl = 'solana:' + WALLET_ADDRESS + '?amount=' + inv.solAmount + '&label=' + label + '&message=' + message;
-    } else {
-      payUrl = 'solana:' + WALLET_ADDRESS + '?amount=' + inv.mrdtAmount + '&spl-token=' + MRDT_CA + '&label=' + label + '&message=' + message;
+  // Step 3: open Solana Pay after wallet pick
+  var buildSolanaPayUrl = function(inv) {
+    var label = encodeURIComponent('TNT House ' + (inv.tierName || 'Banner'));
+    var message = encodeURIComponent(inv.projectName ? ('Audit: ' + inv.projectName) : ('Banner: ' + inv.tokenName));
+    if (inv.currency === 'sol') {
+      return 'solana:' + WALLET_ADDRESS + '?amount=' + inv.solAmount + '&label=' + label + '&message=' + message;
     }
+    return 'solana:' + WALLET_ADDRESS + '?amount=' + inv.mrdtAmount + '&spl-token=' + MRDT_CA + '&label=' + label + '&message=' + message;
+  };
+
+  var handleWalletPick = function(wallet) {
+    setShowWalletModal(false);
+    if (!invoiceData) return;
+    var payUrl = buildSolanaPayUrl(invoiceData);
     if (wallet === 'phantom') {
       var encoded = encodeURIComponent(payUrl);
       window.location.href = 'phantom://v1/browse/' + encoded;
@@ -318,48 +316,51 @@ export default function TntHouse() {
     } else {
       window.location.href = payUrl;
     }
-    // After redirect — save result
     setTimeout(function() {
-      if (!isBanner) {
-        var newToken = {
-          name: (inv.projectName || 'TOKEN').toUpperCase(),
-          symbol: (inv.projectName || 'NEW').slice(0, 4).toUpperCase(),
-          ca: inv.contractAddress || '',
-          price: '0.00000000', liquidity: 0, volume24h: 0, priceChange24h: 0,
-          score: 95, verified: true,
-          dexUrl: 'https://dexscreener.com/solana/' + (inv.contractAddress || ''),
-          chain: 'solana',
-          mintAuthority: 'Отозвана', freezeAuthority: 'Отозвана', isHoneypot: 'Нет',
-        };
-        saveTokenToSupabase(newToken);
-        setListedTokens(function(prev) { return [newToken].concat(prev); });
-        setFormData({ projectName: '', contractAddress: '', email: '' });
-        showToast('Оплата отправлена! Токен добавлен в таблицу.', 'success');
-      } else {
-        var banner = {
-          tokenName: (inv.tokenName || '').toUpperCase(),
-          bannerImg: bannerFormData.bannerImg || '',
-          desc: bannerFormData.desc,
-          expiresAt: Date.now() + parseInt(inv.days || '1') * 86400000,
-        };
-        localStorage.setItem('tnt_active_banner', JSON.stringify(banner));
-        setActiveBanner(banner);
-        setBannerSubmitted(true);
-        setBannerFormData({ tokenName: '', bannerImg: '', desc: '', days: '1' });
-        showToast('Баннер активирован!', 'success');
-        setTimeout(function() { setBannerSubmitted(false); }, 5000);
-      }
+      var newToken = {
+        name: (invoiceData.projectName || 'TOKEN').toUpperCase(),
+        symbol: (invoiceData.projectName || 'NEW').slice(0, 4).toUpperCase(),
+        ca: invoiceData.contractAddress || '',
+        price: '0.00000000', liquidity: 0, volume24h: 0, priceChange24h: 0,
+        score: 95, verified: true,
+        dexUrl: 'https://dexscreener.com/solana/' + (invoiceData.contractAddress || ''),
+        chain: 'solana',
+        mintAuthority: 'Отозвана', freezeAuthority: 'Отозвана', isHoneypot: 'Нет',
+      };
+      saveTokenToSupabase(newToken);
+      setListedTokens(function(prev) { return [newToken].concat(prev); });
+      setFormData({ projectName: '', contractAddress: '', email: '' });
+      showToast('Оплата отправлена! Токен добавлен в таблицу.', 'success');
     }, 1000);
-  };
-
-  var handleWalletPick = function(wallet) {
-    setShowWalletModal(false);
-    openSolanaPay(wallet, false);
   };
 
   var handleBannerWalletPick = function(wallet) {
     setShowBannerWalletModal(false);
-    openSolanaPay(wallet, true);
+    if (!bannerInvoiceData) return;
+    var payUrl = buildSolanaPayUrl(bannerInvoiceData);
+    if (wallet === 'phantom') {
+      var encoded = encodeURIComponent(payUrl);
+      window.location.href = 'phantom://v1/browse/' + encoded;
+      setTimeout(function() {
+        window.location.href = 'https://phantom.app/ul/v1/browse/' + encoded;
+      }, 600);
+    } else {
+      window.location.href = payUrl;
+    }
+    setTimeout(function() {
+      var banner = {
+        tokenName: (bannerInvoiceData.tokenName || '').toUpperCase(),
+        bannerImg: bannerFormData.bannerImg || '',
+        desc: bannerFormData.desc,
+        expiresAt: Date.now() + parseInt(bannerInvoiceData.days || '1') * 86400000,
+      };
+      localStorage.setItem('tnt_active_banner', JSON.stringify(banner));
+      setActiveBanner(banner);
+      setBannerSubmitted(true);
+      setBannerFormData({ tokenName: '', bannerImg: '', desc: '', days: '1' });
+      showToast('Баннер активирован!', 'success');
+      setTimeout(function() { setBannerSubmitted(false); }, 5000);
+    }, 1000);
   };
 
   var copyAddress = function() {
@@ -404,11 +405,12 @@ export default function TntHouse() {
     { icon: Lock, label: 'DAO Лицензия', desc: 'Через $MRDT', color: 'text-purple-400' },
   ];
 
-  // Invoice modal component
   var InvoiceModal = function(props) {
     var inv = props.inv;
     if (!inv) return null;
-    var amount = inv.currency === 'sol' ? inv.solAmount + ' SOL' : inv.mrdtAmount.toLocaleString() + ' $MRDT';
+    var amount = inv.currency === 'sol'
+      ? inv.solAmount + ' SOL'
+      : inv.mrdtAmount.toLocaleString() + ' $MRDT';
     return (
       <div className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
         <div className="bg-slate-950 border-2 border-purple-500/50 rounded-2xl w-full max-w-sm p-6 shadow-2xl">
@@ -419,7 +421,7 @@ export default function TntHouse() {
           <div className="bg-slate-900 rounded-xl p-4 mb-4 space-y-3">
             <div className="flex justify-between text-sm">
               <span className="text-slate-400">Услуга:</span>
-              <span className="text-white font-bold">{inv.tierName || ('Баннер ' + inv.days + ' дн.')}</span>
+              <span className="text-white font-bold text-right max-w-[180px]">{inv.tierName || ('Баннер ' + inv.days + ' дн.')}</span>
             </div>
             {inv.projectName && (
               <div className="flex justify-between text-sm">
@@ -434,30 +436,30 @@ export default function TntHouse() {
               </div>
             )}
             <div className="border-t border-purple-500/20 pt-3">
-              <div className="flex justify-between text-sm mb-1">
+              <div className="flex justify-between text-sm mb-2">
                 <span className="text-slate-400">Сумма USD:</span>
                 <span className="text-emerald-400 font-black">${inv.usd}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-slate-400">К оплате:</span>
-                <span className="text-purple-300 font-black text-base">{amount}</span>
+                <span className="text-purple-300 font-black text-lg">{amount}</span>
               </div>
             </div>
             <div className="border-t border-purple-500/20 pt-3">
-              <div className="text-slate-400 text-xs mb-1">Получатель:</div>
-              <div className="flex items-center gap-2">
+              <div className="text-slate-400 text-xs mb-2">Адрес получателя:</div>
+              <div className="flex items-center gap-2 bg-slate-800 rounded-lg p-2">
                 <span className="text-white font-mono text-[10px] break-all flex-1">{WALLET_ADDRESS}</span>
-                <button onClick={copyAddress} className="text-purple-400 hover:text-purple-300 flex-shrink-0">
-                  <Copy className="w-3.5 h-3.5" />
+                <button onClick={copyAddress} className="text-purple-400 hover:text-purple-300 flex-shrink-0 p-1">
+                  <Copy className="w-4 h-4" />
                 </button>
               </div>
-              {copied && <div className="text-emerald-400 text-[10px] mt-1">Скопировано!</div>}
+              {copied && <div className="text-emerald-400 text-[10px] mt-1 text-center">Скопировано!</div>}
             </div>
           </div>
           <button onClick={props.onPay} className="w-full bg-gradient-to-r from-purple-500 to-emerald-400 text-slate-950 font-black py-3 rounded-xl text-sm mb-3 transition hover:opacity-90">
-            Оплатить через кошелёк
+            Перейти к оплате в кошельке
           </button>
-          <button onClick={props.onClose} className="w-full text-slate-400 hover:text-white text-sm text-center transition">
+          <button onClick={props.onClose} className="w-full text-slate-400 hover:text-white text-sm text-center transition py-1">
             Отмена
           </button>
         </div>
@@ -465,7 +467,6 @@ export default function TntHouse() {
     );
   };
 
-  // Wallet picker modal
   var WalletModal = function(props) {
     return (
       <div className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
@@ -486,7 +487,7 @@ export default function TntHouse() {
               <div className="text-xs text-slate-400 font-normal">Открыть Solana Pay</div>
             </div>
           </button>
-          <button onClick={props.onClose} className="text-slate-400 hover:text-white transition text-sm w-full text-center">Отмена</button>
+          <button onClick={props.onClose} className="text-slate-400 hover:text-white transition text-sm w-full text-center py-1">Отмена</button>
         </div>
       </div>
     );
@@ -526,7 +527,7 @@ export default function TntHouse() {
               </a>
               <div>
                 <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-emerald-400 tracking-wider">TNT HOUSE</h1>
-                <span className="text-[10px] text-purple-400 block font-bold tracking-widest">TOP NEW TOKENS v1.19</span>
+                <span className="text-[10px] text-purple-400 block font-bold tracking-widest">TOP NEW TOKENS v1.20</span>
               </div>
             </div>
             <div className="relative">
@@ -751,7 +752,7 @@ export default function TntHouse() {
 
               <div className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 p-6 backdrop-blur-md">
                 <h3 className="text-lg font-black text-purple-400 mb-2">ЗАКАЗАТЬ ИИ-ИНСПЕКЦИЮ</h3>
-                <p className="text-slate-400 text-xs mb-4">Заполни — выбери валюту — получи счёт — оплати через кошелёк.</p>
+                <p className="text-slate-400 text-xs mb-4">Заполни — выбери валюту — нажми кнопку — появится счёт на экране.</p>
                 <form onSubmit={handleFormSubmit} className="space-y-4">
                   <div>
                     <label className="block text-purple-400 text-xs font-bold mb-1">Название проекта</label>
@@ -853,7 +854,7 @@ export default function TntHouse() {
                 </div>
                 <div className="flex items-start gap-3 p-3 bg-slate-900 rounded-lg border border-purple-500/10">
                   <span className="text-purple-400 font-black text-base">2</span>
-                  <span>Выбери валюту оплаты — $MRDT или SOL</span>
+                  <span>Выбери валюту — $MRDT или SOL</span>
                 </div>
                 <div className="flex items-start gap-3 p-3 bg-slate-900 rounded-lg border border-purple-500/10">
                   <span className="text-purple-400 font-black text-base">3</span>
@@ -861,7 +862,7 @@ export default function TntHouse() {
                 </div>
                 <div className="flex items-start gap-3 p-3 bg-slate-900 rounded-lg border border-purple-500/10">
                   <span className="text-purple-400 font-black text-base">4</span>
-                  <span>Выбери Phantom или Solflare — кошелёк откроется с готовой транзакцией</span>
+                  <span>Нажми "Перейти к оплате" — выбери Phantom или Solflare</span>
                 </div>
                 <div className="flex items-start gap-3 p-3 bg-slate-900 rounded-lg border border-emerald-500/20">
                   <span className="text-emerald-400 font-black text-base">5</span>
@@ -923,7 +924,7 @@ export default function TntHouse() {
               </a>
             </div>
             <div className="text-center space-y-1">
-              <div className="text-purple-400 font-bold text-sm tracking-widest">TNT HOUSE v1.19</div>
+              <div className="text-purple-400 font-bold text-sm tracking-widest">TNT HOUSE v1.20</div>
               <div className="text-slate-400 text-xs">Powered by $MRDT - AI Audits - Supabase</div>
               <div className="text-slate-500 text-[10px]">Built with Next.js + Tailwind CSS - Solana Pay</div>
             </div>
@@ -939,9 +940,9 @@ export default function TntHouse() {
         />
       )}
 
-      {showBannerInvoice && invoiceData && (
+      {showBannerInvoice && bannerInvoiceData && (
         <InvoiceModal
-          inv={invoiceData}
+          inv={bannerInvoiceData}
           onPay={handleBannerInvoicePay}
           onClose={function() { setShowBannerInvoice(false); }}
         />
@@ -1025,4 +1026,4 @@ export default function TntHouse() {
       )}
     </div>
   );
-      }
+        }
