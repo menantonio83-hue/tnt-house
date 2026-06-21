@@ -89,7 +89,7 @@ export default function TntHouse() {
   var [isSending, setIsSending] = useState(false);
   var [submitted, setSubmitted] = useState(false);
 
-  // --- Payment modal state (from 1.17.4) ---
+  // --- Payment modal state — AI Audit ---
   var [showPaymentModal, setShowPaymentModal] = useState(false);
   var [showWalletModal, setShowWalletModal] = useState(false);
   var [showInvoiceModal, setShowInvoiceModal] = useState(false);
@@ -97,6 +97,16 @@ export default function TntHouse() {
   var [selectedWallet, setSelectedWallet] = useState(null);
   var [invoiceAmount, setInvoiceAmount] = useState(0);
   var [invoiceLabel, setInvoiceLabel] = useState('');
+  var [invoiceUsd, setInvoiceUsd] = useState(0);
+
+  // --- Payment modal state — VIP Banner (separate flow) ---
+  var [showBannerPaymentModal, setShowBannerPaymentModal] = useState(false);
+  var [showBannerWalletModal, setShowBannerWalletModal] = useState(false);
+  var [showBannerInvoiceModal, setShowBannerInvoiceModal] = useState(false);
+  var [selectedBannerPaymentMethod, setSelectedBannerPaymentMethod] = useState(null);
+  var [selectedBannerWallet, setSelectedBannerWallet] = useState(null);
+  var [bannerInvoiceAmount, setBannerInvoiceAmount] = useState(0);
+  var [bannerInvoiceUsd, setBannerInvoiceUsd] = useState(0);
 
   // --- Banner form ---
   var [bannerFormData, setBannerFormData] = useState({ tokenName: '', bannerImg: '', desc: '', days: '1' });
@@ -283,7 +293,9 @@ export default function TntHouse() {
     if (mrdtAmount <= 0) { showToast('Ошибка цены, попробуй позже', 'error'); return; }
 
     var tierName = selectedTier === 'fast' ? 'Быстрый' : selectedTier === 'vip' ? 'VIP' : 'Базовый';
+    var usd = selectedTier === 'fast' ? 40 : selectedTier === 'vip' ? 120 : 10;
     setInvoiceAmount(mrdtAmount);
+    setInvoiceUsd(usd);
     setInvoiceLabel('TNT House ' + tierName + ' Audit - ' + formData.projectName);
     setShowPaymentModal(true);
   };
@@ -387,17 +399,47 @@ export default function TntHouse() {
   };
 
   // --- Banner submit ---
+  // --- Banner flow: Step 1 — validate form → open payment modal ---
   var handleBannerSubmit = function (e) {
     e.preventDefault();
-    if (!bannerFormData.tokenName || !bannerFormData.desc) { setBannerError('Укажите название и описание.'); return; }
+    if (!bannerFormData.tokenName || !bannerFormData.desc) {
+      setBannerError('Укажите название и описание.'); return;
+    }
+    var mrdtAmount = getAmountForBanner(bannerFormData.days);
+    if (mrdtAmount <= 0) { setBannerError('Ошибка цены, попробуй позже.'); return; }
+    var usd = bannerFormData.days === '2' ? 35 : bannerFormData.days === '6' ? 100 : 20;
+    setBannerInvoiceAmount(mrdtAmount);
+    setBannerInvoiceUsd(usd);
+    setBannerError('');
+    setShowBannerPaymentModal(true);
+  };
+
+  // --- Banner flow: Step 2 — choose payment method ---
+  var handleBannerPaymentMethodSelect = function (method) {
+    setSelectedBannerPaymentMethod(method);
+    setShowBannerPaymentModal(false);
+    setShowBannerWalletModal(true);
+  };
+
+  // --- Banner flow: Step 3 — choose wallet ---
+  var handleBannerWalletSelect = function (wallet) {
+    setSelectedBannerWallet(wallet);
+    setShowBannerWalletModal(false);
+    setShowBannerInvoiceModal(true);
+  };
+
+  // --- Banner flow: Step 4 — confirm payment → deeplink → activate banner ---
+  var handleBannerConfirmPayment = function () {
+    setShowBannerInvoiceModal(false);
     setIsBannerSending(true);
 
-    var mrdtAmount = getAmountForBanner(bannerFormData.days);
+    var mrdtAmount = bannerInvoiceAmount;
     var label = encodeURIComponent('TNT House VIP Banner ' + bannerFormData.days + 'd');
     var message = encodeURIComponent('VIP Banner for ' + bannerFormData.tokenName);
     var solanaPayUrl = 'solana:' + WALLET_ADDRESS + '?amount=' + mrdtAmount + '&spl-token=' + MRDT_CA + '&label=' + label + '&message=' + message;
     window.location.href = solanaPayUrl;
 
+    // After wallet redirect — activate banner with uploaded image
     setTimeout(function () {
       var banner = {
         tokenName: bannerFormData.tokenName.toUpperCase(),
@@ -409,8 +451,10 @@ export default function TntHouse() {
       setActiveBanner(banner);
       setBannerSubmitted(true);
       setBannerFormData({ tokenName: '', bannerImg: '', desc: '', days: '1' });
-      setBannerError('');
+      setSelectedBannerPaymentMethod(null);
+      setSelectedBannerWallet(null);
       setIsBannerSending(false);
+      showToast('VIP-баннер активирован! Токен теперь на главной.', 'success');
       setTimeout(function () { setBannerSubmitted(false); }, 5000);
     }, 800);
   };
@@ -932,7 +976,7 @@ export default function TntHouse() {
             <div className="bg-slate-900 border border-purple-500/20 rounded-xl p-6 text-center space-y-4">
               <div className="text-xs text-purple-400 font-bold">{selectedWallet} · {selectedPaymentMethod}</div>
               <div className="text-3xl font-black text-emerald-400">{invoiceAmount.toLocaleString()} $MRDT</div>
-              <div className="text-sm font-bold text-slate-300">≈ ${selectedTier === 'fast' ? '40' : selectedTier === 'vip' ? '120' : '10'} USD</div>
+              <div className="text-sm font-bold text-slate-300">≈ ${invoiceUsd} USD</div>
               <div className="text-xs text-slate-400">{invoiceLabel}</div>
               <div className="text-xs text-slate-500 font-mono break-all">Кошелёк: {WALLET_ADDRESS.slice(0, 8)}...{WALLET_ADDRESS.slice(-8)}</div>
             </div>
@@ -944,6 +988,116 @@ export default function TntHouse() {
                 Отмена
               </button>
               <button onClick={handleConfirmPayment} className="flex-1 px-5 py-2.5 text-sm rounded-lg bg-gradient-to-r from-purple-500 to-emerald-400 text-slate-950 font-black hover:from-purple-400 hover:to-emerald-300 transition">
+                ✅ Оплатить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* BANNER PAYMENT MODALS                                        */}
+      {/* ============================================================ */}
+
+      {/* BANNER MODAL 1: Choose payment method */}
+      {showBannerPaymentModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4" onClick={function () { setShowBannerPaymentModal(false); }}>
+          <div className="bg-slate-950 border-2 border-emerald-500/40 rounded-2xl w-full max-w-md p-6 shadow-[0_0_40px_rgba(16,185,129,0.2)]" onClick={function (e) { e.stopPropagation(); }}>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-xl font-black text-emerald-400">Оплата VIP-баннера</h3>
+              <button onClick={function () { setShowBannerPaymentModal(false); }} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
+            </div>
+            <p className="text-slate-500 text-xs mb-6">Баннер появится на главной сразу после оплаты</p>
+            <div className="grid grid-cols-2 gap-4">
+              <button onClick={function () { handleBannerPaymentMethodSelect('MRDT'); }} className="bg-purple-500/10 border-2 border-purple-500/30 hover:border-purple-500 rounded-xl p-6 text-center transition group">
+                <div className="text-3xl mb-2">⚽️</div>
+                <div className="font-bold text-purple-400 group-hover:text-white transition">$MRDT</div>
+                <div className="text-[10px] text-slate-500 mt-1">Рекомендуем</div>
+              </button>
+              <button onClick={function () { handleBannerPaymentMethodSelect('SOL'); }} className="bg-emerald-500/10 border-2 border-emerald-500/30 hover:border-emerald-500 rounded-xl p-6 text-center transition group">
+                <div className="flex justify-center mb-2">
+                  <svg width="36" height="36" viewBox="0 0 397 311" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M64.6 237.9c2.4-2.4 5.7-3.8 9.2-3.8h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1l62.7-62.7z" fill="url(#bs1)"/>
+                    <path d="M64.6 3.8C67.1 1.4 70.4 0 73.8 0h317.4c5.8 0 8.7 7 4.6 11.1L333.1 73.8c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1L64.6 3.8z" fill="url(#bs2)"/>
+                    <path d="M333.1 120.1c-2.4-2.4-5.7-3.8-9.2-3.8H6.5c-5.8 0-8.7 7-4.6 11.1l62.7 62.7c2.4 2.4 5.7 3.8 9.2 3.8h317.4c5.8 0 8.7-7 4.6-11.1l-62.7-62.7z" fill="url(#bs3)"/>
+                    <defs>
+                      <linearGradient id="bs1" x1="360.9" y1="351.4" x2="141.2" y2="-69.2" gradientUnits="userSpaceOnUse"><stop stopColor="#00FFA3"/><stop offset="1" stopColor="#DC1FFF"/></linearGradient>
+                      <linearGradient id="bs2" x1="264.8" y1="351.4" x2="45.2" y2="-69.2" gradientUnits="userSpaceOnUse"><stop stopColor="#00FFA3"/><stop offset="1" stopColor="#DC1FFF"/></linearGradient>
+                      <linearGradient id="bs3" x1="312.5" y1="351.4" x2="92.9" y2="-69.2" gradientUnits="userSpaceOnUse"><stop stopColor="#00FFA3"/><stop offset="1" stopColor="#DC1FFF"/></linearGradient>
+                    </defs>
+                  </svg>
+                </div>
+                <div className="font-bold text-emerald-400 group-hover:text-white transition">SOL</div>
+                <div className="text-[10px] text-slate-500 mt-1">Solana</div>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* BANNER MODAL 2: Choose wallet */}
+      {showBannerWalletModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4" onClick={function () { setShowBannerWalletModal(false); setShowBannerPaymentModal(true); }}>
+          <div className="bg-slate-950 border-2 border-emerald-500/40 rounded-2xl w-full max-w-md p-6 shadow-[0_0_40px_rgba(16,185,129,0.2)]" onClick={function (e) { e.stopPropagation(); }}>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-black text-emerald-400">Выбери кошелёк</h3>
+              <button onClick={function () { setShowBannerWalletModal(false); setShowBannerPaymentModal(true); }} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <button onClick={function () { handleBannerWalletSelect('Phantom'); }} className="bg-purple-500/10 border-2 border-purple-500/30 hover:border-purple-500 rounded-xl p-6 text-center transition group">
+                <div className="text-3xl mb-2">👻</div>
+                <div className="font-bold text-purple-400 group-hover:text-white transition">Phantom</div>
+              </button>
+              <button onClick={function () { handleBannerWalletSelect('Solflare'); }} className="bg-yellow-500/10 border-2 border-yellow-500/30 hover:border-yellow-400 rounded-xl p-6 text-center transition group">
+                <div className="flex justify-center mb-2">
+                  <svg width="40" height="40" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="128" height="128" rx="24" fill="#FBBF24"/>
+                    <text x="64" y="95" textAnchor="middle" fontFamily="Georgia, serif" fontWeight="900" fontSize="82" fill="#1a0a00" fontStyle="italic">S</text>
+                  </svg>
+                </div>
+                <div className="font-bold text-yellow-400 group-hover:text-white transition">Solflare</div>
+              </button>
+            </div>
+            <button onClick={function () { setShowBannerWalletModal(false); setShowBannerPaymentModal(true); }} className="mt-4 w-full text-center text-slate-400 hover:text-white text-xs py-2">
+              ← Назад
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* BANNER MODAL 3: Invoice / confirm */}
+      {showBannerInvoiceModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4" onClick={function () { setShowBannerInvoiceModal(false); }}>
+          <div className="bg-slate-950 border-2 border-emerald-500/40 rounded-2xl w-full max-w-md p-6 shadow-[0_0_40px_rgba(16,185,129,0.2)]" onClick={function (e) { e.stopPropagation(); }}>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-black text-emerald-400">Счёт — VIP-баннер</h3>
+              <button onClick={function () { setShowBannerInvoiceModal(false); }} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
+            </div>
+            {/* Preview of banner image */}
+            {bannerFormData.bannerImg && (
+              <div className="flex items-center gap-3 bg-slate-900 border border-emerald-500/20 rounded-xl p-3 mb-4">
+                <img src={bannerFormData.bannerImg} alt="banner preview" className="w-12 h-12 rounded-xl object-cover border border-emerald-500/30" />
+                <div>
+                  <div className="text-emerald-400 font-black text-sm">${bannerFormData.tokenName.toUpperCase()}</div>
+                  <div className="text-slate-400 text-xs">{bannerFormData.desc}</div>
+                  <div className="text-slate-500 text-[10px]">{bannerFormData.days} {bannerFormData.days === '1' ? 'день' : bannerFormData.days === '2' ? 'дня' : 'дней'}</div>
+                </div>
+              </div>
+            )}
+            <div className="bg-slate-900 border border-emerald-500/20 rounded-xl p-6 text-center space-y-3">
+              <div className="text-xs text-emerald-400 font-bold">{selectedBannerWallet} · {selectedBannerPaymentMethod}</div>
+              <div className="text-3xl font-black text-emerald-400">{bannerInvoiceAmount.toLocaleString()} $MRDT</div>
+              <div className="text-sm font-bold text-slate-300">≈ ${bannerInvoiceUsd} USD</div>
+              <div className="text-xs text-slate-500 font-mono break-all">Кошелёк: {WALLET_ADDRESS.slice(0, 8)}...{WALLET_ADDRESS.slice(-8)}</div>
+            </div>
+            <div className="mt-2 p-2 bg-emerald-950/30 border border-emerald-500/20 rounded-lg text-[10px] text-emerald-300 text-center">
+              После оплаты баннер появится на главной автоматически 🚀
+            </div>
+            <div className="mt-6 flex gap-3">
+              <button onClick={function () { setShowBannerInvoiceModal(false); }} className="flex-1 px-5 py-2.5 text-sm rounded-lg border border-emerald-500/40 hover:bg-emerald-500/10 transition text-slate-300">
+                Отмена
+              </button>
+              <button onClick={handleBannerConfirmPayment} className="flex-1 px-5 py-2.5 text-sm rounded-lg bg-gradient-to-r from-emerald-400 to-purple-500 text-slate-950 font-black hover:from-emerald-300 hover:to-purple-400 transition">
                 ✅ Оплатить
               </button>
             </div>
