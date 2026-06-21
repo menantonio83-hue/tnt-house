@@ -59,6 +59,50 @@ async function loadTokensFromSupabase() {
   } catch (e) { return []; }
 }
 
+// --- Supabase banner helpers ---
+// Save banner to Supabase (upsert — always 1 active row with id=1)
+async function saveBannerToSupabase(banner) {
+  try {
+    await fetch(SUPABASE_URL + '/rest/v1/active_banner', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY,
+        'Prefer': 'resolution=merge-duplicates,return=minimal',
+      },
+      body: JSON.stringify({
+        id: 1,
+        token_name: banner.tokenName,
+        banner_img: banner.bannerImg || '',
+        desc: banner.desc,
+        expires_at: new Date(banner.expiresAt).toISOString(),
+      }),
+    });
+  } catch (e) { console.error('Banner save failed:', e); }
+}
+
+// Load active banner from Supabase
+async function loadBannerFromSupabase() {
+  try {
+    var res = await fetch(SUPABASE_URL + '/rest/v1/active_banner?id=eq.1&select=*', {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY },
+    });
+    if (!res.ok) return null;
+    var data = await res.json();
+    if (!data || !data[0]) return null;
+    var row = data[0];
+    var expiresAt = new Date(row.expires_at).getTime();
+    if (Date.now() > expiresAt) return null; // expired
+    return {
+      tokenName: row.token_name,
+      bannerImg: row.banner_img || '',
+      desc: row.desc,
+      expiresAt: expiresAt,
+    };
+  } catch (e) { return null; }
+}
+
 const FALLBACK_TOKENS = [
   { name: 'Test Gem', symbol: 'TGEM', ca: '11111111111111111111111111111111', price: '0.00001234', liquidity: 45000, volume24h: 120000, priceChange24h: 8.5, verified: true, dexUrl: 'https://dexscreener.com', chain: 'solana' }
 ];
@@ -72,6 +116,7 @@ export default function TntHouse() {
   var [walletAddress, setWalletAddress] = useState('');
   var [isBuyDropdownOpen, setIsBuyDropdownOpen] = useState(false);
   var [activeBanner, setActiveBanner] = useState(null);
+  var [bannerCountdown, setBannerCountdown] = useState('');
   var [isBlueprintOpen, setIsBlueprintOpen] = useState(false);
   var [selectedToken, setSelectedToken] = useState(null);
 
@@ -265,20 +310,37 @@ export default function TntHouse() {
     if (chatEndRef.current) chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
 
+  // Load banner from Supabase on mount + poll every 30s + live countdown every 1s
   useEffect(function () {
-    var check = function () {
-      try {
-        var s = localStorage.getItem('tnt_active_banner');
-        if (s) {
-          var d = JSON.parse(s);
-          if (Date.now() < d.expiresAt) setActiveBanner(d);
-          else { localStorage.removeItem('tnt_active_banner'); setActiveBanner(null); }
-        }
-      } catch (e) { }
+    var fetchBanner = async function () {
+      var banner = await loadBannerFromSupabase();
+      setActiveBanner(banner);
     };
-    check();
-    var i = setInterval(check, 10000);
-    return function () { clearInterval(i); };
+    fetchBanner();
+    var pollInterval = setInterval(fetchBanner, 30000);
+
+    // Live countdown ticker every second
+    var countdownInterval = setInterval(function () {
+      setActiveBanner(function (current) {
+        if (!current) { setBannerCountdown(''); return current; }
+        var msLeft = current.expiresAt - Date.now();
+        if (msLeft <= 0) { setBannerCountdown(''); return null; } // expired
+        var totalSec = Math.floor(msLeft / 1000);
+        var days = Math.floor(totalSec / 86400);
+        var hours = Math.floor((totalSec % 86400) / 3600);
+        var mins = Math.floor((totalSec % 3600) / 60);
+        var secs = totalSec % 60;
+        var parts = [];
+        if (days > 0) parts.push(days + 'д');
+        if (hours > 0) parts.push(hours + 'ч');
+        parts.push((mins < 10 ? '0' : '') + mins + 'м');
+        parts.push((secs < 10 ? '0' : '') + secs + 'с');
+        setBannerCountdown(parts.join(' '));
+        return current;
+      });
+    }, 1000);
+
+    return function () { clearInterval(pollInterval); clearInterval(countdownInterval); };
   }, []);
 
   // --- PAYMENT FLOW (from 1.17.4) ---
@@ -399,11 +461,15 @@ export default function TntHouse() {
   };
 
   // --- Banner submit ---
-  // --- Banner flow: Step 1 — validate form → open payment modal ---
+  // --- Banner flow: Step 1 — validate form → check slot → open payment modal ---
   var handleBannerSubmit = function (e) {
     e.preventDefault();
     if (!bannerFormData.tokenName || !bannerFormData.desc) {
       setBannerError('Укажите название и описание.'); return;
+    }
+    // Block if banner slot is currently taken
+    if (activeBanner) {
+      setBannerError('Место занято! Освободится через ' + bannerCountdown); return;
     }
     var mrdtAmount = getAmountForBanner(bannerFormData.days);
     if (mrdtAmount <= 0) { setBannerError('Ошибка цены, попробуй позже.'); return; }
@@ -428,7 +494,7 @@ export default function TntHouse() {
     setShowBannerInvoiceModal(true);
   };
 
-  // --- Banner flow: Step 4 — confirm payment → deeplink → activate banner ---
+  // --- Banner flow: Step 4 — confirm payment → deeplink → save to Supabase ---
   var handleBannerConfirmPayment = function () {
     setShowBannerInvoiceModal(false);
     setIsBannerSending(true);
@@ -439,7 +505,7 @@ export default function TntHouse() {
     var solanaPayUrl = 'solana:' + WALLET_ADDRESS + '?amount=' + mrdtAmount + '&spl-token=' + MRDT_CA + '&label=' + label + '&message=' + message;
     window.location.href = solanaPayUrl;
 
-    // After wallet redirect — activate banner with uploaded image
+    // After wallet redirect — save banner to Supabase (visible to ALL users)
     setTimeout(function () {
       var banner = {
         tokenName: bannerFormData.tokenName.toUpperCase(),
@@ -447,14 +513,14 @@ export default function TntHouse() {
         desc: bannerFormData.desc,
         expiresAt: Date.now() + parseInt(bannerFormData.days) * 86400000,
       };
-      localStorage.setItem('tnt_active_banner', JSON.stringify(banner));
+      saveBannerToSupabase(banner);
       setActiveBanner(banner);
       setBannerSubmitted(true);
       setBannerFormData({ tokenName: '', bannerImg: '', desc: '', days: '1' });
       setSelectedBannerPaymentMethod(null);
       setSelectedBannerWallet(null);
       setIsBannerSending(false);
-      showToast('VIP-баннер активирован! Токен теперь на главной.', 'success');
+      showToast('VIP-баннер активирован! Токен теперь на главной для всех.', 'success');
       setTimeout(function () { setBannerSubmitted(false); }, 5000);
     }, 800);
   };
@@ -549,6 +615,9 @@ export default function TntHouse() {
                   <span className="bg-purple-500 text-white font-black text-[9px] px-2 py-0.5 rounded tracking-widest block w-max mb-1">VIP БУСТ</span>
                   <h4 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400">${activeBanner.tokenName}</h4>
                   <p className="text-slate-300 text-xs mt-0.5">{activeBanner.desc}</p>
+                  {bannerCountdown && (
+                    <p className="text-[10px] text-slate-500 mt-1">⏱ место освободится через <span className="text-purple-400 font-bold">{bannerCountdown}</span></p>
+                  )}
                 </div>
               </div>
               <button onClick={function () { window.open('https://jup.ag', '_blank'); }} className="bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-black text-xs px-6 py-2.5 rounded transition">
@@ -809,9 +878,15 @@ export default function TntHouse() {
                       <option value="6">6 Дней - $100 (~{priceLoading ? '...' : getAmountForBanner('6').toLocaleString()} $MRDT)</option>
                     </select>
                   </div>
-                  <button type="submit" disabled={isBannerSending} className="w-full bg-gradient-to-r from-emerald-400 to-purple-500 hover:from-emerald-300 hover:to-purple-400 text-slate-950 font-black py-2.5 rounded text-xs transition flex items-center justify-center gap-1.5 disabled:opacity-50">
-                    <Zap className="w-3.5 h-3.5" /> {isBannerSending ? 'ОТПРАВКА...' : 'ОПЛАТИТЬ И РАЗМЕСТИТЬ БАННЕР'}
+                  <button type="submit" disabled={isBannerSending || !!activeBanner} className="w-full bg-gradient-to-r from-emerald-400 to-purple-500 hover:from-emerald-300 hover:to-purple-400 text-slate-950 font-black py-2.5 rounded text-xs transition flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <Zap className="w-3.5 h-3.5" /> {isBannerSending ? 'ОТПРАВКА...' : activeBanner ? '🔒 МЕСТО ЗАНЯТО' : 'ОПЛАТИТЬ И РАЗМЕСТИТЬ БАННЕР'}
                   </button>
+                  {activeBanner && bannerCountdown && (
+                    <div className="p-2.5 bg-slate-900 border border-purple-500/20 rounded text-center">
+                      <p className="text-slate-400 text-[11px]">Место освободится через</p>
+                      <p className="text-purple-400 font-black text-sm mt-0.5">{bannerCountdown}</p>
+                    </div>
+                  )}
                   {bannerSubmitted && <div className="p-3 bg-emerald-950/40 border border-emerald-500/30 rounded text-emerald-300 text-xs text-center font-bold">Баннер активирован!</div>}
                   {bannerError && <div className="p-3 bg-red-950/40 border border-red-500/30 rounded text-red-300 text-xs">{bannerError}</div>}
                 </form>
