@@ -84,7 +84,7 @@ export default function TntHouse() {
   var [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
   // --- AI Inspection form ---
-  var [formData, setFormData] = useState({ projectName: '', contractAddress: '', email: '' });
+  var [formData, setFormData] = useState({ projectName: '', contractAddress: '', telegram: '' });
   var [selectedTier, setSelectedTier] = useState('basic');
   var [isSending, setIsSending] = useState(false);
   var [submitted, setSubmitted] = useState(false);
@@ -276,7 +276,7 @@ export default function TntHouse() {
   // Step 1: Form submit → show payment modal
   var handleFormSubmit = function (e) {
     e.preventDefault();
-    if (!formData.projectName || !formData.contractAddress || !formData.email) {
+    if (!formData.projectName || !formData.contractAddress || !formData.telegram) {
       showToast('Заполни все поля', 'error'); return;
     }
     var mrdtAmount = getAmountForTier(selectedTier);
@@ -334,7 +334,7 @@ export default function TntHouse() {
       saveTokenToSupabase(newToken);
       setListedTokens(function (prev) { return [newToken].concat(prev); });
       setSubmitted(true);
-      setFormData({ projectName: '', contractAddress: '', email: '' });
+      setFormData({ projectName: '', contractAddress: '', telegram: '' });
       setSelectedPaymentMethod(null);
       setSelectedWallet(null);
       showToast('Оплата отправлена! Токен добавлен в таблицу.', 'success');
@@ -682,8 +682,11 @@ export default function TntHouse() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-purple-400 text-xs font-bold mb-1">Email для связи</label>
-                    <input type="email" placeholder="your@email.com" value={formData.email} onChange={function (e) { setFormData(Object.assign({}, formData, { email: e.target.value })); }} className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" />
+                    <label className="block text-purple-400 text-xs font-bold mb-1">Telegram для связи</label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-purple-400 text-xs font-bold">@</span>
+                      <input type="text" placeholder="your_telegram" value={formData.telegram} onChange={function (e) { setFormData(Object.assign({}, formData, { telegram: e.target.value })); }} className="w-full bg-slate-950 border border-purple-500/20 rounded pl-7 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" />
+                    </div>
                   </div>
                   <button type="submit" disabled={isSending} className="w-full bg-gradient-to-r from-purple-500 to-emerald-400 hover:from-purple-400 hover:to-emerald-300 text-slate-950 font-black py-2.5 rounded text-xs transition flex items-center justify-center gap-1.5 disabled:opacity-50">
                     <Send className="w-3.5 h-3.5" /> {isSending ? 'ОТПРАВЛЯЕМ...' : 'ЗАПУСТИТЬ ИИ-ИНСПЕКЦИЮ'}
@@ -816,7 +819,27 @@ export default function TntHouse() {
                 <div className="text-[10px] text-slate-500 mt-1">Рекомендуем</div>
               </button>
               <button onClick={function () { handlePaymentMethodSelect('SOL'); }} className="bg-emerald-500/10 border-2 border-emerald-500/30 hover:border-emerald-500 rounded-xl p-6 text-center transition group">
-                <div className="text-3xl mb-2">◎</div>
+                <div className="flex justify-center mb-2">
+                  <svg width="36" height="36" viewBox="0 0 397 311" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M64.6 237.9c2.4-2.4 5.7-3.8 9.2-3.8h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1l62.7-62.7z" fill="url(#sol_a)"/>
+                    <path d="M64.6 3.8C67.1 1.4 70.4 0 73.8 0h317.4c5.8 0 8.7 7 4.6 11.1L333.1 73.8c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1L64.6 3.8z" fill="url(#sol_b)"/>
+                    <path d="M333.1 120.1c-2.4-2.4-5.7-3.8-9.2-3.8H6.5c-5.8 0-8.7 7-4.6 11.1l62.7 62.7c2.4 2.4 5.7 3.8 9.2 3.8h317.4c5.8 0 8.7-7 4.6-11.1l-62.7-62.7z" fill="url(#sol_c)"/>
+                    <defs>
+                      <linearGradient id="sol_a" x1="360.9" y1="351.4" x2="141.2" y2="-69.2" gradientUnits="userSpaceOnUse">
+                        <stop stopColor="#00FFA3"/>
+                        <stop offset="1" stopColor="#DC1FFF"/>
+                      </linearGradient>
+                      <linearGradient id="sol_b" x1="264.8" y1="351.4" x2="45.2" y2="-69.2" gradientUnits="userSpaceOnUse">
+                        <stop stopColor="#00FFA3"/>
+                        <stop offset="1" stopColor="#DC1FFF"/>
+                      </linearGradient>
+                      <linearGradient id="sol_c" x1="312.5" y1="351.4" x2="92.9" y2="-69.2" gradientUnits="userSpaceOnUse">
+                        <stop stopColor="#00FFA3"/>
+                        <stop offset="1" stopColor="#DC1FFF"/>
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                </div>
                 <div className="font-bold text-emerald-400 group-hover:text-white transition">SOL</div>
                 <div className="text-[10px] text-slate-500 mt-1">Solana</div>
               </button>
@@ -839,7 +862,13 @@ export default function TntHouse() {
                 <div className="font-bold text-purple-400 group-hover:text-white transition">Phantom</div>
               </button>
               <button onClick={function () { handleWalletSelect('Solflare'); }} className="bg-emerald-500/10 border-2 border-emerald-500/30 hover:border-emerald-500 rounded-xl p-6 text-center transition group">
-                <div className="text-3xl mb-2">🪐</div>
+                <div className="flex justify-center mb-2">
+                  <svg width="36" height="36" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="128" height="128" rx="20" fill="#FC6B0A"/>
+                    <path d="M64 20L108 98H20L64 20Z" fill="white"/>
+                    <path d="M64 48L86 86H42L64 48Z" fill="#FC6B0A"/>
+                  </svg>
+                </div>
                 <div className="font-bold text-emerald-400 group-hover:text-white transition">Solflare</div>
               </button>
             </div>
@@ -861,6 +890,7 @@ export default function TntHouse() {
             <div className="bg-slate-900 border border-purple-500/20 rounded-xl p-6 text-center space-y-4">
               <div className="text-xs text-purple-400 font-bold">{selectedWallet} · {selectedPaymentMethod}</div>
               <div className="text-3xl font-black text-emerald-400">{invoiceAmount.toLocaleString()} $MRDT</div>
+              <div className="text-sm font-bold text-slate-300">≈ ${selectedTier === 'fast' ? '40' : selectedTier === 'vip' ? '120' : '10'} USD</div>
               <div className="text-xs text-slate-400">{invoiceLabel}</div>
               <div className="text-xs text-slate-500 font-mono break-all">Кошелёк: {WALLET_ADDRESS.slice(0, 8)}...{WALLET_ADDRESS.slice(-8)}</div>
             </div>
