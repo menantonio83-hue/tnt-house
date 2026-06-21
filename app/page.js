@@ -67,6 +67,8 @@ const isPhantomBrowser = () => typeof window !== 'undefined' && !!(window.solana
 const isSolflareBrowser = () => typeof window !== 'undefined' && !!(window.solflare && window.solflare.isSolflare);
 const isInWalletBrowser = () => isPhantomBrowser() || isSolflareBrowser();
 
+// KEY FIX v1.13: используем только universal link https://phantom.app/ul/v1/browse/
+// чтобы открывать сайт внутри Phantom браузера напрямую
 function redirectToWallet(walletType, planVal, currency, form) {
   var params = new URLSearchParams({
     pName: form.projectName, pCA: form.contractAddress,
@@ -76,12 +78,11 @@ function redirectToWallet(walletType, planVal, currency, form) {
   var targetUrl = SITE_URL + '/?' + params.toString();
   var encoded = encodeURIComponent(targetUrl);
   var ref = encodeURIComponent(SITE_URL);
+
   if (walletType === 'solflare') {
-    window.location.href = 'solflare://v1/browse/' + encoded;
-    setTimeout(function() { window.location.href = 'https://solflare.com/ul/v1/browse/' + encoded + '?ref=' + ref; }, 500);
+    window.location.href = 'https://solflare.com/ul/v1/browse/' + encoded + '?ref=' + ref;
   } else {
-    window.location.href = 'phantom://v1/browse/' + encoded;
-    setTimeout(function() { window.location.href = 'https://phantom.app/ul/browse/' + encoded + '?ref=' + ref; }, 500);
+    window.location.href = 'https://phantom.app/ul/v1/browse/' + encoded + '?ref=' + ref;
   }
 }
 
@@ -267,27 +268,21 @@ export default function TntHouse() {
     return function() { clearInterval(i); };
   }, []);
 
-  // KEY FIX v1.12: signAndSendTransaction для мобильного Phantom
-  // + createAssociatedTokenAccountInstruction если ATA не существует
   var triggerPayment = async function(planVal, currency, form, walletType) {
     var plan = plans.find(function(p) { return p.value === planVal; });
     if (!plan || !currency) return;
-
     setIsPaymentLoading(true);
     setPaymentStatus('Ожидаем кошелёк...');
-
     var solanaWin = null;
     for (var attempt = 0; attempt < 12; attempt++) {
       if (walletType === 'solflare' && window.solflare && window.solflare.isSolflare) { solanaWin = window.solflare; break; }
       if (window.solana && window.solana.isPhantom) { solanaWin = window.solana; break; }
       await new Promise(function(r) { setTimeout(r, 300); });
     }
-
     if (!solanaWin) {
-      showToast('Кошелёк не найден — открой сайт в браузере Phantom или Solflare', 'error');
+      showToast('Кошелёк не найден — открой сайт в браузере Phantom', 'error');
       setIsPaymentLoading(false); setPaymentStatus(''); return;
     }
-
     try {
       setPaymentStatus('Подключаем кошелёк...');
       var resp = await solanaWin.connect();
@@ -301,29 +296,19 @@ export default function TntHouse() {
         var mint = new PublicKey(MRDT_CA);
         var fromAta = await getAssociatedTokenAddress(mint, sender);
         var toAta = await getAssociatedTokenAddress(mint, receiver);
-
         try { await getAccount(connection, fromAta); } catch(e) {
           showToast('Нет $MRDT на кошельке', 'error');
           setIsPaymentLoading(false); setPaymentStatus(''); return;
         }
-
         var mrdtAmount = Math.round(plan.price / mrdtPrice) * Math.pow(10, MRDT_DECIMALS);
         var tx = new Transaction();
         tx.feePayer = sender;
         tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
-
-        // Создаём ATA получателя если не существует
         var toAtaExists = true;
         try { await getAccount(connection, toAta); } catch(e) { toAtaExists = false; }
-        if (!toAtaExists) {
-          tx.add(createAssociatedTokenAccountInstruction(sender, toAta, receiver, mint));
-        }
-
+        if (!toAtaExists) tx.add(createAssociatedTokenAccountInstruction(sender, toAta, receiver, mint));
         tx.add(createTransferInstruction(fromAta, toAta, sender, mrdtAmount));
-
         setPaymentStatus('Подтверди в кошельке...');
-
-        // signAndSendTransaction — работает и на мобильном и на десктопе
         var signed = await solanaWin.signAndSendTransaction(tx);
         signature = signed.signature;
         setPaymentStatus('Подтверждаем в сети...');
@@ -333,21 +318,13 @@ export default function TntHouse() {
         setPaymentStatus('Получаем курс Jupiter...');
         var amountLamports = Math.floor((plan.price / solPrice) * LAMPORTS_PER_SOL);
         var projectAta = await getAssociatedTokenAddress(new PublicKey(MRDT_CA), receiver);
-        var quoteRes = await fetch(
-          'https://quote-api.jup.ag/v6/quote?inputMint=So11111111111111111111111111111111111111112&outputMint=' +
-          MRDT_CA + '&amount=' + amountLamports + '&slippageBps=150'
-        );
+        var quoteRes = await fetch('https://quote-api.jup.ag/v6/quote?inputMint=So11111111111111111111111111111111111111112&outputMint=' + MRDT_CA + '&amount=' + amountLamports + '&slippageBps=150');
         var quote = await quoteRes.json();
         if (!quote || quote.error) throw new Error('Не удалось получить quote от Jupiter');
         var swapRes = await fetch('https://quote-api.jup.ag/v6/swap', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            quoteResponse: quote,
-            userPublicKey: sender.toBase58(),
-            wrapAndUnwrapSol: true,
-            destinationTokenAccount: projectAta.toBase58(),
-          }),
+          body: JSON.stringify({ quoteResponse: quote, userPublicKey: sender.toBase58(), wrapAndUnwrapSol: true, destinationTokenAccount: projectAta.toBase58() }),
         });
         var swapData = await swapRes.json();
         if (!swapData.swapTransaction) throw new Error('Jupiter не вернул транзакцию');
@@ -470,11 +447,9 @@ export default function TntHouse() {
       var encoded = encodeURIComponent(SITE_URL + '/');
       var ref = encodeURIComponent(SITE_URL);
       if (walletType === 'solflare') {
-        window.location.href = 'solflare://v1/browse/' + encoded;
-        setTimeout(function() { window.location.href = 'https://solflare.com/ul/v1/browse/' + encoded + '?ref=' + ref; }, 500);
+        window.location.href = 'https://solflare.com/ul/v1/browse/' + encoded + '?ref=' + ref;
       } else {
-        window.location.href = 'phantom://v1/browse/' + encoded;
-        setTimeout(function() { window.location.href = 'https://phantom.app/ul/browse/' + encoded + '?ref=' + ref; }, 500);
+        window.location.href = 'https://phantom.app/ul/v1/browse/' + encoded + '?ref=' + ref;
       }
       return;
     }
@@ -587,14 +562,14 @@ export default function TntHouse() {
       <div className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
         <div className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-md p-6 shadow-lg">
           <h3 className="text-lg font-black text-white mb-2">{props.title || 'Выбери кошелёк'}</h3>
-          <p className="text-slate-400 text-xs mb-4">Выбери кошелёк для оплаты в $MRDT</p>
+          <p className="text-slate-400 text-xs mb-4">Нажми — сайт откроется внутри кошелька и сразу выскочит счёт</p>
           <button onClick={function() { props.onSelect('phantom'); }} className="block w-full bg-purple-500/20 border border-purple-500/40 rounded-xl p-4 mb-3 text-white font-bold hover:bg-purple-500/30 transition flex items-center gap-3">
             <span className="text-2xl">👻</span>
-            <div className="text-left"><div className="font-black text-purple-300">Phantom</div><div className="text-xs text-slate-400 font-normal">Самый популярный Solana кошелёк</div></div>
+            <div className="text-left"><div className="font-black text-purple-300">Phantom</div><div className="text-xs text-slate-400 font-normal">Откроет сайт в Phantom браузере</div></div>
           </button>
           <button onClick={function() { props.onSelect('solflare'); }} className="block w-full bg-orange-500/10 border border-orange-500/30 rounded-xl p-4 mb-4 text-white font-bold hover:bg-orange-500/20 transition flex items-center gap-3">
             <span className="text-2xl">🔥</span>
-            <div className="text-left"><div className="font-black text-orange-300">Solflare</div><div className="text-xs text-slate-400 font-normal">Альтернативный Solana кошелёк</div></div>
+            <div className="text-left"><div className="font-black text-orange-300">Solflare</div><div className="text-xs text-slate-400 font-normal">Откроет сайт в Solflare браузере</div></div>
           </button>
           <button onClick={props.onClose} className="text-slate-400 hover:text-white transition text-sm w-full text-center">Отмена</button>
         </div>
@@ -638,7 +613,7 @@ export default function TntHouse() {
               <a href="https://t.me/tnt_house2026" target="_blank" rel="noopener noreferrer" className="w-10 h-10 border-2 border-purple-500 rounded-lg flex items-center justify-center bg-purple-500/10 shadow-[0_0_15px_rgba(153,69,255,0.4)] animate-pulse"><span className="text-xl">🧨</span></a>
               <div>
                 <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-emerald-400 tracking-wider">TNT HOUSE</h1>
-                <span className="text-[10px] text-purple-400 block font-bold tracking-widest">TOP NEW TOKENS v1.12</span>
+                <span className="text-[10px] text-purple-400 block font-bold tracking-widest">TOP NEW TOKENS v1.13</span>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -929,7 +904,7 @@ export default function TntHouse() {
               <a href="https://www.maradonatoken-mrdt.xyz" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400 transition-colors"><ExternalLink className="w-6 h-6" /></a>
             </div>
             <div className="text-center space-y-1">
-              <div className="text-purple-400 font-bold text-sm tracking-widest">TNT HOUSE v1.12</div>
+              <div className="text-purple-400 font-bold text-sm tracking-widest">TNT HOUSE v1.13</div>
               <div className="text-slate-400 text-xs">Powered by $MRDT • AI Audits • Supabase ☁️</div>
               <div className="text-slate-500 text-[10px]">Built with Next.js + Tailwind CSS • Phantom + Solflare</div>
             </div>
@@ -984,4 +959,4 @@ export default function TntHouse() {
       )}
     </div>
   );
-      }
+    }
