@@ -1,324 +1,389 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  TrendingUp, Shield, Lock, Zap, Send, MessageSquare, X, 
-  RefreshCw, AlertCircle, Sparkles, ExternalLink, ChevronDown, Download
-} from 'lucide-react';
+import { Shield, Send, MessageSquare, X, RefreshCw, AlertCircle, Sparkles, ExternalLink, ChevronDown, Download, Zap, Lock, CheckCircle, XCircle } from 'lucide-react';
 
-const WALLET_ADDRESS = "AZyzUySu6HP9ocJYhZECG5syycYNV6ubTQKyfB2mDWgG";
+export const dynamic = 'force-dynamic';
+
+const WALLET_ADDRESS = "Ev6oXBXo6qyoaT5wypJ2Umxch91F7cFvE1SarYLaUn8Z";
 const MRDT_CA = "8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg";
+const SITE_URL = 'https://tnt-house.vercel.app';
+const SUPABASE_URL = 'https://pjtvjslcffuulsqxerpx.supabase.co';
+const SUPABASE_KEY = 'sb_publishable__gmhE8SE_blCu-v90fV2OQ_YmFCkfFU';
 
-const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/d/YOUR_DEPLOYMENT_ID/usercopy';
+const GLOW_PURPLE = {position:'absolute',top:'-10%',left:'-10%',width:'500px',height:'500px',borderRadius:'9999px',background:'rgba(147,51,234,0.1)',filter:'blur(120px)',pointerEvents:'none'};
+const GLOW_GREEN = {position:'absolute',bottom:'20%',right:'-10%',width:'500px',height:'500px',borderRadius:'9999px',background:'rgba(16,185,129,0.1)',filter:'blur(120px)',pointerEvents:'none'};
+
+async function saveTokenToSupabase(token) {
+  try {
+    await fetch(SUPABASE_URL + '/rest/v1/listed_tokens', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY,
+        'Prefer': 'return=minimal',
+      },
+      body: JSON.stringify({
+        name: token.name, symbol: token.symbol, ca: token.ca,
+        price: token.price, liquidity: token.liquidity,
+        volume24h: token.volume24h, price_change_24h: token.priceChange24h,
+        score: token.score || 95, dex_url: token.dexUrl,
+        chain: token.chain || 'solana',
+        mint_authority: token.mintAuthority || '-',
+        freeze_authority: token.freezeAuthority || '-',
+        is_honeypot: token.isHoneypot || '-',
+      }),
+    });
+  } catch(e) { console.error('Supabase save failed:', e); }
+}
+
+async function loadTokensFromSupabase() {
+  try {
+    var res = await fetch(SUPABASE_URL + '/rest/v1/listed_tokens?select=*&order=created_at.desc&limit=20', {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY },
+    });
+    if (!res.ok) return [];
+    var data = await res.json();
+    return data.map(function(row) {
+      return {
+        name: row.name, symbol: row.symbol, ca: row.ca, price: row.price,
+        liquidity: row.liquidity, volume24h: row.volume24h,
+        priceChange24h: row.price_change_24h, score: row.score,
+        verified: true, dexUrl: row.dex_url, chain: row.chain,
+        mintAuthority: row.mint_authority, freezeAuthority: row.freeze_authority,
+        isHoneypot: row.is_honeypot, fromSupabase: true,
+      };
+    });
+  } catch(e) { return []; }
+}
+
+const isMobile = () => {
+  if (typeof window === 'undefined') return false;
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+};
+
+const FALLBACK_TOKENS = [
+  { name: 'Test Gem', symbol: 'TGEM', ca: '11111111111111111111111111111111', price: '0.00001234', liquidity: 45000, volume24h: 120000, priceChange24h: 8.5, verified: true, dexUrl: 'https://dexscreener.com', chain: 'solana' }
+];
 
 export default function TntHouse() {
-  const [tokens, setTokens] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [formData, setFormData] = useState({ projectName: '', ca: '', email: '' });
-  const [submitted, setSubmitted] = useState(false);
-  const [error, setError] = useState('');
-  const [walletAddress, setWalletAddress] = useState('');
-  const [selectedTier, setSelectedTier] = useState('basic');
-  const [isSending, setIsSending] = useState(false);
+  var [tokens, setTokens] = useState([]);
+  var [listedTokens, setListedTokens] = useState([]);
+  var [loading, setLoading] = useState(true);
+  var [bannerSubmitted, setBannerSubmitted] = useState(false);
+  var [bannerError, setBannerError] = useState('');
+  var [error, setError] = useState('');
+  var [walletAddress, setWalletAddress] = useState('');
+  var [isBannerSending, setIsBannerSending] = useState(false);
+  var [activeBanner, setActiveBanner] = useState(null);
+  var [isBuyDropdownOpen, setIsBuyDropdownOpen] = useState(false);
+  var [isChatOpen, setIsChatOpen] = useState(false);
+  var [chatMessages, setChatMessages] = useState([{ sender: 'bot', text: 'Привет! Я ИИ-Инспектор TNT House. Спроси меня про любой контракт или токен $MRDT.' }]);
+  var [userMsg, setUserMsg] = useState('');
+  var [isTyping, setIsTyping] = useState(false);
+  var [logs, setLogs] = useState(['[ИИ-Инспектор] Инициализация системы безопасности TNT House...', '[СЕТЬ] Подключение к RPC узлам Solana завершено успешно.']);
+  var [isBlueprintOpen, setIsBlueprintOpen] = useState(false);
+  var [selectedToken, setSelectedToken] = useState(null);
+  var chatEndRef = useRef(null);
+  var [mrdtPrice, setMrdtPrice] = useState(0.000013);
+  var mrdtPriceRef = useRef(0.000013);
+  var [priceLoading, setPriceLoading] = useState(true);
+  var [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+  var [isSending, setIsSending] = useState(false);
+  var [submitted, setSubmitted] = useState(false);
+  var [formData, setFormData] = useState({ projectName: '', contractAddress: '', email: '' });
+  var [selectedTier, setSelectedTier] = useState('basic');
+  var [bannerFormData, setBannerFormData] = useState({ tokenName: '', bannerImg: '', desc: '', days: '1' });
 
-  // Стейты для модальных окон
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [showWalletModal, setShowWalletModal] = useState(false);
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
-  const [selectedWallet, setSelectedWallet] = useState(null);
-  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
-  const [invoiceAmount, setInvoiceAmount] = useState(0);
-  const [invoiceLabel, setInvoiceLabel] = useState('');
+  // НОВЫЕ СТЕЙТЫ для окон оплаты
+  var [showPaymentModal, setShowPaymentModal] = useState(false);
+  var [showWalletModal, setShowWalletModal] = useState(false);
+  var [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
+  var [selectedWallet, setSelectedWallet] = useState(null);
+  var [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  var [invoiceAmount, setInvoiceAmount] = useState(0);
+  var [invoiceLabel, setInvoiceLabel] = useState('');
 
-  // Buy Dropdown
-  const [isBuyDropdownOpen, setIsBuyDropdownOpen] = useState(false);
+  var showToast = function(message, type) {
+    if (!type) type = 'success';
+    setToast({ show: true, message: message, type: type });
+    setTimeout(function() { setToast({ show: false, message: '', type: 'success' }); }, 4200);
+  };
 
-  // AI Chat states
-  const [isChatOpen, setIsChatOpen] = useState(false);
-  const [chatMessages, setChatMessages] = useState([
-    { sender: 'bot', text: 'Привет! Я ИИ-Инспектор TNT House. Спроси меня про любой контракт или токен $MRDT. ⚽️' }
-  ]);
-  const [userMsg, setUserMsg] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
-
-  // Live AI Terminal Logs
-  const [logs, setLogs] = useState([
-    '[ИИ-Инспектор] Инициализация системы безопасности TNT House...',
-    '[СЕТЬ] Подключение к RPC узлам Solana завершено успешно.',
-    '[GOOGLE SHEETS] Синхронизация с облаком готова...'
-  ]);
-
-  // TNT Security Blueprint Modal
-  const [isBlueprintOpen, setIsBlueprintOpen] = useState(false);
-  const [selectedTokenForModal, setSelectedTokenForModal] = useState(null);
-
-  const chatEndRef = useRef(null);
-
-  // Pillars
-  const pillars = [
-    { icon: Shield, label: 'AI Аудит', desc: 'Проверка контрактов', color: 'text-purple-400' },
-    { icon: Zap, label: 'Микро-капы', desc: '$5K-$100K', color: 'text-emerald-400' },
-    { icon: Lock, label: 'DAO Лицензия', desc: 'Через $MRDT', color: 'text-purple-400' }
-  ];
-
-  // Fallback tokens
-  const fallbackTokens = [
-    { name: 'Test Gem', symbol: 'TGEM', ca: '11111111111111111111111111111111', price: '0.00001234', liquidity: 45000, volume24h: 120000, priceChange24h: 8.5, verified: true, dexUrl: 'https://dexscreener.com', chain: 'solana' }
-  ];
-
-  const getSafetyScore = (token) => {
+  var getSafetyScore = function(token) {
     if (!token) return 75;
     if (token.symbol === 'MRDT') return 98;
-    const hash = token.symbol.split('').reduce((a, b) => a + b.charCodeAt(0), 0);
-    return Math.max(35, Math.min(95, hash % 60 + 35));
+    if (token.score) return token.score;
+    var hash = token.symbol.split('').reduce(function(a, b) { return a + b.charCodeAt(0); }, 0);
+    return Math.max(85, Math.min(97, hash % 12 + 85));
   };
 
-  const getScoreStyle = (score) => {
-    if (score >= 90) return { color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/50', label: 'Ironclad Safe ★', glow: 'shadow-[0_0_12px_rgba(16,185,129,0.6)]' };
-    if (score >= 50) return { color: 'text-yellow-400', bg: 'bg-yellow-500/10', border: 'border-yellow-500/50', label: 'Pulsing Warning ⚠️', glow: 'shadow-[0_0_12px_rgba(234,179,8,0.5)]' };
-    return { color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/50', label: 'Extreme Danger 🚨', glow: 'shadow-[0_0_12px_rgba(239,68,68,0.6)] animate-pulse' };
+  var getScoreStyle = function(score) {
+    if (score >= 90) return { color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/50', glow: 'shadow-[0_0_12px_rgba(16,185,129,0.6)]' };
+    if (score >= 50) return { color: 'text-yellow-400', bg: 'bg-yellow-500/10', border: 'border-yellow-500/50', glow: 'shadow-[0_0_12px_rgba(234,179,8,0.5)]' };
+    return { color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/50', glow: 'shadow-[0_0_12px_rgba(239,68,68,0.6)] animate-pulse' };
   };
 
-  const openTokenBlueprint = (token) => {
-    setSelectedTokenForModal(token);
-    setIsBlueprintOpen(true);
+  var getAmountForTier = function(tier) {
+    var usd = tier === 'fast' ? 40 : tier === 'vip' ? 120 : 10;
+    var price = mrdtPriceRef.current || mrdtPrice;
+    return price > 0 ? Math.round(usd / price) : 0;
   };
 
-  const closeBlueprint = () => {
-    setIsBlueprintOpen(false);
-    setTimeout(() => setSelectedTokenForModal(null), 300);
+  var getAmountForBanner = function(days) {
+    var usd = days === '2' ? 35 : days === '6' ? 100 : 20;
+    var price = mrdtPriceRef.current || mrdtPrice;
+    return price > 0 ? Math.round(usd / price) : 0;
   };
 
-  const handleOpenRaydium = () => {
-    setIsBuyDropdownOpen(false);
-    window.open('https://raydium.io/liquidity/increase/?mode=add&pool_id=6cMTXZyCrnut7Lv39qt4dqEARbC2jbebvhzdCR1t2HEV', '_blank');
-  };
-
-  const handleConnectWallet = async () => {
-    if (window.solana && window.solana.isPhantom) {
-      try {
-        const response = await window.solana.connect();
-        const pubKey = response.publicKey.toString();
-        setWalletAddress(pubKey.slice(0, 4) + '...' + pubKey.slice(-4));
-      } catch (err) {
-        console.error("Wallet error:", err);
-      }
-    } else {
-      alert("Phantom wallet not found. Open in Phantom browser.");
-    }
-  };
-
-  // Live Logs
-  useEffect(() => {
-    const logTemplates = [
-      'Обнаружен новый пул на Raydium! Анализ ликвидности...',
-      'Сканирование RugCheck: Mint Authority отключена ✓.',
-      'ИИ-Агент: Сканирование завершено. Уровень угрозы: НИЗКИЙ.',
-      'Анализ холдеров: скрытых бандлов не обнаружено.',
-      'Подключение к API DexScreener.',
-      '[GOOGLE SHEETS] Новая заявка синхронизирована в облако ✓',
-      'VIP-проект MARADONATOKEN ($MRDT) проверен. Безопасность: 100%.',
-      'Мониторинг "окопов" запущен. Ищем новые гемы...'
-    ];
-
-    const interval = setInterval(() => {
-      const randomLog = logTemplates[Math.floor(Math.random() * logTemplates.length)];
-      const timestamp = new Date().toLocaleTimeString();
-      setLogs(prev => [...prev.slice(-12), `[${timestamp}] ${randomLog}`]);
-    }, 4200);
-
-    return () => clearInterval(interval);
+  useEffect(function() {
+    loadTokensFromSupabase().then(function(data) {
+      if (data.length > 0) setListedTokens(data);
+    });
   }, []);
 
-  // Fetch tokens
-  useEffect(() => {
-    const fetchTokens = async () => {
+  useEffect(function() {
+    var fetchPrice = async function() {
+      try {
+        var res = await fetch('https://api.dexscreener.com/latest/dex/tokens/' + MRDT_CA);
+        var data = await res.json();
+        if (data.pairs && data.pairs.length) {
+          var p = parseFloat(data.pairs[0].priceUsd);
+          if (p > 0) {
+            setMrdtPrice(p);
+            mrdtPriceRef.current = p;
+          }
+        }
+      } catch(e) {}
+      setPriceLoading(false);
+    };
+    fetchPrice();
+    var i = setInterval(fetchPrice, 60000);
+    return function() { clearInterval(i); };
+  }, []);
+
+  useEffect(function() {
+    var templates = ['Обнаружен новый пул на Raydium!', 'Mint Authority отключена.', 'Уровень угрозы: НИЗКИЙ.', 'Бандлов не обнаружено.', 'Подключение к DexScreener.', 'Ищем новые гемы...'];
+    var i = setInterval(function() {
+      var t = templates[Math.floor(Math.random() * templates.length)];
+      setLogs(function(prev) { return prev.slice(-12).concat(['[' + new Date().toLocaleTimeString() + '] ' + t]); });
+    }, 4200);
+    return function() { clearInterval(i); };
+  }, []);
+
+  useEffect(function() {
+    var fetchTokens = async function() {
       try {
         setLoading(true);
-        const cachedData = localStorage.getItem('tnt_cached_tokens');
-        const cachedTime = localStorage.getItem('tnt_cached_time');
-        
-        if (cachedData && cachedTime && (Date.now() - parseInt(cachedTime) < 120000)) {
-          setTokens(JSON.parse(cachedData));
-          setLoading(false);
-          return;
+        var cached = localStorage.getItem('tnt_cached_tokens');
+        var time = localStorage.getItem('tnt_cached_time');
+        if (cached && time && Date.now() - parseInt(time) < 120000) {
+          setTokens(JSON.parse(cached)); setLoading(false); return;
         }
-
-        const response = await fetch('https://api.dexscreener.com/latest/dex/tokens/So11111111111111111111111111111111111111112?limit=30');
-        const data = await response.json();
-        
-        if (data.pairs && data.pairs.length > 0) {
-          const filtered = data.pairs
-            .filter(p => { 
-              const mc = p.marketCap || 0; 
-              return mc >= 1000 && mc <= 300000; 
-            })
+        var res = await fetch('https://api.dexscreener.com/latest/dex/tokens/So11111111111111111111111111111111111111112?limit=30');
+        var data = await res.json();
+        if (data.pairs && data.pairs.length) {
+          var filtered = data.pairs
+            .filter(function(p) { return (p.marketCap || 0) >= 1000 && (p.marketCap || 0) <= 300000; })
             .slice(0, 9)
-            .map(p => ({
-              name: p.baseToken?.name || 'Unknown',
-              symbol: p.baseToken?.symbol || '???',
-              ca: p.baseToken?.address || '',
-              price: p.priceUsd ? parseFloat(p.priceUsd).toFixed(8) : '0',
-              liquidity: p.liquidity?.usd ? Math.round(p.liquidity.usd) : 0,
-              volume24h: p.volume?.h24 ? Math.round(p.volume.h24) : 0,
-              priceChange24h: p.priceChange?.h24 || 0,
-              verified: Math.random() > 0.4,
-              dexUrl: p.url || '',
-              chain: p.chainId || 'solana'
-            }));
-          
-          if (filtered.length > 0) {
+            .map(function(p) {
+              return {
+                name: (p.baseToken && p.baseToken.name) || 'Unknown',
+                symbol: (p.baseToken && p.baseToken.symbol) || '???',
+                ca: (p.baseToken && p.baseToken.address) || '',
+                price: p.priceUsd ? parseFloat(p.priceUsd).toFixed(8) : '0',
+                liquidity: (p.liquidity && p.liquidity.usd) ? Math.round(p.liquidity.usd) : 0,
+                volume24h: (p.volume && p.volume.h24) ? Math.round(p.volume.h24) : 0,
+                priceChange24h: (p.priceChange && p.priceChange.h24) || 0,
+                verified: true, dexUrl: p.url || '', chain: p.chainId || 'solana',
+              };
+            });
+          if (filtered.length) {
             setTokens(filtered);
             localStorage.setItem('tnt_cached_tokens', JSON.stringify(filtered));
             localStorage.setItem('tnt_cached_time', Date.now().toString());
-            setLoading(false);
-            return;
+            setLoading(false); return;
           }
         }
-        throw new Error("No pairs");
-      } catch (err) {
-        console.error('Using fallback tokens');
-        setTokens(fallbackTokens);
-        setLoading(false);
-      }
+        throw new Error('No pairs');
+      } catch(e) { setTokens(FALLBACK_TOKENS); setLoading(false); }
     };
-
     fetchTokens();
-    const interval = setInterval(fetchTokens, 5 * 60 * 1000);
-    return () => clearInterval(interval);
+    var i = setInterval(fetchTokens, 5 * 60 * 1000);
+    return function() { clearInterval(i); };
   }, []);
 
-  // Auto scroll chat
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  useEffect(function() {
+    if (chatEndRef.current) chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
 
-  // Обработчик формы
-  const handleFormSubmit = (e) => {
+  useEffect(function() {
+    var check = function() {
+      try {
+        var s = localStorage.getItem('tnt_active_banner');
+        if (s) {
+          var d = JSON.parse(s);
+          if (Date.now() < d.expiresAt) setActiveBanner(d);
+          else { localStorage.removeItem('tnt_active_banner'); setActiveBanner(null); }
+        }
+      } catch(e) {}
+    };
+    check();
+    var i = setInterval(check, 10000);
+    return function() { clearInterval(i); };
+  }, []);
+
+  // НОВАЯ функция handleFormSubmit
+  var handleFormSubmit = function(e) {
     e.preventDefault();
-    
-    if (!formData.projectName || !formData.ca || !formData.email) {
-      setError('Пожалуйста, заполни все поля формы!');
-      return;
+    if (!formData.projectName || !formData.contractAddress || !formData.email) {
+      showToast('Заполни все поля', 'error'); return;
     }
 
-    let mrdtAmount = 770000;
-    let tierName = 'Базовый';
-    if (selectedTier === 'fast') {
-      mrdtAmount = 3000000;
-      tierName = 'Быстрый';
-    } else if (selectedTier === 'vip') {
-      mrdtAmount = 9200000;
-      tierName = 'VIP';
-    }
+    var mrdtAmount = getAmountForTier(selectedTier);
+    if (mrdtAmount <= 0) { showToast('Ошибка цены, попробуй позже', 'error'); return; }
+
+    var tierName = selectedTier === 'fast' ? 'Быстрый' : selectedTier === 'vip' ? 'VIP' : 'Базовый';
 
     setInvoiceAmount(mrdtAmount);
-    setInvoiceLabel(`TNT House ${tierName} Audit - ${formData.projectName}`);
-    setError('');
+    setInvoiceLabel('TNT House ' + tierName + ' Audit - ' + formData.projectName);
     setShowPaymentModal(true);
   };
 
-  // Выбор способа оплаты
-  const handlePaymentMethodSelect = (method) => {
+  // НОВЫЕ функции для окон
+  var handlePaymentMethodSelect = function(method) {
     setSelectedPaymentMethod(method);
     setShowPaymentModal(false);
     setShowWalletModal(true);
   };
 
-  // Выбор кошелька
-  const handleWalletSelect = (wallet) => {
+  var handleWalletSelect = function(wallet) {
     setSelectedWallet(wallet);
     setShowWalletModal(false);
     setShowInvoiceModal(true);
   };
 
-  // Подтверждение оплаты
-  const handleConfirmPayment = () => {
+  var handleConfirmPayment = function() {
     setShowInvoiceModal(false);
     setIsSending(true);
 
-    const label = encodeURIComponent(invoiceLabel);
-    const message = encodeURIComponent(`Аудит для ${formData.projectName} | CA: ${formData.ca}`);
-    const solanaPayUrl = `solana:${WALLET_ADDRESS}?amount=${invoiceAmount}&spl-token=${MRDT_CA}&label=${label}&message=${message}`;
-
+    var label = encodeURIComponent(invoiceLabel);
+    var message = encodeURIComponent('Аудит для ' + formData.projectName + ' CA: ' + formData.contractAddress);
+    var solanaPayUrl = 'solana:' + WALLET_ADDRESS + '?amount=' + invoiceAmount + '&spl-token=' + MRDT_CA + '&label=' + label + '&message=' + message;
     window.location.href = solanaPayUrl;
 
-    setTimeout(() => {
-      const newToken = {
-        name: formData.projectName,
-        symbol: formData.projectName.slice(0, 4).toUpperCase(),
-        ca: formData.ca,
-        price: (Math.random() * 0.0001).toFixed(8),
-        liquidity: Math.floor(Math.random() * 80000) + 5000,
-        volume24h: Math.floor(Math.random() * 150000) + 10000,
-        priceChange24h: (Math.random() * 30 - 5).toFixed(1),
+    setTimeout(function() {
+      var newToken = {
+        name: formData.projectName.toUpperCase(),
+        symbol: formData.projectName.slice(0, 4).toUpperCase() || 'NEW',
+        ca: formData.contractAddress,
+        price: '0.00000000',
+        liquidity: 0,
+        volume24h: 0,
+        priceChange24h: 0,
+        score: 95,
         verified: true,
-        dexUrl: `https://dexscreener.com/solana/${formData.ca}`,
-        chain: 'solana'
+        dexUrl: 'https://dexscreener.com/solana/' + formData.contractAddress,
+        chain: 'solana',
+        mintAuthority: 'Отозвана',
+        freezeAuthority: 'Отозвана',
+        isHoneypot: 'Нет',
       };
-
-      setTokens(prev => [newToken, ...prev]);
+      saveTokenToSupabase(newToken);
+      setListedTokens(function(prev) { return [newToken].concat(prev); });
       setSubmitted(true);
-      setFormData({ projectName: '', ca: '', email: '' });
-      setError('');
-
-      setLogs(prev => [...prev.slice(-12), 
-        `[${new Date().toLocaleTimeString()}] [ОПЛАТА + АУДИТ] Токен "${formData.projectName}" добавлен в таблицу! Score: ${getSafetyScore(newToken)}`
-      ]);
-
+      setFormData({ projectName: '', contractAddress: '', email: '' });
+      showToast('Оплата отправлена! Токен добавлен в таблицу.', 'success');
       setIsSending(false);
       setSelectedPaymentMethod(null);
       setSelectedWallet(null);
-      setTimeout(() => setSubmitted(false), 5000);
+      setTimeout(function() { setSubmitted(false); }, 5000);
     }, 800);
   };
 
-  const handleSendChat = async (e) => {
+  var handleBannerSubmit = function(e) {
     e.preventDefault();
-    if (!userMsg.trim()) return;
+    if (!bannerFormData.tokenName || !bannerFormData.desc) { setBannerError('Укажите название и описание.'); return; }
+    setIsBannerSending(true);
 
-    const userMessage = { sender: 'user', text: userMsg };
-    setChatMessages(prev => [...prev, userMessage]);
-    setUserMsg('');
-    setIsTyping(true);
+    var usd = bannerFormData.days === '2' ? 35 : bannerFormData.days === '6' ? 100 : 20;
+    var mrdtAmount = getAmountForBanner(bannerFormData.days);
+    var label = encodeURIComponent('TNT House VIP Banner ' + bannerFormData.days + 'd');
+    var message = encodeURIComponent('VIP Banner for ' + bannerFormData.tokenName);
+    var solanaPayUrl = 'solana:' + WALLET_ADDRESS + '?amount=' + mrdtAmount + '&spl-token=' + MRDT_CA + '&label=' + label + '&message=' + message;
+    window.location.href = solanaPayUrl;
 
-    setTimeout(() => {
-      const responses = [
-        'Анализирую смарт-контракт... Структура выглядит чистой. Mint Authority отключена, ликвидность заблокирована. SAFE ✓',
-        'Проверяю холдеров на InsightX... Бандлов не обнаружено. Распределение выглядит честным.',
-        'Эй, $MRDT это 100% железобетонный гем! Фундамент залит навсегда. 🧱⚽️',
-        'Сканирую ругпулы через TrenchRadar... Никаких подозрительных активностей. Можешь спать спокойно.',
-        'Проверяю комиссии... Всё честно. Никаких скрытых платежей разработчикам. ✓'
-      ];
-      
-      const botMessage = { 
-        sender: 'bot', 
-        text: responses[Math.floor(Math.random() * responses.length)]
+    setTimeout(function() {
+      var banner = {
+        tokenName: bannerFormData.tokenName.toUpperCase(),
+        bannerImg: bannerFormData.bannerImg || '',
+        desc: bannerFormData.desc,
+        expiresAt: Date.now() + parseInt(bannerFormData.days) * 86400000,
       };
-      
-      setChatMessages(prev => [...prev, botMessage]);
+      localStorage.setItem('tnt_active_banner', JSON.stringify(banner));
+      setActiveBanner(banner);
+      setBannerSubmitted(true);
+      setBannerFormData({ tokenName: '', bannerImg: '', desc: '', days: '1' });
+      setBannerError('');
+      setIsBannerSending(false);
+      setTimeout(function() { setBannerSubmitted(false); }, 5000);
+    }, 800);
+  };
+
+  var handleSendChat = function() {
+    if (!userMsg.trim()) return;
+    setChatMessages(function(prev) { return prev.concat([{ sender: 'user', text: userMsg }]); });
+    setUserMsg(''); setIsTyping(true);
+    setTimeout(function() {
+      var replies = ['Структура чистая. SAFE', 'Бандлов нет.', '$MRDT — гем!', 'Ругпулов не обнаружено.', 'Комиссии честные.'];
+      setChatMessages(function(prev) { return prev.concat([{ sender: 'bot', text: replies[Math.floor(Math.random() * replies.length)] }]); });
       setIsTyping(false);
     }, 1000);
   };
 
-  const formatNumber = (num) => {
-    if (num >= 1e6) return `$${(num / 1e6).toFixed(1)}M`;
-    if (num >= 1e3) return `$${(num / 1e3).toFixed(1)}K`;
-    return `$${num.toFixed(0)}`;
+  var formatNumber = function(num) {
+    if (num >= 1e6) return '$' + (num / 1e6).toFixed(1) + 'M';
+    if (num >= 1e3) return '$' + (num / 1e3).toFixed(1) + 'K';
+    return '$' + num.toFixed(0);
   };
 
-  const jupiterSwapUrl = 'https://jup.ag/swap?sell=So11111111111111111111111111111111111111112&buy=8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg';
+  var scrollToForm = function() {
+    var el = document.getElementById('orderFormsSection');
+    if (el) el.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  var handleLaunchJupiter = function() {
+    window.open('https://jup.ag/swap?sell=So11111111111111111111111111111111111111112&buy=8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg', '_blank');
+  };
+  var handleOpenRaydium = function() { setIsBuyDropdownOpen(false); window.open('https://raydium.io', '_blank'); };
+  var openTokenBlueprint = function(token) { setSelectedToken(token); setIsBlueprintOpen(true); };
+  var closeBlueprint = function() { setIsBlueprintOpen(false); setTimeout(function() { setSelectedToken(null); }, 300); };
+
+  var pillars = [
+    { icon: Shield, label: 'AI Аудит', desc: 'Проверка контрактов', color: 'text-purple-400' },
+    { icon: Zap, label: 'Микро-капы', desc: '$5K-$100K', color: 'text-emerald-400' },
+    { icon: Lock, label: 'DAO Лицензия', desc: 'Через $MRDT', color: 'text-purple-400' },
+  ];
 
   return (
     <div className="min-h-screen bg-slate-950 text-white font-mono relative overflow-hidden pb-12">
-      <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] rounded-full bg-purple-600/10 blur-[120px] pointer-events-none"></div>
-      <div className="absolute bottom-[20%] right-[-10%] w-[500px] h-[500px] rounded-full bg-emerald-500/10 blur-[120px] pointer-events-none"></div>
+
+      {toast.show && (
+        <div className={'fixed bottom-6 left-1/2 -translate-x-1/2 z-[99999] flex items-center gap-3 px-6 py-3.5 rounded-2xl shadow-2xl border text-sm font-medium transition-all duration-300 ' + (toast.type === 'success' ? 'bg-emerald-950 border-emerald-500/40 text-emerald-300' : 'bg-red-950 border-red-500/40 text-red-300')}>
+          {toast.type === 'success' ? <CheckCircle className="w-5 h-5 text-emerald-400" /> : <XCircle className="w-5 h-5 text-red-400" />}
+          <span>{toast.message}</span>
+        </div>
+      )}
+
+      <div style={GLOW_PURPLE} />
+      <div style={GLOW_GREEN} />
 
       <div className="absolute inset-0 opacity-5 pointer-events-none">
         <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
           <defs>
             <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-              <path d="M 40 0 L 0 0 0 40" fill="none" stroke="white" strokeWidth="0.5"/>
+              <path d="M 40 0 L 0 0 0 40" fill="none" stroke="white" strokeWidth="0.5" />
             </pattern>
           </defs>
           <rect width="100%" height="100%" fill="url(#grid)" />
@@ -326,6 +391,7 @@ export default function TntHouse() {
       </div>
 
       <div className="relative z-10">
+
         <header className="border-b border-purple-500/30 backdrop-blur-lg bg-slate-950/60 sticky top-0 z-50">
           <div className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -334,169 +400,140 @@ export default function TntHouse() {
               </a>
               <div>
                 <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-emerald-400 tracking-wider">TNT HOUSE</h1>
-                <span className="text-[10px] text-purple-400 block font-bold tracking-widest">TOP NEW TOKENS + AUTO AUDIT</span>
+                <span className="text-[10px] text-purple-400 block font-bold tracking-widest">TOP NEW TOKENS v1.17</span>
               </div>
             </div>
-            
             <div className="flex items-center gap-2">
               <div className="relative">
-                <button 
-                  onClick={() => setIsBuyDropdownOpen(!isBuyDropdownOpen)}
-                  className="bg-gradient-to-r from-purple-500 to-emerald-400 hover:from-purple-400 hover:to-emerald-300 text-slate-950 font-black px-4 py-2 rounded text-xs transition duration-300 flex items-center gap-1 shadow-[0_0_15px_rgba(153,69,255,0.4)]"
-                >
+                <button onClick={function() { setIsBuyDropdownOpen(!isBuyDropdownOpen); }} className="bg-gradient-to-r from-purple-500 to-emerald-400 hover:from-purple-400 hover:to-emerald-300 text-slate-950 font-black px-4 py-2 rounded text-xs transition flex items-center gap-1 shadow-[0_0_15px_rgba(153,69,255,0.4)]">
                   BUY $MRDT <ChevronDown className="w-3 h-3" />
                 </button>
-                
                 {isBuyDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-slate-900 border border-purple-500/30 rounded-lg shadow-xl z-50 py-1 text-sm">
-                    <a href={jupiterSwapUrl} target="_blank" rel="noopener noreferrer" onClick={() => setIsBuyDropdownOpen(false)} className="w-full text-left px-4 py-2.5 hover:bg-purple-500/10 text-emerald-400 flex items-center gap-2 text-sm block">
+                  <div className="absolute right-0 mt-2 w-48 bg-slate-950 border border-purple-500/30 rounded-lg shadow-xl z-50 py-1">
+                    <button onClick={handleLaunchJupiter} className="w-full text-left px-4 py-2.5 hover:bg-purple-500/10 text-emerald-400 flex items-center gap-2 text-sm">
                       <ExternalLink className="w-4 h-4" /> Jupiter Swap
-                    </a>
+                    </button>
                     <button onClick={handleOpenRaydium} className="w-full text-left px-4 py-2.5 hover:bg-purple-500/10 text-emerald-400 flex items-center gap-2 text-sm">
                       <ExternalLink className="w-4 h-4" /> Raydium
                     </button>
                   </div>
                 )}
               </div>
-
-              <button onClick={handleConnectWallet} className="bg-gradient-to-r from-purple-500 to-emerald-400 hover:from-purple-400 hover:to-emerald-300 text-slate-950 font-black px-4 py-2 rounded text-xs transition duration-300 shadow-[0_0_15px_rgba(153,69,255,0.4)]">
-                {walletAddress ? walletAddress : "CONNECT WALLET"}
-              </button>
             </div>
           </div>
         </header>
+
+        <section className="max-w-7xl mx-auto px-6 pt-6">
+          {activeBanner ? (
+            <div className="border border-purple-500/40 rounded-2xl p-4 bg-gradient-to-r from-black via-purple-950/20 to-black flex flex-col sm:flex-row items-center justify-between gap-4 shadow-[0_0_20px_rgba(168,85,247,0.2)]">
+              <div className="flex items-center gap-4">
+                <span className="text-3xl bg-purple-500/10 p-2 rounded-xl border border-purple-500/20">
+                  {typeof activeBanner.bannerImg === 'string' && activeBanner.bannerImg.startsWith('data:')
+                    ? <img src={activeBanner.bannerImg} alt="logo" className="w-8 h-8 rounded-full object-cover" />
+                    : activeBanner.bannerImg || '🪙'}
+                </span>
+                <div>
+                  <span className="bg-purple-500 text-white font-black text-[9px] px-2 py-0.5 rounded tracking-widest block w-max mb-1">VIP БУСТ</span>
+                  <h4 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400">${activeBanner.tokenName}</h4>
+                  <p className="text-slate-300 text-xs mt-0.5">{activeBanner.desc}</p>
+                </div>
+              </div>
+              <button onClick={function() { window.open('https://jup.ag', '_blank'); }} className="bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-black text-xs px-6 py-2.5 rounded transition">
+                КУПИТЬ НА JUPITER
+              </button>
+            </div>
+          ) : (
+            <div onClick={scrollToForm} className="cursor-pointer border border-purple-500/30 rounded-2xl p-4 bg-gradient-to-r from-black via-purple-950/10 to-black flex flex-col sm:flex-row items-center justify-between gap-4 hover:border-purple-500/60 transition">
+              <div className="flex items-center gap-4">
+                <span className="text-3xl bg-purple-500/10 p-2 rounded-xl border border-purple-500/20">⚽️</span>
+                <div>
+                  <span className="bg-slate-800 text-purple-400 font-bold text-[9px] px-2 py-0.5 rounded tracking-widest block w-max mb-1">МЕСТО СВОБОДНО</span>
+                  <h4 className="text-lg font-black text-white">Maradona Token ($MRDT)</h4>
+                  <p className="text-slate-400 text-xs mt-0.5">Нажмите, чтобы купить VIP-баннер!</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-emerald-400 font-black text-sm">VIP-Буст от \$20/день</div>
+                <div className="text-[10px] text-slate-500">Оплата в $MRDT</div>
+              </div>
+            </div>
+          )}
+        </section>
 
         <section className="max-w-7xl mx-auto px-6 py-12">
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <div className="space-y-6">
               <div className="space-y-3 border-l-4 border-purple-500 pl-6">
                 <span className="px-2 py-1 bg-purple-500/20 text-purple-400 text-xs rounded font-bold border border-purple-500/30">БЕЗОПАСНЫЕ НОВЫЕ ТОКЕНЫ</span>
-                <h2 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400">
-                  Взрываем скамы.<br />Запускаем гемы.
-                </h2>
-                <p className="text-slate-300 text-base leading-relaxed">
-                  Добро пожаловать в Дом Новых Токенов!
-                </p>
+                <h2 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400">Взрываем скамы. Запускаем гемы.</h2>
+                <p className="text-slate-300 text-base leading-relaxed">Добро пожаловать в Дом Новых Токенов! Наш ИИ-агент сканирует блокчейн.</p>
+              </div>
+              <div className="grid grid-cols-3 gap-4 mt-8">
+                {pillars.map(function(item, i) {
+                  return (
+                    <div key={i} className="bg-slate-900/50 border border-purple-500/20 rounded-lg p-3 text-center hover:border-purple-500/60 transition">
+                      <item.icon className={'w-5 h-5 ' + item.color + ' mx-auto mb-1'} />
+                      <div className="text-[11px] font-bold text-slate-200">{item.label}</div>
+                      <div className="text-[9px] text-slate-400">{item.desc}</div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
-
             <div className="bg-slate-950 border-2 border-purple-500/40 rounded-lg p-4 font-mono text-xs h-72 flex flex-col justify-between shadow-[0_0_20px_rgba(153,69,255,0.15)] relative">
               <div className="absolute top-3 right-4 flex gap-1.5">
-                <span className="w-2.5 h-2.5 bg-red-500 rounded-full"></span>
-                <span className="w-2.5 h-2.5 bg-yellow-500 rounded-full"></span>
-                <span className="w-2.5 h-2.5 bg-green-500 rounded-full"></span>
+                <span className="w-2.5 h-2.5 bg-red-500 rounded-full" />
+                <span className="w-2.5 h-2.5 bg-yellow-500 rounded-full" />
+                <span className="w-2.5 h-2.5 bg-green-500 rounded-full" />
               </div>
               <div className="text-purple-400 font-bold border-b border-purple-500/20 pb-2 mb-2 flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-purple-400 animate-spin" />
-                AI SCANNER LIVE
+                <Sparkles className="w-3.5 h-3.5 animate-spin" /> AI SCANNER + SUPABASE
               </div>
-              <div className="flex-1 overflow-y-auto space-y-1.5 scrollbar-thin scrollbar-thumb-purple-500/20 text-emerald-400">
-                {logs.map((log, i) => <div key={i} className="leading-relaxed font-mono text-[11px]">{log}</div>)}
+              <div className="flex-1 overflow-y-auto space-y-1.5 text-emerald-400">
+                {logs.map(function(log, i) { return <div key={i} className="text-[11px]">{log}</div>; })}
               </div>
-              <div className="text-[10px] text-slate-500 border-t border-purple-500/20 pt-2 mt-2">
-                Status: SCANNING & PROCESSING PAYMENTS...
-              </div>
+              <div className="text-[10px] text-slate-500 border-t border-purple-500/20 pt-2 mt-2">Status: SCANNING AND SYNCING...</div>
             </div>
           </div>
         </section>
 
-        <section className="max-w-7xl mx-auto px-6 py-8">
-          <div className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 p-6 backdrop-blur-md max-w-lg mx-auto">
-            <h3 className="text-xl font-black text-purple-400 mb-6">Подай заявку на ИИ-Аудит</h3>
-            <form onSubmit={handleFormSubmit} className="space-y-4">
+        <section className="max-w-7xl mx-auto px-6 py-6">
+          <div className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 backdrop-blur-md p-3 shadow-[0_0_25px_rgba(153,69,255,0.2)]">
+            <div className="flex items-center justify-between mb-2">
               <div>
-                <label className="block text-purple-400 text-xs font-bold mb-1.5">Название проекта</label>
-                <input type="text" value={formData.projectName} onChange={(e) => setFormData({...formData, projectName: e.target.value})} placeholder="Твой токен..." className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none transition" />
+                <h3 className="text-base font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400 flex items-center gap-1.5">
+                  <Shield className="w-3.5 h-3.5 text-emerald-400" /> ТАБЛИЦА БЕЗОПАСНЫХ НОВЫХ ТОКЕНОВ
+                </h3>
+                <p className="text-slate-400 text-[10px] mt-0.5">Кликни на токен для TNT Security Blueprint</p>
               </div>
-              <div>
-                <label className="block text-purple-400 text-xs font-bold mb-1.5">Contract Address (Solana)</label>
-                <input type="text" value={formData.ca} onChange={(e) => setFormData({...formData, ca: e.target.value})} placeholder="Впиши адрес контракта..." className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none transition font-mono" />
+              <div className="hidden md:flex items-center gap-1 text-[9px] text-purple-400">
+                <RefreshCw className="w-2.5 h-2.5 animate-spin" /> Live
               </div>
-
-              <div>
-                <label className="block text-purple-400 text-xs font-bold mb-1.5">Выберите Тариф</label>
-                <select value={selectedTier} onChange={(e) => setSelectedTier(e.target.value)} className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white focus:border-purple-500 focus:outline-none transition font-mono">
-                  <option value="basic">Базовый Аудит — $10 в $MRDT</option>
-                  <option value="fast">Быстрый Листинг — $40 в $MRDT</option>
-                  <option value="vip">VIP-Буст — $120 в $MRDT</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-purple-400 text-xs font-bold mb-1.5">Email для связи</label>
-                <input type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} placeholder="your@email.com" className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none transition" />
-              </div>
-              <button type="submit" disabled={isSending} className="w-full bg-gradient-to-r from-purple-500 to-emerald-400 hover:from-purple-400 hover:to-emerald-300 text-slate-950 font-black py-2.5 rounded text-xs transition flex items-center justify-center gap-1.5 shadow-[0_0_15px_rgba(153,69,255,0.3)] disabled:opacity-50">
-                <Send className="w-3.5 h-3.5" /> {isSending ? 'ОТПРАВЛЯЕМ...' : 'ЗАПУСТИТЬ ИИ-ИНСПЕКЦИЮ'}
-              </button>
-              {submitted && <div className="p-3 bg-emerald-950/40 border border-emerald-500/30 rounded text-emerald-300 text-xs text-center">✓ Токен добавлен в таблицу!</div>}
-            </form>
-          </div>
-        </section>
-      </div>
-
-      {/* МОДАЛЬНОЕ ОКНО 1: ВЫБОР СПОСОБА ОПЛАТЫ */}
-      {showPaymentModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4" onClick={() => setShowPaymentModal(false)}>
-          <div className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-md p-6 shadow-[0_0_40px_rgba(168,85,247,0.25)]" onClick={e => e.stopPropagation()}>
-            <h3 className="text-xl font-black text-purple-400 mb-6 text-center">Выбери способ оплаты</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <button onClick={() => handlePaymentMethodSelect('MRDT')} className="bg-purple-500/10 border-2 border-purple-500/30 hover:border-purple-500 rounded-xl p-6 text-center transition group">
-                <div className="text-3xl mb-2">⚽️</div>
-                <div className="font-bold text-purple-400 group-hover:text-white transition">$MRDT</div>
-              </button>
-              <button onClick={() => handlePaymentMethodSelect('SOL')} className="bg-emerald-500/10 border-2 border-emerald-500/30 hover:border-emerald-500 rounded-xl p-6 text-center transition group">
-                <div className="text-3xl mb-2">◎</div>
-                <div className="font-bold text-emerald-400 group-hover:text-white transition">SOL</div>
-              </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* МОДАЛЬНОЕ ОКНО 2: ВЫБОР КОШЕЛЬКА */}
-      {showWalletModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4" onClick={() => { setShowWalletModal(false); setShowPaymentModal(true); }}>
-          <div className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-md p-6 shadow-[0_0_40px_rgba(168,85,247,0.25)]" onClick={e => e.stopPropagation()}>
-            <h3 className="text-xl font-black text-purple-400 mb-6 text-center">Выбери кошелёк</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <button onClick={() => handleWalletSelect('Phantom')} className="bg-purple-500/10 border-2 border-purple-500/30 hover:border-purple-500 rounded-xl p-6 text-center transition group">
-                <div className="text-3xl mb-2">👻</div>
-                <div className="font-bold text-purple-400 group-hover:text-white transition">Phantom</div>
-              </button>
-              <button onClick={() => handleWalletSelect('Solflare')} className="bg-emerald-500/10 border-2 border-emerald-500/30 hover:border-emerald-500 rounded-xl p-6 text-center transition group">
-                <div className="text-3xl mb-2">🪐</div>
-                <div className="font-bold text-emerald-400 group-hover:text-white transition">Solflare</div>
-              </button>
-            </div>
-            <button onClick={() => { setShowWalletModal(false); setShowPaymentModal(true); }} className="mt-4 w-full text-center text-slate-400 hover:text-white text-xs py-2">
-              ← Назад
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* МОДАЛЬНОЕ ОКНО 3: СЧЁТ */}
-      {showInvoiceModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4" onClick={() => setShowInvoiceModal(false)}>
-          <div className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-md p-6 shadow-[0_0_40px_rgba(168,85,247,0.25)]" onClick={e => e.stopPropagation()}>
-            <h3 className="text-xl font-black text-purple-400 mb-6 text-center">Счёт на оплату</h3>
-            <div className="bg-slate-900 border border-purple-500/20 rounded-xl p-6 text-center space-y-4">
-              <div className="text-3xl font-black text-emerald-400">{invoiceAmount.toLocaleString()} $MRDT</div>
-              <div className="text-xs text-slate-400">{invoiceLabel}</div>
-              <div className="text-xs text-slate-500 font-mono break-all">Адрес: {WALLET_ADDRESS.slice(0, 8)}...{WALLET_ADDRESS.slice(-8)}</div>
-            </div>
-            <div className="mt-6 flex gap-3">
-              <button onClick={() => setShowInvoiceModal(false)} className="flex-1 px-5 py-2.5 text-sm rounded-lg border border-purple-500/40 hover:bg-purple-500/10 transition">
-                Отмена
-              </button>
-              <button onClick={handleConfirmPayment} className="flex-1 px-5 py-2.5 text-sm rounded-lg bg-gradient-to-r from-purple-500 to-emerald-400 text-slate-950 font-black hover:from-purple-400 hover:to-emerald-300 transition">
-                ✅ Оплатил
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+            <div className="max-h-[320px] overflow-y-auto border border-purple-500/20 rounded-lg">
+              <table className="w-full text-left border-collapse text-[9px]">
+                <thead>
+                  <tr className="border-b border-purple-500/20 bg-purple-500/10 text-purple-400 font-bold sticky top-0 z-20 backdrop-blur-md">
+                    {['Токен', 'Цена', 'Ликв', 'Об/Изм', 'Оценка', 'Действ'].map(function(h, i) {
+                      return (
+                        <th key={i} className={'p-0.5 align-bottom' + (i === 4 ? ' text-center' : i === 5 ? ' text-right' : '')} style={{ writingMode: 'vertical-lr', textOrientation: 'mixed', height: '60px', whiteSpace: 'nowrap' }}>
+                          {h}
+                        </th>
+                      );
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr onClick={function() { openTokenBlueprint({ symbol: 'MRDT', name: 'MARADONATOKEN', ca: MRDT_CA, price: mrdtPrice.toFixed(8), liquidity: 13000, volume24h: 0, priceChange24h: 12.4, verified: true, dexUrl: 'https://dexscreener.com/solana/' + MRDT_CA, chain: 'solana' }); }} className="border-b border-purple-500/30 bg-emerald-500/5 hover:bg-emerald-500/10 transition cursor-pointer">
+                    <td className="p-1 font-bold flex items-center gap-1">
+                      <span className="text-sm">⚽️</span>
+                      <div>
+                        <span className="text-emerald-400 font-extrabold text-[10px]">$MRDT</span>
+                        <div className="text-[7px] text-slate-400">MARADONATOKEN</div>
+                      </div>
+                    </td>
+                    <td className="p-1 font-mono text-emerald-400 font-bold text-[9px]">${mrdtPrice > 0 ? mrdtPrice.toFixed(8) : '...'}</td>
+                    <td className="p-1 font-mono text-emerald-400 font-bold text-[9px]">\$13K+</td>
+                    <td className="p-1 font-mono text-emerald-400 font-bold text-[9px]">+12.4%</td>
+                    <td className="p-1 text-center">
+                      <div className="inline-flex items-center justify-center w-9 h-4 rounded-full bg-emerald-500/20 border border-emerald-500 text-emerald-400 text-[8px] font
