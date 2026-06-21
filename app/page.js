@@ -161,10 +161,15 @@ export default function TntHouse() {
 
   // --- Chat ---
   var [isChatOpen, setIsChatOpen] = useState(false);
-  var [chatMessages, setChatMessages] = useState([{ sender: 'bot', text: 'Привет! Я ИИ-Инспектор TNT House. Спроси меня про любой контракт или токен $MRDT.' }]);
+  var [chatMessages, setChatMessages] = useState([{ sender: 'bot', text: 'Привет! Я ИИ-Инспектор TNT House 🤖\n\nВставь адрес контракта (CA) — дам быстрый разбор. У тебя 5 бесплатных вопросов каждые 10 минут.' }]);
   var [userMsg, setUserMsg] = useState('');
   var [isTyping, setIsTyping] = useState(false);
   var chatEndRef = useRef(null);
+  // Rate limit: 5 messages per 10 minutes
+  var [chatCount, setChatCount] = useState(0);
+  var [chatResetTime, setChatResetTime] = useState(null);
+  var [chatBlocked, setChatBlocked] = useState(false);
+  var [chatTimer, setChatTimer] = useState('');
 
   // --- Live logs ---
   var [logs, setLogs] = useState(['[ИИ-Инспектор] Инициализация системы безопасности TNT House...', '[СЕТЬ] Подключение к RPC узлам Solana завершено успешно.']);
@@ -525,16 +530,62 @@ export default function TntHouse() {
     }, 800);
   };
 
-  // --- Chat send ---
-  var handleSendChat = function () {
-    if (!userMsg.trim()) return;
-    setChatMessages(function (prev) { return prev.concat([{ sender: 'user', text: userMsg }]); });
-    setUserMsg(''); setIsTyping(true);
-    setTimeout(function () {
-      var replies = ['Структура чистая. SAFE ✓', 'Бандлов нет.', '$MRDT — железобетонный гем! 🧱⚽️', 'Ругпулов не обнаружено.', 'Комиссии честные. ✓'];
-      setChatMessages(function (prev) { return prev.concat([{ sender: 'bot', text: replies[Math.floor(Math.random() * replies.length)] }]); });
-      setIsTyping(false);
+  // --- Chat rate-limit countdown ticker ---
+  useEffect(function () {
+    var t = setInterval(function () {
+      if (!chatResetTime) return;
+      var msLeft = chatResetTime - Date.now();
+      if (msLeft <= 0) {
+        setChatBlocked(false);
+        setChatCount(0);
+        setChatResetTime(null);
+        setChatTimer('');
+      } else {
+        var m = Math.floor(msLeft / 60000);
+        var s = Math.floor((msLeft % 60000) / 1000);
+        setChatTimer(m + 'м ' + (s < 10 ? '0' : '') + s + 'с');
+      }
     }, 1000);
+    return function () { clearInterval(t); };
+  }, [chatResetTime]);
+
+  // --- Chat send — Groq API via server route + rate limit ---
+  var handleSendChat = async function () {
+    if (!userMsg.trim() || isTyping) return;
+
+    // Rate limit check
+    if (chatBlocked) return;
+    var newCount = chatCount + 1;
+    setChatCount(newCount);
+    if (newCount >= 5) {
+      var resetAt = Date.now() + 10 * 60 * 1000;
+      setChatResetTime(resetAt);
+      setChatBlocked(true);
+    }
+
+    var text = userMsg.trim();
+    var updatedMessages = chatMessages
+      .filter(function (m) { return m.sender !== 'bot' || chatMessages.indexOf(m) > 0; })
+      .map(function (m) { return { role: m.sender === 'user' ? 'user' : 'assistant', content: m.text }; })
+      .concat([{ role: 'user', content: text }]);
+
+    setChatMessages(function (prev) { return prev.concat([{ sender: 'user', text: text }]); });
+    setUserMsg('');
+    setIsTyping(true);
+
+    try {
+      var res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: updatedMessages }),
+      });
+      var data = await res.json();
+      var reply = data.reply || data.error || 'Ошибка. Попробуй ещё раз.';
+      setChatMessages(function (prev) { return prev.concat([{ sender: 'bot', text: reply }]); });
+    } catch (e) {
+      setChatMessages(function (prev) { return prev.concat([{ sender: 'bot', text: 'Ошибка соединения. 💎 Полный аудит → от $10' }]); });
+    }
+    setIsTyping(false);
   };
 
   // =====================
@@ -1222,13 +1273,22 @@ export default function TntHouse() {
                 <span className="text-[9px] text-slate-100 font-bold tracking-widest">Trench Agent D10S</span>
               </div>
             </div>
-            <button onClick={function () { setIsChatOpen(false); }} className="text-white"><X className="w-4 h-4" /></button>
+            <div className="flex items-center gap-3">
+              {/* Rate limit counter */}
+              <div className="text-[9px] text-white/70 text-right">
+                {chatBlocked
+                  ? <span className="text-red-300 font-bold">🔒 {chatTimer}</span>
+                  : <span>{5 - chatCount}/5 вопросов</span>
+                }
+              </div>
+              <button onClick={function () { setIsChatOpen(false); }} className="text-white"><X className="w-4 h-4" /></button>
+            </div>
           </div>
           <div className="flex-1 p-4 overflow-y-auto space-y-3 text-xs">
             {chatMessages.map(function (msg, i) {
               return (
                 <div key={i} className={'flex ' + (msg.sender === 'user' ? 'justify-end' : 'justify-start')}>
-                  <div className={'max-w-[80%] rounded-lg p-2.5 leading-relaxed ' + (msg.sender === 'user' ? 'bg-purple-500/20 text-purple-200 border border-purple-500/30' : 'bg-slate-950 text-emerald-400 border border-emerald-500/30')}>
+                  <div className={'max-w-[80%] rounded-lg p-2.5 leading-relaxed whitespace-pre-wrap ' + (msg.sender === 'user' ? 'bg-purple-500/20 text-purple-200 border border-purple-500/30' : 'bg-slate-950 text-emerald-400 border border-emerald-500/30')}>
                     {msg.text}
                   </div>
                 </div>
@@ -1236,17 +1296,30 @@ export default function TntHouse() {
             })}
             {isTyping && (
               <div className="flex justify-start">
-                <div className="bg-slate-950 text-emerald-400 border border-emerald-500/30 rounded-lg p-2.5 animate-pulse text-[11px]">Думаю...</div>
+                <div className="bg-slate-950 text-emerald-400 border border-emerald-500/30 rounded-lg p-2.5 animate-pulse text-[11px]">Анализирую...</div>
               </div>
             )}
             <div ref={chatEndRef} />
           </div>
-          <div className="p-3 border-t border-purple-500/20 bg-slate-950 flex gap-2">
-            <input type="text" value={userMsg} onChange={function (e) { setUserMsg(e.target.value); }} onKeyDown={function (e) { if (e.key === 'Enter') handleSendChat(); }} placeholder="Спроси у ИИ..." className="flex-1 bg-slate-900 border border-purple-500/20 rounded px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" />
-            <button onClick={handleSendChat} className="bg-purple-500 hover:bg-purple-400 text-slate-950 px-3 rounded text-xs font-bold">
-              <Send className="w-3.5 h-3.5" />
-            </button>
-          </div>
+
+          {/* Blocked state */}
+          {chatBlocked ? (
+            <div className="p-3 border-t border-purple-500/20 bg-slate-950 space-y-2">
+              <div className="text-center text-[11px] text-slate-400">
+                Лимит 5 вопросов исчерпан. Разблокировка через <span className="text-purple-400 font-bold">{chatTimer}</span>
+              </div>
+              <button onClick={scrollToForm} className="w-full bg-gradient-to-r from-purple-500 to-emerald-400 text-slate-950 font-black py-2 rounded text-[11px]">
+                💎 Заказать полный аудит от $10
+              </button>
+            </div>
+          ) : (
+            <div className="p-3 border-t border-purple-500/20 bg-slate-950 flex gap-2">
+              <input type="text" value={userMsg} onChange={function (e) { setUserMsg(e.target.value); }} onKeyDown={function (e) { if (e.key === 'Enter') handleSendChat(); }} placeholder="Вставь CA или задай вопрос..." className="flex-1 bg-slate-900 border border-purple-500/20 rounded px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" />
+              <button onClick={handleSendChat} disabled={isTyping} className="bg-purple-500 hover:bg-purple-400 text-slate-950 px-3 rounded text-xs font-bold disabled:opacity-50">
+                <Send className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
         </div>
       )}
 
