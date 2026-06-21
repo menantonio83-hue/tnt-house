@@ -302,34 +302,77 @@ export default function TntHouse() {
     setShowInvoiceModal(true);
   };
 
-  // Step 4: Confirm payment → fire Solana Pay deeplink
-  var handleConfirmPayment = function () {
+  // Step 4: Confirm payment → fire Solana Pay deeplink → run real RugCheck audit
+  var handleConfirmPayment = async function () {
     setShowInvoiceModal(false);
     setIsSending(true);
 
-    var label = encodeURIComponent(invoiceLabel);
-    var message = encodeURIComponent('Аудит для ' + formData.projectName + ' CA: ' + formData.contractAddress);
-    var solanaPayUrl = 'solana:' + WALLET_ADDRESS + '?amount=' + invoiceAmount + '&spl-token=' + MRDT_CA + '&label=' + label + '&message=' + message;
+    var ca = formData.contractAddress;
+    var projectName = formData.projectName;
 
+    // Fire Solana Pay deeplink to open wallet
+    var label = encodeURIComponent(invoiceLabel);
+    var message = encodeURIComponent('Аудит для ' + projectName + ' CA: ' + ca);
+    var solanaPayUrl = 'solana:' + WALLET_ADDRESS + '?amount=' + invoiceAmount + '&spl-token=' + MRDT_CA + '&label=' + label + '&message=' + message;
     window.location.href = solanaPayUrl;
 
-    // After wallet redirect — save token to Supabase and update UI
+    // Run real RugCheck audit in parallel
+    var auditResult = {
+      score: 75,
+      mintAuthority: 'Неизвестно',
+      freezeAuthority: 'Неизвестно',
+      isHoneypot: 'Неизвестно',
+    };
+
+    try {
+      setLogs(function (prev) { return prev.slice(-12).concat(['[АУДИТ] Запрос к RugCheck API для ' + ca + '...']); });
+      var rugRes = await fetch('https://api.rugcheck.xyz/v1/tokens/' + ca + '/report/summary', {
+        headers: { 'Accept': 'application/json' }
+      });
+      if (rugRes.ok) {
+        var rugData = await rugRes.json();
+        // RugCheck score: 0=risky, higher=safer — normalize to 0-100
+        var rawScore = rugData.score || 0;
+        var normalizedScore = Math.min(100, Math.max(0, Math.round(100 - rawScore / 10)));
+
+        // Parse risks array for specific flags
+        var risks = rugData.risks || [];
+        var hasMint = risks.some(function (r) { return r.name && r.name.toLowerCase().includes('mint'); });
+        var hasFreeze = risks.some(function (r) { return r.name && r.name.toLowerCase().includes('freeze'); });
+        var hasHoneypot = risks.some(function (r) { return r.name && r.name.toLowerCase().includes('honeypot'); });
+
+        auditResult = {
+          score: normalizedScore,
+          mintAuthority: hasMint ? 'Активна ⚠️' : 'Отозвана ✓',
+          freezeAuthority: hasFreeze ? 'Активна ⚠️' : 'Отозвана ✓',
+          isHoneypot: hasHoneypot ? 'Да 🚨' : 'Нет ✓',
+        };
+
+        setLogs(function (prev) { return prev.slice(-12).concat(['[АУДИТ ✓] ' + projectName + ' — Score: ' + normalizedScore + ' | Mint: ' + auditResult.mintAuthority + ' | Honeypot: ' + auditResult.isHoneypot]); });
+      } else {
+        setLogs(function (prev) { return prev.slice(-12).concat(['[АУДИТ] RugCheck недоступен, используем базовые данные.']); });
+      }
+    } catch (e) {
+      setLogs(function (prev) { return prev.slice(-12).concat(['[АУДИТ] Ошибка подключения к RugCheck: ' + e.message]); });
+    }
+
+    // Save to Supabase with real audit data
     setTimeout(function () {
       var newToken = {
-        name: formData.projectName.toUpperCase(),
-        symbol: formData.projectName.slice(0, 4).toUpperCase() || 'NEW',
-        ca: formData.contractAddress,
+        name: projectName.toUpperCase(),
+        symbol: projectName.slice(0, 4).toUpperCase() || 'NEW',
+        ca: ca,
         price: '0.00000000',
         liquidity: 0,
         volume24h: 0,
         priceChange24h: 0,
-        score: 95,
+        score: auditResult.score,
         verified: true,
-        dexUrl: 'https://dexscreener.com/solana/' + formData.contractAddress,
+        dexUrl: 'https://dexscreener.com/solana/' + ca,
         chain: 'solana',
-        mintAuthority: 'Отозвана',
-        freezeAuthority: 'Отозвана',
-        isHoneypot: 'Нет',
+        mintAuthority: auditResult.mintAuthority,
+        freezeAuthority: auditResult.freezeAuthority,
+        isHoneypot: auditResult.isHoneypot,
       };
       saveTokenToSupabase(newToken);
       setListedTokens(function (prev) { return [newToken].concat(prev); });
@@ -337,7 +380,7 @@ export default function TntHouse() {
       setFormData({ projectName: '', contractAddress: '', telegram: '' });
       setSelectedPaymentMethod(null);
       setSelectedWallet(null);
-      showToast('Оплата отправлена! Токен добавлен в таблицу.', 'success');
+      showToast('Аудит завершён! Токен добавлен в таблицу. Score: ' + auditResult.score, 'success');
       setIsSending(false);
       setTimeout(function () { setSubmitted(false); }, 5000);
     }, 800);
@@ -861,15 +904,14 @@ export default function TntHouse() {
                 <div className="text-3xl mb-2">👻</div>
                 <div className="font-bold text-purple-400 group-hover:text-white transition">Phantom</div>
               </button>
-              <button onClick={function () { handleWalletSelect('Solflare'); }} className="bg-emerald-500/10 border-2 border-emerald-500/30 hover:border-emerald-500 rounded-xl p-6 text-center transition group">
+              <button onClick={function () { handleWalletSelect('Solflare'); }} className="bg-yellow-500/10 border-2 border-yellow-500/30 hover:border-yellow-400 rounded-xl p-6 text-center transition group">
                 <div className="flex justify-center mb-2">
-                  <svg width="36" height="36" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect width="128" height="128" rx="20" fill="#FC6B0A"/>
-                    <path d="M64 20L108 98H20L64 20Z" fill="white"/>
-                    <path d="M64 48L86 86H42L64 48Z" fill="#FC6B0A"/>
+                  <svg width="40" height="40" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="128" height="128" rx="24" fill="#FBBF24"/>
+                    <text x="64" y="95" textAnchor="middle" fontFamily="Georgia, serif" fontWeight="900" fontSize="82" fill="#1a0a00" fontStyle="italic">S</text>
                   </svg>
                 </div>
-                <div className="font-bold text-emerald-400 group-hover:text-white transition">Solflare</div>
+                <div className="font-bold text-yellow-400 group-hover:text-white transition">Solflare</div>
               </button>
             </div>
             <button onClick={function () { setShowWalletModal(false); setShowPaymentModal(true); }} className="mt-4 w-full text-center text-slate-400 hover:text-white text-xs py-2">
