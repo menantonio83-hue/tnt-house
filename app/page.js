@@ -21,7 +21,7 @@ export default function TntHouse() {
   const [selectedTier, setSelectedTier] = useState('basic');
   const [isSending, setIsSending] = useState(false);
 
-  // НОВОЕ: Стейты для окон
+  // Стейты для модальных окон
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showWalletModal, setShowWalletModal] = useState(false);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
@@ -193,7 +193,7 @@ export default function TntHouse() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
 
-  // НОВОЕ: Обработчик формы
+  // Обработчик формы
   const handleFormSubmit = (e) => {
     e.preventDefault();
     
@@ -218,21 +218,21 @@ export default function TntHouse() {
     setShowPaymentModal(true);
   };
 
-  // НОВОЕ: Выбор способа оплаты
+  // Выбор способа оплаты
   const handlePaymentMethodSelect = (method) => {
     setSelectedPaymentMethod(method);
     setShowPaymentModal(false);
     setShowWalletModal(true);
   };
 
-  // НОВОЕ: Выбор кошелька
+  // Выбор кошелька
   const handleWalletSelect = (wallet) => {
     setSelectedWallet(wallet);
     setShowWalletModal(false);
     setShowInvoiceModal(true);
   };
 
-  // НОВОЕ: Подтверждение оплаты
+  // Подтверждение оплаты
   const handleConfirmPayment = () => {
     setShowInvoiceModal(false);
     setIsSending(true);
@@ -528,6 +528,7 @@ export default function TntHouse() {
               >
                 <Send className="w-3.5 h-3.5" /> {isSending ? 'ОТПРАВЛЯЕМ...' : 'ЗАПУСТИТЬ ИИ-ИНСПЕКЦИЮ'}
               </button>
+              {submitted && <div className="p-3 bg-emerald-950/40 border border-emerald-500/30 rounded text-emerald-300 text-xs text-center">✓ Токен добавлен в таблицу с оценкой!</div>}
             </form>
           </div>
         </section>
@@ -596,11 +597,4 @@ export default function TntHouse() {
             </div>
             <button onClick={() => { setShowWalletModal(false); setShowPaymentModal(true); }} className="mt-4 w-full text-center text-slate-400 hover:text-white text-xs py-2">
               ← Назад
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* МОДАЛЬНОЕ ОКНО 3: СЧЁТ */}
-      {showInvoiceModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm
+            </
