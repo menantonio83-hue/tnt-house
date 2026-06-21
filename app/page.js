@@ -75,7 +75,7 @@ async function saveBannerToSupabase(banner) {
         id: 1,
         token_name: banner.tokenName,
         banner_img: banner.bannerImg || '',
-        desc: banner.desc,
+        description: banner.desc,
         expires_at: new Date(banner.expiresAt).toISOString(),
       }),
     });
@@ -97,7 +97,7 @@ async function loadBannerFromSupabase() {
     return {
       tokenName: row.token_name,
       bannerImg: row.banner_img || '',
-      desc: row.desc,
+      desc: row.description,
       expiresAt: expiresAt,
     };
   } catch (e) { return null; }
