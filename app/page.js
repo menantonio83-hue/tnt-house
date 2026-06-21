@@ -24,8 +24,8 @@ export default function TntHouse() {
   // НОВОЕ: Стейты для двух окон
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showWalletModal, setShowWalletModal] = useState(false);
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null); // 'MRDT' или 'SOL'
-  const [selectedWallet, setSelectedWallet] = useState(null); // 'Phantom' или 'Solflare'
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
+  const [selectedWallet, setSelectedWallet] = useState(null);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [invoiceAmount, setInvoiceAmount] = useState(0);
   const [invoiceLabel, setInvoiceLabel] = useState('');
@@ -216,21 +216,21 @@ export default function TntHouse() {
     setInvoiceAmount(mrdtAmount);
     setInvoiceLabel(`TNT House ${tierName} Audit - ${formData.projectName}`);
     setError('');
-    setShowPaymentModal(true); // Открываем окно выбора способа оплаты
+    setShowPaymentModal(true);
   };
 
   // НОВОЕ: Выбор способа оплаты (MRDT / SOL)
   const handlePaymentMethodSelect = (method) => {
     setSelectedPaymentMethod(method);
     setShowPaymentModal(false);
-    setShowWalletModal(true); // Открываем окно выбора кошелька
+    setShowWalletModal(true);
   };
 
   // НОВОЕ: Выбор кошелька (Phantom / Solflare)
   const handleWalletSelect = (wallet) => {
     setSelectedWallet(wallet);
     setShowWalletModal(false);
-    setShowInvoiceModal(true); // Открываем окно счёта
+    setShowInvoiceModal(true);
   };
 
   // НОВОЕ: Подтверждение оплаты (кнопка "ОК" в счёте)
@@ -238,11 +238,12 @@ export default function TntHouse() {
     setShowInvoiceModal(false);
     setIsSending(true);
 
-    // Открываем Solana Pay (как было раньше)
-    const solanaPayUrl = `solana:${WALLET_ADDRESS}?amount=${invoiceAmount}&spl-token=${MRDT_CA}&label=${encodeURIComponent(invoiceLabel)}&message=${encodeURIComponent(`Аудит для ${formData.projectName} | CA: ${formData.ca}`)}`;
+    const label = encodeURIComponent(invoiceLabel);
+    const message = encodeURIComponent(`Аудит для ${formData.projectName} | CA: ${formData.ca}`);
+    const solanaPayUrl = `solana:${WALLET_ADDRESS}?amount=${invoiceAmount}&spl-token=${MRDT_CA}&label=${label}&message=${message}`;
+
     window.location.href = solanaPayUrl;
 
-    // Симуляция успеха
     setTimeout(() => {
       const newToken = {
         name: formData.projectName,
@@ -273,7 +274,6 @@ export default function TntHouse() {
     }, 800);
   };
 
-  // REAL AI Chat
   const handleSendChat = async (e) => {
     e.preventDefault();
     if (!userMsg.trim()) return;
@@ -343,7 +343,6 @@ export default function TntHouse() {
               </div>
             </div>
             
-            {/* Buy Dropdown + Wallet */}
             <div className="flex items-center gap-2">
               <div className="relative">
                 <button 
@@ -403,7 +402,6 @@ export default function TntHouse() {
               </div>
             </div>
 
-            {/* AI Scanner Terminal */}
             <div className="bg-slate-950 border-2 border-purple-500/40 rounded-lg p-4 font-mono text-xs h-72 flex flex-col justify-between shadow-[0_0_20px_rgba(153,69,255,0.15)] relative">
               <div className="absolute top-3 right-4 flex gap-1.5">
                 <span className="w-2.5 h-2.5 bg-red-500 rounded-full"></span>
@@ -424,7 +422,7 @@ export default function TntHouse() {
           </div>
         </section>
 
-        {/* Table with Safety Score */}
+        {/* Table */}
         <section className="max-w-7xl mx-auto px-6 py-6">
           <div className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 backdrop-blur-md p-6 shadow-[0_0_25px_rgba(153,69,255,0.2)]">
             <div className="flex items-center justify-between mb-4">
@@ -450,7 +448,6 @@ export default function TntHouse() {
                   </tr>
                 </thead>
                 <tbody>
-                  {/* Pinned $MRDT */}
                   <tr 
                     onClick={() => openTokenBlueprint({ symbol: 'MRDT', name: 'MARADONATOKEN', ca: MRDT_CA, price: '0.00001300', liquidity: 13000, verified: true })}
                     className="border-b border-purple-500/30 bg-emerald-500/5 hover:bg-emerald-500/10 transition cursor-pointer"
@@ -539,7 +536,7 @@ export default function TntHouse() {
             <div className="space-y-4">
               <h3 className="text-2xl font-black text-purple-400">Подай заявку на ИИ-Аудит</h3>
               <p className="text-slate-300 text-sm leading-relaxed">
-                Заполни форму → Оплати $MRDT через Solana Pay → Токен автоматически появится в таблице с оценкой!
+                Заполни форму → Выбери способ оплаты → Кошелёк → Счёт → Токен в таблице!
               </p>
 
               <div className="mt-6 border-t border-purple-500/20 pt-4 space-y-3">
@@ -591,4 +588,21 @@ export default function TntHouse() {
                 </div>
 
                 <div>
-                  <label className="block text-purple-400 text-xs font-bold mb-1.
+                  <label className="block text-purple-400 text-xs font-bold mb-1.5">Выберите Тариф</label>
+                  <select
+                    value={selectedTier}
+                    onChange={(e) => setSelectedTier(e.target.value)}
+                    className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white focus:border-purple-500 focus:outline-none transition font-mono"
+                  >
+                    <option value="basic">Базовый Аудит — $10 в $MRDT (~770,000 $MRDT)</option>
+                    <option value="fast">Быстрый Листинг — $40 в $MRDT (~3,000,000 $MRDT)</option>
+                    <option value="vip">VIP-Буст (Баннер 24ч) — $120 в $MRDT (~9,200,000 $MRDT)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-purple-400 text-xs font-bold mb-1.5">Email для связи</label>
+                  <input 
+                    type="email" 
+                    value={formData.email} 
+                    onChange={(e) => set
