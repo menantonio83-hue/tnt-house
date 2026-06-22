@@ -396,6 +396,9 @@ export default function TntHouse() {
   // Shared audit + Supabase save (free and paid flows)
   var runAuditAndSave = async function (ca, projectName, isFree) {
     var auditResult = { score: 75, mintAuthority: 'Unknown', freezeAuthority: 'Unknown', isHoneypot: 'Unknown' };
+    var dexData = { price: '0.00000000', liquidity: 0, volume24h: 0, priceChange24h: 0 };
+
+    // 1. RugCheck audit
     try {
       setLogs(function (prev) { return prev.slice(-12).concat(['[AUDIT] RugCheck API request for ' + ca + '...']); });
       var rugRes = await fetch('https://api.rugcheck.xyz/v1/tokens/' + ca + '/report/summary', { headers: { 'Accept': 'application/json' } });
@@ -420,13 +423,40 @@ export default function TntHouse() {
     } catch (e) {
       setLogs(function (prev) { return prev.slice(-12).concat(['[AUDIT] Error: ' + e.message]); });
     }
+
+    // 2. Fetch real price/liq/vol from DexScreener
+    try {
+      setLogs(function (prev) { return prev.slice(-12).concat(['[DEX] Fetching live market data...']); });
+      var dexRes = await fetch('https://api.dexscreener.com/latest/dex/tokens/' + ca);
+      var dexJson = await dexRes.json();
+      if (dexJson.pairs && dexJson.pairs.length > 0) {
+        var pair = dexJson.pairs[0];
+        dexData = {
+          price: pair.priceUsd ? parseFloat(pair.priceUsd).toFixed(8) : '0.00000000',
+          liquidity: (pair.liquidity && pair.liquidity.usd) ? Math.round(pair.liquidity.usd) : 0,
+          volume24h: (pair.volume && pair.volume.h24) ? Math.round(pair.volume.h24) : 0,
+          priceChange24h: (pair.priceChange && pair.priceChange.h24) ? pair.priceChange.h24 : 0,
+        };
+        setLogs(function (prev) { return prev.slice(-12).concat(['[DEX ✓] Price: $' + dexData.price + ' | Liq: $' + dexData.liquidity]); });
+      }
+    } catch (e) {
+      setLogs(function (prev) { return prev.slice(-12).concat(['[DEX] Could not fetch market data.']); });
+    }
+
     setTimeout(function () {
       var newToken = {
         name: projectName.toUpperCase(), symbol: projectName.slice(0, 4).toUpperCase() || 'NEW',
-        ca: ca, price: '0.00000000', liquidity: 0, volume24h: 0, priceChange24h: 0,
+        ca: ca,
+        price: dexData.price,
+        liquidity: dexData.liquidity,
+        volume24h: dexData.volume24h,
+        priceChange24h: dexData.priceChange24h,
         score: auditResult.score, verified: true,
         dexUrl: 'https://dexscreener.com/solana/' + ca, chain: 'solana',
-        mintAuthority: auditResult.mintAuthority, freezeAuthority: auditResult.freezeAuthority, isHoneypot: auditResult.isHoneypot,
+        mintAuthority: auditResult.mintAuthority,
+        freezeAuthority: auditResult.freezeAuthority,
+        isHoneypot: auditResult.isHoneypot,
+        rugcheckUrl: 'https://rugcheck.xyz/tokens/' + ca,
       };
       saveTokenToSupabase(newToken);
       setListedTokens(function (prev) { return [newToken].concat(prev); });
@@ -1239,24 +1269,77 @@ export default function TntHouse() {
       {/* TNT Security Blueprint modal */}
       {isBlueprintOpen && selectedToken && (
         <div className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={closeBlueprint}>
-          <div className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-lg p-6 shadow-lg" onClick={function (e) { e.stopPropagation(); }}>
-            <h2 className="text-2xl font-black text-white mb-4">TNT Security Blueprint</h2>
-            <p className="text-purple-400 font-bold">{selectedToken.name} <span className="text-slate-400 font-normal">({selectedToken.symbol})</span></p>
-            <p className="text-slate-400 text-xs break-all mt-1">CA: {selectedToken.ca}</p>
-            {selectedToken.mintAuthority && (
-              <p className="text-slate-300 mt-2 text-sm">Mint Authority: <span className={selectedToken.mintAuthority === 'Revoked' ? 'text-emerald-400' : 'text-red-400'}>{selectedToken.mintAuthority}</span></p>
-            )}
-            {selectedToken.freezeAuthority && (
-              <p className="text-slate-300 text-sm">Freeze Authority: <span className={selectedToken.freezeAuthority === 'Revoked' ? 'text-emerald-400' : 'text-red-400'}>{selectedToken.freezeAuthority}</span></p>
-            )}
-            {selectedToken.isHoneypot && (
-              <p className="text-slate-300 text-sm">Honeypot: <span className={selectedToken.isHoneypot === 'Нет' ? 'text-emerald-400' : 'text-red-400'}>{selectedToken.isHoneypot}</span></p>
-            )}
-            <a href={selectedToken.dexUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-purple-400 hover:text-emerald-400 text-xs mt-3">
-              DexScreener <ExternalLink className="w-3 h-3" />
-            </a>
-            <div className="mt-6">
-              <button onClick={closeBlueprint} className="text-slate-400 hover:text-white transition text-sm">Close</button>
+          <div className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-lg p-6 shadow-[0_0_40px_rgba(168,85,247,0.2)]" onClick={function (e) { e.stopPropagation(); }}>
+            {/* Header */}
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-black text-white">TNT Security Blueprint</h2>
+              <button onClick={closeBlueprint} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
+            </div>
+
+            {/* Token identity */}
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-lg">
+                {selectedToken.symbol === 'MRDT' ? '⚽️' : '🪙'}
+              </div>
+              <div>
+                <p className="text-purple-400 font-black text-base">${selectedToken.symbol} <span className="text-slate-400 font-normal text-sm">{selectedToken.name}</span></p>
+                <p className="text-slate-500 text-[10px] font-mono break-all">{selectedToken.ca}</p>
+              </div>
+            </div>
+
+            {/* Score badge */}
+            <div className="flex items-center gap-3 mb-4 p-3 bg-slate-900 rounded-xl border border-purple-500/20">
+              <div className={'w-14 h-14 rounded-full flex items-center justify-center text-xl font-black border-2 ' + (getSafetyScore(selectedToken) >= 90 ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : getSafetyScore(selectedToken) >= 50 ? 'bg-yellow-500/20 border-yellow-500 text-yellow-400' : 'bg-red-500/20 border-red-500 text-red-400')}>
+                {getSafetyScore(selectedToken)}
+              </div>
+              <div>
+                <p className="text-white font-bold text-sm">Safety Score</p>
+                <p className="text-slate-400 text-xs">{getSafetyScore(selectedToken) >= 90 ? 'Ironclad Safe ★' : getSafetyScore(selectedToken) >= 50 ? 'Moderate Risk ⚠️' : 'High Risk 🚨'}</p>
+              </div>
+            </div>
+
+            {/* Market data */}
+            <div className="grid grid-cols-3 gap-2 mb-4">
+              {[
+                { label: 'Price', value: '$' + (selectedToken.price || '0.00000000') },
+                { label: 'Liquidity', value: selectedToken.liquidity ? '$' + (selectedToken.liquidity >= 1000 ? (selectedToken.liquidity/1000).toFixed(1)+'K' : selectedToken.liquidity) : '$0' },
+                { label: 'Volume 24h', value: selectedToken.volume24h ? '$' + (selectedToken.volume24h >= 1000 ? (selectedToken.volume24h/1000).toFixed(1)+'K' : selectedToken.volume24h) : '$0' },
+              ].map(function(item, i) {
+                return (
+                  <div key={i} className="bg-slate-900 border border-purple-500/10 rounded-lg p-2.5 text-center">
+                    <p className="text-slate-500 text-[9px] mb-0.5">{item.label}</p>
+                    <p className="text-emerald-400 font-bold text-xs font-mono">{item.value}</p>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Security flags */}
+            <div className="space-y-2 mb-4">
+              {[
+                { label: 'Mint Authority', value: selectedToken.mintAuthority },
+                { label: 'Freeze Authority', value: selectedToken.freezeAuthority },
+                { label: 'Honeypot', value: selectedToken.isHoneypot },
+              ].map(function(item, i) {
+                if (!item.value) return null;
+                var isSafe = item.value.includes('Revoked') || item.value.includes('No ✓');
+                return (
+                  <div key={i} className="flex items-center justify-between px-3 py-2 bg-slate-900 rounded-lg border border-purple-500/10">
+                    <span className="text-slate-400 text-xs">{item.label}</span>
+                    <span className={'text-xs font-bold ' + (isSafe ? 'text-emerald-400' : 'text-red-400')}>{item.value}</span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Links */}
+            <div className="flex gap-3">
+              <a href={selectedToken.dexUrl} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border border-purple-500/30 text-purple-400 hover:text-emerald-400 hover:border-emerald-500/30 transition text-xs font-bold">
+                DexScreener <ExternalLink className="w-3 h-3" />
+              </a>
+              <a href={'https://rugcheck.xyz/tokens/' + selectedToken.ca} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border border-purple-500/30 text-purple-400 hover:text-emerald-400 hover:border-emerald-500/30 transition text-xs font-bold">
+                RugCheck <ExternalLink className="w-3 h-3" />
+              </a>
             </div>
           </div>
         </div>
