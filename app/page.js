@@ -133,6 +133,9 @@ export default function TntHouse() {
   var [selectedTier, setSelectedTier] = useState('basic');
   var [isSending, setIsSending] = useState(false);
   var [submitted, setSubmitted] = useState(false);
+  // Free slots: first 10 tokens audited for free
+  var [freeSlots, setFreeSlots] = useState(10);
+  var FREE_TOTAL = 10;
 
   // --- Payment modal state — AI Audit ---
   var [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -196,7 +199,7 @@ export default function TntHouse() {
   };
 
   var getAmountForTier = function (tier) {
-    var usd = tier === 'fast' ? 40 : tier === 'vip' ? 120 : 10;
+    var usd = tier === 'fast' ? 25 : tier === 'vip' ? 75 : 10;
     var price = mrdtPriceRef.current || mrdtPrice;
     return price > 0 ? Math.round(usd / price) : 0;
   };
@@ -240,6 +243,9 @@ export default function TntHouse() {
   useEffect(function () {
     loadTokensFromSupabase().then(function (data) {
       if (data.length > 0) setListedTokens(data);
+      // Calculate remaining free slots
+      var used = data.length;
+      setFreeSlots(Math.max(0, FREE_TOTAL - used));
     });
   }, []);
 
@@ -350,17 +356,25 @@ export default function TntHouse() {
 
   // --- PAYMENT FLOW (from 1.17.4) ---
 
-  // Step 1: Form submit → show payment modal
+  // Step 1: Form submit → if free slot available skip payment, else show payment modal
   var handleFormSubmit = function (e) {
     e.preventDefault();
     if (!formData.projectName || !formData.contractAddress || !formData.telegram) {
       showToast('Заполни все поля', 'error'); return;
     }
+
+    // FREE slot — skip payment, run audit directly
+    if (freeSlots > 0) {
+      setIsSending(true);
+      runAuditAndSave(formData.contractAddress, formData.projectName, true);
+      return;
+    }
+
+    // PAID flow
     var mrdtAmount = getAmountForTier(selectedTier);
     if (mrdtAmount <= 0) { showToast('Ошибка цены, попробуй позже', 'error'); return; }
-
     var tierName = selectedTier === 'fast' ? 'Быстрый' : selectedTier === 'vip' ? 'VIP' : 'Базовый';
-    var usd = selectedTier === 'fast' ? 40 : selectedTier === 'vip' ? 120 : 10;
+    var usd = selectedTier === 'fast' ? 25 : selectedTier === 'vip' ? 75 : 10;
     setInvoiceAmount(mrdtAmount);
     setInvoiceUsd(usd);
     setInvoiceLabel('TNT House ' + tierName + ' Audit - ' + formData.projectName);
@@ -381,88 +395,63 @@ export default function TntHouse() {
     setShowInvoiceModal(true);
   };
 
-  // Step 4: Confirm payment → fire Solana Pay deeplink → run real RugCheck audit
-  var handleConfirmPayment = async function () {
-    setShowInvoiceModal(false);
-    setIsSending(true);
-
-    var ca = formData.contractAddress;
-    var projectName = formData.projectName;
-
-    // Fire Solana Pay deeplink to open wallet
-    var label = encodeURIComponent(invoiceLabel);
-    var message = encodeURIComponent('Аудит для ' + projectName + ' CA: ' + ca);
-    var solanaPayUrl = 'solana:' + WALLET_ADDRESS + '?amount=' + invoiceAmount + '&spl-token=' + MRDT_CA + '&label=' + label + '&message=' + message;
-    window.location.href = solanaPayUrl;
-
-    // Run real RugCheck audit in parallel
-    var auditResult = {
-      score: 75,
-      mintAuthority: 'Неизвестно',
-      freezeAuthority: 'Неизвестно',
-      isHoneypot: 'Неизвестно',
-    };
-
+  // Shared audit + Supabase save (free and paid flows)
+  var runAuditAndSave = async function (ca, projectName, isFree) {
+    var auditResult = { score: 75, mintAuthority: 'Неизвестно', freezeAuthority: 'Неизвестно', isHoneypot: 'Неизвестно' };
     try {
       setLogs(function (prev) { return prev.slice(-12).concat(['[АУДИТ] Запрос к RugCheck API для ' + ca + '...']); });
-      var rugRes = await fetch('https://api.rugcheck.xyz/v1/tokens/' + ca + '/report/summary', {
-        headers: { 'Accept': 'application/json' }
-      });
+      var rugRes = await fetch('https://api.rugcheck.xyz/v1/tokens/' + ca + '/report/summary', { headers: { 'Accept': 'application/json' } });
       if (rugRes.ok) {
         var rugData = await rugRes.json();
-        // RugCheck score: 0=risky, higher=safer — normalize to 0-100
         var rawScore = rugData.score || 0;
         var normalizedScore = Math.min(100, Math.max(0, Math.round(100 - rawScore / 10)));
-
-        // Parse risks array for specific flags
         var risks = rugData.risks || [];
         var hasMint = risks.some(function (r) { return r.name && r.name.toLowerCase().includes('mint'); });
         var hasFreeze = risks.some(function (r) { return r.name && r.name.toLowerCase().includes('freeze'); });
         var hasHoneypot = risks.some(function (r) { return r.name && r.name.toLowerCase().includes('honeypot'); });
-
         auditResult = {
           score: normalizedScore,
           mintAuthority: hasMint ? 'Активна ⚠️' : 'Отозвана ✓',
           freezeAuthority: hasFreeze ? 'Активна ⚠️' : 'Отозвана ✓',
           isHoneypot: hasHoneypot ? 'Да 🚨' : 'Нет ✓',
         };
-
-        setLogs(function (prev) { return prev.slice(-12).concat(['[АУДИТ ✓] ' + projectName + ' — Score: ' + normalizedScore + ' | Mint: ' + auditResult.mintAuthority + ' | Honeypot: ' + auditResult.isHoneypot]); });
+        setLogs(function (prev) { return prev.slice(-12).concat(['[АУДИТ ✓] ' + projectName + ' — Score: ' + normalizedScore]); });
       } else {
-        setLogs(function (prev) { return prev.slice(-12).concat(['[АУДИТ] RugCheck недоступен, используем базовые данные.']); });
+        setLogs(function (prev) { return prev.slice(-12).concat(['[АУДИТ] RugCheck недоступен, базовые данные.']); });
       }
     } catch (e) {
-      setLogs(function (prev) { return prev.slice(-12).concat(['[АУДИТ] Ошибка подключения к RugCheck: ' + e.message]); });
+      setLogs(function (prev) { return prev.slice(-12).concat(['[АУДИТ] Ошибка: ' + e.message]); });
     }
-
-    // Save to Supabase with real audit data
     setTimeout(function () {
       var newToken = {
-        name: projectName.toUpperCase(),
-        symbol: projectName.slice(0, 4).toUpperCase() || 'NEW',
-        ca: ca,
-        price: '0.00000000',
-        liquidity: 0,
-        volume24h: 0,
-        priceChange24h: 0,
-        score: auditResult.score,
-        verified: true,
-        dexUrl: 'https://dexscreener.com/solana/' + ca,
-        chain: 'solana',
-        mintAuthority: auditResult.mintAuthority,
-        freezeAuthority: auditResult.freezeAuthority,
-        isHoneypot: auditResult.isHoneypot,
+        name: projectName.toUpperCase(), symbol: projectName.slice(0, 4).toUpperCase() || 'NEW',
+        ca: ca, price: '0.00000000', liquidity: 0, volume24h: 0, priceChange24h: 0,
+        score: auditResult.score, verified: true,
+        dexUrl: 'https://dexscreener.com/solana/' + ca, chain: 'solana',
+        mintAuthority: auditResult.mintAuthority, freezeAuthority: auditResult.freezeAuthority, isHoneypot: auditResult.isHoneypot,
       };
       saveTokenToSupabase(newToken);
       setListedTokens(function (prev) { return [newToken].concat(prev); });
+      if (isFree) setFreeSlots(function (prev) { return Math.max(0, prev - 1); });
       setSubmitted(true);
       setFormData({ projectName: '', contractAddress: '', telegram: '' });
       setSelectedPaymentMethod(null);
       setSelectedWallet(null);
-      showToast('Аудит завершён! Токен добавлен в таблицу. Score: ' + auditResult.score, 'success');
+      showToast((isFree ? '🎁 Бесплатный аудит завершён! Score: ' : 'Аудит завершён! Score: ') + auditResult.score, 'success');
       setIsSending(false);
       setTimeout(function () { setSubmitted(false); }, 5000);
     }, 800);
+  };
+
+  // Step 4: Confirm payment → fire Solana Pay deeplink → run audit
+  var handleConfirmPayment = function () {
+    setShowInvoiceModal(false);
+    setIsSending(true);
+    var label = encodeURIComponent(invoiceLabel);
+    var message = encodeURIComponent('Аудит для ' + formData.projectName + ' CA: ' + formData.contractAddress);
+    var solanaPayUrl = 'solana:' + WALLET_ADDRESS + '?amount=' + invoiceAmount + '&spl-token=' + MRDT_CA + '&label=' + label + '&message=' + message;
+    window.location.href = solanaPayUrl;
+    runAuditAndSave(formData.contractAddress, formData.projectName, false);
   };
 
   // --- Banner submit ---
@@ -869,8 +858,25 @@ export default function TntHouse() {
 
               {/* AI Inspection form */}
               <div className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 p-6 backdrop-blur-md">
-                <h3 className="text-lg font-black text-purple-400 mb-2">ЗАКАЗАТЬ ИИ-ИНСПЕКЦИЮ</h3>
-                <p className="text-slate-400 text-xs mb-4">Заполни форму — выбери кошелёк — оплати через Solana Pay — токен появится в таблице.</p>
+                <div className="flex items-start justify-between mb-2">
+                  <h3 className="text-lg font-black text-purple-400">ЗАКАЗАТЬ ИИ-ИНСПЕКЦИЮ</h3>
+                  {freeSlots > 0 ? (
+                    <div className="bg-emerald-500/20 border border-emerald-500/40 rounded-lg px-2 py-1 text-center">
+                      <div className="text-emerald-400 font-black text-sm">{freeSlots}/{FREE_TOTAL}</div>
+                      <div className="text-[9px] text-emerald-500">бесплатно</div>
+                    </div>
+                  ) : (
+                    <div className="bg-slate-800 border border-slate-600 rounded-lg px-2 py-1 text-center">
+                      <div className="text-slate-400 font-black text-sm">0/{FREE_TOTAL}</div>
+                      <div className="text-[9px] text-slate-500">мест нет</div>
+                    </div>
+                  )}
+                </div>
+                <p className="text-slate-400 text-xs mb-4">
+                  {freeSlots > 0
+                    ? '🎁 Осталось ' + freeSlots + ' бесплатных мест! Заполни форму — аудит запустится сразу.'
+                    : 'Заполни форму — выбери кошелёк — оплати через Solana Pay — токен появится в таблице.'}
+                </p>
                 <form onSubmit={handleFormSubmit} className="space-y-4">
                   <div>
                     <label className="block text-purple-400 text-xs font-bold mb-1">Название проекта</label>
@@ -884,8 +890,8 @@ export default function TntHouse() {
                     <label className="block text-purple-400 text-xs font-bold mb-1">Выберите тариф</label>
                     <select value={selectedTier} onChange={function (e) { setSelectedTier(e.target.value); }} className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white focus:border-purple-500 focus:outline-none font-mono">
                       <option value="basic">Базовый Аудит — $10 в $MRDT (~{priceLoading ? '...' : getAmountForTier('basic').toLocaleString()} $MRDT)</option>
-                      <option value="fast">Быстрый Листинг — $40 в $MRDT (~{priceLoading ? '...' : getAmountForTier('fast').toLocaleString()} $MRDT)</option>
-                      <option value="vip">VIP-Буст — $120 в $MRDT (~{priceLoading ? '...' : getAmountForTier('vip').toLocaleString()} $MRDT)</option>
+                      <option value="fast">Быстрый Листинг — $25 в $MRDT (~{priceLoading ? '...' : getAmountForTier('fast').toLocaleString()} $MRDT)</option>
+                      <option value="vip">VIP-Буст — $75 в $MRDT (~{priceLoading ? '...' : getAmountForTier('vip').toLocaleString()} $MRDT)</option>
                     </select>
                   </div>
                   <div>
@@ -895,8 +901,8 @@ export default function TntHouse() {
                       <input type="text" placeholder="your_telegram" value={formData.telegram} onChange={function (e) { setFormData(Object.assign({}, formData, { telegram: e.target.value })); }} className="w-full bg-slate-950 border border-purple-500/20 rounded pl-7 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" />
                     </div>
                   </div>
-                  <button type="submit" disabled={isSending} className="w-full bg-gradient-to-r from-purple-500 to-emerald-400 hover:from-purple-400 hover:to-emerald-300 text-slate-950 font-black py-2.5 rounded text-xs transition flex items-center justify-center gap-1.5 disabled:opacity-50">
-                    <Send className="w-3.5 h-3.5" /> {isSending ? 'ОТПРАВЛЯЕМ...' : 'ЗАПУСТИТЬ ИИ-ИНСПЕКЦИЮ'}
+                  <button type="submit" disabled={isSending} className={'w-full font-black py-2.5 rounded text-xs transition flex items-center justify-center gap-1.5 disabled:opacity-50 ' + (freeSlots > 0 ? 'bg-gradient-to-r from-emerald-400 to-purple-500 hover:from-emerald-300 hover:to-purple-400 text-slate-950' : 'bg-gradient-to-r from-purple-500 to-emerald-400 hover:from-purple-400 hover:to-emerald-300 text-slate-950')}>
+                    <Send className="w-3.5 h-3.5" /> {isSending ? 'ЗАПУСКАЕМ...' : freeSlots > 0 ? '🎁 ЗАПУСТИТЬ БЕСПЛАТНЫЙ АУДИТ' : 'ЗАПУСТИТЬ ИИ-ИНСПЕКЦИЮ'}
                   </button>
                   {submitted && <div className="p-3 bg-emerald-950/40 border border-emerald-500/30 rounded text-emerald-300 text-xs text-center font-bold">Оплата отправлена! Токен добавлен в таблицу.</div>}
                 </form>
@@ -954,17 +960,18 @@ export default function TntHouse() {
                 </h4>
                 <div className="grid grid-cols-1 gap-2 text-xs font-mono">
                   {[
-                    ['Первые 3 токена', 'БЕСПЛАТНО'],
+                    ['🎁 Первые 10 токенов', 'БЕСПЛАТНО'],
                     ['Базовый ИИ-Аудит', '$10 ~ ' + (priceLoading ? '...' : getAmountForTier('basic').toLocaleString()) + ' $MRDT'],
-                    ['Быстрый Листинг', '$40 ~ ' + (priceLoading ? '...' : getAmountForTier('fast').toLocaleString()) + ' $MRDT'],
+                    ['Быстрый Листинг', '$25 ~ ' + (priceLoading ? '...' : getAmountForTier('fast').toLocaleString()) + ' $MRDT'],
+                    ['VIP-Буст', '$75 ~ ' + (priceLoading ? '...' : getAmountForTier('vip').toLocaleString()) + ' $MRDT'],
                     ['Баннер 1 день', '$20 ~ ' + (priceLoading ? '...' : getAmountForBanner('1').toLocaleString()) + ' $MRDT'],
                     ['Баннер 2 дня', '$35 ~ ' + (priceLoading ? '...' : getAmountForBanner('2').toLocaleString()) + ' $MRDT'],
                     ['Баннер 6 дней', '$100 ~ ' + (priceLoading ? '...' : getAmountForBanner('6').toLocaleString()) + ' $MRDT'],
                   ].map(function (row, i) {
                     return (
-                      <div key={i} className={'flex justify-between p-2.5 border rounded-lg ' + (i === 0 ? 'bg-purple-500/10 border-purple-500/20' : 'bg-slate-950 border-purple-500/10')}>
-                        <span className="text-slate-300">{row[0]}</span>
-                        <span className="text-emerald-400 font-bold">{row[1]}</span>
+                      <div key={i} className={'flex justify-between p-2.5 border rounded-lg ' + (i === 0 ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-slate-950 border-purple-500/10')}>
+                        <span className={i === 0 ? 'text-emerald-300 font-bold' : 'text-slate-300'}>{row[0]}</span>
+                        <span className={i === 0 ? 'text-emerald-400 font-black' : 'text-emerald-400 font-bold'}>{row[1]}</span>
                       </div>
                     );
                   })}
