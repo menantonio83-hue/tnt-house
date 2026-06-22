@@ -154,6 +154,16 @@ export default function TntHouse() {
   var [bannerInvoiceAmount, setBannerInvoiceAmount] = useState(0);
   var [bannerInvoiceUsd, setBannerInvoiceUsd] = useState(0);
 
+  // --- Payment verification states ---
+  var [showVerifyModal, setShowVerifyModal] = useState(false);
+  var [verifyType, setVerifyType] = useState(''); // 'banner' or 'audit'
+  var [verifyStatus, setVerifyStatus] = useState('waiting'); // 'waiting' | 'success' | 'failed'
+  var [verifyAttempts, setVerifyAttempts] = useState(0);
+  var [verifyStartTime, setVerifyStartTime] = useState(null);
+  var [pendingBannerData, setPendingBannerData] = useState(null);
+  var [pendingAuditData, setPendingAuditData] = useState(null);
+  var verifyIntervalRef = useRef(null);
+
   // --- Banner form ---
   var [bannerFormData, setBannerFormData] = useState({ tokenName: '', bannerImg: '', desc: '', days: '1' });
   var [bannerSubmitted, setBannerSubmitted] = useState(false);
@@ -471,15 +481,69 @@ export default function TntHouse() {
     }, 800);
   };
 
-  // Step 4: Confirm payment → fire Solana Pay deeplink → run audit
-  var handleConfirmPayment = function () {
+  // Step 4: Run RugCheck audit first to get data, then poll for payment confirmation
+  var handleConfirmPayment = async function () {
     setShowInvoiceModal(false);
     setIsSending(true);
+
+    var ca = formData.contractAddress;
+    var projectName = formData.projectName;
+
+    // Run audit to get real data (RugCheck + DexScreener)
+    var auditResult = { score: 75, mintAuthority: 'Unknown', freezeAuthority: 'Unknown', isHoneypot: 'Unknown' };
+    var dexData = { price: '0.00000000', liquidity: 0, volume24h: 0, priceChange24h: 0 };
+
+    try {
+      var rugRes = await fetch('https://api.rugcheck.xyz/v1/tokens/' + ca + '/report/summary', { headers: { 'Accept': 'application/json' } });
+      if (rugRes.ok) {
+        var rugData = await rugRes.json();
+        var rawScore = rugData.score || 0;
+        var normalizedScore = Math.min(100, Math.max(0, Math.round(100 - rawScore / 10)));
+        var risks = rugData.risks || [];
+        auditResult = {
+          score: normalizedScore,
+          mintAuthority: risks.some(function (r) { return r.name && r.name.toLowerCase().includes('mint'); }) ? 'Active ⚠️' : 'Revoked ✓',
+          freezeAuthority: risks.some(function (r) { return r.name && r.name.toLowerCase().includes('freeze'); }) ? 'Active ⚠️' : 'Revoked ✓',
+          isHoneypot: risks.some(function (r) { return r.name && r.name.toLowerCase().includes('honeypot'); }) ? 'Yes 🚨' : 'No ✓',
+        };
+      }
+    } catch (e) { console.error('RugCheck error:', e); }
+
+    try {
+      var dexRes = await fetch('https://api.dexscreener.com/latest/dex/tokens/' + ca);
+      var dexJson = await dexRes.json();
+      if (dexJson.pairs && dexJson.pairs.length > 0) {
+        var pair = dexJson.pairs[0];
+        dexData = {
+          price: pair.priceUsd ? parseFloat(pair.priceUsd).toFixed(8) : '0.00000000',
+          liquidity: (pair.liquidity && pair.liquidity.usd) ? Math.round(pair.liquidity.usd) : 0,
+          volume24h: (pair.volume && pair.volume.h24) ? Math.round(pair.volume.h24) : 0,
+          priceChange24h: (pair.priceChange && pair.priceChange.h24) ? pair.priceChange.h24 : 0,
+        };
+      }
+    } catch (e) { console.error('DexScreener error:', e); }
+
+    var tokenData = {
+      name: projectName.toUpperCase(), symbol: projectName.slice(0, 4).toUpperCase() || 'NEW',
+      ca: ca, price: dexData.price, liquidity: dexData.liquidity,
+      volume24h: dexData.volume24h, priceChange24h: dexData.priceChange24h,
+      score: auditResult.score, verified: true,
+      dexUrl: 'https://dexscreener.com/solana/' + ca, chain: 'solana',
+      mintAuthority: auditResult.mintAuthority, freezeAuthority: auditResult.freezeAuthority,
+      isHoneypot: auditResult.isHoneypot, rugcheckUrl: 'https://rugcheck.xyz/tokens/' + ca,
+    };
+
+    setFormData({ projectName: '', contractAddress: '', telegram: '' });
+    setIsSending(false);
+
+    // Start payment polling — only saves to Supabase after TX confirmed
+    startPaymentVerification('audit', invoiceAmount, null, tokenData);
+
+    // Fire Solana Pay deeplink
     var label = encodeURIComponent(invoiceLabel);
-    var message = encodeURIComponent('Audit for ' + formData.projectName + ' CA: ' + formData.contractAddress);
+    var message = encodeURIComponent('Audit for ' + projectName + ' CA: ' + ca);
     var solanaPayUrl = 'solana:' + WALLET_ADDRESS + '?amount=' + invoiceAmount + '&spl-token=' + MRDT_CA + '&label=' + label + '&message=' + message;
-    window.location.href = solanaPayUrl;
-    runAuditAndSave(formData.contractAddress, formData.projectName, false);
+    setTimeout(function () { window.location.href = solanaPayUrl; }, 300);
   };
 
   // --- Banner submit ---
@@ -516,35 +580,94 @@ export default function TntHouse() {
     setShowBannerInvoiceModal(true);
   };
 
-  // --- Banner flow: Step 4 — confirm payment → deeplink → save to Supabase ---
+  // --- Payment verification polling (every 10s, max 5 min) ---
+  var startPaymentVerification = function (type, expectedAmount, bannerData, auditData) {
+    var startTime = Date.now();
+    setVerifyStartTime(startTime);
+    setVerifyType(type);
+    setVerifyStatus('waiting');
+    setVerifyAttempts(0);
+    setShowVerifyModal(true);
+    if (bannerData) setPendingBannerData(bannerData);
+    if (auditData) setPendingAuditData(auditData);
+
+    var attempts = 0;
+    var maxAttempts = 30; // 30 x 10s = 5 minutes
+
+    if (verifyIntervalRef.current) clearInterval(verifyIntervalRef.current);
+
+    var interval = setInterval(async function () {
+      attempts++;
+      setVerifyAttempts(attempts);
+
+      try {
+        var res = await fetch('/api/verify-payment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ expectedAmount: expectedAmount, since: startTime }),
+        });
+        var data = await res.json();
+
+        if (data.verified) {
+          clearInterval(interval);
+          verifyIntervalRef.current = null;
+          setVerifyStatus('success');
+
+          if (type === 'banner' && bannerData) {
+            await saveBannerToSupabase(bannerData);
+            setActiveBanner(bannerData);
+            showToast('✅ Payment confirmed! Banner is live for everyone.', 'success');
+          } else if (type === 'audit' && auditData) {
+            saveTokenToSupabase(auditData);
+            setListedTokens(function (prev) { return [auditData].concat(prev); });
+            showToast('✅ Payment confirmed! Token added to table. Score: ' + auditData.score, 'success');
+          }
+          setTimeout(function () { setShowVerifyModal(false); }, 3000);
+          return;
+        }
+      } catch (e) { console.error('Verify poll error:', e); }
+
+      if (attempts >= maxAttempts) {
+        clearInterval(interval);
+        verifyIntervalRef.current = null;
+        setVerifyStatus('failed');
+      }
+    }, 10000);
+
+    verifyIntervalRef.current = interval;
+  };
+
+  // Cleanup polling interval on unmount
+  useEffect(function () {
+    return function () { if (verifyIntervalRef.current) clearInterval(verifyIntervalRef.current); };
+  }, []);
+
+  // --- Banner flow: Step 4 — open wallet, poll for real payment confirmation ---
   var handleBannerConfirmPayment = function () {
     setShowBannerInvoiceModal(false);
     setIsBannerSending(true);
 
+    var banner = {
+      tokenName: bannerFormData.tokenName.toUpperCase(),
+      bannerImg: bannerFormData.bannerImg || '',
+      desc: bannerFormData.desc,
+      expiresAt: Date.now() + parseInt(bannerFormData.days) * 86400000,
+    };
+
     var mrdtAmount = bannerInvoiceAmount;
     var label = encodeURIComponent('TNT House VIP Banner ' + bannerFormData.days + 'd');
-    var message = encodeURIComponent('VIP Banner for ' + bannerFormData.tokenName);
+    var message = encodeURIComponent('VIP Banner for ' + banner.tokenName);
     var solanaPayUrl = 'solana:' + WALLET_ADDRESS + '?amount=' + mrdtAmount + '&spl-token=' + MRDT_CA + '&label=' + label + '&message=' + message;
-    window.location.href = solanaPayUrl;
 
-    // After wallet redirect — save banner to Supabase (visible to ALL users)
-    setTimeout(function () {
-      var banner = {
-        tokenName: bannerFormData.tokenName.toUpperCase(),
-        bannerImg: bannerFormData.bannerImg || '',
-        desc: bannerFormData.desc,
-        expiresAt: Date.now() + parseInt(bannerFormData.days) * 86400000,
-      };
-      saveBannerToSupabase(banner);
-      setActiveBanner(banner);
-      setBannerSubmitted(true);
-      setBannerFormData({ tokenName: '', bannerImg: '', desc: '', days: '1' });
-      setSelectedBannerPaymentMethod(null);
-      setSelectedBannerWallet(null);
-      setIsBannerSending(false);
-      showToast('VIP banner activated! Token is now live for everyone.', 'success');
-      setTimeout(function () { setBannerSubmitted(false); }, 5000);
-    }, 800);
+    // Start polling BEFORE redirect — waits for real TX on-chain
+    startPaymentVerification('banner', mrdtAmount, banner, null);
+    setBannerFormData({ tokenName: '', bannerImg: '', desc: '', days: '1' });
+    setSelectedBannerPaymentMethod(null);
+    setSelectedBannerWallet(null);
+    setIsBannerSending(false);
+
+    // Open wallet after short delay
+    setTimeout(function () { window.location.href = solanaPayUrl; }, 300);
   };
 
   // --- Chat rate-limit countdown ticker ---
@@ -1262,6 +1385,52 @@ export default function TntHouse() {
                 ✅ Pay Now
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Verification Modal */}
+      {showVerifyModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+          <div className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-sm p-6 shadow-[0_0_40px_rgba(168,85,247,0.25)] text-center">
+            {verifyStatus === 'waiting' && (
+              <>
+                <div className="w-16 h-16 rounded-full border-4 border-purple-500 border-t-transparent animate-spin mx-auto mb-4" />
+                <h3 className="text-lg font-black text-white mb-2">Waiting for Payment</h3>
+                <p className="text-slate-400 text-xs mb-4">Complete the transaction in your wallet and return here. We'll detect it automatically.</p>
+                <div className="bg-slate-900 rounded-lg p-3 mb-4">
+                  <p className="text-[10px] text-slate-500">Checking blockchain... attempt {verifyAttempts}/30</p>
+                  <div className="w-full bg-slate-800 rounded-full h-1.5 mt-2">
+                    <div className="bg-purple-500 h-1.5 rounded-full transition-all" style={{ width: Math.round((verifyAttempts / 30) * 100) + '%' }} />
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-1">Timeout in {Math.max(0, 5 - Math.floor(verifyAttempts / 6))} min</p>
+                </div>
+                <button onClick={function () { if (verifyIntervalRef.current) clearInterval(verifyIntervalRef.current); setShowVerifyModal(false); }} className="text-slate-500 hover:text-white text-xs">
+                  Cancel
+                </button>
+              </>
+            )}
+            {verifyStatus === 'success' && (
+              <>
+                <div className="text-5xl mb-4">✅</div>
+                <h3 className="text-lg font-black text-emerald-400 mb-2">Payment Confirmed!</h3>
+                <p className="text-slate-400 text-xs">{verifyType === 'banner' ? 'Your banner is now live for all visitors.' : 'Token added to the safety table.'}</p>
+              </>
+            )}
+            {verifyStatus === 'failed' && (
+              <>
+                <div className="text-5xl mb-4">⏱</div>
+                <h3 className="text-lg font-black text-red-400 mb-2">Payment Not Detected</h3>
+                <p className="text-slate-400 text-xs mb-4">We couldn't confirm your payment within 5 minutes. If you paid, contact admin in Telegram.</p>
+                <a href="https://t.me/tnt_house2026" target="_blank" rel="noopener noreferrer" className="inline-block bg-purple-500 hover:bg-purple-400 text-white font-bold py-2 px-4 rounded text-xs mb-3">
+                  Contact Admin
+                </a>
+                <br />
+                <button onClick={function () { setShowVerifyModal(false); }} className="text-slate-500 hover:text-white text-xs">
+                  Close
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}
