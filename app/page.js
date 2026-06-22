@@ -162,9 +162,7 @@ export default function TntHouse() {
 
   // --- Chat ---
   var [isChatOpen, setIsChatOpen] = useState(false);
-  var [chatMessages, setChatMessages] = useState([{ sender: 'bot', text: "Hey! I'm TNT House AI Inspector 🤖
-
-Paste a CA — I'll give a quick breakdown. You have 5 free questions per 10 min." }]);
+  var [chatMessages, setChatMessages] = useState([{ sender: 'bot', text: "Hey! I'm TNT House AI Inspector 🤖\n\nPaste a CA — I'll give a quick breakdown. You have 5 free questions per 10 min." }]);
   var [userMsg, setUserMsg] = useState('');
   var [isTyping, setIsTyping] = useState(false);
   var chatEndRef = useRef(null);
@@ -987,9 +985,9 @@ Paste a CA — I'll give a quick breakdown. You have 5 free questions per 10 min
             <div className="absolute top-0 right-0 w-40 h-40 bg-purple-500/10 rounded-full blur-3xl" />
             <div className="relative z-10 max-w-2xl">
               <h3 className="text-2xl font-black text-purple-400 mb-2">TNT WHALE CLUB (DAO)</h3>
-              <p className="text-slate-300 text-sm leading-relaxed mb-5">Hold $MRDT and get access to the exclusive Telegram chat. Be first to discover new gems!</p>
+              <p className="text-slate-300 text-sm leading-relaxed mb-5">Questions about audits, listings or $MRDT? Write to our admin in Telegram — we reply fast. 🚀</p>
               <a href="https://t.me/tnt_house2026" target="_blank" rel="noopener noreferrer" className="inline-block bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-400 hover:to-purple-500 text-white font-bold py-2.5 px-6 rounded text-xs transition">
-                Join VIP Club
+                💬 Ask Admin in Telegram
               </a>
             </div>
           </div>
