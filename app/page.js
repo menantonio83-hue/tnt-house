@@ -22,7 +22,7 @@ const TRANSLATIONS = {
   ru: { flag:'🇷🇺',name:'RU',tagline:'НОВЫЕ ТОКЕНЫ',heroTitle:'Взрываем скамы. Запускаем гемы.',heroSub:'Добро пожаловать в Дом Новых Токенов! Наш ИИ-агент сканирует блокчейн.',pillar1:'ИИ Аудит',pillar1sub:'Безопасность контрактов',pillar2:'Микро-капы',pillar2sub:'$5K-$100K',pillar3:'DAO Лицензия',pillar3sub:'Через $MRDT',tableTitle:'ТАБЛИЦА БЕЗОПАСНЫХ ТОКЕНОВ',tableClick:'Нажмите на токен для TNT Security Blueprint',scanning:'Сканирование...',formTitle:'ЗАКАЗАТЬ ИИ-ИНСПЕКЦИЮ',formFreeLeft:'бесплатных мест! Заполни форму — аудит запустится сразу.',formPaid:'Заполни форму — выбери кошелёк — оплати — токен появится в таблице.',fieldProject:'Название проекта',fieldProjectPH:'Твой токен...',fieldCA:'Адрес контракта (Solana)',fieldCAPH:'Введи адрес контракта...',fieldTier:'Выбери тариф',tierBasic:'Базовый Аудит',tierFast:'Быстрый Листинг',tierVIP:'VIP-Буст',fieldTelegram:'Telegram для связи',btnFreeAudit:'🎁 БЕСПЛАТНЫЙ АУДИТ',btnAudit:'ЗАПУСТИТЬ ИИ-ИНСПЕКЦИЮ',btnLaunching:'ОТПРАВЛЯЕМ...',bannerTitle:'КУПИТЬ VIP-БАННЕР',bannerSub:'Твой токен автоматически заменит рекламное место.',fieldTokenName:'Название / Тикер токена',fieldUpload:'Загрузить изображение',fieldSlogan:'Краткий рекламный слоган',fieldSloganPH:'Самый быстрый мемкоин...',fieldDuration:'Срок размещения',dur1:'1 День',dur2:'2 Дня',dur6:'6 Дней',btnBanner:'ОПЛАТИТЬ И РАЗМЕСТИТЬ БАННЕР',btnSlotTaken:'🔒 МЕСТО ЗАНЯТО',btnSending:'ОТПРАВКА...',slotAvailIn:'Место освободится через',investorTitle:'Информация для инвесторов',investorSub:'Все платежи принимаются в $MRDT через Solana Pay. После оплаты токен появится в таблице автоматически.',pricingTitle:'ТЕКУЩИЕ ТАРИФЫ:',first10:'🎁 Первые 10 токенов',free:'БЕСПЛАТНО',daoTitle:'TNT WHALE CLUB (DAO)',daoText:'Вопросы об аудитах, листинге или $MRDT? Пишите нашему админу в Telegram. 🚀',daoBtn:'💬 Написать Админу',choosePayment:'Выбери способ оплаты',recommended:'Рекомендуем',chooseWallet:'Выбери кошелёк',back:'← Назад',invoice:'Счёт на оплату',invoiceBanner:'Счёт — VIP-Баннер',cancel:'Отмена',payNow:'✅ Оплатить',bannerLive:'Баннер появится автоматически после оплаты 🚀',waitPayment:'Ожидание оплаты',waitSub:'Подтверди транзакцию в кошельке и вернись сюда.',checkingBC:'Проверяем блокчейн... попытка',timeoutIn:'Таймаут через',min:'мин',payConfirmed:'Оплата подтверждена!',bannerLiveMsg:'Твой баннер активен для всех посетителей.',tokenAdded:'Токен добавлен в таблицу безопасности.',payNotDetected:'Оплата не обнаружена',payNotMsg:'Не смогли подтвердить оплату за 5 минут. Если заплатил — напиши админу.',contactAdmin:'Написать Админу',close:'Закрыть',slotAvailable:'МЕСТО СВОБОДНО',slotAvailClick:'Нажмите, чтобы купить VIP-баннер!',vipBoostFrom:'VIP-Буст от $20/день',payInMrdt:'Оплата в $MRDT',buyOnJupiter:'КУПИТЬ НА JUPITER',safetyScore:'Оценка безопасности',ironclad:'Железобетонно безопасно ★',moderate:'Умеренный риск ⚠️',highRisk:'Высокий риск 🚨',mintAuth:'Mint Authority',freezeAuth:'Freeze Authority',honeypot:'Honeypot',price:'Цена',liquidity:'Ликвидность',volume24h:'Объём 24ч',noFreeSlots:'мест нет',questions:'вопросов',limitReached:'Лимит 5 вопросов исчерпан. Разблокировка через',orderAudit:'💎 Заказать полный аудит от $10',pasteCa:'Вставь CA или задай вопрос...',analyzing:'Анализирую...',fillFields:'Заполни все поля',priceError:'Ошибка цены, попробуй позже' },
 };
 
-
+// --- Supabase helpers ---
 async function saveTokenToSupabase(token) {
   try {
     await fetch(SUPABASE_URL + '/rest/v1/listed_tokens', {
@@ -181,6 +181,7 @@ export default function TntHouse() {
     { icon: Lock, label: t.pillar3, desc: t.pillar3sub, color: 'text-purple-400' },
   ];
 
+  // Load listed tokens from Supabase on mount
   useEffect(function() {
     loadTokensFromSupabase().then(function(data) {
       if (data.length > 0) setListedTokens(data);
@@ -188,6 +189,7 @@ export default function TntHouse() {
     });
   }, []);
 
+  // Fetch $MRDT price from DexScreener every 60s
   useEffect(function() {
     var fetchPrice = async function() {
       try {
@@ -202,15 +204,17 @@ export default function TntHouse() {
     return function() { clearInterval(i); };
   }, []);
 
+  // Rotating terminal log messages
   useEffect(function() {
     var templates = ['New pool detected on Raydium!', 'Mint Authority disabled ✓', 'Threat level: LOW.', 'No bundles detected.', 'Connected to DexScreener.', 'Searching for new gems...', '[SUPABASE] Sync complete ✓'];
     var i = setInterval(function() {
-      var t = templates[Math.floor(Math.random() * templates.length)];
-      setLogs(function(prev) { return prev.slice(-12).concat(['[' + new Date().toLocaleTimeString() + '] ' + t]); });
+      var msg = templates[Math.floor(Math.random() * templates.length)];
+      setLogs(function(prev) { return prev.slice(-12).concat(['[' + new Date().toLocaleTimeString() + '] ' + msg]); });
     }, 4200);
     return function() { clearInterval(i); };
   }, []);
 
+  // Fetch live DexScreener tokens (micro-cap filter)
   useEffect(function() {
     var fetchTokens = async function() {
       try {
@@ -234,8 +238,10 @@ export default function TntHouse() {
     return function() { clearInterval(i); };
   }, []);
 
+  // Auto-scroll chat to bottom
   useEffect(function() { if (chatEndRef.current) chatEndRef.current.scrollIntoView({ behavior: 'smooth' }); }, [chatMessages]);
 
+  // Load banner + countdown timer
   useEffect(function() {
     var fetchBanner = async function() { var banner = await loadBannerFromSupabase(); setActiveBanner(banner); };
     fetchBanner();
@@ -278,9 +284,8 @@ export default function TntHouse() {
   var handlePaymentMethodSelect = function(method) { setSelectedPaymentMethod(method); setShowPaymentModal(false); setShowWalletModal(true); };
   var handleWalletSelect = function(wallet) { setSelectedWallet(wallet); setShowWalletModal(false); setShowInvoiceModal(true); };
 
-  // Run RugCheck + DexScreener audit, return token data
-  // If isFree=true — saves to Supabase immediately (no payment needed)
-  // If isFree=false — just returns token data, caller handles saving after payment verified
+  // Run RugCheck + DexScreener audit
+  // isFree=true: saves immediately; isFree=false: returns data only (save after payment)
   var runAuditAndSave = async function(ca, projectName, isFree) {
     var auditResult = { score: 75, mintAuthority: 'Unknown', freezeAuthority: 'Unknown', isHoneypot: 'Unknown' };
     var dexData = { price: '0.00000000', liquidity: 0, volume24h: 0, priceChange24h: 0 };
@@ -307,7 +312,6 @@ export default function TntHouse() {
     var tokenData = { name: projectName.toUpperCase(), symbol: projectName.slice(0, 4).toUpperCase() || 'NEW', ca: ca, price: dexData.price, liquidity: dexData.liquidity, volume24h: dexData.volume24h, priceChange24h: dexData.priceChange24h, score: auditResult.score, verified: true, dexUrl: 'https://dexscreener.com/solana/' + ca, chain: 'solana', mintAuthority: auditResult.mintAuthority, freezeAuthority: auditResult.freezeAuthority, isHoneypot: auditResult.isHoneypot };
 
     if (isFree) {
-      // FREE slot — save immediately, no payment needed
       saveTokenToSupabase(tokenData);
       setListedTokens(function(prev) { return [tokenData].concat(prev); });
       setFreeSlots(function(prev) { return Math.max(0, prev - 1); });
@@ -325,19 +329,11 @@ export default function TntHouse() {
     setShowInvoiceModal(false); setIsSending(true);
     var ca = formData.contractAddress;
     var projectName = formData.projectName;
-
-    // Run audit to get real data BEFORE redirect (RugCheck + DexScreener)
-    // isFree=false means it won't save yet — just returns token data
     var tokenData = await runAuditAndSave(ca, projectName, false);
-
     setFormData({ projectName: '', contractAddress: '', telegram: '' });
     setSelectedPaymentMethod(null); setSelectedWallet(null);
     setIsSending(false);
-
-    // Start payment polling — token saves to Supabase ONLY after TX confirmed
     startPaymentVerification('audit', invoiceAmount, null, tokenData);
-
-    // Fire Solana Pay deeplink
     var label = encodeURIComponent(invoiceLabel);
     var message = encodeURIComponent('Audit for ' + projectName + ' CA: ' + ca);
     setTimeout(function() { window.location.href = 'solana:' + WALLET_ADDRESS + '?amount=' + invoiceAmount + '&spl-token=' + MRDT_CA + '&label=' + label + '&message=' + message; }, 300);
@@ -381,6 +377,7 @@ export default function TntHouse() {
     verifyIntervalRef.current = interval;
   };
 
+  // Cleanup payment verification interval on unmount
   useEffect(function() { return function() { if (verifyIntervalRef.current) clearInterval(verifyIntervalRef.current); }; }, []);
 
   var handleBannerConfirmPayment = function() {
@@ -395,14 +392,15 @@ export default function TntHouse() {
     setTimeout(function() { window.location.href = 'solana:' + WALLET_ADDRESS + '?amount=' + mrdtAmount + '&spl-token=' + MRDT_CA + '&label=' + label + '&message=' + message; }, 300);
   };
 
+  // Chat countdown timer for rate limiting
   useEffect(function() {
-    var t = setInterval(function() {
+    var interval = setInterval(function() {
       if (!chatResetTime) return;
       var msLeft = chatResetTime - Date.now();
       if (msLeft <= 0) { setChatBlocked(false); setChatCount(0); setChatResetTime(null); setChatTimer(''); }
       else { var m = Math.floor(msLeft / 60000); var s = Math.floor((msLeft % 60000) / 1000); setChatTimer(m + 'm ' + (s < 10 ? '0' : '') + s + 's'); }
     }, 1000);
-    return function() { clearInterval(t); };
+    return function() { clearInterval(interval); };
   }, [chatResetTime]);
 
   var handleSendChat = async function() {
@@ -411,20 +409,24 @@ export default function TntHouse() {
     var newCount = chatCount + 1; setChatCount(newCount);
     if (newCount >= 5) { var resetAt = Date.now() + 10 * 60 * 1000; setChatResetTime(resetAt); setChatBlocked(true); }
     var text = userMsg.trim();
-    var updatedMessages = chatMessages.filter(function(m) { return m.sender !== 'bot' || chatMessages.indexOf(m) > 0; }).map(function(m) { return { role: m.sender === 'user' ? 'user' : 'assistant', content: m.text }; }).concat([{ role: 'user', content: text }]);
+    var updatedMessages = chatMessages
+      .filter(function(m) { return m.sender !== 'bot' || chatMessages.indexOf(m) > 0; })
+      .map(function(m) { return { role: m.sender === 'user' ? 'user' : 'assistant', content: m.text }; })
+      .concat([{ role: 'user', content: text }]);
     setChatMessages(function(prev) { return prev.concat([{ sender: 'user', text: text }]); });
     setUserMsg(''); setIsTyping(true);
     try {
       var res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages: updatedMessages }) });
       var data = await res.json();
       setChatMessages(function(prev) { return prev.concat([{ sender: 'bot', text: data.reply || data.error || 'Error. Try again.' }]); });
-    } catch (e) { setChatMessages(function(prev) { return prev.concat([{ sender: 'bot', text: 'Connection error. 💎 Full audit → from \$10' }]); }); }
+    } catch (e) { setChatMessages(function(prev) { return prev.concat([{ sender: 'bot', text: 'Connection error. 💎 Full audit → from $10' }]); }); }
     setIsTyping(false);
   };
 
   return (
     <div className="min-h-screen bg-slate-950 text-white font-mono relative overflow-hidden pb-12">
 
+      {/* Toast notification */}
       {toast.show && (
         <div className={'fixed bottom-6 left-1/2 -translate-x-1/2 z-[99999] flex items-center gap-3 px-6 py-3.5 rounded-2xl shadow-2xl border text-sm font-medium transition-all duration-300 ' + (toast.type === 'success' ? 'bg-emerald-950 border-emerald-500/40 text-emerald-300' : 'bg-red-950 border-red-500/40 text-red-300')}>
           {toast.type === 'success' ? <CheckCircle className="w-5 h-5 text-emerald-400" /> : <XCircle className="w-5 h-5 text-red-400" />}
@@ -432,6 +434,7 @@ export default function TntHouse() {
         </div>
       )}
 
+      {/* Background glows */}
       <div style={GLOW_PURPLE} />
       <div style={GLOW_GREEN} />
       <div className="absolute inset-0 opacity-5 pointer-events-none">
@@ -439,6 +442,7 @@ export default function TntHouse() {
       </div>
 
       <div className="relative z-10">
+        {/* Header */}
         <header className="border-b border-purple-500/30 backdrop-blur-lg bg-slate-950/60 sticky top-0 z-50">
           <div className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -447,23 +451,23 @@ export default function TntHouse() {
               </a>
               <div>
                 <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-emerald-400 tracking-wider">TNT HOUSE</h1>
-                <span className="text-[10px] text-purple-400 block font-bold tracking-widest">TOP NEW TOKENS v1.35</span>
+                <span className="text-[10px] text-purple-400 block font-bold tracking-widest">TOP NEW TOKENS v1.36</span>
               </div>
             </div>
+
             {/* Language switcher */}
             <div className="flex items-center gap-0.5 mr-1">
               {Object.keys(TRANSLATIONS).map(function(l) {
                 return (
-                  <button
-                    key={l}
-                    onClick={function() { setLang(l); }}
-                    title={TRANSLATIONS[l].name}
+                  <button key={l} onClick={function() { setLang(l); }} title={TRANSLATIONS[l].name}
                     className={'text-base px-1 py-0.5 rounded transition ' + (lang === l ? 'opacity-100 scale-110' : 'opacity-40 hover:opacity-80')}>
                     {TRANSLATIONS[l].flag}
                   </button>
                 );
               })}
             </div>
+
+            {/* BUY $MRDT dropdown */}
             <div className="relative">
               <button onClick={function() { setIsBuyDropdownOpen(!isBuyDropdownOpen); }} className="bg-gradient-to-r from-purple-500 to-emerald-400 hover:from-purple-400 hover:to-emerald-300 text-slate-950 font-black px-4 py-2 rounded text-xs transition flex items-center gap-1 shadow-[0_0_15px_rgba(153,69,255,0.4)]">
                 BUY $MRDT <ChevronDown className="w-3 h-3" />
@@ -478,12 +482,11 @@ export default function TntHouse() {
           </div>
         </header>
 
-        {/* VIP Banner — FIXED: full image, text at bottom */}
+        {/* VIP Banner section */}
         <section className="max-w-7xl mx-auto px-6 pt-6">
           {activeBanner ? (
             <>
               <div className="relative border border-purple-500/40 rounded-2xl overflow-hidden shadow-[0_0_30px_rgba(168,85,247,0.25)] min-h-[160px]">
-                {/* Full background image */}
                 {activeBanner.bannerImg && activeBanner.bannerImg.startsWith('data:') ? (
                   <div className="absolute inset-0">
                     <img src={activeBanner.bannerImg} alt="banner" className="w-full h-full object-cover" />
@@ -492,11 +495,9 @@ export default function TntHouse() {
                 ) : (
                   <div className="absolute inset-0 bg-gradient-to-r from-black via-purple-950/30 to-black" />
                 )}
-                {/* VIP badge top-left */}
                 <div className="absolute top-3 left-3">
                   <span className="bg-purple-500 text-white font-black text-[9px] px-2 py-0.5 rounded tracking-widest">VIP BOOST</span>
                 </div>
-                {/* Content bottom — no button here */}
                 <div className="relative z-10 p-4 pt-16">
                   <h4 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-300 to-emerald-300">${activeBanner.tokenName}</h4>
                   <p className="text-slate-300 text-xs mt-0.5">{activeBanner.desc}</p>
@@ -505,22 +506,14 @@ export default function TntHouse() {
                   )}
                 </div>
               </div>
-
-              {/* 3 action buttons below banner */}
               <div className="grid grid-cols-3 gap-2 mt-2">
-                {/* Buy on Jupiter */}
                 <button onClick={handleLaunchJupiter} className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-gradient-to-r from-purple-500 to-emerald-400 hover:from-purple-400 hover:to-emerald-300 text-slate-950 font-black text-[11px] transition shadow-[0_0_12px_rgba(153,69,255,0.4)]">
                   <ExternalLink className="w-3 h-3" /> {t.buyOnJupiter}
                 </button>
-                {/* Official website */}
                 <a href="https://www.maradonatoken-mrdt.xyz" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-purple-500/40 hover:border-purple-400 text-purple-300 hover:text-white font-bold text-[11px] transition text-center">
                   <ExternalLink className="w-3 h-3 shrink-0" /> Official Site
                 </a>
-                {/* Info about $MRDT — opens Blueprint for MRDT */}
-                <button
-                  onClick={function() {
-                    openTokenBlueprint({ symbol: 'MRDT', name: 'MARADONATOKEN', ca: MRDT_CA, price: mrdtPrice.toFixed(8), liquidity: 13000, volume24h: 0, priceChange24h: 12.4, verified: true, dexUrl: 'https://dexscreener.com/solana/' + MRDT_CA, chain: 'solana' });
-                  }}
+                <button onClick={function() { openTokenBlueprint({ symbol: 'MRDT', name: 'MARADONATOKEN', ca: MRDT_CA, price: mrdtPrice.toFixed(8), liquidity: 13000, volume24h: 0, priceChange24h: 12.4, verified: true, dexUrl: 'https://dexscreener.com/solana/' + MRDT_CA, chain: 'solana' }); }}
                   className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-emerald-500/40 hover:border-emerald-400 text-emerald-400 hover:text-white font-bold text-[11px] transition">
                   ⚽️ $MRDT Info
                 </button>
@@ -544,6 +537,7 @@ export default function TntHouse() {
           )}
         </section>
 
+        {/* Hero section */}
         <section className="max-w-7xl mx-auto px-6 py-12">
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <div className="space-y-6">
@@ -564,6 +558,7 @@ export default function TntHouse() {
                 })}
               </div>
             </div>
+            {/* Terminal log widget */}
             <div className="bg-slate-950 border-2 border-purple-500/40 rounded-lg p-4 font-mono text-xs h-72 flex flex-col justify-between shadow-[0_0_20px_rgba(153,69,255,0.15)] relative">
               <div className="absolute top-3 right-4 flex gap-1.5">
                 <span className="w-2.5 h-2.5 bg-red-500 rounded-full" /><span className="w-2.5 h-2.5 bg-yellow-500 rounded-full" /><span className="w-2.5 h-2.5 bg-green-500 rounded-full" />
@@ -579,6 +574,7 @@ export default function TntHouse() {
           </div>
         </section>
 
+        {/* Token table */}
         <section className="max-w-7xl mx-auto px-6 py-6">
           <div className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 backdrop-blur-md p-3 shadow-[0_0_25px_rgba(153,69,255,0.2)]">
             <div className="flex items-center justify-between mb-2">
@@ -602,14 +598,16 @@ export default function TntHouse() {
                   </tr>
                 </thead>
                 <tbody>
+                  {/* Pinned MRDT row */}
                   <tr onClick={function() { openTokenBlueprint({ symbol: 'MRDT', name: 'MARADONATOKEN', ca: MRDT_CA, price: mrdtPrice.toFixed(8), liquidity: 13000, volume24h: 0, priceChange24h: 12.4, verified: true, dexUrl: 'https://dexscreener.com/solana/' + MRDT_CA, chain: 'solana' }); }} className="border-b border-purple-500/30 bg-emerald-500/5 hover:bg-emerald-500/10 transition cursor-pointer">
                     <td className="p-1 font-bold flex items-center gap-1"><span className="text-sm">⚽️</span><div><span className="text-emerald-400 font-extrabold text-[10px]">$MRDT</span><div className="text-[7px] text-slate-400">MARADONATOKEN</div></div></td>
                     <td className="p-1 font-mono text-emerald-400 font-bold text-[9px]">${mrdtPrice > 0 ? mrdtPrice.toFixed(8) : '...'}</td>
-                    <td className="p-1 font-mono text-emerald-400 font-bold text-[9px]">\$13K+</td>
+                    <td className="p-1 font-mono text-emerald-400 font-bold text-[9px]">$13K+</td>
                     <td className="p-1 font-mono text-emerald-400 font-bold text-[9px]">+12.4%</td>
                     <td className="p-1 text-center"><div className="inline-flex items-center justify-center w-9 h-4 rounded-full bg-emerald-500/20 border border-emerald-500 text-emerald-400 text-[8px] font-extrabold shadow-[0_0_6px_rgba(16,185,129,0.5)]">98</div></td>
                     <td className="p-1 text-right"><button onClick={function(e) { e.stopPropagation(); handleLaunchJupiter(); }} className="text-[8px] text-emerald-400 hover:text-emerald-300 font-bold hover:underline inline-flex items-center gap-0.5">Buy <ExternalLink className="w-2 h-2" /></button></td>
                   </tr>
+                  {/* Supabase listed tokens */}
                   {listedTokens.map(function(token, i) {
                     var score = getSafetyScore(token); var style = getScoreStyle(score);
                     return (
@@ -623,6 +621,7 @@ export default function TntHouse() {
                       </tr>
                     );
                   })}
+                  {/* Live DexScreener tokens */}
                   {loading && tokens.length === 0 ? (
                     <tr><td colSpan={6} className="p-6 text-center text-purple-400 font-bold"><RefreshCw className="w-4 h-4 animate-spin mx-auto mb-1" />{t.scanning}</td></tr>
                   ) : tokens.map(function(token, i) {
@@ -638,12 +637,11 @@ export default function TntHouse() {
                       </tr>
                     );
                   })}
+                  {/* Empty placeholder rows */}
                   {[1,2,3,4].map(function(n) {
                     return (
                       <tr key={'e'+n} className="border-b border-purple-500/5 opacity-40">
-                        {[0,1,2,3,4,5].map(function(i) {
-                          return <td key={i} className="p-1 text-slate-600 text-[8px] italic">-</td>;
-                        })}
+                        {[0,1,2,3,4,5].map(function(i) { return <td key={i} className="p-1 text-slate-600 text-[8px] italic">-</td>; })}
                       </tr>
                     );
                   })}
@@ -654,9 +652,11 @@ export default function TntHouse() {
           </div>
         </section>
 
+        {/* Order forms + pricing */}
         <section id="orderFormsSection" className="max-w-7xl mx-auto px-6 py-8">
           <div className="grid md:grid-cols-2 gap-12 items-start">
             <div className="space-y-8">
+              {/* Audit form */}
               <div className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 p-6 backdrop-blur-md">
                 <div className="flex items-start justify-between mb-2">
                   <h3 className="text-lg font-black text-purple-400">{t.formTitle}</h3>
@@ -704,6 +704,7 @@ export default function TntHouse() {
                 </form>
               </div>
 
+              {/* Banner form */}
               <div className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 p-6 backdrop-blur-md">
                 <h3 className="text-lg font-black text-purple-400 mb-2">{t.bannerTitle}</h3>
                 <p className="text-slate-400 text-xs mb-4">{t.bannerSub}</p>
@@ -715,21 +716,7 @@ export default function TntHouse() {
                     </div>
                     <div>
                       <label className="block text-purple-400 text-[11px] font-bold mb-1">{t.fieldUpload}</label>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={function(e) {
-                          var f = e.target.files && e.target.files[0];
-                          if (f) {
-                            var r = new FileReader();
-                            r.onload = function(ev) {
-                              setBannerFormData(Object.assign({}, bannerFormData, { bannerImg: ev.target.result }));
-                            };
-                            r.readAsDataURL(f);
-                          }
-                        }}
-                        className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-bold file:bg-gradient-to-r file:from-purple-500 file:to-emerald-400 file:text-slate-950 hover:file:from-purple-400 hover:file:to-emerald-300"
-                      />
+                      <input type="file" accept="image/*" onChange={function(e) { var f = e.target.files && e.target.files[0]; if (f) { var r = new FileReader(); r.onload = function(ev) { setBannerFormData(Object.assign({}, bannerFormData, { bannerImg: ev.target.result })); }; r.readAsDataURL(f); } }} className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-bold file:bg-gradient-to-r file:from-purple-500 file:to-emerald-400 file:text-slate-950 hover:file:from-purple-400 hover:file:to-emerald-300" />
                     </div>
                   </div>
                   <div>
@@ -759,6 +746,7 @@ export default function TntHouse() {
               </div>
             </div>
 
+            {/* Pricing panel */}
             <div className="space-y-4 bg-slate-900/20 border-2 border-purple-500/20 rounded-xl p-6">
               <h3 className="text-xl font-black text-purple-400">{t.investorTitle}</h3>
               <p className="text-slate-300 text-xs leading-relaxed">{t.investorSub}</p>
@@ -767,11 +755,18 @@ export default function TntHouse() {
                   <Download className="w-4 h-4 text-purple-400 animate-pulse" /> {t.pricingTitle}
                 </h4>
                 <div className="grid grid-cols-1 gap-2 text-xs font-mono">
-                  {[[t.first10, t.free],['Basic AI Audit','$10 ~ '+(priceLoading?'...':getAmountForTier('basic').toLocaleString())+' $MRDT'],['Fast Listing','$25 ~ '+(priceLoading?'...':getAmountForTier('fast').toLocaleString())+' $MRDT'],['VIP Boost','$75 ~ '+(priceLoading?'...':getAmountForTier('vip').toLocaleString())+' $MRDT'],['Banner 1 day','$20 ~ '+(priceLoading?'...':getAmountForBanner('1').toLocaleString())+' $MRDT'],['Banner 2 days','$35 ~ '+(priceLoading?'...':getAmountForBanner('2').toLocaleString())+' $MRDT'],['Banner 6 days','$100 ~ '+(priceLoading?'...':getAmountForBanner('6').toLocaleString())+' $MRDT']].map(function(row,i) {
-                    var rowCls = 'flex justify-between p-2.5 border rounded-lg ' +
-                      (i===0 ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-slate-950 border-purple-500/10');
-                    var labelCls = i===0 ? 'text-emerald-300 font-bold' : 'text-slate-300';
-                    var valCls = i===0 ? 'text-emerald-400 font-black' : 'text-emerald-400 font-bold';
+                  {[
+                    [t.first10, t.free],
+                    ['Basic AI Audit', '$10 ~ ' + (priceLoading ? '...' : getAmountForTier('basic').toLocaleString()) + ' $MRDT'],
+                    ['Fast Listing', '$25 ~ ' + (priceLoading ? '...' : getAmountForTier('fast').toLocaleString()) + ' $MRDT'],
+                    ['VIP Boost', '$75 ~ ' + (priceLoading ? '...' : getAmountForTier('vip').toLocaleString()) + ' $MRDT'],
+                    ['Banner 1 day', '$20 ~ ' + (priceLoading ? '...' : getAmountForBanner('1').toLocaleString()) + ' $MRDT'],
+                    ['Banner 2 days', '$35 ~ ' + (priceLoading ? '...' : getAmountForBanner('2').toLocaleString()) + ' $MRDT'],
+                    ['Banner 6 days', '$100 ~ ' + (priceLoading ? '...' : getAmountForBanner('6').toLocaleString()) + ' $MRDT'],
+                  ].map(function(row, i) {
+                    var rowCls = 'flex justify-between p-2.5 border rounded-lg ' + (i === 0 ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-slate-950 border-purple-500/10');
+                    var labelCls = i === 0 ? 'text-emerald-300 font-bold' : 'text-slate-300';
+                    var valCls = i === 0 ? 'text-emerald-400 font-black' : 'text-emerald-400 font-bold';
                     return (
                       <div key={i} className={rowCls}>
                         <span className={labelCls}>{row[0]}</span>
@@ -785,6 +780,7 @@ export default function TntHouse() {
           </div>
         </section>
 
+        {/* DAO section */}
         <section className="max-w-7xl mx-auto px-6 py-6">
           <div className="relative bg-gradient-to-r from-purple-500/10 via-transparent to-emerald-500/10 border-2 border-purple-500/30 rounded-lg p-10 overflow-hidden">
             <div className="absolute top-0 right-0 w-40 h-40 bg-purple-500/10 rounded-full blur-3xl" />
@@ -798,6 +794,7 @@ export default function TntHouse() {
           </div>
         </section>
 
+        {/* Footer */}
         <footer className="border-t border-purple-500/20 mt-12 py-8 bg-slate-950/60 backdrop-blur-lg">
           <div className="max-w-7xl mx-auto px-6">
             <div className="flex flex-wrap items-center justify-center gap-8 mb-4">
@@ -808,7 +805,7 @@ export default function TntHouse() {
               <a href="https://www.maradonatoken-mrdt.xyz" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400 transition-colors"><ExternalLink className="w-6 h-6" /></a>
             </div>
             <div className="text-center space-y-1">
-              <div className="text-purple-400 font-bold text-sm tracking-widest">TNT HOUSE v1.35</div>
+              <div className="text-purple-400 font-bold text-sm tracking-widest">TNT HOUSE v1.36</div>
               <div className="text-slate-400 text-xs">Powered by $MRDT · AI Audits · Supabase</div>
               <div className="text-slate-500 text-[10px]">Built with Next.js + Tailwind CSS · Solana Pay</div>
             </div>
@@ -816,7 +813,9 @@ export default function TntHouse() {
         </footer>
       </div>
 
-      {/* PAYMENT MODALS */}
+      {/* ═══════════════ PAYMENT MODALS ═══════════════ */}
+
+      {/* Step 1: Choose payment method (Audit) */}
       {showPaymentModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4" onClick={function() { setShowPaymentModal(false); }}>
           <div className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-md p-6 shadow-[0_0_40px_rgba(168,85,247,0.25)]" onClick={function(e) { e.stopPropagation(); }}>
@@ -843,6 +842,7 @@ export default function TntHouse() {
         </div>
       )}
 
+      {/* Step 2: Choose wallet (Audit) */}
       {showWalletModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4" onClick={function() { setShowWalletModal(false); setShowPaymentModal(true); }}>
           <div className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-md p-6 shadow-[0_0_40px_rgba(168,85,247,0.25)]" onClick={function(e) { e.stopPropagation(); }}>
@@ -854,11 +854,12 @@ export default function TntHouse() {
                 <div className="font-bold text-yellow-400 group-hover:text-white transition">Solflare</div>
               </button>
             </div>
-            <button onClick={function() { setShowWalletModal(false); setShowPaymentModal(true); }} className="mt-4 w-full text-center text-slate-400 hover:text-white text-xs py-2">← Back</button>
+            <button onClick={function() { setShowWalletModal(false); setShowPaymentModal(true); }} className="mt-4 w-full text-center text-slate-400 hover:text-white text-xs py-2">{t.back}</button>
           </div>
         </div>
       )}
 
+      {/* Step 3: Invoice (Audit) */}
       {showInvoiceModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4" onClick={function() { setShowInvoiceModal(false); }}>
           <div className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-md p-6 shadow-[0_0_40px_rgba(168,85,247,0.25)]" onClick={function(e) { e.stopPropagation(); }}>
@@ -879,7 +880,9 @@ export default function TntHouse() {
         </div>
       )}
 
-      {/* BANNER PAYMENT MODALS */}
+      {/* ═══════════════ BANNER PAYMENT MODALS ═══════════════ */}
+
+      {/* Step 1: Choose payment method (Banner) */}
       {showBannerPaymentModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4" onClick={function() { setShowBannerPaymentModal(false); }}>
           <div className="bg-slate-950 border-2 border-emerald-500/40 rounded-2xl w-full max-w-md p-6 shadow-[0_0_40px_rgba(16,185,129,0.2)]" onClick={function(e) { e.stopPropagation(); }}>
@@ -907,6 +910,7 @@ export default function TntHouse() {
         </div>
       )}
 
+      {/* Step 2: Choose wallet (Banner) */}
       {showBannerWalletModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4" onClick={function() { setShowBannerWalletModal(false); setShowBannerPaymentModal(true); }}>
           <div className="bg-slate-950 border-2 border-emerald-500/40 rounded-2xl w-full max-w-md p-6 shadow-[0_0_40px_rgba(16,185,129,0.2)]" onClick={function(e) { e.stopPropagation(); }}>
@@ -918,11 +922,12 @@ export default function TntHouse() {
                 <div className="font-bold text-yellow-400 group-hover:text-white transition">Solflare</div>
               </button>
             </div>
-            <button onClick={function() { setShowBannerWalletModal(false); setShowBannerPaymentModal(true); }} className="mt-4 w-full text-center text-slate-400 hover:text-white text-xs py-2">← Back</button>
+            <button onClick={function() { setShowBannerWalletModal(false); setShowBannerPaymentModal(true); }} className="mt-4 w-full text-center text-slate-400 hover:text-white text-xs py-2">{t.back}</button>
           </div>
         </div>
       )}
 
+      {/* Step 3: Invoice (Banner) */}
       {showBannerInvoiceModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4" onClick={function() { setShowBannerInvoiceModal(false); }}>
           <div className="bg-slate-950 border-2 border-emerald-500/40 rounded-2xl w-full max-w-md p-6 shadow-[0_0_40px_rgba(16,185,129,0.2)]" onClick={function(e) { e.stopPropagation(); }}>
@@ -963,7 +968,9 @@ export default function TntHouse() {
                 <p className="text-slate-400 text-xs mb-4">{t.waitSub}</p>
                 <div className="bg-slate-900 rounded-lg p-3 mb-4">
                   <p className="text-[10px] text-slate-500">{t.checkingBC} {verifyAttempts}/30</p>
-                  <div className="w-full bg-slate-800 rounded-full h-1.5 mt-2"><div className="bg-purple-500 h-1.5 rounded-full transition-all" style={{ width: Math.round((verifyAttempts / 30) * 100) + '%' }} /></div>
+                  <div className="w-full bg-slate-800 rounded-full h-1.5 mt-2">
+                    <div className="bg-purple-500 h-1.5 rounded-full transition-all" style={{ width: Math.round((verifyAttempts / 30) * 100) + '%' }} />
+                  </div>
                   <p className="text-[10px] text-slate-500 mt-1">{t.timeoutIn} {Math.max(0, 5 - Math.floor(verifyAttempts / 6))} {t.min}</p>
                 </div>
                 <button onClick={function() { if (verifyIntervalRef.current) clearInterval(verifyIntervalRef.current); setShowVerifyModal(false); }} className="text-slate-500 hover:text-white text-xs">{t.cancel}</button>
@@ -981,4 +988,92 @@ export default function TntHouse() {
                 <div className="text-5xl mb-4">⏱</div>
                 <h3 className="text-lg font-black text-red-400 mb-2">{t.payNotDetected}</h3>
                 <p className="text-slate-400 text-xs mb-4">{t.payNotMsg}</p>
-                <a href="https://t.me/tnt_house2026" target="_blank" rel="noopener noreferrer" className="inline-block bg-pur
+                <a href="https://t.me/tnt_house2026" target="_blank" rel="noopener noreferrer" className="inline-block bg-purple-500 hover:bg-purple-400 text-white font-bold py-2 px-4 rounded text-xs mb-3">{t.contactAdmin}</a>
+                <br />
+                <button onClick={function() { setShowVerifyModal(false); }} className="text-slate-500 hover:text-white text-xs">{t.close}</button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* TNT Security Blueprint Modal */}
+      {isBlueprintOpen && selectedToken && (
+        <div className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={closeBlueprint}>
+          <div className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-lg shadow-[0_0_40px_rgba(168,85,247,0.2)] overflow-y-auto max-h-[90vh]" onClick={function(e) { e.stopPropagation(); }}>
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-black text-white">TNT Security Blueprint</h2>
+                <button onClick={closeBlueprint} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
+              </div>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-lg">{selectedToken.symbol === 'MRDT' ? '⚽️' : '🪙'}</div>
+                <div>
+                  <p className="text-purple-400 font-black text-base">${selectedToken.symbol} <span className="text-slate-400 font-normal text-sm">{selectedToken.name}</span></p>
+                  <p className="text-slate-500 text-[10px] font-mono break-all">{selectedToken.ca}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 mb-4 p-3 bg-slate-900 rounded-xl border border-purple-500/20">
+                <div className={'w-14 h-14 rounded-full flex items-center justify-center text-xl font-black border-2 shrink-0 ' + (getSafetyScore(selectedToken) >= 90 ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : getSafetyScore(selectedToken) >= 50 ? 'bg-yellow-500/20 border-yellow-500 text-yellow-400' : 'bg-red-500/20 border-red-500 text-red-400')}>{getSafetyScore(selectedToken)}</div>
+                <div>
+                  <p className="text-white font-bold text-sm">{t.safetyScore}</p>
+                  <p className="text-slate-400 text-xs">{getSafetyScore(selectedToken) >= 90 ? t.ironclad : getSafetyScore(selectedToken) >= 50 ? t.moderate : t.highRisk}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                {[
+                  { label: t.price, value: '$' + (selectedToken.price || '0.00000000') },
+                  { label: t.liquidity, value: selectedToken.liquidity ? '$' + (selectedToken.liquidity >= 1000 ? (selectedToken.liquidity / 1000).toFixed(1) + 'K' : selectedToken.liquidity) : '$0' },
+                  { label: t.volume24h, value: selectedToken.volume24h ? '$' + (selectedToken.volume24h >= 1000 ? (selectedToken.volume24h / 1000).toFixed(1) + 'K' : selectedToken.volume24h) : '$0' },
+                ].map(function(item, i) {
+                  return (
+                    <div key={i} className="bg-slate-900 border border-purple-500/10 rounded-lg p-2.5 text-center">
+                      <p className="text-slate-500 text-[9px] mb-0.5">{item.label}</p>
+                      <p className="text-emerald-400 font-bold text-xs font-mono">{item.value}</p>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="space-y-1.5 mb-3">
+                {[
+                  { label: t.mintAuth, value: selectedToken.mintAuthority },
+                  { label: t.freezeAuth, value: selectedToken.freezeAuthority },
+                  { label: t.honeypot, value: selectedToken.isHoneypot },
+                  { label: 'LP Tokens', value: selectedToken.symbol === 'MRDT' ? '🔥 Burned Forever' : (selectedToken.lpStatus || 'Unknown') },
+                  { label: 'Holders', value: selectedToken.symbol === 'MRDT' ? '718 wallets' : (selectedToken.holders ? selectedToken.holders + ' wallets' : 'Unknown') },
+                  { label: 'LP Lock', value: selectedToken.symbol === 'MRDT' ? '❄️ 670M locked 1yr' : (selectedToken.lpLock || 'Unknown') },
+                ].map(function(item, i) {
+                  if (!item.value) return null;
+                  var isUnknown = item.value === 'Unknown';
+                  var isSafe = item.value.includes('Revoked') || item.value.includes('No ✓') || item.value.includes('Burned') || item.value.includes('locked') || item.value.includes('wallets');
+                  return (
+                    <div key={i} className="flex items-center justify-between px-3 py-2 bg-slate-900 rounded-lg border border-purple-500/10">
+                      <span className="text-slate-400 text-xs">{item.label}</span>
+                      <span className={'text-xs font-bold ' + (isUnknown ? 'text-slate-500' : isSafe ? 'text-emerald-400' : 'text-red-400')}>{item.value}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              {selectedToken.symbol === 'MRDT' && (
+                <div className="flex items-center gap-2 px-3 py-2 bg-emerald-500/10 border border-emerald-500/30 rounded-lg mb-3">
+                  <span className="text-emerald-400 text-sm">✅</span>
+                  <span className="text-emerald-400 text-xs font-bold">DexScreener Audit Passed</span>
+                </div>
+              )}
+              <div className="flex gap-2">
+                <a href={selectedToken.dexUrl} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg border border-purple-500/30 text-purple-400 hover:text-emerald-400 hover:border-emerald-500/30 transition text-xs font-bold">DexScreener <ExternalLink className="w-3 h-3" /></a>
+                <a href={'https://rugcheck.xyz/tokens/' + selectedToken.ca} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg border border-purple-500/30 text-purple-400 hover:text-emerald-400 hover:border-emerald-500/30 transition text-xs font-bold">RugCheck <ExternalLink className="w-3 h-3" /></a>
+                <button onClick={handleLaunchJupiter} className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg bg-gradient-to-r from-purple-500 to-emerald-400 text-slate-950 font-black text-xs hover:from-purple-400 hover:to-emerald-300 transition">Buy $MRDT ⚽️</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════ AI CHAT WIDGET ═══════════════ */}
+
+      {/* Chat toggle button */}
+      <button
+        onClick={function() { setIsChatOpen(!isChatOpen); }}
+        className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-tr from-purple-500 to-emerald-400 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(153,69,255,0.5)] hover:scale-105 transition z-50 animate-bounce">
+        {isChatOpen ? <X className="w-6 h-6 text-slate-950" /> : <MessageSquare clas
