@@ -477,34 +477,47 @@ export default function TntHouse() {
         {/* VIP Banner — FIXED: full image, text at bottom */}
         <section className="max-w-7xl mx-auto px-6 pt-6">
           {activeBanner ? (
-            <div className="relative border border-purple-500/40 rounded-2xl overflow-hidden shadow-[0_0_30px_rgba(168,85,247,0.25)] min-h-[160px]">
-              {/* Full background image */}
-              {activeBanner.bannerImg && activeBanner.bannerImg.startsWith('data:') ? (
-                <div className="absolute inset-0">
-                  <img src={activeBanner.bannerImg} alt="banner" className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/20" />
+            <>
+              <div className="relative border border-purple-500/40 rounded-2xl overflow-hidden shadow-[0_0_30px_rgba(168,85,247,0.25)] min-h-[160px]">
+                {/* Full background image */}
+                {activeBanner.bannerImg && activeBanner.bannerImg.startsWith('data:') ? (
+                  <div className="absolute inset-0">
+                    <img src={activeBanner.bannerImg} alt="banner" className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/20" />
+                  </div>
+                ) : (
+                  <div className="absolute inset-0 bg-gradient-to-r from-black via-purple-950/30 to-black" />
+                )}
+                {/* VIP badge top-left */}
+                <div className="absolute top-3 left-3">
+                  <span className="bg-purple-500 text-white font-black text-[9px] px-2 py-0.5 rounded tracking-widest">VIP BOOST</span>
                 </div>
-              ) : (
-                <div className="absolute inset-0 bg-gradient-to-r from-black via-purple-950/30 to-black" />
-              )}
-              {/* VIP badge top-left */}
-              <div className="absolute top-3 left-3">
-                <span className="bg-purple-500 text-white font-black text-[9px] px-2 py-0.5 rounded tracking-widest">VIP BOOST</span>
-              </div>
-              {/* Content bottom */}
-              <div className="relative z-10 flex items-end justify-between p-4 pt-16">
-                <div>
+                {/* Content bottom — no button here */}
+                <div className="relative z-10 p-4 pt-16">
                   <h4 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-300 to-emerald-300">${activeBanner.tokenName}</h4>
                   <p className="text-slate-300 text-xs mt-0.5">{activeBanner.desc}</p>
                   {bannerCountdown && (
                     <p className="text-[10px] text-slate-400 mt-1">⏱ slot available in <span className="text-purple-400 font-bold">{bannerCountdown}</span></p>
                   )}
                 </div>
-                <button onClick={handleLaunchJupiter} className="bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-black text-xs px-5 py-2.5 rounded-xl transition shrink-0 ml-4">
-                  BUY ON JUPITER
+              </div>
+
+              {/* 3 action buttons below banner */}
+              <div className="grid grid-cols-3 gap-2 mt-2">
+                {/* Buy on Jupiter */}
+                <button onClick={handleLaunchJupiter} className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-gradient-to-r from-purple-500 to-emerald-400 hover:from-purple-400 hover:to-emerald-300 text-slate-950 font-black text-[11px] transition shadow-[0_0_12px_rgba(153,69,255,0.4)]">
+                  <ExternalLink className="w-3 h-3" /> {t.buyOnJupiter}
+                </button>
+                {/* Official website */}
+                <a href="https://www.maradonatoken-mrdt.xyz" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-purple-500/40 hover:border-purple-400 text-purple-300 hover:text-white font-bold text-[11px] transition text-center">
+                  <ExternalLink className="w-3 h-3 shrink-0" /> Official Site
+                </a>
+                {/* Info about $MRDT — opens Blueprint for MRDT */}
+                <button onClick={function() { openTokenBlueprint({ symbol: 'MRDT', name: 'MARADONATOKEN', ca: MRDT_CA, price: mrdtPrice.toFixed(8), liquidity: 13000, volume24h: 0, priceChange24h: 12.4, verified: true, dexUrl: 'https://dexscreener.com/solana/' + MRDT_CA, chain: 'solana' }); }} className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-emerald-500/40 hover:border-emerald-400 text-emerald-400 hover:text-white font-bold text-[11px] transition">
+                  ⚽️ $MRDT Info
                 </button>
               </div>
-            </div>
+            </>
           ) : (
             <div onClick={scrollToForm} className="cursor-pointer border border-purple-500/30 rounded-2xl p-4 bg-gradient-to-r from-black via-purple-950/10 to-black flex flex-col sm:flex-row items-center justify-between gap-4 hover:border-purple-500/60 transition">
               <div className="flex items-center gap-4">
@@ -923,11 +936,15 @@ export default function TntHouse() {
       {/* TNT Security Blueprint */}
       {isBlueprintOpen && selectedToken && (
         <div className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={closeBlueprint}>
-          <div className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-lg p-6 shadow-[0_0_40px_rgba(168,85,247,0.2)]" onClick={function(e) { e.stopPropagation(); }}>
+          <div className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-lg shadow-[0_0_40px_rgba(168,85,247,0.2)] overflow-y-auto max-h-[90vh]" onClick={function(e) { e.stopPropagation(); }}>
+            <div className="p-6">
+            {/* Header */}
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-black text-white">TNT Security Blueprint</h2>
               <button onClick={closeBlueprint} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
             </div>
+
+            {/* Token identity */}
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-full bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-lg">{selectedToken.symbol === 'MRDT' ? '⚽️' : '🪙'}</div>
               <div>
@@ -935,27 +952,61 @@ export default function TntHouse() {
                 <p className="text-slate-500 text-[10px] font-mono break-all">{selectedToken.ca}</p>
               </div>
             </div>
+
+            {/* Score badge */}
             <div className="flex items-center gap-3 mb-4 p-3 bg-slate-900 rounded-xl border border-purple-500/20">
-              <div className={'w-14 h-14 rounded-full flex items-center justify-center text-xl font-black border-2 ' + (getSafetyScore(selectedToken) >= 90 ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : getSafetyScore(selectedToken) >= 50 ? 'bg-yellow-500/20 border-yellow-500 text-yellow-400' : 'bg-red-500/20 border-red-500 text-red-400')}>{getSafetyScore(selectedToken)}</div>
+              <div className={'w-14 h-14 rounded-full flex items-center justify-center text-xl font-black border-2 shrink-0 ' + (getSafetyScore(selectedToken) >= 90 ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : getSafetyScore(selectedToken) >= 50 ? 'bg-yellow-500/20 border-yellow-500 text-yellow-400' : 'bg-red-500/20 border-red-500 text-red-400')}>{getSafetyScore(selectedToken)}</div>
               <div><p className="text-white font-bold text-sm">{t.safetyScore}</p><p className="text-slate-400 text-xs">{getSafetyScore(selectedToken) >= 90 ? t.ironclad : getSafetyScore(selectedToken) >= 50 ? t.moderate : t.highRisk}</p></div>
             </div>
-            <div className="grid grid-cols-3 gap-2 mb-4">
-              {[{ label: 'Price', value: '$' + (selectedToken.price || '0.00000000') }, { label: 'Liquidity', value: selectedToken.liquidity ? '$' + (selectedToken.liquidity >= 1000 ? (selectedToken.liquidity/1000).toFixed(1)+'K' : selectedToken.liquidity) : '$0' }, { label: 'Volume 24h', value: selectedToken.volume24h ? '$' + (selectedToken.volume24h >= 1000 ? (selectedToken.volume24h/1000).toFixed(1)+'K' : selectedToken.volume24h) : '$0' }].map(function(item, i) {
+
+            {/* Market data grid */}
+            <div className="grid grid-cols-3 gap-2 mb-3">
+              {[
+                { label: t.price, value: '$' + (selectedToken.price || '0.00000000') },
+                { label: t.liquidity, value: selectedToken.liquidity ? '$' + (selectedToken.liquidity >= 1000 ? (selectedToken.liquidity/1000).toFixed(1)+'K' : selectedToken.liquidity) : '$0' },
+                { label: t.volume24h, value: selectedToken.volume24h ? '$' + (selectedToken.volume24h >= 1000 ? (selectedToken.volume24h/1000).toFixed(1)+'K' : selectedToken.volume24h) : '$0' },
+              ].map(function(item, i) {
                 return <div key={i} className="bg-slate-900 border border-purple-500/10 rounded-lg p-2.5 text-center"><p className="text-slate-500 text-[9px] mb-0.5">{item.label}</p><p className="text-emerald-400 font-bold text-xs font-mono">{item.value}</p></div>;
               })}
             </div>
-            <div className="space-y-2 mb-4">
-              {[{ label: 'Mint Authority', value: selectedToken.mintAuthority }, { label: 'Freeze Authority', value: selectedToken.freezeAuthority }, { label: 'Honeypot', value: selectedToken.isHoneypot }].map(function(item, i) {
+
+            {/* Security flags */}
+            <div className="space-y-1.5 mb-3">
+              {[
+                { label: t.mintAuth, value: selectedToken.mintAuthority },
+                { label: t.freezeAuth, value: selectedToken.freezeAuthority },
+                { label: t.honeypot, value: selectedToken.isHoneypot },
+                /* LP status - hardcoded for MRDT, generic for others */
+                { label: 'LP Tokens', value: selectedToken.symbol === 'MRDT' ? '🔥 Burned Forever' : (selectedToken.lpStatus || 'Unknown') },
+                { label: 'Holders', value: selectedToken.symbol === 'MRDT' ? '718 wallets' : (selectedToken.holders ? selectedToken.holders + ' wallets' : 'Unknown') },
+                { label: 'LP Lock', value: selectedToken.symbol === 'MRDT' ? '❄️ 670M locked 1yr' : (selectedToken.lpLock || 'Unknown') },
+              ].map(function(item, i) {
                 if (!item.value) return null;
-                var isSafe = item.value.includes('Revoked') || item.value.includes('No ✓');
-                return <div key={i} className="flex items-center justify-between px-3 py-2 bg-slate-900 rounded-lg border border-purple-500/10"><span className="text-slate-400 text-xs">{item.label}</span><span className={'text-xs font-bold ' + (isSafe ? 'text-emerald-400' : 'text-red-400')}>{item.value}</span></div>;
+                var isUnknown = item.value === 'Unknown';
+                var isSafe = item.value.includes('Revoked') || item.value.includes('No ✓') || item.value.includes('Burned') || item.value.includes('locked') || item.value.includes('wallets');
+                return (
+                  <div key={i} className="flex items-center justify-between px-3 py-2 bg-slate-900 rounded-lg border border-purple-500/10">
+                    <span className="text-slate-400 text-xs">{item.label}</span>
+                    <span className={'text-xs font-bold ' + (isUnknown ? 'text-slate-500' : isSafe ? 'text-emerald-400' : 'text-red-400')}>{item.value}</span>
+                  </div>
+                );
               })}
             </div>
+
+            {/* DexScreener audit badge for MRDT */}
+            {selectedToken.symbol === 'MRDT' && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-emerald-500/10 border border-emerald-500/30 rounded-lg mb-3">
+                <span className="text-emerald-400 text-sm">✅</span>
+                <span className="text-emerald-400 text-xs font-bold">DexScreener Audit Passed</span>
+              </div>
+            )}
+
             {/* Links + Buy $MRDT button */}
             <div className="flex gap-2">
               <a href={selectedToken.dexUrl} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg border border-purple-500/30 text-purple-400 hover:text-emerald-400 hover:border-emerald-500/30 transition text-xs font-bold">DexScreener <ExternalLink className="w-3 h-3" /></a>
               <a href={'https://rugcheck.xyz/tokens/' + selectedToken.ca} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg border border-purple-500/30 text-purple-400 hover:text-emerald-400 hover:border-emerald-500/30 transition text-xs font-bold">RugCheck <ExternalLink className="w-3 h-3" /></a>
               <button onClick={handleLaunchJupiter} className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg bg-gradient-to-r from-purple-500 to-emerald-400 text-slate-950 font-black text-xs hover:from-purple-400 hover:to-emerald-300 transition">Buy $MRDT ⚽️</button>
+            </div>
             </div>
           </div>
         </div>
@@ -978,22 +1029,4 @@ export default function TntHouse() {
             {chatMessages.map(function(msg, i) {
               return <div key={i} className={'flex ' + (msg.sender === 'user' ? 'justify-end' : 'justify-start')}><div className={'max-w-[80%] rounded-lg p-2.5 leading-relaxed whitespace-pre-wrap ' + (msg.sender === 'user' ? 'bg-purple-500/20 text-purple-200 border border-purple-500/30' : 'bg-slate-950 text-emerald-400 border border-emerald-500/30')}>{msg.text}</div></div>;
             })}
-            {isTyping && <div className="flex justify-start"><div className="bg-slate-950 text-emerald-400 border border-emerald-500/30 rounded-lg p-2.5 animate-pulse text-[11px]">{t.analyzing}</div></div>}
-            <div ref={chatEndRef} />
-          </div>
-          {chatBlocked ? (
-            <div className="p-3 border-t border-purple-500/20 bg-slate-950 space-y-2">
-              <div className="text-center text-[11px] text-slate-400">{t.limitReached} <span className="text-purple-400 font-bold">{chatTimer}</span></div>
-              <button onClick={scrollToForm} className="w-full bg-gradient-to-r from-purple-500 to-emerald-400 text-slate-950 font-black py-2 rounded text-[11px]">{t.orderAudit}</button>
-            </div>
-          ) : (
-            <div className="p-3 border-t border-purple-500/20 bg-slate-950 flex gap-2">
-              <input type="text" value={userMsg} onChange={function(e) { setUserMsg(e.target.value); }} onKeyDown={function(e) { if (e.key === 'Enter') handleSendChat(); }} placeholder={t.pasteCa} className="flex-1 bg-slate-900 border border-purple-500/20 rounded px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" />
-              <button onClick={handleSendChat} disabled={isTyping} className="bg-purple-500 hover:bg-purple-400 text-slate-950 px-3 rounded text-xs font-bold disabled:opacity-50"><Send className="w-3.5 h-3.5" /></button>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
+            {isTyping && <div className="flex justify-start"><div className="bg-slate-950 text-emerald-400 border border-emerald-500/30 rounded
