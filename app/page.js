@@ -825,7 +825,16 @@ export default function TntHouse() {
               <button onClick={function() { handlePaymentMethodSelect('MRDT'); }} className="bg-purple-500/10 border-2 border-purple-500/30 hover:border-purple-500 rounded-xl p-6 text-center transition group"><div className="text-3xl mb-2">⚽️</div><div className="font-bold text-purple-400 group-hover:text-white transition">$MRDT</div><div className="text-[10px] text-slate-500 mt-1">{t.recommended}</div></button>
               <button onClick={function() { handlePaymentMethodSelect('SOL'); }} className="bg-emerald-500/10 border-2 border-emerald-500/30 hover:border-emerald-500 rounded-xl p-6 text-center transition group">
                 <div className="flex justify-center mb-2">
-                  <svg width="36" height="36" viewBox="0 0 397 311" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M64.6 237.9c2.4-2.4 5.7-3.8 9.2-3.8h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1l62.7-62.7z" fill="url(#sol_a)"/><path d="M64.6 3.8C67.1 1.4 70.4 0 73.8 0h317.4c5.8 0 8.7 7 4.6 11.1L333.1 73.8c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1L64.6 3.8z" fill="url(#sol_b)"/><path d="M333.1 120.1c-2.4-2.4-5.7-3.8-9.2-3.8H6.5c-5.8 0-8.7 7-4.6 11.1l62.7 62.7c2.4 2.4 5.7 3.8 9.2 3.8h317.4c5.8 0 8.7-7 4.6-11.1l-62.7-62.7z" fill="url(#sol_c)"/><defs><linearGradient id="sol_a" x1="360.9" y1="351.4" x2="141.2" y2="-69.2" gradientUnits="userSpaceOnUse"><stop stopColor="#00FFA3"/><stop offset="1" stopColor="#DC1FFF"/></linearGradient><linearGradient id="sol_b" x1="264.8" y1="351.4" x2="45.2" y2="-69.2" gradientUnits="userSpaceOnUse"><stop stopColor="#00FFA3"/><stop offset="1" stopColor="#DC1FFF"/></linearGradient><linearGradient id="sol_c" x1="312.5" y1="351.4" x2="92.9" y2="-69.2" gradientUnits="userSpaceOnUse"><stop stopColor="#00FFA3"/><stop offset="1" stopColor="#DC1FFF"/></linearGradient></defs></svg>
+                  <svg width="36" height="36" viewBox="0 0 397 311" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M64.6 237.9c2.4-2.4 5.7-3.8 9.2-3.8h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1l62.7-62.7z" fill="url(#sol_a)"/>
+                    <path d="M64.6 3.8C67.1 1.4 70.4 0 73.8 0h317.4c5.8 0 8.7 7 4.6 11.1L333.1 73.8c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1L64.6 3.8z" fill="url(#sol_b)"/>
+                    <path d="M333.1 120.1c-2.4-2.4-5.7-3.8-9.2-3.8H6.5c-5.8 0-8.7 7-4.6 11.1l62.7 62.7c2.4 2.4 5.7 3.8 9.2 3.8h317.4c5.8 0 8.7-7 4.6-11.1l-62.7-62.7z" fill="url(#sol_c)"/>
+                    <defs>
+                      <linearGradient id="sol_a" x1="360.9" y1="351.4" x2="141.2" y2="-69.2" gradientUnits="userSpaceOnUse"><stop stopColor="#00FFA3"/><stop offset="1" stopColor="#DC1FFF"/></linearGradient>
+                      <linearGradient id="sol_b" x1="264.8" y1="351.4" x2="45.2" y2="-69.2" gradientUnits="userSpaceOnUse"><stop stopColor="#00FFA3"/><stop offset="1" stopColor="#DC1FFF"/></linearGradient>
+                      <linearGradient id="sol_c" x1="312.5" y1="351.4" x2="92.9" y2="-69.2" gradientUnits="userSpaceOnUse"><stop stopColor="#00FFA3"/><stop offset="1" stopColor="#DC1FFF"/></linearGradient>
+                    </defs>
+                  </svg>
                 </div>
                 <div className="font-bold text-emerald-400 group-hover:text-white transition">SOL</div><div className="text-[10px] text-slate-500 mt-1">Solana</div>
               </button>
@@ -880,7 +889,16 @@ export default function TntHouse() {
               <button onClick={function() { handleBannerPaymentMethodSelect('MRDT'); }} className="bg-purple-500/10 border-2 border-purple-500/30 hover:border-purple-500 rounded-xl p-6 text-center transition group"><div className="text-3xl mb-2">⚽️</div><div className="font-bold text-purple-400 group-hover:text-white transition">$MRDT</div><div className="text-[10px] text-slate-500 mt-1">{t.recommended}</div></button>
               <button onClick={function() { handleBannerPaymentMethodSelect('SOL'); }} className="bg-emerald-500/10 border-2 border-emerald-500/30 hover:border-emerald-500 rounded-xl p-6 text-center transition group">
                 <div className="flex justify-center mb-2">
-                  <svg width="36" height="36" viewBox="0 0 397 311" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M64.6 237.9c2.4-2.4 5.7-3.8 9.2-3.8h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1l62.7-62.7z" fill="url(#bs1)"/><path d="M64.6 3.8C67.1 1.4 70.4 0 73.8 0h317.4c5.8 0 8.7 7 4.6 11.1L333.1 73.8c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1L64.6 3.8z" fill="url(#bs2)"/><path d="M333.1 120.1c-2.4-2.4-5.7-3.8-9.2-3.8H6.5c-5.8 0-8.7 7-4.6 11.1l62.7 62.7c2.4 2.4 5.7 3.8 9.2 3.8h317.4c5.8 0 8.7-7 4.6-11.1l-62.7-62.7z" fill="url(#bs3)"/><defs><linearGradient id="bs1" x1="360.9" y1="351.4" x2="141.2" y2="-69.2" gradientUnits="userSpaceOnUse"><stop stopColor="#00FFA3"/><stop offset="1" stopColor="#DC1FFF"/></linearGradient><linearGradient id="bs2" x1="264.8" y1="351.4" x2="45.2" y2="-69.2" gradientUnits="userSpaceOnUse"><stop stopColor="#00FFA3"/><stop offset="1" stopColor="#DC1FFF"/></linearGradient><linearGradient id="bs3" x1="312.5" y1="351.4" x2="92.9" y2="-69.2" gradientUnits="userSpaceOnUse"><stop stopColor="#00FFA3"/><stop offset="1" stopColor="#DC1FFF"/></linearGradient></defs></svg>
+                  <svg width="36" height="36" viewBox="0 0 397 311" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M64.6 237.9c2.4-2.4 5.7-3.8 9.2-3.8h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1l62.7-62.7z" fill="url(#bs1)"/>
+                    <path d="M64.6 3.8C67.1 1.4 70.4 0 73.8 0h317.4c5.8 0 8.7 7 4.6 11.1L333.1 73.8c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1L64.6 3.8z" fill="url(#bs2)"/>
+                    <path d="M333.1 120.1c-2.4-2.4-5.7-3.8-9.2-3.8H6.5c-5.8 0-8.7 7-4.6 11.1l62.7 62.7c2.4 2.4 5.7 3.8 9.2 3.8h317.4c5.8 0 8.7-7 4.6-11.1l-62.7-62.7z" fill="url(#bs3)"/>
+                    <defs>
+                      <linearGradient id="bs1" x1="360.9" y1="351.4" x2="141.2" y2="-69.2" gradientUnits="userSpaceOnUse"><stop stopColor="#00FFA3"/><stop offset="1" stopColor="#DC1FFF"/></linearGradient>
+                      <linearGradient id="bs2" x1="264.8" y1="351.4" x2="45.2" y2="-69.2" gradientUnits="userSpaceOnUse"><stop stopColor="#00FFA3"/><stop offset="1" stopColor="#DC1FFF"/></linearGradient>
+                      <linearGradient id="bs3" x1="312.5" y1="351.4" x2="92.9" y2="-69.2" gradientUnits="userSpaceOnUse"><stop stopColor="#00FFA3"/><stop offset="1" stopColor="#DC1FFF"/></linearGradient>
+                    </defs>
+                  </svg>
                 </div>
                 <div className="font-bold text-emerald-400 group-hover:text-white transition">SOL</div><div className="text-[10px] text-slate-500 mt-1">Solana</div>
               </button>
@@ -1061,6 +1079,4 @@ export default function TntHouse() {
       </button>
 
       {isChatOpen && (
-        <div className="fixed bottom-24 right-6 w-80 md:w-96 h-[450px] bg-slate-900 border-2 border-purple-500 rounded-xl shadow-[0_0_30px_rgba(153,69,255,0.4)] flex flex-col overflow-hidden z-50 font-mono">
-          <div className="bg-gradient-to-r from-purple-600 to-emerald-500 p-4 flex items-center justify-between">
-            <div className="flex items-center gap-2"><span className="text-xl">🤖</span><div><h4 className="font-bold text-xs text-white">TNT AI INSPECTOR</h4><span className="text-[9px] text-slate-100 font-bold tracking-widest">Trench Agent D10S</sp
+        <div className="fixed bottom-24 right-6 w-80 md:w-96 h-[450px] bg-slate-900 border-2 border-purple-500 rounded-xl shadow-[0_0_30px_rgba(153,69,255,0.4)] flex flex-col overflow-hi
