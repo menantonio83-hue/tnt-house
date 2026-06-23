@@ -513,7 +513,11 @@ export default function TntHouse() {
                   <ExternalLink className="w-3 h-3 shrink-0" /> Official Site
                 </a>
                 {/* Info about $MRDT — opens Blueprint for MRDT */}
-                <button onClick={function() { openTokenBlueprint({ symbol: 'MRDT', name: 'MARADONATOKEN', ca: MRDT_CA, price: mrdtPrice.toFixed(8), liquidity: 13000, volume24h: 0, priceChange24h: 12.4, verified: true, dexUrl: 'https://dexscreener.com/solana/' + MRDT_CA, chain: 'solana' }); }} className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-emerald-500/40 hover:border-emerald-400 text-emerald-400 hover:text-white font-bold text-[11px] transition">
+                <button
+                  onClick={function() {
+                    openTokenBlueprint({ symbol: 'MRDT', name: 'MARADONATOKEN', ca: MRDT_CA, price: mrdtPrice.toFixed(8), liquidity: 13000, volume24h: 0, priceChange24h: 12.4, verified: true, dexUrl: 'https://dexscreener.com/solana/' + MRDT_CA, chain: 'solana' });
+                  }}
+                  className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-emerald-500/40 hover:border-emerald-400 text-emerald-400 hover:text-white font-bold text-[11px] transition">
                   ⚽️ $MRDT Info
                 </button>
               </div>
@@ -699,7 +703,21 @@ export default function TntHouse() {
                     </div>
                     <div>
                       <label className="block text-purple-400 text-[11px] font-bold mb-1">{t.fieldUpload}</label>
-                      <input type="file" accept="image/*" onChange={function(e) { var f = e.target.files && e.target.files[0]; if (f) { var r = new FileReader(); r.onload = function(ev) { setBannerFormData(Object.assign({}, bannerFormData, { bannerImg: ev.target.result })); }; r.readAsDataURL(f); } }} className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-bold file:bg-gradient-to-r file:from-purple-500 file:to-emerald-400 file:text-slate-950 hover:file:from-purple-400 hover:file:to-emerald-300" />
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={function(e) {
+                          var f = e.target.files && e.target.files[0];
+                          if (f) {
+                            var r = new FileReader();
+                            r.onload = function(ev) {
+                              setBannerFormData(Object.assign({}, bannerFormData, { bannerImg: ev.target.result }));
+                            };
+                            r.readAsDataURL(f);
+                          }
+                        }}
+                        className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-bold file:bg-gradient-to-r file:from-purple-500 file:to-emerald-400 file:text-slate-950 hover:file:from-purple-400 hover:file:to-emerald-300"
+                      />
                     </div>
                   </div>
                   <div>
@@ -1027,6 +1045,4 @@ export default function TntHouse() {
           </div>
           <div className="flex-1 p-4 overflow-y-auto space-y-3 text-xs">
             {chatMessages.map(function(msg, i) {
-              return <div key={i} className={'flex ' + (msg.sender === 'user' ? 'justify-end' : 'justify-start')}><div className={'max-w-[80%] rounded-lg p-2.5 leading-relaxed whitespace-pre-wrap ' + (msg.sender === 'user' ? 'bg-purple-500/20 text-purple-200 border border-purple-500/30' : 'bg-slate-950 text-emerald-400 border border-emerald-500/30')}>{msg.text}</div></div>;
-            })}
-            {isTyping && <div className="flex justify-start"><div className="bg-slate-950 text-emerald-400 border border-emerald-500/30 rounded
+              return <div key={i} className={'flex ' + (msg.sender === 'user' ? 'justify-end' : 'jus
