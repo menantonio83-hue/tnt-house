@@ -267,6 +267,9 @@ export default function TntHouse() {
   var handlePaymentMethodSelect = function(method) { setSelectedPaymentMethod(method); setShowPaymentModal(false); setShowWalletModal(true); };
   var handleWalletSelect = function(wallet) { setSelectedWallet(wallet); setShowWalletModal(false); setShowInvoiceModal(true); };
 
+  // Run RugCheck + DexScreener audit, return token data
+  // If isFree=true — saves to Supabase immediately (no payment needed)
+  // If isFree=false — just returns token data, caller handles saving after payment verified
   var runAuditAndSave = async function(ca, projectName, isFree) {
     var auditResult = { score: 75, mintAuthority: 'Unknown', freezeAuthority: 'Unknown', isHoneypot: 'Unknown' };
     var dexData = { price: '0.00000000', liquidity: 0, volume24h: 0, priceChange24h: 0 };
@@ -289,44 +292,41 @@ export default function TntHouse() {
         dexData = { price: pair.priceUsd ? parseFloat(pair.priceUsd).toFixed(8) : '0.00000000', liquidity: (pair.liquidity && pair.liquidity.usd) ? Math.round(pair.liquidity.usd) : 0, volume24h: (pair.volume && pair.volume.h24) ? Math.round(pair.volume.h24) : 0, priceChange24h: (pair.priceChange && pair.priceChange.h24) ? pair.priceChange.h24 : 0 };
       }
     } catch (e) {}
-    setTimeout(function() {
-      var newToken = { name: projectName.toUpperCase(), symbol: projectName.slice(0, 4).toUpperCase() || 'NEW', ca: ca, price: dexData.price, liquidity: dexData.liquidity, volume24h: dexData.volume24h, priceChange24h: dexData.priceChange24h, score: auditResult.score, verified: true, dexUrl: 'https://dexscreener.com/solana/' + ca, chain: 'solana', mintAuthority: auditResult.mintAuthority, freezeAuthority: auditResult.freezeAuthority, isHoneypot: auditResult.isHoneypot };
-      saveTokenToSupabase(newToken);
-      setListedTokens(function(prev) { return [newToken].concat(prev); });
-      if (isFree) setFreeSlots(function(prev) { return Math.max(0, prev - 1); });
+
+    var tokenData = { name: projectName.toUpperCase(), symbol: projectName.slice(0, 4).toUpperCase() || 'NEW', ca: ca, price: dexData.price, liquidity: dexData.liquidity, volume24h: dexData.volume24h, priceChange24h: dexData.priceChange24h, score: auditResult.score, verified: true, dexUrl: 'https://dexscreener.com/solana/' + ca, chain: 'solana', mintAuthority: auditResult.mintAuthority, freezeAuthority: auditResult.freezeAuthority, isHoneypot: auditResult.isHoneypot };
+
+    if (isFree) {
+      // FREE slot — save immediately, no payment needed
+      saveTokenToSupabase(tokenData);
+      setListedTokens(function(prev) { return [tokenData].concat(prev); });
+      setFreeSlots(function(prev) { return Math.max(0, prev - 1); });
       setSubmitted(true);
       setFormData({ projectName: '', contractAddress: '', telegram: '' });
-      setSelectedPaymentMethod(null); setSelectedWallet(null);
-      showToast((isFree ? '🎁 Free audit complete! Score: ' : 'Audit complete! Score: ') + auditResult.score, 'success');
+      showToast('🎁 Free audit complete! Score: ' + auditResult.score, 'success');
       setIsSending(false);
       setTimeout(function() { setSubmitted(false); }, 5000);
-    }, 800);
+    }
+
+    return tokenData;
   };
 
   var handleConfirmPayment = async function() {
     setShowInvoiceModal(false); setIsSending(true);
-    var ca = formData.contractAddress; var projectName = formData.projectName;
-    var auditResult = { score: 75, mintAuthority: 'Unknown', freezeAuthority: 'Unknown', isHoneypot: 'Unknown' };
-    var dexData = { price: '0.00000000', liquidity: 0, volume24h: 0, priceChange24h: 0 };
-    try {
-      var rugRes = await fetch('https://api.rugcheck.xyz/v1/tokens/' + ca + '/report/summary', { headers: { 'Accept': 'application/json' } });
-      if (rugRes.ok) {
-        var rugData = await rugRes.json();
-        var risks = rugData.risks || [];
-        auditResult = { score: Math.min(100, Math.max(0, Math.round(100 - (rugData.score || 0) / 10))), mintAuthority: risks.some(function(r) { return r.name && r.name.toLowerCase().includes('mint'); }) ? 'Active ⚠️' : 'Revoked ✓', freezeAuthority: risks.some(function(r) { return r.name && r.name.toLowerCase().includes('freeze'); }) ? 'Active ⚠️' : 'Revoked ✓', isHoneypot: risks.some(function(r) { return r.name && r.name.toLowerCase().includes('honeypot'); }) ? 'Yes 🚨' : 'No ✓' };
-      }
-    } catch (e) {}
-    try {
-      var dexRes = await fetch('https://api.dexscreener.com/latest/dex/tokens/' + ca);
-      var dexJson = await dexRes.json();
-      if (dexJson.pairs && dexJson.pairs.length > 0) {
-        var pair = dexJson.pairs[0];
-        dexData = { price: pair.priceUsd ? parseFloat(pair.priceUsd).toFixed(8) : '0.00000000', liquidity: (pair.liquidity && pair.liquidity.usd) ? Math.round(pair.liquidity.usd) : 0, volume24h: (pair.volume && pair.volume.h24) ? Math.round(pair.volume.h24) : 0, priceChange24h: (pair.priceChange && pair.priceChange.h24) ? pair.priceChange.h24 : 0 };
-      }
-    } catch (e) {}
-    var tokenData = { name: projectName.toUpperCase(), symbol: projectName.slice(0, 4).toUpperCase() || 'NEW', ca: ca, price: dexData.price, liquidity: dexData.liquidity, volume24h: dexData.volume24h, priceChange24h: dexData.priceChange24h, score: auditResult.score, verified: true, dexUrl: 'https://dexscreener.com/solana/' + ca, chain: 'solana', mintAuthority: auditResult.mintAuthority, freezeAuthority: auditResult.freezeAuthority, isHoneypot: auditResult.isHoneypot };
-    setFormData({ projectName: '', contractAddress: '', telegram: '' }); setIsSending(false);
+    var ca = formData.contractAddress;
+    var projectName = formData.projectName;
+
+    // Run audit to get real data BEFORE redirect (RugCheck + DexScreener)
+    // isFree=false means it won't save yet — just returns token data
+    var tokenData = await runAuditAndSave(ca, projectName, false);
+
+    setFormData({ projectName: '', contractAddress: '', telegram: '' });
+    setSelectedPaymentMethod(null); setSelectedWallet(null);
+    setIsSending(false);
+
+    // Start payment polling — token saves to Supabase ONLY after TX confirmed
     startPaymentVerification('audit', invoiceAmount, null, tokenData);
+
+    // Fire Solana Pay deeplink
     var label = encodeURIComponent(invoiceLabel);
     var message = encodeURIComponent('Audit for ' + projectName + ' CA: ' + ca);
     setTimeout(function() { window.location.href = 'solana:' + WALLET_ADDRESS + '?amount=' + invoiceAmount + '&spl-token=' + MRDT_CA + '&label=' + label + '&message=' + message; }, 300);
