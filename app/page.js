@@ -1076,4 +1076,75 @@ export default function TntHouse() {
       <button
         onClick={function() { setIsChatOpen(!isChatOpen); }}
         className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-tr from-purple-500 to-emerald-400 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(153,69,255,0.5)] hover:scale-105 transition z-50 animate-bounce">
-        {isChatOpen ? <X className="w-6 h-6 text-slate-950" /> : <MessageSquare clas
+        {isChatOpen ? <X className="w-6 h-6 text-slate-950" /> : <MessageSquare className="w-6 h-6 text-slate-950" />}      </button>
+
+      {/* Chat panel */}
+      {isChatOpen && (
+        <div className="fixed bottom-24 right-6 w-80 md:w-96 h-[450px] bg-slate-900 border-2 border-purple-500 rounded-xl shadow-[0_0_30px_rgba(153,69,255,0.4)] flex flex-col overflow-hidden z-50">
+          {/* Chat header */}
+          <div className="flex items-center justify-between px-4 py-3 border-b border-purple-500/30 bg-slate-950">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+              <span className="text-xs font-black text-purple-400">TNT AI Inspector 🤖</span>
+            </div>
+            <div className="text-[9px] text-slate-500">
+              {chatBlocked
+                ? t.limitReached + ' ' + chatTimer
+                : (5 - chatCount) + ' ' + t.questions + ' left'}
+            </div>
+          </div>
+
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto p-3 space-y-3">
+            {chatMessages.map(function(msg, i) {
+              return (
+                <div key={i} className={'flex ' + (msg.sender === 'user' ? 'justify-end' : 'justify-start')}>
+                  <div className={'max-w-[85%] px-3 py-2 rounded-xl text-xs whitespace-pre-wrap ' + (msg.sender === 'user' ? 'bg-purple-500 text-white rounded-br-none' : 'bg-slate-800 text-slate-200 rounded-bl-none border border-purple-500/20')}>
+                    {msg.text}
+                  </div>
+                </div>
+              );
+            })}
+            {isTyping && (
+              <div className="flex justify-start">
+                <div className="bg-slate-800 border border-purple-500/20 rounded-xl rounded-bl-none px-3 py-2 flex gap-1">
+                  <span className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
+              </div>
+            )}
+            <div ref={chatEndRef} />
+          </div>
+
+          {/* Rate limit banner */}
+          {chatBlocked && (
+            <div className="px-3 py-2 bg-purple-950/60 border-t border-purple-500/30 text-center">
+              <p className="text-[10px] text-purple-300">{t.limitReached} <span className="font-black text-purple-400">{chatTimer}</span></p>
+              <button onClick={scrollToForm} className="text-[10px] text-emerald-400 hover:text-emerald-300 font-bold mt-0.5">{t.orderAudit}</button>
+            </div>
+          )}
+
+          {/* Input row */}
+          <div className="flex items-center gap-2 p-3 border-t border-purple-500/30 bg-slate-950">
+            <input
+              type="text"
+              value={userMsg}
+              onChange={function(e) { setUserMsg(e.target.value); }}
+              onKeyDown={function(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendChat(); } }}
+              disabled={chatBlocked}
+              placeholder={chatBlocked ? t.limitReached.slice(0, 30) + '...' : t.pasteCa}
+              className="flex-1 bg-slate-900 border border-purple-500/20 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-600 focus:border-purple-500 focus:outline-none disabled:opacity-40"
+            />
+            <button
+              onClick={handleSendChat}
+              disabled={chatBlocked || isTyping || !userMsg.trim()}
+              className="w-8 h-8 bg-gradient-to-tr from-purple-500 to-emerald-400 rounded-lg flex items-center justify-center disabled:opacity-40 transition hover:scale-105">
+              <Send className="w-3.5 h-3.5 text-slate-950" />
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+              }
