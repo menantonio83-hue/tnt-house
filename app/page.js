@@ -179,9 +179,9 @@ export default function TntHouse() {
   var closeBlueprint = function() { setIsBlueprintOpen(false); setTimeout(function() { setSelectedToken(null); }, 300); };
 
   var pillars = [
-    { icon: Shield, label: label: t.pillar1, desc: t.pillar1sub, color: 'text-purple-400' },
-    { icon: Zap, label: label: t.pillar2, desc: t.pillar2sub, color: 'text-emerald-400' },
-    { icon: Lock, label: label: t.pillar3, desc: t.pillar3sub, color: 'text-purple-400' },
+    { icon: Shield, label: t.pillar1, desc: t.pillar1sub, color: 'text-purple-400' },
+    { icon: Zap, label: t.pillar2, desc: t.pillar2sub, color: 'text-emerald-400' },
+    { icon: Lock, label: t.pillar3, desc: t.pillar3sub, color: 'text-purple-400' },
   ];
 
   useEffect(function() {
