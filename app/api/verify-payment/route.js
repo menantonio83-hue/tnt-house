@@ -1,18 +1,7 @@
-// app/api/verify-payment/route.js
-// v4 - Multiple verification strategies: Enhanced Txs, getSignaturesForAddress, getTokenAccountBalance
-
 export const runtime = 'edge';
 
 const WALLET_ADDRESS = "Ev6oXBXo6qyoaT5wypJ2Umxch91F7cFvE1SarYLaUn8Z";
 const MRDT_CA = "8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg";
-const SPL_TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
-
-// Derive Associated Token Account from wallet and mint
-function deriveATA(walletPubkey, tokenMint) {
-  // This is a simplified approach - in production use proper ATA derivation
-  // For now, Helius will handle it in API responses
-  return null; // Will use Helius tokenAccounts API instead
-}
 
 // Strategy 1: Try Helius Enhanced Transactions API (if available)
 async function verifyWithEnhancedTxs(heliusKey, expectedAmount, sinceSeconds) {
