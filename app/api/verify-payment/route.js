@@ -1,250 +1,82 @@
+// app/api/verify-payment/route.js
+import { NextResponse } from 'next/server';
+
 export const runtime = 'edge';
 
-const WALLET_ADDRESS = "Ev6oXBXo6qyoaT5wypJ2Umxch91F7cFvE1SarYLaUn8Z";
-const MRDT_CA = "8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg";
+const HELIUS_API_KEY = process.env.HELIUS_API_KEY;
+const RECIPIENT = 'Ev6oXBXo6qyoaT5wypJ2Umxch91F7cFvE1SarYLaUn8Z';
+const MRDT_MINT = '8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg';
 
-// Strategy 1: Try Helius Enhanced Transactions API (if available)
-async function verifyWithEnhancedTxs(heliusKey, expectedAmount, sinceSeconds) {
+export async function POST(req) {
   try {
-    const res = await fetch(
-      `https://api.helius.xyz/v0/addresses/${WALLET_ADDRESS}/transactions?api-key=${heliusKey}&limit=30`,
-      { method: 'GET', headers: { 'Content-Type': 'application/json' } }
-    );
+    const { expectedAmount, since } = await req.json();
 
-    if (!res.ok) return null;
-
-    const txs = await res.json();
-    if (!Array.isArray(txs) || txs.length === 0) return null;
-
-    // Filter by timestamp
-    const recentTxs = txs.filter(tx => tx.timestamp && tx.timestamp >= sinceSeconds);
-
-    for (const tx of recentTxs) {
-      // Check tokenTransfers array
-      if (Array.isArray(tx.tokenTransfers)) {
-        for (const transfer of tx.tokenTransfers) {
-          if (
-            transfer.mint === MRDT_CA &&
-            transfer.toUserAccount === WALLET_ADDRESS &&
-            parseFloat(transfer.tokenAmount) >= expectedAmount * 0.95
-          ) {
-            return {
-              verified: true,
-              received: parseFloat(transfer.tokenAmount),
-              expected: expectedAmount,
-              signature: tx.signature,
-              method: 'enhancedTxs'
-            };
-          }
-        }
-      }
-
-      // Check accountData tokenBalanceChanges
-      if (Array.isArray(tx.accountData)) {
-        for (const account of tx.accountData) {
-          if (account.account === WALLET_ADDRESS && Array.isArray(account.tokenBalanceChanges)) {
-            for (const change of account.tokenBalanceChanges) {
-              if (change.mint === MRDT_CA) {
-                const received = parseFloat(change.rawTokenAmount?.uiAmount || 0);
-                if (received > 0 && received >= expectedAmount * 0.95) {
-                  return {
-                    verified: true,
-                    received,
-                    expected: expectedAmount,
-                    signature: tx.signature,
-                    method: 'accountData'
-                  };
-                }
-              }
-            }
-          }
-        }
-      }
+    if (!expectedAmount || typeof expectedAmount !== 'number' || expectedAmount <= 0) {
+      return NextResponse.json({ verified: false, reason: 'Invalid expectedAmount' }, { status: 400 });
     }
 
-    return null;
-  } catch (e) {
-    console.log('Enhanced Txs failed:', e.message);
-    return null;
-  }
-}
+    const sinceSec = Math.floor((since || (Date.now() - 15 * 60 * 1000)) / 1000);
 
-// Strategy 2: Use getSignaturesForAddress + getTransaction (slower but reliable)
-async function verifyWithSignatures(rpcUrl, expectedAmount, sinceSeconds) {
-  try {
-    // Get transaction signatures for our wallet
-    const sigRes = await fetch(rpcUrl, {
+    const rpcUrl = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
+
+    const payload = {
+      jsonrpc: '2.0',
+      id: 'verify-mrdt',
+      method: 'getTransfersByAddress',
+      params: [
+        RECIPIENT,
+        {
+          direction: 'in',
+          mint: MRDT_MINT,
+          limit: 25,
+          sortOrder: 'desc',
+          commitment: 'finalized',
+          filters: {
+            blockTime: { gte: sinceSec - 180 } // небольшой буфер
+          }
+        }
+      ]
+    };
+
+    const res = await fetch(rpcUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id: 1,
-        method: 'getSignaturesForAddress',
-        params: [
-          WALLET_ADDRESS,
-          { limit: 30 }
-        ]
-      })
+      body: JSON.stringify(payload),
     });
 
-    const sigData = await sigRes.json();
-    if (!sigData.result || !Array.isArray(sigData.result)) return null;
+    if (!res.ok) throw new Error(`Helius RPC ${res.status}`);
 
-    // Filter by timestamp
-    const recentSigs = sigData.result.filter(sig => {
-      const blockTime = sig.blockTime || 0;
-      return blockTime >= sinceSeconds;
-    });
+    const json = await res.json();
+    if (json.error) throw new Error(json.error.message || 'Helius error');
 
-    if (recentSigs.length === 0) return null;
+    const transfers = json.result?.data || [];
+    const minAmount = expectedAmount * 0.95;
 
-    // Check each transaction
-    for (const sigInfo of recentSigs) {
-      const txRes = await fetch(rpcUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          id: 1,
-          method: 'getTransaction',
-          params: [sigInfo.signature, { encoding: 'jsonParsed', maxSupportedTransactionVersion: 0 }]
-        })
-      });
+    for (const tx of transfers) {
+      if (!tx.uiAmount || tx.blockTime < sinceSec - 300) continue;
 
-      const txData = await txRes.json();
-      if (!txData.result) continue;
-
-      const tx = txData.result;
-      const postTokenBalances = tx.meta?.postTokenBalances || [];
-
-      // Find token account changes for MRDT
-      for (const balance of postTokenBalances) {
-        if (balance.mint === MRDT_CA && balance.owner === WALLET_ADDRESS) {
-          const amount = parseFloat(balance.uiTokenAmount?.uiAmount || 0);
-          if (amount >= expectedAmount * 0.95) {
-            // Double-check preTokenBalances to confirm it's an increase
-            const preTokenBalances = tx.meta?.preTokenBalances || [];
-            const preBalance = preTokenBalances.find(b => b.mint === MRDT_CA && b.owner === WALLET_ADDRESS);
-            const preAmount = preBalance ? parseFloat(preBalance.uiTokenAmount?.uiAmount || 0) : 0;
-
-            if (amount > preAmount) {
-              return {
-                verified: true,
-                received: amount,
-                expected: expectedAmount,
-                signature: sigInfo.signature,
-                method: 'signatures'
-              };
-            }
-          }
-        }
-      }
-    }
-
-    return null;
-  } catch (e) {
-    console.log('Signatures method failed:', e.message);
-    return null;
-  }
-}
-
-// Strategy 3: Check current ATA balance (quick sanity check)
-async function verifyWithBalance(heliusKey, expectedAmount) {
-  try {
-    // Get all token accounts for our wallet with MRDT mint
-    const res = await fetch(
-      `https://api.helius.xyz/v0/addresses/${WALLET_ADDRESS}/token-accounts?api-key=${heliusKey}&mint=${MRDT_CA}`,
-      { method: 'GET', headers: { 'Content-Type': 'application/json' } }
-    );
-
-    if (!res.ok) return null;
-
-    const accounts = await res.json();
-    if (!Array.isArray(accounts) || accounts.length === 0) return null;
-
-    // Check if any MRDT token account has received funds
-    for (const account of accounts) {
-      const balance = parseFloat(account.tokenAmount?.uiAmount || 0);
-      if (balance >= expectedAmount * 0.95) {
-        return {
+      if (tx.uiAmount >= minAmount) {
+        return NextResponse.json({
           verified: true,
-          received: balance,
-          expected: expectedAmount,
-          method: 'balance',
-          timestamp: new Date().toISOString()
-        };
+          received: tx.uiAmount,
+          signature: tx.signature,
+          from: tx.fromUserAccount,
+          timestamp: tx.blockTime,
+        });
       }
     }
 
-    return null;
-  } catch (e) {
-    console.log('Balance check failed:', e.message);
-    return null;
-  }
-}
-
-export async function POST(request) {
-  try {
-    const body = await request.json();
-    const { expectedAmount, since } = body;
-
-    if (!expectedAmount || !since) {
-      return Response.json(
-        { verified: false, reason: 'Missing expectedAmount or since' },
-        { status: 400 }
-      );
-    }
-
-    const heliusKey = process.env.HELIUS_API_KEY;
-    const rpcUrl = process.env.SOLANA_RPC_URL || `https://mainnet.helius-rpc.com/?api-key=${heliusKey}`;
-
-    if (!heliusKey) {
-      return Response.json(
-        { verified: false, reason: 'Missing HELIUS_API_KEY' },
-        { status: 500 }
-      );
-    }
-
-    const sinceSeconds = Math.floor(since / 1000) - 60; // 60s buffer for blockchain latency
-
-    // Try strategies in order
-    console.log(`[verify-payment] Checking for ${expectedAmount} MRDT since ${sinceSeconds}`);
-
-    // Strategy 1: Enhanced Txs (fastest if available)
-    let result = await verifyWithEnhancedTxs(heliusKey, expectedAmount, sinceSeconds);
-    if (result) {
-      console.log('[verify-payment] ✓ Verified via Enhanced Txs');
-      return Response.json(result);
-    }
-
-    // Strategy 2: Signatures + getTransaction (most reliable)
-    result = await verifyWithSignatures(rpcUrl, expectedAmount, sinceSeconds);
-    if (result) {
-      console.log('[verify-payment] ✓ Verified via Signatures method');
-      return Response.json(result);
-    }
-
-    // Strategy 3: Quick balance check (covers edge cases)
-    result = await verifyWithBalance(heliusKey, expectedAmount);
-    if (result) {
-      console.log('[verify-payment] ✓ Verified via Balance check');
-      return Response.json(result);
-    }
-
-    // All strategies failed
-    return Response.json({
+    return NextResponse.json({
       verified: false,
-      reason: 'Payment not found in any verification method',
-      expectedAmount,
-      sinceSeconds,
-      debug: { strategies: ['enhancedTxs', 'signatures', 'balance'] }
+      reason: 'No matching incoming $MRDT transfer found',
+      checked: transfers.length,
     });
 
   } catch (e) {
-    console.error('[verify-payment] Error:', e.message);
-    return Response.json(
-      { verified: false, reason: 'Server error: ' + e.message },
-      { status: 500 }
-    );
+    console.error('[verify-payment]', e);
+    return NextResponse.json({
+      verified: false,
+      reason: e.message || 'Internal error',
+    }, { status: 500 });
   }
 }
