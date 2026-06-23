@@ -11,29 +11,28 @@ export async function POST(req) {
   try {
     const { expectedAmount, since } = await req.json();
 
-    if (!expectedAmount || typeof expectedAmount !== 'number' || expectedAmount <= 0) {
-      return NextResponse.json({ verified: false, reason: 'Invalid expectedAmount' }, { status: 400 });
+    if (!expectedAmount || typeof expectedAmount !== 'number') {
+      return NextResponse.json({ verified: false, reason: 'Bad expectedAmount' });
     }
 
-    const sinceSec = Math.floor((since || (Date.now() - 15 * 60 * 1000)) / 1000);
+    const sinceSec = Math.floor((since || Date.now() - 20 * 60 * 1000) / 1000);
+    const minAmount = expectedAmount * 0.95;
 
     const rpcUrl = `https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
 
+    // Убрал жёсткий filters из Helius — берём последние входящие и фильтруем сами
     const payload = {
       jsonrpc: '2.0',
-      id: 'verify-mrdt',
+      id: 'verify',
       method: 'getTransfersByAddress',
       params: [
         RECIPIENT,
         {
           direction: 'in',
           mint: MRDT_MINT,
-          limit: 25,
+          limit: 30,
           sortOrder: 'desc',
-          commitment: 'finalized',
-          filters: {
-            blockTime: { gte: sinceSec - 180 } // небольшой буфер
-          }
+          commitment: 'confirmed'   // ← поменял на confirmed (быстрее)
         }
       ]
     };
@@ -41,42 +40,57 @@ export async function POST(req) {
     const res = await fetch(rpcUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(payload)
     });
 
-    if (!res.ok) throw new Error(`Helius RPC ${res.status}`);
-
     const json = await res.json();
-    if (json.error) throw new Error(json.error.message || 'Helius error');
+
+    if (json.error) {
+      return NextResponse.json({
+        verified: false,
+        reason: 'Helius error: ' + json.error.message,
+        heluisResponse: json
+      });
+    }
 
     const transfers = json.result?.data || [];
-    const minAmount = expectedAmount * 0.95;
 
+    // Ищем подходящий перевод
     for (const tx of transfers) {
-      if (!tx.uiAmount || tx.blockTime < sinceSec - 300) continue;
+      const amount = Number(tx.uiAmount) || 0;
+      const txTime = tx.blockTime || 0;
 
-      if (tx.uiAmount >= minAmount) {
+      if (amount >= minAmount && txTime >= sinceSec - 300) {
         return NextResponse.json({
           verified: true,
-          received: tx.uiAmount,
+          received: amount,
           signature: tx.signature,
           from: tx.fromUserAccount,
-          timestamp: tx.blockTime,
+          timestamp: txTime
         });
       }
     }
 
+    // Если не нашли — возвращаем что именно видел эндпоинт (для дебага)
     return NextResponse.json({
       verified: false,
-      reason: 'No matching incoming $MRDT transfer found',
-      checked: transfers.length,
+      reason: 'No matching transfer found',
+      expectedAmount,
+      minAmount,
+      since: sinceSec,
+      transfersFound: transfers.length,
+      recentTransfers: transfers.slice(0, 5).map(t => ({
+        signature: t.signature,
+        uiAmount: t.uiAmount,
+        blockTime: t.blockTime,
+        from: t.fromUserAccount
+      }))
     });
 
   } catch (e) {
-    console.error('[verify-payment]', e);
     return NextResponse.json({
       verified: false,
-      reason: e.message || 'Internal error',
-    }, { status: 500 });
+      reason: e.message || 'Server error'
+    });
   }
 }
