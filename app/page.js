@@ -418,7 +418,7 @@ export default function TntHouse() {
       var res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages: updatedMessages }) });
       var data = await res.json();
       setChatMessages(function(prev) { return prev.concat([{ sender: 'bot', text: data.reply || data.error || 'Error. Try again.' }]); });
-    } catch (e) { setChatMessages(function(prev) { return prev.concat([{ sender: 'bot', text: 'Connection error. 💎 Full audit → from $10' }]); }); }
+    } catch (e) { setChatMessages(function(prev) { return prev.concat([{ sender: 'bot', text: 'Connection error. 💎 Full audit → from \$10' }]); }); }
     setIsTyping(false);
   };
 
@@ -605,7 +605,7 @@ export default function TntHouse() {
                   <tr onClick={function() { openTokenBlueprint({ symbol: 'MRDT', name: 'MARADONATOKEN', ca: MRDT_CA, price: mrdtPrice.toFixed(8), liquidity: 13000, volume24h: 0, priceChange24h: 12.4, verified: true, dexUrl: 'https://dexscreener.com/solana/' + MRDT_CA, chain: 'solana' }); }} className="border-b border-purple-500/30 bg-emerald-500/5 hover:bg-emerald-500/10 transition cursor-pointer">
                     <td className="p-1 font-bold flex items-center gap-1"><span className="text-sm">⚽️</span><div><span className="text-emerald-400 font-extrabold text-[10px]">$MRDT</span><div className="text-[7px] text-slate-400">MARADONATOKEN</div></div></td>
                     <td className="p-1 font-mono text-emerald-400 font-bold text-[9px]">${mrdtPrice > 0 ? mrdtPrice.toFixed(8) : '...'}</td>
-                    <td className="p-1 font-mono text-emerald-400 font-bold text-[9px]">$13K+</td>
+                    <td className="p-1 font-mono text-emerald-400 font-bold text-[9px]">\$13K+</td>
                     <td className="p-1 font-mono text-emerald-400 font-bold text-[9px]">+12.4%</td>
                     <td className="p-1 text-center"><div className="inline-flex items-center justify-center w-9 h-4 rounded-full bg-emerald-500/20 border border-emerald-500 text-emerald-400 text-[8px] font-extrabold shadow-[0_0_6px_rgba(16,185,129,0.5)]">98</div></td>
                     <td className="p-1 text-right"><button onClick={function(e) { e.stopPropagation(); handleLaunchJupiter(); }} className="text-[8px] text-emerald-400 hover:text-emerald-300 font-bold hover:underline inline-flex items-center gap-0.5">Buy <ExternalLink className="w-2 h-2" /></button></td>
@@ -981,102 +981,4 @@ export default function TntHouse() {
                 <div className="text-5xl mb-4">⏱</div>
                 <h3 className="text-lg font-black text-red-400 mb-2">{t.payNotDetected}</h3>
                 <p className="text-slate-400 text-xs mb-4">{t.payNotMsg}</p>
-                <a href="https://t.me/tnt_house2026" target="_blank" rel="noopener noreferrer" className="inline-block bg-purple-500 hover:bg-purple-400 text-white font-bold py-2 px-4 rounded text-xs mb-3">Contact Admin</a>
-                <br />
-                <button onClick={function() { setShowVerifyModal(false); }} className="text-slate-500 hover:text-white text-xs">Close</button>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* TNT Security Blueprint */}
-      {isBlueprintOpen && selectedToken && (
-        <div className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={closeBlueprint}>
-          <div className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-lg shadow-[0_0_40px_rgba(168,85,247,0.2)] overflow-y-auto max-h-[90vh]" onClick={function(e) { e.stopPropagation(); }}>
-            <div className="p-6">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-black text-white">TNT Security Blueprint</h2>
-              <button onClick={closeBlueprint} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
-            </div>
-
-            {/* Token identity */}
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-lg">{selectedToken.symbol === 'MRDT' ? '⚽️' : '🪙'}</div>
-              <div>
-                <p className="text-purple-400 font-black text-base">${selectedToken.symbol} <span className="text-slate-400 font-normal text-sm">{selectedToken.name}</span></p>
-                <p className="text-slate-500 text-[10px] font-mono break-all">{selectedToken.ca}</p>
-              </div>
-            </div>
-
-            {/* Score badge */}
-            <div className="flex items-center gap-3 mb-4 p-3 bg-slate-900 rounded-xl border border-purple-500/20">
-              <div className={'w-14 h-14 rounded-full flex items-center justify-center text-xl font-black border-2 shrink-0 ' + (getSafetyScore(selectedToken) >= 90 ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : getSafetyScore(selectedToken) >= 50 ? 'bg-yellow-500/20 border-yellow-500 text-yellow-400' : 'bg-red-500/20 border-red-500 text-red-400')}>{getSafetyScore(selectedToken)}</div>
-              <div><p className="text-white font-bold text-sm">{t.safetyScore}</p><p className="text-slate-400 text-xs">{getSafetyScore(selectedToken) >= 90 ? t.ironclad : getSafetyScore(selectedToken) >= 50 ? t.moderate : t.highRisk}</p></div>
-            </div>
-
-            {/* Market data grid */}
-            <div className="grid grid-cols-3 gap-2 mb-3">
-              {[
-                { label: t.price, value: '$' + (selectedToken.price || '0.00000000') },
-                { label: t.liquidity, value: selectedToken.liquidity ? '$' + (selectedToken.liquidity >= 1000 ? (selectedToken.liquidity/1000).toFixed(1)+'K' : selectedToken.liquidity) : '$0' },
-                { label: t.volume24h, value: selectedToken.volume24h ? '$' + (selectedToken.volume24h >= 1000 ? (selectedToken.volume24h/1000).toFixed(1)+'K' : selectedToken.volume24h) : '$0' },
-              ].map(function(item, i) {
-                return (
-                  <div key={i} className="bg-slate-900 border border-purple-500/10 rounded-lg p-2.5 text-center">
-                    <p className="text-slate-500 text-[9px] mb-0.5">{item.label}</p>
-                    <p className="text-emerald-400 font-bold text-xs font-mono">{item.value}</p>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Security flags */}
-            <div className="space-y-1.5 mb-3">
-              {[
-                { label: t.mintAuth, value: selectedToken.mintAuthority },
-                { label: t.freezeAuth, value: selectedToken.freezeAuthority },
-                { label: t.honeypot, value: selectedToken.isHoneypot },
-                /* LP status - hardcoded for MRDT, generic for others */
-                { label: 'LP Tokens', value: selectedToken.symbol === 'MRDT' ? '🔥 Burned Forever' : (selectedToken.lpStatus || 'Unknown') },
-                { label: 'Holders', value: selectedToken.symbol === 'MRDT' ? '718 wallets' : (selectedToken.holders ? selectedToken.holders + ' wallets' : 'Unknown') },
-                { label: 'LP Lock', value: selectedToken.symbol === 'MRDT' ? '❄️ 670M locked 1yr' : (selectedToken.lpLock || 'Unknown') },
-              ].map(function(item, i) {
-                if (!item.value) return null;
-                var isUnknown = item.value === 'Unknown';
-                var isSafe = item.value.includes('Revoked') || item.value.includes('No ✓') || item.value.includes('Burned') || item.value.includes('locked') || item.value.includes('wallets');
-                return (
-                  <div key={i} className="flex items-center justify-between px-3 py-2 bg-slate-900 rounded-lg border border-purple-500/10">
-                    <span className="text-slate-400 text-xs">{item.label}</span>
-                    <span className={'text-xs font-bold ' + (isUnknown ? 'text-slate-500' : isSafe ? 'text-emerald-400' : 'text-red-400')}>{item.value}</span>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* DexScreener audit badge for MRDT */}
-            {selectedToken.symbol === 'MRDT' && (
-              <div className="flex items-center gap-2 px-3 py-2 bg-emerald-500/10 border border-emerald-500/30 rounded-lg mb-3">
-                <span className="text-emerald-400 text-sm">✅</span>
-                <span className="text-emerald-400 text-xs font-bold">DexScreener Audit Passed</span>
-              </div>
-            )}
-
-            {/* Links + Buy $MRDT button */}
-            <div className="flex gap-2">
-              <a href={selectedToken.dexUrl} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg border border-purple-500/30 text-purple-400 hover:text-emerald-400 hover:border-emerald-500/30 transition text-xs font-bold">DexScreener <ExternalLink className="w-3 h-3" /></a>
-              <a href={'https://rugcheck.xyz/tokens/' + selectedToken.ca} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg border border-purple-500/30 text-purple-400 hover:text-emerald-400 hover:border-emerald-500/30 transition text-xs font-bold">RugCheck <ExternalLink className="w-3 h-3" /></a>
-              <button onClick={handleLaunchJupiter} className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg bg-gradient-to-r from-purple-500 to-emerald-400 text-slate-950 font-black text-xs hover:from-purple-400 hover:to-emerald-300 transition">Buy $MRDT ⚽️</button>
-            </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <button onClick={function() { setIsChatOpen(!isChatOpen); }} className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-tr from-purple-500 to-emerald-400 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(153,69,255,0.5)] hover:scale-105 transition z-50 animate-bounce">
-        {isChatOpen ? <X className="w-6 h-6 text-slate-950" /> : <MessageSquare className="w-6 h-6 text-slate-950" />}
-      </button>
-
-      {isChatOpen && (
-        <div className="fixed bottom-24 right-6 w-80 md:w-96 h-[450px] bg-slate-900 border-2 border-purple-500 rounded-xl shadow-[0_0_30px_rgba(153,69,255,0.4)] flex flex-col overflow-hi
+                <a href="https://t.me/tnt_house2026" target="_blank" rel="noopener noreferrer" className="inline-block bg-pur
