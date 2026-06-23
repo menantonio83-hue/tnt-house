@@ -14,6 +14,18 @@ const SUPABASE_KEY = 'sb_publishable__gmhE8SE_blCu-v90fV2OQ_YmFCkfFU';
 const GLOW_PURPLE = { position: 'absolute', top: '-10%', left: '-10%', width: '500px', height: '500px', borderRadius: '9999px', background: 'rgba(147,51,234,0.1)', filter: 'blur(120px)', pointerEvents: 'none' };
 const GLOW_GREEN = { position: 'absolute', bottom: '20%', right: '-10%', width: '500px', height: '500px', borderRadius: '9999px', background: 'rgba(16,185,129,0.1)', filter: 'blur(120px)', pointerEvents: 'none' };
 
+// ============================================================
+// i18n — translations for EN / ES / FR / EL / RU
+// ============================================================
+const TRANSLATIONS = {
+  en: { flag:'🇬🇧',name:'EN',tagline:'TOP NEW TOKENS',heroTitle:'{t.heroTitle}',heroSub:'{t.heroSub}',pillar1:'AI Audit',pillar1sub:'Contract security check',pillar2:'Micro-caps',pillar2sub:'$5K-$100K',pillar3:'DAO License',pillar3sub:'Via $MRDT',tableTitle:'{t.tableTitle}',tableClick:'{t.tableClick}',scanning:'Scanning...',formTitle:'{t.formTitle}',formFreeLeft:'{t.formFreeLeft}',formPaid:'{t.formPaid}',fieldProject:'Project Name',fieldProjectPH:'Your token...',fieldCA:'Contract Address (Solana)',fieldCAPH:'Enter contract address...',fieldTier:'Select tier',tierBasic:'{t.tierBasic}',tierFast:'{t.tierFast}',tierVIP:'{t.tierVIP}',fieldTelegram:'Telegram handle',btnFreeAudit:t.btnFreeAudit,btnAudit:t.btnAudit,btnLaunching:t.btnLaunching,bannerTitle:'{t.bannerTitle}',bannerSub:'{t.bannerSub}',fieldTokenName:'Token name / Ticker',fieldUpload:'Upload image',fieldSlogan:'Short ad slogan',fieldSloganPH:'The fastest memecoin...',fieldDuration:'Duration',dur1:'1 Day - $20',dur2:'2 Days - $35',dur6:'6 Days - $100',btnBanner:t.btnBanner,btnSlotTaken:t.btnSlotTaken,btnSending:t.btnSending,slotAvailIn:'{t.slotAvailIn}',investorTitle:'Investor Information',investorSub:'{t.investorSub}',pricingTitle:'{t.pricingTitle}',first10:t.first10,free:t.free,daoTitle:'{t.daoTitle}',daoText:'{t.daoText}',daoBtn:'{t.daoBtn}',choosePayment:'Choose payment method',recommended:'Recommended',chooseWallet:'Choose wallet',back:'{t.back}',invoice:'Payment Invoice',invoiceBanner:'Invoice — VIP Banner',cancel:'Cancel',payNow:'{t.payNow}',bannerLive:'{t.bannerLive}',waitPayment:'Waiting for Payment',waitSub:"{t.waitSub}",checkingBC:'{t.checkingBC}',timeoutIn:'{t.timeoutIn}',min:'min',payConfirmed:'Payment Confirmed!',bannerLiveMsg:'{t.bannerLiveMsg}',tokenAdded:'{t.tokenAdded}',payNotDetected:'Payment Not Detected',payNotMsg:"{t.payNotMsg}",contactAdmin:'Contact Admin',close:'Close',slotAvailable:'{t.slotAvailable}',slotAvailClick:'{t.slotAvailClick}',vipBoostFrom:'{t.vipBoostFrom}',payInMrdt:'{t.payInMrdt}',buyOnJupiter:'{t.buyOnJupiter}',safetyScore:'Safety Score',ironclad:t.ironclad,moderate:t.moderate,highRisk:t.highRisk,mintAuth:'Mint Authority',freezeAuth:'Freeze Authority',honeypot:'Honeypot',price:t.price,liquidity:t.liquidity,volume24h:t.volume24h,noFreeSlots:t.noFreeSlots,questions:'questions',limitReached:'{t.limitReached}',orderAudit:'{t.orderAudit}',pasteCa:'Paste CA or ask a question...',analyzing:'Analyzing...',fillFields:'Fill all fields',priceError:'Price error, try later' },
+  es: { flag:'🇪🇸',name:'ES',tagline:'NUEVOS TOKENS',heroTitle:'Destruyendo scams. Lanzando gems.',heroSub:'¡Bienvenido a la Casa de Nuevos Tokens! Nuestro agente IA escanea la blockchain.',pillar1:'Auditoría IA',pillar1sub:'Seguridad de contratos',pillar2:'Micro-caps',pillar2sub:'$5K-$100K',pillar3:'Licencia DAO',pillar3sub:'Vía $MRDT',tableTitle:'TABLA DE TOKENS SEGUROS',tableClick:'Toca un token para TNT Security Blueprint',scanning:'Escaneando...',formTitle:'PEDIR INSPECCIÓN IA',formFreeLeft:'lugares gratis! Llena el formulario.',formPaid:'Llena el formulario — elige billetera — paga — el token aparece en la tabla.',fieldProject:'Nombre del proyecto',fieldProjectPH:'Tu token...',fieldCA:'Dirección del Contrato (Solana)',fieldCAPH:'Ingresa la dirección...',fieldTier:'Selecciona plan',tierBasic:'Auditoría Básica — $10 en $MRDT',tierFast:'Listado Rápido — $25 en $MRDT',tierVIP:'VIP Boost — $75 en $MRDT',fieldTelegram:'Usuario de Telegram',btnFreeAudit:'🎁 AUDITORÍA GRATIS',btnAudit:'INICIAR INSPECCIÓN IA',btnLaunching:'ENVIANDO...',bannerTitle:'COMPRAR BANNER VIP',bannerSub:'Tu token reemplaza el espacio publicitario automáticamente.',fieldTokenName:'Nombre del token / Ticker',fieldUpload:'Subir imagen',fieldSlogan:'Eslogan publicitario',fieldSloganPH:'El memecoin más rápido...',fieldDuration:'Duración',dur1:'1 Día - $20',dur2:'2 Días - $35',dur6:'6 Días - $100',btnBanner:'PAGAR Y COLOCAR BANNER',btnSlotTaken:'🔒 LUGAR OCUPADO',btnSending:'ENVIANDO...',slotAvailIn:'Lugar disponible en',investorTitle:'Información para Inversores',investorSub:'Todos los pagos se aceptan en $MRDT vía Solana Pay.',pricingTitle:'PRECIOS ACTUALES:',first10:'🎁 Primeros 10 tokens',free:'GRATIS',daoTitle:'{t.daoTitle}',daoText:'¿Preguntas sobre auditorías o $MRDT? Escríbenos en Telegram. 🚀',daoBtn:'💬 Contactar Admin',choosePayment:'Elige método de pago',recommended:'Recomendado',chooseWallet:'Elige billetera',back:'← Volver',invoice:'Factura de Pago',invoiceBanner:'Factura — Banner VIP',cancel:'Cancelar',payNow:'✅ Pagar Ahora',bannerLive:'El banner se activa automáticamente después del pago 🚀',waitPayment:'Esperando Pago',waitSub:'Completa la transacción en tu billetera y regresa aquí.',checkingBC:'Verificando blockchain... intento',timeoutIn:'Tiempo límite en',min:'min',payConfirmed:'¡Pago Confirmado!',bannerLiveMsg:'Tu banner está activo para todos los visitantes.',tokenAdded:'Token añadido a la tabla de seguridad.',payNotDetected:'Pago No Detectado',payNotMsg:'No pudimos confirmar tu pago en 5 minutos. Si pagaste, contacta al admin.',contactAdmin:'Contactar Admin',close:'Cerrar',slotAvailable:'LUGAR DISPONIBLE',slotAvailClick:'¡Haz clic para comprar banner VIP!',vipBoostFrom:'VIP Boost desde $20/día',payInMrdt:'Pago en $MRDT',buyOnJupiter:'COMPRAR EN JUPITER',safetyScore:'Puntuación de Seguridad',ironclad:'Totalmente Seguro ★',moderate:'Riesgo Moderado ⚠️',highRisk:'Alto Riesgo 🚨',mintAuth:'Mint Authority',freezeAuth:'Freeze Authority',honeypot:'Honeypot',price:'Precio',liquidity:'Liquidez',volume24h:'Volumen 24h',noFreeSlots:'sin lugares',questions:'preguntas',limitReached:'Límite de 5 preguntas. Se desbloquea en',orderAudit:'💎 Pedir auditoría desde $10',pasteCa:'Pega CA o haz una pregunta...',analyzing:'Analizando...',fillFields:'Completa todos los campos',priceError:'Error de precio, intenta más tarde' },
+  fr: { flag:'🇫🇷',name:'FR',tagline:'NOUVEAUX TOKENS',heroTitle:'Détruire les arnaques. Lancer des gems.',heroSub:'Bienvenue à la Maison des Nouveaux Tokens ! Notre agent IA scanne la blockchain.',pillar1:'Audit IA',pillar1sub:'Sécurité des contrats',pillar2:'Micro-caps',pillar2sub:'$5K-$100K',pillar3:'Licence DAO',pillar3sub:'Via $MRDT',tableTitle:'TABLE DES TOKENS SÉCURISÉS',tableClick:'Cliquez sur un token pour le TNT Security Blueprint',scanning:'Analyse...',formTitle:"COMMANDER UNE INSPECTION IA",formFreeLeft:'places gratuites! Remplissez le formulaire.',formPaid:'Remplissez — choisissez un portefeuille — payez — le token apparaît.',fieldProject:'Nom du projet',fieldProjectPH:'Votre token...',fieldCA:'Adresse du Contrat (Solana)',fieldCAPH:"Entrez l'adresse...",fieldTier:'Choisir le plan',tierBasic:'Audit Basique — $10 en $MRDT',tierFast:'Listing Rapide — $25 en $MRDT',tierVIP:'VIP Boost — $75 en $MRDT',fieldTelegram:'Pseudo Telegram',btnFreeAudit:'🎁 AUDIT GRATUIT',btnAudit:"LANCER L'INSPECTION IA",btnLaunching:'ENVOI...',bannerTitle:'ACHETER BANNIÈRE VIP',bannerSub:"Votre token remplace automatiquement l'espace publicitaire.",fieldTokenName:'Nom du token / Ticker',fieldUpload:'Télécharger image',fieldSlogan:'Slogan publicitaire',fieldSloganPH:'Le memecoin le plus rapide...',fieldDuration:'Durée',dur1:'1 Jour - $20',dur2:'2 Jours - $35',dur6:'6 Jours - $100',btnBanner:'PAYER ET PLACER LA BANNIÈRE',btnSlotTaken:'🔒 EMPLACEMENT OCCUPÉ',btnSending:'ENVOI...',slotAvailIn:'Emplacement disponible dans',investorTitle:'Informations Investisseurs',investorSub:'Tous les paiements sont acceptés en $MRDT via Solana Pay.',pricingTitle:'TARIFS ACTUELS:',first10:'🎁 10 premiers tokens',free:'GRATUIT',daoTitle:'{t.daoTitle}',daoText:"Questions sur les audits ou $MRDT ? Écrivez à notre admin sur Telegram. 🚀",daoBtn:"💬 Contacter l'Admin",choosePayment:'Choisir méthode de paiement',recommended:'Recommandé',chooseWallet:'Choisir portefeuille',back:'← Retour',invoice:'Facture de Paiement',invoiceBanner:'Facture — Bannière VIP',cancel:'Annuler',payNow:'✅ Payer Maintenant',bannerLive:'La bannière est activée automatiquement après paiement 🚀',waitPayment:'En attente du Paiement',waitSub:'Complétez la transaction et revenez ici.',checkingBC:'Vérification blockchain... tentative',timeoutIn:'Délai dans',min:'min',payConfirmed:'Paiement Confirmé!',bannerLiveMsg:'Votre bannière est en ligne pour tous les visiteurs.',tokenAdded:'Token ajouté à la table de sécurité.',payNotDetected:'Paiement Non Détecté',payNotMsg:"Nous n'avons pas pu confirmer votre paiement en 5 minutes.",contactAdmin:"Contacter l'Admin",close:'Fermer',slotAvailable:'EMPLACEMENT DISPONIBLE',slotAvailClick:'Cliquez pour acheter la bannière VIP!',vipBoostFrom:'VIP Boost à partir de $20/jour',payInMrdt:'Paiement en $MRDT',buyOnJupiter:'ACHETER SUR JUPITER',safetyScore:'Score de Sécurité',ironclad:'Totalement Sécurisé ★',moderate:'Risque Modéré ⚠️',highRisk:'Risque Élevé 🚨',mintAuth:'Mint Authority',freezeAuth:'Freeze Authority',honeypot:'Honeypot',price:'Prix',liquidity:'Liquidité',volume24h:t.volume24h,noFreeSlots:'plus de places',questions:'questions',limitReached:'Limite de 5 questions atteinte. Débloqué dans',orderAudit:'💎 Commander audit dès $10',pasteCa:'Collez CA ou posez une question...',analyzing:'Analyse...',fillFields:'Remplissez tous les champs',priceError:'Erreur de prix, réessayez plus tard' },
+  el: { flag:'🇬🇷',name:'EL',tagline:'ΝΕΑ TOKENS',heroTitle:'Σπάζουμε scams. Λανσάρουμε gems.',heroSub:'Καλώς ήρθατε στο Σπίτι Νέων Tokens! Ο AI πράκτοράς μας σαρώνει το blockchain.',pillar1:'AI Έλεγχος',pillar1sub:'Ασφάλεια συμβολαίων',pillar2:'Micro-caps',pillar2sub:'$5K-$100K',pillar3:'Άδεια DAO',pillar3sub:'Μέσω $MRDT',tableTitle:'ΠΙΝΑΚΑΣ ΑΣΦΑΛΩΝ TOKENS',tableClick:'Κλικ σε token για TNT Security Blueprint',scanning:'Σάρωση...',formTitle:'ΠΑΡΑΓΓΕΛΙΑ AI ΕΠΙΘΕΩΡΗΣΗΣ',formFreeLeft:'δωρεάν θέσεις! Συμπλήρωσε τη φόρμα.',formPaid:'Συμπλήρωσε — επίλεξε πορτοφόλι — πλήρωσε.',fieldProject:'Όνομα Έργου',fieldProjectPH:'Το token σου...',fieldCA:'Διεύθυνση Συμβολαίου (Solana)',fieldCAPH:'Εισαγωγή διεύθυνσης...',fieldTier:'Επιλογή πλάνου',tierBasic:'Βασικός Έλεγχος — $10 σε $MRDT',tierFast:'Γρήγορη Καταχώρηση — $25 σε $MRDT',tierVIP:'VIP Boost — $75 σε $MRDT',fieldTelegram:'Χρήστης Telegram',btnFreeAudit:'🎁 ΔΩΡΕΑΝ ΕΛΕΓΧΟΣ',btnAudit:'ΕΚΚΙΝΗΣΗ AI ΕΠΙΘΕΩΡΗΣΗΣ',btnLaunching:'ΑΠΟΣΤΟΛΗ...',bannerTitle:'ΑΓΟΡΑ VIP BANNER',bannerSub:'Το token σου αντικαθιστά αυτόματα τη διαφήμιση.',fieldTokenName:'Όνομα token / Ticker',fieldUpload:'Ανέβασμα εικόνας',fieldSlogan:'Σύντομο σλόγκαν',fieldSloganPH:'Το γρηγορότερο memecoin...',fieldDuration:'Διάρκεια',dur1:'1 Ημέρα - $20',dur2:'2 Ημέρες - $35',dur6:'6 Ημέρες - $100',btnBanner:'ΠΛΗΡΩΜΗ ΚΑΙ ΤΟΠΟΘΕΤΗΣΗ BANNER',btnSlotTaken:'🔒 ΘΕΣΗ ΚΑΤΕΙΛΗΜΜΕΝΗ',btnSending:'ΑΠΟΣΤΟΛΗ...',slotAvailIn:'Θέση διαθέσιμη σε',investorTitle:'Πληροφορίες Επενδυτών',investorSub:'Όλες οι πληρωμές γίνονται σε $MRDT μέσω Solana Pay.',pricingTitle:'ΤΡΕΧΟΥΣΕΣ ΤΙΜΕΣ:',first10:'🎁 Πρώτα 10 tokens',free:'ΔΩΡΕΑΝ',daoTitle:'{t.daoTitle}',daoText:'Ερωτήσεις για ελέγχους ή $MRDT; Γράψτε μας στο Telegram. 🚀',daoBtn:'💬 Επικοινωνία Admin',choosePayment:'Επιλογή μεθόδου πληρωμής',recommended:'Προτεινόμενο',chooseWallet:'Επιλογή πορτοφολιού',back:'← Πίσω',invoice:'Τιμολόγιο Πληρωμής',invoiceBanner:'Τιμολόγιο — VIP Banner',cancel:'Ακύρωση',payNow:'✅ Πληρωμή Τώρα',bannerLive:'Το banner ενεργοποιείται αυτόματα μετά την πληρωμή 🚀',waitPayment:'Αναμονή Πληρωμής',waitSub:'Ολοκλήρωσε τη συναλλαγή και επέστρεψε εδώ.',checkingBC:'Έλεγχος blockchain... προσπάθεια',timeoutIn:'Λήξη σε',min:'λεπτά',payConfirmed:'Πληρωμή Επιβεβαιώθηκε!',bannerLiveMsg:'Το banner σου είναι ενεργό για όλους τους επισκέπτες.',tokenAdded:'Token προστέθηκε στον πίνακα ασφαλείας.',payNotDetected:'Πληρωμή Δεν Εντοπίστηκε',payNotMsg:'Δεν μπορέσαμε να επιβεβαιώσουμε την πληρωμή σε 5 λεπτά.',contactAdmin:'Επικοινωνία Admin',close:'Κλείσιμο',slotAvailable:'ΘΕΣΗ ΔΙΑΘΕΣΙΜΗ',slotAvailClick:'Κλικ για αγορά VIP banner!',vipBoostFrom:'VIP Boost από $20/ημέρα',payInMrdt:'Πληρωμή σε $MRDT',buyOnJupiter:'ΑΓΟΡΑ ΣΤΟ JUPITER',safetyScore:'Βαθμολογία Ασφαλείας',ironclad:'Απολύτως Ασφαλές ★',moderate:'Μέτριος Κίνδυνος ⚠️',highRisk:'Υψηλός Κίνδυνος 🚨',mintAuth:'Mint Authority',freezeAuth:'Freeze Authority',honeypot:'Honeypot',price:'Τιμή',liquidity:'Ρευστότητα',volume24h:'Όγκος 24ω',noFreeSlots:'χωρίς θέσεις',questions:'ερωτήσεις',limitReached:'Όριο 5 ερωτήσεων. Ξεκλειδώνει σε',orderAudit:'💎 Παραγγελία ελέγχου από $10',pasteCa:'Επικόλληση CA ή ερώτηση...',analyzing:'Ανάλυση...',fillFields:'Συμπλήρωσε όλα τα πεδία',priceError:'Σφάλμα τιμής, δοκίμασε αργότερα' },
+  ru: { flag:'🇷🇺',name:'RU',tagline:'НОВЫЕ ТОКЕНЫ',heroTitle:'Взрываем скамы. Запускаем гемы.',heroSub:'Добро пожаловать в Дом Новых Токенов! Наш ИИ-агент сканирует блокчейн.',pillar1:'ИИ Аудит',pillar1sub:'Безопасность контрактов',pillar2:'Микро-капы',pillar2sub:'$5K-$100K',pillar3:'DAO Лицензия',pillar3sub:'Через $MRDT',tableTitle:'ТАБЛИЦА БЕЗОПАСНЫХ ТОКЕНОВ',tableClick:'Нажмите на токен для TNT Security Blueprint',scanning:'Сканирование...',formTitle:'ЗАКАЗАТЬ ИИ-ИНСПЕКЦИЮ',formFreeLeft:'бесплатных мест! Заполни форму — аудит запустится сразу.',formPaid:'Заполни форму — выбери кошелёк — оплати — токен появится в таблице.',fieldProject:'Название проекта',fieldProjectPH:'Твой токен...',fieldCA:'Адрес контракта (Solana)',fieldCAPH:'Введи адрес контракта...',fieldTier:'Выбери тариф',tierBasic:'Базовый Аудит — $10 в $MRDT',tierFast:'Быстрый Листинг — $25 в $MRDT',tierVIP:'VIP-Буст — $75 в $MRDT',fieldTelegram:'Telegram для связи',btnFreeAudit:'🎁 БЕСПЛАТНЫЙ АУДИТ',btnAudit:'ЗАПУСТИТЬ ИИ-ИНСПЕКЦИЮ',btnLaunching:'ОТПРАВЛЯЕМ...',bannerTitle:'КУПИТЬ VIP-БАННЕР',bannerSub:'Твой токен автоматически заменит рекламное место.',fieldTokenName:'Название / Тикер токена',fieldUpload:'Загрузить изображение',fieldSlogan:'Краткий рекламный слоган',fieldSloganPH:'Самый быстрый мемкоин...',fieldDuration:'Срок размещения',dur1:'1 День - $20',dur2:'2 Дня - $35',dur6:'6 Дней - $100',btnBanner:'ОПЛАТИТЬ И РАЗМЕСТИТЬ БАННЕР',btnSlotTaken:'🔒 МЕСТО ЗАНЯТО',btnSending:'ОТПРАВКА...',slotAvailIn:'Место освободится через',investorTitle:'Информация для инвесторов',investorSub:'Все платежи принимаются в $MRDT через Solana Pay. После оплаты токен появится в таблице автоматически.',pricingTitle:'ТЕКУЩИЕ ТАРИФЫ:',first10:'🎁 Первые 10 токенов',free:'БЕСПЛАТНО',daoTitle:'{t.daoTitle}',daoText:'Вопросы об аудитах, листинге или $MRDT? Пишите нашему админу в Telegram. 🚀',daoBtn:'💬 Написать Админу',choosePayment:'Выбери способ оплаты',recommended:'Рекомендуем',chooseWallet:'Выбери кошелёк',back:'← Назад',invoice:'Счёт на оплату',invoiceBanner:'Счёт — VIP-Баннер',cancel:'Отмена',payNow:'✅ Оплатить',bannerLive:'Баннер появится автоматически после оплаты 🚀',waitPayment:'Ожидание оплаты',waitSub:'Подтверди транзакцию в кошельке и вернись сюда. Обнаружим автоматически.',checkingBC:'Проверяем блокчейн... попытка',timeoutIn:'Таймаут через',min:'мин',payConfirmed:'Оплата подтверждена!',bannerLiveMsg:'Твой баннер активен для всех посетителей.',tokenAdded:'Токен добавлен в таблицу безопасности.',payNotDetected:'Оплата не обнаружена',payNotMsg:'Не смогли подтвердить оплату за 5 минут. Если заплатил — напиши админу.',contactAdmin:'Написать Админу',close:'Закрыть',slotAvailable:'МЕСТО СВОБОДНО',slotAvailClick:'Нажмите, чтобы купить VIP-баннер!',vipBoostFrom:'VIP-Буст от $20/день',payInMrdt:'Оплата в $MRDT',buyOnJupiter:'КУПИТЬ НА JUPITER',safetyScore:'Оценка безопасности',ironclad:'Железобетонно безопасно ★',moderate:'Умеренный риск ⚠️',highRisk:'Высокий риск 🚨',mintAuth:'Mint Authority',freezeAuth:'Freeze Authority',honeypot:'Honeypot',price:'Цена',liquidity:'Ликвидность',volume24h:'Объём 24ч',noFreeSlots:'мест нет',questions:'вопросов',limitReached:'Лимит 5 вопросов исчерпан. Разблокировка через',orderAudit:'💎 Заказать полный аудит от $10',pasteCa:'Вставь CA или задай вопрос...',analyzing:'Анализирую...',fillFields:'Заполни все поля',priceError:'Ошибка цены, попробуй позже' },
+};
+
+
 async function saveTokenToSupabase(token) {
   try {
     await fetch(SUPABASE_URL + '/rest/v1/listed_tokens', {
@@ -72,6 +84,8 @@ export default function TntHouse() {
   var mrdtPriceRef = useRef(0.000013);
   var [priceLoading, setPriceLoading] = useState(true);
   var [toast, setToast] = useState({ show: false, message: '', type: 'success' });
+  var [lang, setLang] = useState('en');
+  var t = TRANSLATIONS[lang] || TRANSLATIONS.en;
   var [formData, setFormData] = useState({ projectName: '', contractAddress: '', telegram: '' });
   var [selectedTier, setSelectedTier] = useState('basic');
   var [isSending, setIsSending] = useState(false);
@@ -165,9 +179,9 @@ export default function TntHouse() {
   var closeBlueprint = function() { setIsBlueprintOpen(false); setTimeout(function() { setSelectedToken(null); }, 300); };
 
   var pillars = [
-    { icon: Shield, label: 'AI Audit', desc: 'Contract security check', color: 'text-purple-400' },
-    { icon: Zap, label: 'Micro-caps', desc: '$5K-$100K', color: 'text-emerald-400' },
-    { icon: Lock, label: 'DAO License', desc: 'Via $MRDT', color: 'text-purple-400' },
+    { icon: Shield, label: label: t.pillar1, desc: t.pillar1sub, color: 'text-purple-400' },
+    { icon: Zap, label: label: t.pillar2, desc: t.pillar2sub, color: 'text-emerald-400' },
+    { icon: Lock, label: label: t.pillar3, desc: t.pillar3sub, color: 'text-purple-400' },
   ];
 
   useEffect(function() {
@@ -436,8 +450,19 @@ export default function TntHouse() {
               </a>
               <div>
                 <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-emerald-400 tracking-wider">TNT HOUSE</h1>
-                <span className="text-[10px] text-purple-400 block font-bold tracking-widest">TOP NEW TOKENS v1.33</span>
+                <span className="text-[10px] text-purple-400 block font-bold tracking-widest">{t.tagline} v1.35</span>
               </div>
+            </div>
+
+            {/* Language switcher */}
+            <div className="flex items-center gap-1">
+              {Object.keys(TRANSLATIONS).map(function(l) {
+                return (
+                  <button key={l} onClick={function() { setLang(l); }} className={'text-sm px-1.5 py-0.5 rounded transition ' + (lang === l ? 'bg-purple-500/30 text-white' : 'text-slate-400 hover:text-white')}>
+                    {TRANSLATIONS[l].flag}
+                  </button>
+                );
+              })}
             </div>
             <div className="relative">
               <button onClick={function() { setIsBuyDropdownOpen(!isBuyDropdownOpen); }} className="bg-gradient-to-r from-purple-500 to-emerald-400 hover:from-purple-400 hover:to-emerald-300 text-slate-950 font-black px-4 py-2 rounded text-xs transition flex items-center gap-1 shadow-[0_0_15px_rgba(153,69,255,0.4)]">
@@ -480,7 +505,7 @@ export default function TntHouse() {
                   )}
                 </div>
                 <button onClick={handleLaunchJupiter} className="bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-black text-xs px-5 py-2.5 rounded-xl transition shrink-0 ml-4">
-                  BUY ON JUPITER
+                  {t.buyOnJupiter}
                 </button>
               </div>
             </div>
@@ -489,14 +514,14 @@ export default function TntHouse() {
               <div className="flex items-center gap-4">
                 <span className="text-3xl bg-purple-500/10 p-2 rounded-xl border border-purple-500/20">⚽️</span>
                 <div>
-                  <span className="bg-slate-800 text-purple-400 font-bold text-[9px] px-2 py-0.5 rounded tracking-widest block w-max mb-1">SLOT AVAILABLE</span>
+                  <span className="bg-slate-800 text-purple-400 font-bold text-[9px] px-2 py-0.5 rounded tracking-widest block w-max mb-1">{t.slotAvailable}</span>
                   <h4 className="text-lg font-black text-white">Maradona Token ($MRDT)</h4>
-                  <p className="text-slate-400 text-xs mt-0.5">Click to buy VIP banner!</p>
+                  <p className="text-slate-400 text-xs mt-0.5">{t.slotAvailClick}</p>
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-emerald-400 font-black text-sm">VIP Boost from $20/day</div>
-                <div className="text-[10px] text-slate-500">Payment in $MRDT</div>
+                <div className="text-emerald-400 font-black text-sm">{t.vipBoostFrom}</div>
+                <div className="text-[10px] text-slate-500">{t.payInMrdt}</div>
               </div>
             </div>
           )}
@@ -507,8 +532,8 @@ export default function TntHouse() {
             <div className="space-y-6">
               <div className="space-y-3 border-l-4 border-purple-500 pl-6">
                 <span className="px-2 py-1 bg-purple-500/20 text-purple-400 text-xs rounded font-bold border border-purple-500/30">SAFE NEW TOKENS</span>
-                <h2 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400">Exploding scams. Launching gems.</h2>
-                <p className="text-slate-300 text-base leading-relaxed">Welcome to the Home of New Tokens! Our AI agent scans the blockchain.</p>
+                <h2 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400">{t.heroTitle}</h2>
+                <p className="text-slate-300 text-base leading-relaxed">{t.heroSub}</p>
               </div>
               <div className="grid grid-cols-3 gap-4 mt-8">
                 {pillars.map(function(item, i) {
@@ -542,9 +567,9 @@ export default function TntHouse() {
             <div className="flex items-center justify-between mb-2">
               <div>
                 <h3 className="text-base font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400 flex items-center gap-1.5">
-                  <Shield className="w-3.5 h-3.5 text-emerald-400" /> SAFE NEW TOKENS TABLE
+                  <Shield className="w-3.5 h-3.5 text-emerald-400" /> {t.tableTitle}
                 </h3>
-                <p className="text-slate-400 text-[10px] mt-0.5">Click token for TNT Security Blueprint</p>
+                <p className="text-slate-400 text-[10px] mt-0.5">{t.tableClick}</p>
               </div>
               <div className="hidden md:flex items-center gap-1 text-[9px] text-purple-400">
                 <RefreshCw className="w-2.5 h-2.5 animate-spin" /> Live
@@ -554,7 +579,7 @@ export default function TntHouse() {
               <table className="w-full text-left border-collapse text-[9px]">
                 <thead>
                   <tr className="border-b border-purple-500/20 bg-purple-500/10 text-purple-400 font-bold sticky top-0 z-20 backdrop-blur-md">
-                    {['Token', 'Price', 'Liq', 'Vol/Chg', 'Score', 'Action'].map(function(h, i) {
+                    {['Token', t.price, 'Liq', 'Vol/Chg', 'Score', 'Action'].map(function(h, i) {
                       return <th key={i} className={'p-1.5 text-[9px] font-bold whitespace-nowrap' + (i === 4 ? ' text-center' : i === 5 ? ' text-right' : ' text-left')}>{h}</th>;
                     })}
                   </tr>
@@ -582,7 +607,7 @@ export default function TntHouse() {
                     );
                   })}
                   {loading && tokens.length === 0 ? (
-                    <tr><td colSpan={6} className="p-6 text-center text-purple-400 font-bold"><RefreshCw className="w-4 h-4 animate-spin mx-auto mb-1" />Scanning...</td></tr>
+                    <tr><td colSpan={6} className="p-6 text-center text-purple-400 font-bold"><RefreshCw className="w-4 h-4 animate-spin mx-auto mb-1" />{t.scanning}</td></tr>
                   ) : tokens.map(function(token, i) {
                     var score = getSafetyScore(token); var style = getScoreStyle(score);
                     return (
@@ -609,7 +634,7 @@ export default function TntHouse() {
             <div className="space-y-8">
               <div className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 p-6 backdrop-blur-md">
                 <div className="flex items-start justify-between mb-2">
-                  <h3 className="text-lg font-black text-purple-400">ORDER AI INSPECTION</h3>
+                  <h3 className="text-lg font-black text-purple-400">{t.formTitle}</h3>
                   {freeSlots > 0 ? (
                     <div className="bg-emerald-500/20 border border-emerald-500/40 rounded-lg px-2 py-1 text-center">
                       <div className="text-emerald-400 font-black text-sm">{freeSlots}/{FREE_TOTAL}</div>
@@ -622,58 +647,58 @@ export default function TntHouse() {
                     </div>
                   )}
                 </div>
-                <p className="text-slate-400 text-xs mb-4">{freeSlots > 0 ? '🎁 ' + freeSlots + ' free slots left! Fill the form — audit starts immediately.' : 'Fill the form — choose wallet — pay via Solana Pay — token appears in table.'}</p>
+                <p className="text-slate-400 text-xs mb-4">{freeSlots > 0 ? '🎁 ' + freeSlots + ' {t.formFreeLeft}' : '{t.formPaid}'}</p>
                 <form onSubmit={handleFormSubmit} className="space-y-4">
                   <div>
-                    <label className="block text-purple-400 text-xs font-bold mb-1">Project Name</label>
-                    <input type="text" placeholder="Your token..." value={formData.projectName} onChange={function(e) { setFormData(Object.assign({}, formData, { projectName: e.target.value })); }} className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" />
+                    <label className="block text-purple-400 text-xs font-bold mb-1">{t.fieldProject}</label>
+                    <input type="text" placeholder={t.fieldProjectPH} value={formData.projectName} onChange={function(e) { setFormData(Object.assign({}, formData, { projectName: e.target.value })); }} className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" />
                   </div>
                   <div>
-                    <label className="block text-purple-400 text-xs font-bold mb-1">Contract Address (Solana)</label>
-                    <input type="text" placeholder="Enter contract address..." value={formData.contractAddress} onChange={function(e) { setFormData(Object.assign({}, formData, { contractAddress: e.target.value })); }} className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none font-mono" />
+                    <label className="block text-purple-400 text-xs font-bold mb-1">{t.fieldCA}</label>
+                    <input type="text" placeholder={t.fieldCAPH} value={formData.contractAddress} onChange={function(e) { setFormData(Object.assign({}, formData, { contractAddress: e.target.value })); }} className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none font-mono" />
                   </div>
                   <div>
-                    <label className="block text-purple-400 text-xs font-bold mb-1">Select tier</label>
+                    <label className="block text-purple-400 text-xs font-bold mb-1">{t.fieldTier}</label>
                     <select value={selectedTier} onChange={function(e) { setSelectedTier(e.target.value); }} className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white focus:border-purple-500 focus:outline-none font-mono">
-                      <option value="basic">Basic Audit — $10 in $MRDT (~{priceLoading ? '...' : getAmountForTier('basic').toLocaleString()} $MRDT)</option>
-                      <option value="fast">Fast Listing — $25 in $MRDT (~{priceLoading ? '...' : getAmountForTier('fast').toLocaleString()} $MRDT)</option>
-                      <option value="vip">VIP Boost — $75 in $MRDT (~{priceLoading ? '...' : getAmountForTier('vip').toLocaleString()} $MRDT)</option>
+                      <option value="basic">{t.tierBasic} (~{priceLoading ? '...' : getAmountForTier('basic').toLocaleString()} $MRDT)</option>
+                      <option value="fast">{t.tierFast} (~{priceLoading ? '...' : getAmountForTier('fast').toLocaleString()} $MRDT)</option>
+                      <option value="vip">{t.tierVIP} (~{priceLoading ? '...' : getAmountForTier('vip').toLocaleString()} $MRDT)</option>
                     </select>
                   </div>
                   <div>
-                    <label className="block text-purple-400 text-xs font-bold mb-1">Telegram handle</label>
+                    <label className="block text-purple-400 text-xs font-bold mb-1">{t.fieldTelegram}</label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-purple-400 text-xs font-bold">@</span>
                       <input type="text" placeholder="your_telegram" value={formData.telegram} onChange={function(e) { setFormData(Object.assign({}, formData, { telegram: e.target.value })); }} className="w-full bg-slate-950 border border-purple-500/20 rounded pl-7 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" />
                     </div>
                   </div>
                   <button type="submit" disabled={isSending} className={'w-full font-black py-2.5 rounded text-xs transition flex items-center justify-center gap-1.5 disabled:opacity-50 ' + (freeSlots > 0 ? 'bg-gradient-to-r from-emerald-400 to-purple-500 hover:from-emerald-300 hover:to-purple-400 text-slate-950' : 'bg-gradient-to-r from-purple-500 to-emerald-400 hover:from-purple-400 hover:to-emerald-300 text-slate-950')}>
-                    <Send className="w-3.5 h-3.5" /> {isSending ? 'LAUNCHING...' : freeSlots > 0 ? '🎁 LAUNCH FREE AUDIT' : 'LAUNCH AI INSPECTION'}
+                    <Send className="w-3.5 h-3.5" /> {isSending ? t.btnLaunching : freeSlots > 0 ? t.btnFreeAudit : t.btnAudit}
                   </button>
                   {submitted && <div className="p-3 bg-emerald-950/40 border border-emerald-500/30 rounded text-emerald-300 text-xs text-center font-bold">Payment sent! Token added to table.</div>}
                 </form>
               </div>
 
               <div className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 p-6 backdrop-blur-md">
-                <h3 className="text-lg font-black text-purple-400 mb-2">BUY VIP BANNER</h3>
-                <p className="text-slate-400 text-xs mb-4">Your token replaces the ad slot automatically.</p>
+                <h3 className="text-lg font-black text-purple-400 mb-2">{t.bannerTitle}</h3>
+                <p className="text-slate-400 text-xs mb-4">{t.bannerSub}</p>
                 <form onSubmit={handleBannerSubmit} className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-purple-400 text-[11px] font-bold mb-1">Token name / Ticker</label>
+                      <label className="block text-purple-400 text-[11px] font-bold mb-1">{t.fieldTokenName}</label>
                       <input type="text" value={bannerFormData.tokenName} onChange={function(e) { setBannerFormData(Object.assign({}, bannerFormData, { tokenName: e.target.value })); }} placeholder="SOLANA" className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" />
                     </div>
                     <div>
-                      <label className="block text-purple-400 text-[11px] font-bold mb-1">Upload image</label>
+                      <label className="block text-purple-400 text-[11px] font-bold mb-1">{t.fieldUpload}</label>
                       <input type="file" accept="image/*" onChange={function(e) { var f = e.target.files && e.target.files[0]; if (f) { var r = new FileReader(); r.onload = function(ev) { setBannerFormData(Object.assign({}, bannerFormData, { bannerImg: ev.target.result })); }; r.readAsDataURL(f); } }} className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-bold file:bg-gradient-to-r file:from-purple-500 file:to-emerald-400 file:text-slate-950 hover:file:from-purple-400 hover:file:to-emerald-300" />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-purple-400 text-[11px] font-bold mb-1">Short ad slogan</label>
-                    <input type="text" value={bannerFormData.desc} onChange={function(e) { setBannerFormData(Object.assign({}, bannerFormData, { desc: e.target.value })); }} placeholder="The fastest memecoin..." className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" />
+                    <label className="block text-purple-400 text-[11px] font-bold mb-1">{t.fieldSlogan}</label>
+                    <input type="text" value={bannerFormData.desc} onChange={function(e) { setBannerFormData(Object.assign({}, bannerFormData, { desc: e.target.value })); }} placeholder={t.fieldSloganPH} className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" />
                   </div>
                   <div>
-                    <label className="block text-purple-400 text-[11px] font-bold mb-1">Duration</label>
+                    <label className="block text-purple-400 text-[11px] font-bold mb-1">{t.fieldDuration}</label>
                     <select value={bannerFormData.days} onChange={function(e) { setBannerFormData(Object.assign({}, bannerFormData, { days: e.target.value })); }} className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white focus:border-purple-500 focus:outline-none font-mono">
                       <option value="1">1 Day - $20 (~{priceLoading ? '...' : getAmountForBanner('1').toLocaleString()} $MRDT)</option>
                       <option value="2">2 Days - $35 (~{priceLoading ? '...' : getAmountForBanner('2').toLocaleString()} $MRDT)</option>
@@ -681,11 +706,11 @@ export default function TntHouse() {
                     </select>
                   </div>
                   <button type="submit" disabled={isBannerSending || !!activeBanner} className="w-full bg-gradient-to-r from-emerald-400 to-purple-500 hover:from-emerald-300 hover:to-purple-400 text-slate-950 font-black py-2.5 rounded text-xs transition flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed">
-                    <Zap className="w-3.5 h-3.5" /> {isBannerSending ? 'SENDING...' : activeBanner ? '🔒 SLOT TAKEN' : 'PAY AND PLACE BANNER'}
+                    <Zap className="w-3.5 h-3.5" /> {isBannerSending ? t.btnSending : activeBanner ? t.btnSlotTaken : t.btnBanner}
                   </button>
                   {activeBanner && bannerCountdown && (
                     <div className="p-2.5 bg-slate-900 border border-purple-500/20 rounded text-center">
-                      <p className="text-slate-400 text-[11px]">Slot available in</p>
+                      <p className="text-slate-400 text-[11px]">{t.slotAvailIn}</p>
                       <p className="text-purple-400 font-black text-sm mt-0.5">{bannerCountdown}</p>
                     </div>
                   )}
@@ -696,14 +721,14 @@ export default function TntHouse() {
             </div>
 
             <div className="space-y-4 bg-slate-900/20 border-2 border-purple-500/20 rounded-xl p-6">
-              <h3 className="text-xl font-black text-purple-400">Investor Information</h3>
-              <p className="text-slate-300 text-xs leading-relaxed">All payments are accepted in $MRDT via Solana Pay. After payment, the token appears in the table automatically.</p>
+              <h3 className="text-xl font-black text-purple-400">{t.investorTitle}</h3>
+              <p className="text-slate-300 text-xs leading-relaxed">{t.investorSub}</p>
               <div className="mt-6 space-y-3">
                 <h4 className="text-xs font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400 flex items-center gap-1.5">
-                  <Download className="w-4 h-4 text-purple-400 animate-pulse" /> CURRENT PRICING:
+                  <Download className="w-4 h-4 text-purple-400 animate-pulse" /> {t.pricingTitle}
                 </h4>
                 <div className="grid grid-cols-1 gap-2 text-xs font-mono">
-                  {[['🎁 First 10 tokens','FREE'],['Basic AI Audit','$10 ~ '+(priceLoading?'...':getAmountForTier('basic').toLocaleString())+' $MRDT'],['Fast Listing','$25 ~ '+(priceLoading?'...':getAmountForTier('fast').toLocaleString())+' $MRDT'],['VIP Boost','$75 ~ '+(priceLoading?'...':getAmountForTier('vip').toLocaleString())+' $MRDT'],['Banner 1 day','$20 ~ '+(priceLoading?'...':getAmountForBanner('1').toLocaleString())+' $MRDT'],['Banner 2 days','$35 ~ '+(priceLoading?'...':getAmountForBanner('2').toLocaleString())+' $MRDT'],['Banner 6 days','$100 ~ '+(priceLoading?'...':getAmountForBanner('6').toLocaleString())+' $MRDT']].map(function(row,i) {
+                  {[[t.first10,t.free],['Basic AI Audit','$10 ~ '+(priceLoading?'...':getAmountForTier('basic').toLocaleString())+' $MRDT'],['Fast Listing','$25 ~ '+(priceLoading?'...':getAmountForTier('fast').toLocaleString())+' $MRDT'],['VIP Boost','$75 ~ '+(priceLoading?'...':getAmountForTier('vip').toLocaleString())+' $MRDT'],['Banner 1 day','$20 ~ '+(priceLoading?'...':getAmountForBanner('1').toLocaleString())+' $MRDT'],['Banner 2 days','$35 ~ '+(priceLoading?'...':getAmountForBanner('2').toLocaleString())+' $MRDT'],['Banner 6 days','$100 ~ '+(priceLoading?'...':getAmountForBanner('6').toLocaleString())+' $MRDT']].map(function(row,i) {
                     return <div key={i} className={'flex justify-between p-2.5 border rounded-lg '+(i===0?'bg-emerald-500/10 border-emerald-500/30':'bg-slate-950 border-purple-500/10')}><span className={i===0?'text-emerald-300 font-bold':'text-slate-300'}>{row[0]}</span><span className={i===0?'text-emerald-400 font-black':'text-emerald-400 font-bold'}>{row[1]}</span></div>;
                   })}
                 </div>
@@ -716,10 +741,10 @@ export default function TntHouse() {
           <div className="relative bg-gradient-to-r from-purple-500/10 via-transparent to-emerald-500/10 border-2 border-purple-500/30 rounded-lg p-10 overflow-hidden">
             <div className="absolute top-0 right-0 w-40 h-40 bg-purple-500/10 rounded-full blur-3xl" />
             <div className="relative z-10 max-w-2xl">
-              <h3 className="text-2xl font-black text-purple-400 mb-2">TNT WHALE CLUB (DAO)</h3>
-              <p className="text-slate-300 text-sm leading-relaxed mb-5">Questions about audits, listings or $MRDT? Write to our admin in Telegram — we reply fast. 🚀</p>
+              <h3 className="text-2xl font-black text-purple-400 mb-2">{t.daoTitle}</h3>
+              <p className="text-slate-300 text-sm leading-relaxed mb-5">{t.daoText}</p>
               <a href="https://t.me/tnt_house2026" target="_blank" rel="noopener noreferrer" className="inline-block bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-400 hover:to-purple-500 text-white font-bold py-2.5 px-6 rounded text-xs transition">
-                💬 Ask Admin in Telegram
+                {t.daoBtn}
               </a>
             </div>
           </div>
@@ -735,7 +760,7 @@ export default function TntHouse() {
               <a href="https://www.maradonatoken-mrdt.xyz" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400 transition-colors"><ExternalLink className="w-6 h-6" /></a>
             </div>
             <div className="text-center space-y-1">
-              <div className="text-purple-400 font-bold text-sm tracking-widest">TNT HOUSE v1.33</div>
+              <div className="text-purple-400 font-bold text-sm tracking-widest">TNT HOUSE v1.35</div>
               <div className="text-slate-400 text-xs">Powered by $MRDT · AI Audits · Supabase</div>
               <div className="text-slate-500 text-[10px]">Built with Next.js + Tailwind CSS · Solana Pay</div>
             </div>
@@ -747,9 +772,9 @@ export default function TntHouse() {
       {showPaymentModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4" onClick={function() { setShowPaymentModal(false); }}>
           <div className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-md p-6 shadow-[0_0_40px_rgba(168,85,247,0.25)]" onClick={function(e) { e.stopPropagation(); }}>
-            <div className="flex items-center justify-between mb-6"><h3 className="text-xl font-black text-purple-400">Choose payment method</h3><button onClick={function() { setShowPaymentModal(false); }} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button></div>
+            <div className="flex items-center justify-between mb-6"><h3 className="text-xl font-black text-purple-400">{t.choosePayment}</h3><button onClick={function() { setShowPaymentModal(false); }} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button></div>
             <div className="grid grid-cols-2 gap-4">
-              <button onClick={function() { handlePaymentMethodSelect('MRDT'); }} className="bg-purple-500/10 border-2 border-purple-500/30 hover:border-purple-500 rounded-xl p-6 text-center transition group"><div className="text-3xl mb-2">⚽️</div><div className="font-bold text-purple-400 group-hover:text-white transition">$MRDT</div><div className="text-[10px] text-slate-500 mt-1">Recommended</div></button>
+              <button onClick={function() { handlePaymentMethodSelect('MRDT'); }} className="bg-purple-500/10 border-2 border-purple-500/30 hover:border-purple-500 rounded-xl p-6 text-center transition group"><div className="text-3xl mb-2">⚽️</div><div className="font-bold text-purple-400 group-hover:text-white transition">$MRDT</div><div className="text-[10px] text-slate-500 mt-1">{t.recommended}</div></button>
               <button onClick={function() { handlePaymentMethodSelect('SOL'); }} className="bg-emerald-500/10 border-2 border-emerald-500/30 hover:border-emerald-500 rounded-xl p-6 text-center transition group">
                 <div className="flex justify-center mb-2">
                   <svg width="36" height="36" viewBox="0 0 397 311" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M64.6 237.9c2.4-2.4 5.7-3.8 9.2-3.8h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1l62.7-62.7z" fill="url(#sol_a)"/><path d="M64.6 3.8C67.1 1.4 70.4 0 73.8 0h317.4c5.8 0 8.7 7 4.6 11.1L333.1 73.8c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1L64.6 3.8z" fill="url(#sol_b)"/><path d="M333.1 120.1c-2.4-2.4-5.7-3.8-9.2-3.8H6.5c-5.8 0-8.7 7-4.6 11.1l62.7 62.7c2.4 2.4 5.7 3.8 9.2 3.8h317.4c5.8 0 8.7-7 4.6-11.1l-62.7-62.7z" fill="url(#sol_c)"/><defs><linearGradient id="sol_a" x1="360.9" y1="351.4" x2="141.2" y2="-69.2" gradientUnits="userSpaceOnUse"><stop stopColor="#00FFA3"/><stop offset="1" stopColor="#DC1FFF"/></linearGradient><linearGradient id="sol_b" x1="264.8" y1="351.4" x2="45.2" y2="-69.2" gradientUnits="userSpaceOnUse"><stop stopColor="#00FFA3"/><stop offset="1" stopColor="#DC1FFF"/></linearGradient><linearGradient id="sol_c" x1="312.5" y1="351.4" x2="92.9" y2="-69.2" gradientUnits="userSpaceOnUse"><stop stopColor="#00FFA3"/><stop offset="1" stopColor="#DC1FFF"/></linearGradient></defs></svg>
@@ -764,7 +789,7 @@ export default function TntHouse() {
       {showWalletModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4" onClick={function() { setShowWalletModal(false); setShowPaymentModal(true); }}>
           <div className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-md p-6 shadow-[0_0_40px_rgba(168,85,247,0.25)]" onClick={function(e) { e.stopPropagation(); }}>
-            <div className="flex items-center justify-between mb-6"><h3 className="text-xl font-black text-purple-400">Choose wallet</h3><button onClick={function() { setShowWalletModal(false); setShowPaymentModal(true); }} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button></div>
+            <div className="flex items-center justify-between mb-6"><h3 className="text-xl font-black text-purple-400">{t.chooseWallet}</h3><button onClick={function() { setShowWalletModal(false); setShowPaymentModal(true); }} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button></div>
             <div className="grid grid-cols-2 gap-4">
               <button onClick={function() { handleWalletSelect('Phantom'); }} className="bg-purple-500/10 border-2 border-purple-500/30 hover:border-purple-500 rounded-xl p-6 text-center transition group"><div className="text-3xl mb-2">👻</div><div className="font-bold text-purple-400 group-hover:text-white transition">Phantom</div></button>
               <button onClick={function() { handleWalletSelect('Solflare'); }} className="bg-yellow-500/10 border-2 border-yellow-500/30 hover:border-yellow-400 rounded-xl p-6 text-center transition group">
@@ -772,7 +797,7 @@ export default function TntHouse() {
                 <div className="font-bold text-yellow-400 group-hover:text-white transition">Solflare</div>
               </button>
             </div>
-            <button onClick={function() { setShowWalletModal(false); setShowPaymentModal(true); }} className="mt-4 w-full text-center text-slate-400 hover:text-white text-xs py-2">← Back</button>
+            <button onClick={function() { setShowWalletModal(false); setShowPaymentModal(true); }} className="mt-4 w-full text-center text-slate-400 hover:text-white text-xs py-2">{t.back}</button>
           </div>
         </div>
       )}
@@ -780,7 +805,7 @@ export default function TntHouse() {
       {showInvoiceModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4" onClick={function() { setShowInvoiceModal(false); }}>
           <div className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-md p-6 shadow-[0_0_40px_rgba(168,85,247,0.25)]" onClick={function(e) { e.stopPropagation(); }}>
-            <div className="flex items-center justify-between mb-6"><h3 className="text-xl font-black text-purple-400">Payment Invoice</h3><button onClick={function() { setShowInvoiceModal(false); }} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button></div>
+            <div className="flex items-center justify-between mb-6"><h3 className="text-xl font-black text-purple-400">{t.invoice}</h3><button onClick={function() { setShowInvoiceModal(false); }} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button></div>
             <div className="bg-slate-900 border border-purple-500/20 rounded-xl p-6 text-center space-y-4">
               <div className="text-xs text-purple-400 font-bold">{selectedWallet} · {selectedPaymentMethod}</div>
               <div className="text-3xl font-black text-emerald-400">{invoiceAmount.toLocaleString()} $MRDT</div>
@@ -790,8 +815,8 @@ export default function TntHouse() {
             </div>
             <div className="mt-2 p-2 bg-purple-950/30 border border-purple-500/20 rounded-lg text-[10px] text-purple-300 text-center">Tapping will open {selectedWallet}. Confirm the transaction and return to the site.</div>
             <div className="mt-6 flex gap-3">
-              <button onClick={function() { setShowInvoiceModal(false); }} className="flex-1 px-5 py-2.5 text-sm rounded-lg border border-purple-500/40 hover:bg-purple-500/10 transition text-slate-300">Cancel</button>
-              <button onClick={handleConfirmPayment} className="flex-1 px-5 py-2.5 text-sm rounded-lg bg-gradient-to-r from-purple-500 to-emerald-400 text-slate-950 font-black hover:from-purple-400 hover:to-emerald-300 transition">✅ Pay Now</button>
+              <button onClick={function() { setShowInvoiceModal(false); }} className="flex-1 px-5 py-2.5 text-sm rounded-lg border border-purple-500/40 hover:bg-purple-500/10 transition text-slate-300">{t.cancel}</button>
+              <button onClick={handleConfirmPayment} className="flex-1 px-5 py-2.5 text-sm rounded-lg bg-gradient-to-r from-purple-500 to-emerald-400 text-slate-950 font-black hover:from-purple-400 hover:to-emerald-300 transition">{t.payNow}</button>
             </div>
           </div>
         </div>
@@ -804,7 +829,7 @@ export default function TntHouse() {
             <div className="flex items-center justify-between mb-2"><h3 className="text-xl font-black text-emerald-400">VIP Banner Payment</h3><button onClick={function() { setShowBannerPaymentModal(false); }} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button></div>
             <p className="text-slate-500 text-xs mb-6">Banner goes live on homepage right after payment</p>
             <div className="grid grid-cols-2 gap-4">
-              <button onClick={function() { handleBannerPaymentMethodSelect('MRDT'); }} className="bg-purple-500/10 border-2 border-purple-500/30 hover:border-purple-500 rounded-xl p-6 text-center transition group"><div className="text-3xl mb-2">⚽️</div><div className="font-bold text-purple-400 group-hover:text-white transition">$MRDT</div><div className="text-[10px] text-slate-500 mt-1">Recommended</div></button>
+              <button onClick={function() { handleBannerPaymentMethodSelect('MRDT'); }} className="bg-purple-500/10 border-2 border-purple-500/30 hover:border-purple-500 rounded-xl p-6 text-center transition group"><div className="text-3xl mb-2">⚽️</div><div className="font-bold text-purple-400 group-hover:text-white transition">$MRDT</div><div className="text-[10px] text-slate-500 mt-1">{t.recommended}</div></button>
               <button onClick={function() { handleBannerPaymentMethodSelect('SOL'); }} className="bg-emerald-500/10 border-2 border-emerald-500/30 hover:border-emerald-500 rounded-xl p-6 text-center transition group">
                 <div className="flex justify-center mb-2">
                   <svg width="36" height="36" viewBox="0 0 397 311" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M64.6 237.9c2.4-2.4 5.7-3.8 9.2-3.8h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1l62.7-62.7z" fill="url(#bs1)"/><path d="M64.6 3.8C67.1 1.4 70.4 0 73.8 0h317.4c5.8 0 8.7 7 4.6 11.1L333.1 73.8c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1L64.6 3.8z" fill="url(#bs2)"/><path d="M333.1 120.1c-2.4-2.4-5.7-3.8-9.2-3.8H6.5c-5.8 0-8.7 7-4.6 11.1l62.7 62.7c2.4 2.4 5.7 3.8 9.2 3.8h317.4c5.8 0 8.7-7 4.6-11.1l-62.7-62.7z" fill="url(#bs3)"/><defs><linearGradient id="bs1" x1="360.9" y1="351.4" x2="141.2" y2="-69.2" gradientUnits="userSpaceOnUse"><stop stopColor="#00FFA3"/><stop offset="1" stopColor="#DC1FFF"/></linearGradient><linearGradient id="bs2" x1="264.8" y1="351.4" x2="45.2" y2="-69.2" gradientUnits="userSpaceOnUse"><stop stopColor="#00FFA3"/><stop offset="1" stopColor="#DC1FFF"/></linearGradient><linearGradient id="bs3" x1="312.5" y1="351.4" x2="92.9" y2="-69.2" gradientUnits="userSpaceOnUse"><stop stopColor="#00FFA3"/><stop offset="1" stopColor="#DC1FFF"/></linearGradient></defs></svg>
@@ -819,7 +844,7 @@ export default function TntHouse() {
       {showBannerWalletModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4" onClick={function() { setShowBannerWalletModal(false); setShowBannerPaymentModal(true); }}>
           <div className="bg-slate-950 border-2 border-emerald-500/40 rounded-2xl w-full max-w-md p-6 shadow-[0_0_40px_rgba(16,185,129,0.2)]" onClick={function(e) { e.stopPropagation(); }}>
-            <div className="flex items-center justify-between mb-6"><h3 className="text-xl font-black text-emerald-400">Choose wallet</h3><button onClick={function() { setShowBannerWalletModal(false); setShowBannerPaymentModal(true); }} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button></div>
+            <div className="flex items-center justify-between mb-6"><h3 className="text-xl font-black text-emerald-400">{t.chooseWallet}</h3><button onClick={function() { setShowBannerWalletModal(false); setShowBannerPaymentModal(true); }} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button></div>
             <div className="grid grid-cols-2 gap-4">
               <button onClick={function() { handleBannerWalletSelect('Phantom'); }} className="bg-purple-500/10 border-2 border-purple-500/30 hover:border-purple-500 rounded-xl p-6 text-center transition group"><div className="text-3xl mb-2">👻</div><div className="font-bold text-purple-400 group-hover:text-white transition">Phantom</div></button>
               <button onClick={function() { handleBannerWalletSelect('Solflare'); }} className="bg-yellow-500/10 border-2 border-yellow-500/30 hover:border-yellow-400 rounded-xl p-6 text-center transition group">
@@ -827,7 +852,7 @@ export default function TntHouse() {
                 <div className="font-bold text-yellow-400 group-hover:text-white transition">Solflare</div>
               </button>
             </div>
-            <button onClick={function() { setShowBannerWalletModal(false); setShowBannerPaymentModal(true); }} className="mt-4 w-full text-center text-slate-400 hover:text-white text-xs py-2">← Back</button>
+            <button onClick={function() { setShowBannerWalletModal(false); setShowBannerPaymentModal(true); }} className="mt-4 w-full text-center text-slate-400 hover:text-white text-xs py-2">{t.back}</button>
           </div>
         </div>
       )}
@@ -835,7 +860,7 @@ export default function TntHouse() {
       {showBannerInvoiceModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4" onClick={function() { setShowBannerInvoiceModal(false); }}>
           <div className="bg-slate-950 border-2 border-emerald-500/40 rounded-2xl w-full max-w-md p-6 shadow-[0_0_40px_rgba(16,185,129,0.2)]" onClick={function(e) { e.stopPropagation(); }}>
-            <div className="flex items-center justify-between mb-6"><h3 className="text-xl font-black text-emerald-400">Invoice — VIP Banner</h3><button onClick={function() { setShowBannerInvoiceModal(false); }} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button></div>
+            <div className="flex items-center justify-between mb-6"><h3 className="text-xl font-black text-emerald-400">{t.invoiceBanner}</h3><button onClick={function() { setShowBannerInvoiceModal(false); }} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button></div>
             {bannerFormData.bannerImg && (
               <div className="flex items-center gap-3 bg-slate-900 border border-emerald-500/20 rounded-xl p-3 mb-4">
                 <img src={bannerFormData.bannerImg} alt="banner preview" className="w-12 h-12 rounded-xl object-cover border border-emerald-500/30" />
@@ -852,10 +877,10 @@ export default function TntHouse() {
               <div className="text-sm font-bold text-slate-300">≈ ${bannerInvoiceUsd} USD</div>
               <div className="text-xs text-slate-500 font-mono break-all">Wallet: {WALLET_ADDRESS.slice(0,8)}...{WALLET_ADDRESS.slice(-8)}</div>
             </div>
-            <div className="mt-2 p-2 bg-emerald-950/30 border border-emerald-500/20 rounded-lg text-[10px] text-emerald-300 text-center">Banner goes live automatically after payment 🚀</div>
+            <div className="mt-2 p-2 bg-emerald-950/30 border border-emerald-500/20 rounded-lg text-[10px] text-emerald-300 text-center">{t.bannerLive}</div>
             <div className="mt-6 flex gap-3">
-              <button onClick={function() { setShowBannerInvoiceModal(false); }} className="flex-1 px-5 py-2.5 text-sm rounded-lg border border-emerald-500/40 hover:bg-emerald-500/10 transition text-slate-300">Cancel</button>
-              <button onClick={handleBannerConfirmPayment} className="flex-1 px-5 py-2.5 text-sm rounded-lg bg-gradient-to-r from-emerald-400 to-purple-500 text-slate-950 font-black hover:from-emerald-300 hover:to-purple-400 transition">✅ Pay Now</button>
+              <button onClick={function() { setShowBannerInvoiceModal(false); }} className="flex-1 px-5 py-2.5 text-sm rounded-lg border border-emerald-500/40 hover:bg-emerald-500/10 transition text-slate-300">{t.cancel}</button>
+              <button onClick={handleBannerConfirmPayment} className="flex-1 px-5 py-2.5 text-sm rounded-lg bg-gradient-to-r from-emerald-400 to-purple-500 text-slate-950 font-black hover:from-emerald-300 hover:to-purple-400 transition">{t.payNow}</button>
             </div>
           </div>
         </div>
@@ -868,31 +893,31 @@ export default function TntHouse() {
             {verifyStatus === 'waiting' && (
               <>
                 <div className="w-16 h-16 rounded-full border-4 border-purple-500 border-t-transparent animate-spin mx-auto mb-4" />
-                <h3 className="text-lg font-black text-white mb-2">Waiting for Payment</h3>
-                <p className="text-slate-400 text-xs mb-4">Complete the transaction in your wallet and return here. We'll detect it automatically.</p>
+                <h3 className="text-lg font-black text-white mb-2">{t.waitPayment}</h3>
+                <p className="text-slate-400 text-xs mb-4">{t.waitSub}</p>
                 <div className="bg-slate-900 rounded-lg p-3 mb-4">
-                  <p className="text-[10px] text-slate-500">Checking blockchain... attempt {verifyAttempts}/30</p>
+                  <p className="text-[10px] text-slate-500">{t.checkingBC} {verifyAttempts}/30</p>
                   <div className="w-full bg-slate-800 rounded-full h-1.5 mt-2"><div className="bg-purple-500 h-1.5 rounded-full transition-all" style={{ width: Math.round((verifyAttempts / 30) * 100) + '%' }} /></div>
-                  <p className="text-[10px] text-slate-500 mt-1">Timeout in {Math.max(0, 5 - Math.floor(verifyAttempts / 6))} min</p>
+                  <p className="text-[10px] text-slate-500 mt-1">{t.timeoutIn} {Math.max(0, 5 - Math.floor(verifyAttempts / 6))} min</p>
                 </div>
-                <button onClick={function() { if (verifyIntervalRef.current) clearInterval(verifyIntervalRef.current); setShowVerifyModal(false); }} className="text-slate-500 hover:text-white text-xs">Cancel</button>
+                <button onClick={function() { if (verifyIntervalRef.current) clearInterval(verifyIntervalRef.current); setShowVerifyModal(false); }} className="text-slate-500 hover:text-white text-xs">{t.cancel}</button>
               </>
             )}
             {verifyStatus === 'success' && (
               <>
                 <div className="text-5xl mb-4">✅</div>
-                <h3 className="text-lg font-black text-emerald-400 mb-2">Payment Confirmed!</h3>
-                <p className="text-slate-400 text-xs">{verifyType === 'banner' ? 'Your banner is now live for all visitors.' : 'Token added to the safety table.'}</p>
+                <h3 className="text-lg font-black text-emerald-400 mb-2">{t.payConfirmed}</h3>
+                <p className="text-slate-400 text-xs">{verifyType === 'banner' ? '{t.bannerLiveMsg}' : '{t.tokenAdded}'}</p>
               </>
             )}
             {verifyStatus === 'failed' && (
               <>
                 <div className="text-5xl mb-4">⏱</div>
-                <h3 className="text-lg font-black text-red-400 mb-2">Payment Not Detected</h3>
-                <p className="text-slate-400 text-xs mb-4">We couldn't confirm your payment within 5 minutes. If you paid, contact admin in Telegram.</p>
-                <a href="https://t.me/tnt_house2026" target="_blank" rel="noopener noreferrer" className="inline-block bg-purple-500 hover:bg-purple-400 text-white font-bold py-2 px-4 rounded text-xs mb-3">Contact Admin</a>
+                <h3 className="text-lg font-black text-red-400 mb-2">{t.payNotDetected}</h3>
+                <p className="text-slate-400 text-xs mb-4">{t.payNotMsg}</p>
+                <a href="https://t.me/tnt_house2026" target="_blank" rel="noopener noreferrer" className="inline-block bg-purple-500 hover:bg-purple-400 text-white font-bold py-2 px-4 rounded text-xs mb-3">{t.contactAdmin}</a>
                 <br />
-                <button onClick={function() { setShowVerifyModal(false); }} className="text-slate-500 hover:text-white text-xs">Close</button>
+                <button onClick={function() { setShowVerifyModal(false); }} className="text-slate-500 hover:text-white text-xs">{t.close}</button>
               </>
             )}
           </div>
@@ -916,10 +941,10 @@ export default function TntHouse() {
             </div>
             <div className="flex items-center gap-3 mb-4 p-3 bg-slate-900 rounded-xl border border-purple-500/20">
               <div className={'w-14 h-14 rounded-full flex items-center justify-center text-xl font-black border-2 ' + (getSafetyScore(selectedToken) >= 90 ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : getSafetyScore(selectedToken) >= 50 ? 'bg-yellow-500/20 border-yellow-500 text-yellow-400' : 'bg-red-500/20 border-red-500 text-red-400')}>{getSafetyScore(selectedToken)}</div>
-              <div><p className="text-white font-bold text-sm">Safety Score</p><p className="text-slate-400 text-xs">{getSafetyScore(selectedToken) >= 90 ? 'Ironclad Safe ★' : getSafetyScore(selectedToken) >= 50 ? 'Moderate Risk ⚠️' : 'High Risk 🚨'}</p></div>
+              <div><p className="text-white font-bold text-sm">{t.safetyScore}</p><p className="text-slate-400 text-xs">{getSafetyScore(selectedToken) >= 90 ? t.ironclad : getSafetyScore(selectedToken) >= 50 ? t.moderate : t.highRisk}</p></div>
             </div>
             <div className="grid grid-cols-3 gap-2 mb-4">
-              {[{ label: 'Price', value: '$' + (selectedToken.price || '0.00000000') }, { label: 'Liquidity', value: selectedToken.liquidity ? '$' + (selectedToken.liquidity >= 1000 ? (selectedToken.liquidity/1000).toFixed(1)+'K' : selectedToken.liquidity) : '$0' }, { label: 'Volume 24h', value: selectedToken.volume24h ? '$' + (selectedToken.volume24h >= 1000 ? (selectedToken.volume24h/1000).toFixed(1)+'K' : selectedToken.volume24h) : '$0' }].map(function(item, i) {
+              {[{ label: t.price, value: '$' + (selectedToken.price || '0.00000000') }, { label: t.liquidity, value: selectedToken.liquidity ? '$' + (selectedToken.liquidity >= 1000 ? (selectedToken.liquidity/1000).toFixed(1)+'K' : selectedToken.liquidity) : '$0' }, { label: t.volume24h, value: selectedToken.volume24h ? '$' + (selectedToken.volume24h >= 1000 ? (selectedToken.volume24h/1000).toFixed(1)+'K' : selectedToken.volume24h) : '$0' }].map(function(item, i) {
                 return <div key={i} className="bg-slate-900 border border-purple-500/10 rounded-lg p-2.5 text-center"><p className="text-slate-500 text-[9px] mb-0.5">{item.label}</p><p className="text-emerald-400 font-bold text-xs font-mono">{item.value}</p></div>;
               })}
             </div>
@@ -957,17 +982,17 @@ export default function TntHouse() {
             {chatMessages.map(function(msg, i) {
               return <div key={i} className={'flex ' + (msg.sender === 'user' ? 'justify-end' : 'justify-start')}><div className={'max-w-[80%] rounded-lg p-2.5 leading-relaxed whitespace-pre-wrap ' + (msg.sender === 'user' ? 'bg-purple-500/20 text-purple-200 border border-purple-500/30' : 'bg-slate-950 text-emerald-400 border border-emerald-500/30')}>{msg.text}</div></div>;
             })}
-            {isTyping && <div className="flex justify-start"><div className="bg-slate-950 text-emerald-400 border border-emerald-500/30 rounded-lg p-2.5 animate-pulse text-[11px]">Analyzing...</div></div>}
+            {isTyping && <div className="flex justify-start"><div className="bg-slate-950 text-emerald-400 border border-emerald-500/30 rounded-lg p-2.5 animate-pulse text-[11px]">{t.analyzing}</div></div>}
             <div ref={chatEndRef} />
           </div>
           {chatBlocked ? (
             <div className="p-3 border-t border-purple-500/20 bg-slate-950 space-y-2">
-              <div className="text-center text-[11px] text-slate-400">Limit of 5 questions reached. Unlocks in <span className="text-purple-400 font-bold">{chatTimer}</span></div>
-              <button onClick={scrollToForm} className="w-full bg-gradient-to-r from-purple-500 to-emerald-400 text-slate-950 font-black py-2 rounded text-[11px]">💎 Order full audit from $10</button>
+              <div className="text-center text-[11px] text-slate-400">{t.limitReached} <span className="text-purple-400 font-bold">{chatTimer}</span></div>
+              <button onClick={scrollToForm} className="w-full bg-gradient-to-r from-purple-500 to-emerald-400 text-slate-950 font-black py-2 rounded text-[11px]">{t.orderAudit}</button>
             </div>
           ) : (
             <div className="p-3 border-t border-purple-500/20 bg-slate-950 flex gap-2">
-              <input type="text" value={userMsg} onChange={function(e) { setUserMsg(e.target.value); }} onKeyDown={function(e) { if (e.key === 'Enter') handleSendChat(); }} placeholder="Paste CA or ask a question..." className="flex-1 bg-slate-900 border border-purple-500/20 rounded px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" />
+              <input type="text" value={userMsg} onChange={function(e) { setUserMsg(e.target.value); }} onKeyDown={function(e) { if (e.key === 'Enter') handleSendChat(); }} placeholder={t.pasteCa} className="flex-1 bg-slate-900 border border-purple-500/20 rounded px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" />
               <button onClick={handleSendChat} disabled={isTyping} className="bg-purple-500 hover:bg-purple-400 text-slate-950 px-3 rounded text-xs font-bold disabled:opacity-50"><Send className="w-3.5 h-3.5" /></button>
             </div>
           )}
