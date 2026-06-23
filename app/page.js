@@ -14,128 +14,70 @@ const SUPABASE_KEY = 'sb_publishable__gmhE8SE_blCu-v90fV2OQ_YmFCkfFU';
 const GLOW_PURPLE = { position: 'absolute', top: '-10%', left: '-10%', width: '500px', height: '500px', borderRadius: '9999px', background: 'rgba(147,51,234,0.1)', filter: 'blur(120px)', pointerEvents: 'none' };
 const GLOW_GREEN = { position: 'absolute', bottom: '20%', right: '-10%', width: '500px', height: '500px', borderRadius: '9999px', background: 'rgba(16,185,129,0.1)', filter: 'blur(120px)', pointerEvents: 'none' };
 
-// --- Supabase helpers ---
 async function saveTokenToSupabase(token) {
   try {
     await fetch(SUPABASE_URL + '/rest/v1/listed_tokens', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': SUPABASE_KEY,
-        'Authorization': 'Bearer ' + SUPABASE_KEY,
-        'Prefer': 'return=minimal',
-      },
-      body: JSON.stringify({
-        name: token.name, symbol: token.symbol, ca: token.ca,
-        price: token.price, liquidity: token.liquidity,
-        volume24h: token.volume24h, price_change_24h: token.priceChange24h,
-        score: token.score || 95, dex_url: token.dexUrl,
-        chain: token.chain || 'solana',
-        mint_authority: token.mintAuthority || '-',
-        freeze_authority: token.freezeAuthority || '-',
-        is_honeypot: token.isHoneypot || '-',
-      }),
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ name: token.name, symbol: token.symbol, ca: token.ca, price: token.price, liquidity: token.liquidity, volume24h: token.volume24h, price_change_24h: token.priceChange24h, score: token.score || 95, dex_url: token.dexUrl, chain: token.chain || 'solana', mint_authority: token.mintAuthority || '-', freeze_authority: token.freezeAuthority || '-', is_honeypot: token.isHoneypot || '-' }),
     });
   } catch (e) { console.error('Supabase save failed:', e); }
 }
 
 async function loadTokensFromSupabase() {
   try {
-    var res = await fetch(SUPABASE_URL + '/rest/v1/listed_tokens?select=*&order=created_at.desc&limit=20', {
-      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY },
-    });
+    var res = await fetch(SUPABASE_URL + '/rest/v1/listed_tokens?select=*&order=created_at.desc&limit=20', { headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY } });
     if (!res.ok) return [];
     var data = await res.json();
-    return data.map(function (row) {
-      return {
-        name: row.name, symbol: row.symbol, ca: row.ca, price: row.price,
-        liquidity: row.liquidity, volume24h: row.volume24h,
-        priceChange24h: row.price_change_24h, score: row.score,
-        verified: true, dexUrl: row.dex_url, chain: row.chain,
-        mintAuthority: row.mint_authority, freezeAuthority: row.freeze_authority,
-        isHoneypot: row.is_honeypot, fromSupabase: true,
-      };
-    });
+    return data.map(function(row) { return { name: row.name, symbol: row.symbol, ca: row.ca, price: row.price, liquidity: row.liquidity, volume24h: row.volume24h, priceChange24h: row.price_change_24h, score: row.score, verified: true, dexUrl: row.dex_url, chain: row.chain, mintAuthority: row.mint_authority, freezeAuthority: row.freeze_authority, isHoneypot: row.is_honeypot, fromSupabase: true }; });
   } catch (e) { return []; }
 }
 
-// --- Supabase banner helpers ---
-// Save banner to Supabase (upsert — always 1 active row with id=1)
 async function saveBannerToSupabase(banner) {
   try {
     await fetch(SUPABASE_URL + '/rest/v1/active_banner', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': SUPABASE_KEY,
-        'Authorization': 'Bearer ' + SUPABASE_KEY,
-        'Prefer': 'resolution=merge-duplicates,return=minimal',
-      },
-      body: JSON.stringify({
-        id: 1,
-        token_name: banner.tokenName,
-        banner_img: banner.bannerImg || '',
-        description: banner.desc,
-        expires_at: new Date(banner.expiresAt).toISOString(),
-      }),
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify({ id: 1, token_name: banner.tokenName, banner_img: banner.bannerImg || '', description: banner.desc, expires_at: new Date(banner.expiresAt).toISOString() }),
     });
   } catch (e) { console.error('Banner save failed:', e); }
 }
 
-// Load active banner from Supabase
 async function loadBannerFromSupabase() {
   try {
-    var res = await fetch(SUPABASE_URL + '/rest/v1/active_banner?id=eq.1&select=*', {
-      headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY },
-    });
+    var res = await fetch(SUPABASE_URL + '/rest/v1/active_banner?id=eq.1&select=*', { headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY } });
     if (!res.ok) return null;
     var data = await res.json();
     if (!data || !data[0]) return null;
     var row = data[0];
     var expiresAt = new Date(row.expires_at).getTime();
-    if (Date.now() > expiresAt) return null; // expired
-    return {
-      tokenName: row.token_name,
-      bannerImg: row.banner_img || '',
-      desc: row.description,
-      expiresAt: expiresAt,
-    };
+    if (Date.now() > expiresAt) return null;
+    return { tokenName: row.token_name, bannerImg: row.banner_img || '', desc: row.description, expiresAt: expiresAt };
   } catch (e) { return null; }
 }
 
 const FALLBACK_TOKENS = [];
 
 export default function TntHouse() {
-  // --- Core state ---
   var [tokens, setTokens] = useState([]);
   var [listedTokens, setListedTokens] = useState([]);
   var [loading, setLoading] = useState(true);
   var [error, setError] = useState('');
-  var [walletAddress, setWalletAddress] = useState('');
   var [isBuyDropdownOpen, setIsBuyDropdownOpen] = useState(false);
   var [activeBanner, setActiveBanner] = useState(null);
   var [bannerCountdown, setBannerCountdown] = useState('');
   var [isBlueprintOpen, setIsBlueprintOpen] = useState(false);
   var [selectedToken, setSelectedToken] = useState(null);
-
-  // --- Price state ---
   var [mrdtPrice, setMrdtPrice] = useState(0.000013);
   var mrdtPriceRef = useRef(0.000013);
   var [priceLoading, setPriceLoading] = useState(true);
-
-  // --- Toast ---
   var [toast, setToast] = useState({ show: false, message: '', type: 'success' });
-
-  // --- AI Inspection form ---
   var [formData, setFormData] = useState({ projectName: '', contractAddress: '', telegram: '' });
   var [selectedTier, setSelectedTier] = useState('basic');
   var [isSending, setIsSending] = useState(false);
   var [submitted, setSubmitted] = useState(false);
-  // Free slots: first 10 tokens audited for free
   var [freeSlots, setFreeSlots] = useState(10);
   var FREE_TOTAL = 10;
-
-  // --- Payment modal state — AI Audit ---
   var [showPaymentModal, setShowPaymentModal] = useState(false);
   var [showWalletModal, setShowWalletModal] = useState(false);
   var [showInvoiceModal, setShowInvoiceModal] = useState(false);
@@ -144,8 +86,6 @@ export default function TntHouse() {
   var [invoiceAmount, setInvoiceAmount] = useState(0);
   var [invoiceLabel, setInvoiceLabel] = useState('');
   var [invoiceUsd, setInvoiceUsd] = useState(0);
-
-  // --- Payment modal state — VIP Banner (separate flow) ---
   var [showBannerPaymentModal, setShowBannerPaymentModal] = useState(false);
   var [showBannerWalletModal, setShowBannerWalletModal] = useState(false);
   var [showBannerInvoiceModal, setShowBannerInvoiceModal] = useState(false);
@@ -153,93 +93,76 @@ export default function TntHouse() {
   var [selectedBannerWallet, setSelectedBannerWallet] = useState(null);
   var [bannerInvoiceAmount, setBannerInvoiceAmount] = useState(0);
   var [bannerInvoiceUsd, setBannerInvoiceUsd] = useState(0);
-
-  // --- Payment verification states ---
   var [showVerifyModal, setShowVerifyModal] = useState(false);
-  var [verifyType, setVerifyType] = useState(''); // 'banner' or 'audit'
-  var [verifyStatus, setVerifyStatus] = useState('waiting'); // 'waiting' | 'success' | 'failed'
+  var [verifyType, setVerifyType] = useState('');
+  var [verifyStatus, setVerifyStatus] = useState('waiting');
   var [verifyAttempts, setVerifyAttempts] = useState(0);
   var [verifyStartTime, setVerifyStartTime] = useState(null);
   var [pendingBannerData, setPendingBannerData] = useState(null);
   var [pendingAuditData, setPendingAuditData] = useState(null);
   var verifyIntervalRef = useRef(null);
-
-  // --- Banner form ---
   var [bannerFormData, setBannerFormData] = useState({ tokenName: '', bannerImg: '', desc: '', days: '1' });
   var [bannerSubmitted, setBannerSubmitted] = useState(false);
   var [bannerError, setBannerError] = useState('');
   var [isBannerSending, setIsBannerSending] = useState(false);
-
-  // --- Chat ---
   var [isChatOpen, setIsChatOpen] = useState(false);
   var [chatMessages, setChatMessages] = useState([{ sender: 'bot', text: "Hey! I'm TNT House AI Inspector 🤖\n\nPaste a CA — I'll give a quick breakdown. You have 5 free questions per 10 min." }]);
   var [userMsg, setUserMsg] = useState('');
   var [isTyping, setIsTyping] = useState(false);
   var chatEndRef = useRef(null);
-  // Rate limit: 5 messages per 10 minutes
   var [chatCount, setChatCount] = useState(0);
   var [chatResetTime, setChatResetTime] = useState(null);
   var [chatBlocked, setChatBlocked] = useState(false);
   var [chatTimer, setChatTimer] = useState('');
+  var [logs, setLogs] = useState(['[AI-Inspector] Initializing TNT House security system...', '[NET] Connected to Solana RPC nodes successfully.']);
 
-  // --- Live logs ---
-  var [logs, setLogs] = useState(['[ИИ-Inspector] Initializing TNT House security system...', '[NET] Connected to Solana RPC nodes successfully.']);
-
-  // --- Helpers ---
-  var showToast = function (message, type) {
+  var showToast = function(message, type) {
     if (!type) type = 'success';
     setToast({ show: true, message: message, type: type });
-    setTimeout(function () { setToast({ show: false, message: '', type: 'success' }); }, 4200);
+    setTimeout(function() { setToast({ show: false, message: '', type: 'success' }); }, 4200);
   };
 
-  var getSafetyScore = function (token) {
+  var getSafetyScore = function(token) {
     if (!token) return 75;
     if (token.symbol === 'MRDT') return 98;
     if (token.score) return token.score;
-    var hash = token.symbol.split('').reduce(function (a, b) { return a + b.charCodeAt(0); }, 0);
+    var hash = token.symbol.split('').reduce(function(a, b) { return a + b.charCodeAt(0); }, 0);
     return Math.max(85, Math.min(97, hash % 12 + 85));
   };
 
-  var getScoreStyle = function (score) {
+  var getScoreStyle = function(score) {
     if (score >= 90) return { color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/50', glow: 'shadow-[0_0_12px_rgba(16,185,129,0.6)]' };
     if (score >= 50) return { color: 'text-yellow-400', bg: 'bg-yellow-500/10', border: 'border-yellow-500/50', glow: 'shadow-[0_0_12px_rgba(234,179,8,0.5)]' };
     return { color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/50', glow: 'shadow-[0_0_12px_rgba(239,68,68,0.6)] animate-pulse' };
   };
 
-  var getAmountForTier = function (tier) {
+  var getAmountForTier = function(tier) {
     var usd = tier === 'fast' ? 25 : tier === 'vip' ? 75 : 10;
     var price = mrdtPriceRef.current || mrdtPrice;
     return price > 0 ? Math.round(usd / price) : 0;
   };
 
-  var getAmountForBanner = function (days) {
+  var getAmountForBanner = function(days) {
     var usd = days === '2' ? 35 : days === '6' ? 100 : 20;
     var price = mrdtPriceRef.current || mrdtPrice;
     return price > 0 ? Math.round(usd / price) : 0;
   };
 
-  var formatNumber = function (num) {
+  var formatNumber = function(num) {
     if (num >= 1e6) return '$' + (num / 1e6).toFixed(1) + 'M';
     if (num >= 1e3) return '$' + (num / 1e3).toFixed(1) + 'K';
     return '$' + (typeof num === 'number' ? num.toFixed(0) : '0');
   };
 
-  var scrollToForm = function () {
+  var scrollToForm = function() {
     var el = document.getElementById('orderFormsSection');
     if (el) el.scrollIntoView({ behavior: 'smooth' });
   };
 
-  var handleLaunchJupiter = function () {
-    window.open('https://jup.ag/swap?sell=So11111111111111111111111111111111111111112&buy=8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg', '_blank');
-  };
-
-  var handleOpenRaydium = function () {
-    setIsBuyDropdownOpen(false);
-    window.open('https://raydium.io/liquidity/increase/?mode=add&pool_id=6cMTXZyCrnut7Lv39qt4dqEARbC2jbebvhzdCR1t2HEV', '_blank');
-  };
-
-  var openTokenBlueprint = function (token) { setSelectedToken(token); setIsBlueprintOpen(true); };
-  var closeBlueprint = function () { setIsBlueprintOpen(false); setTimeout(function () { setSelectedToken(null); }, 300); };
+  var handleLaunchJupiter = function() { window.open('https://jup.ag/swap?sell=So11111111111111111111111111111111111111112&buy=8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg', '_blank'); };
+  var handleOpenRaydium = function() { setIsBuyDropdownOpen(false); window.open('https://raydium.io/liquidity/increase/?mode=add&pool_id=6cMTXZyCrnut7Lv39qt4dqEARbC2jbebvhzdCR1t2HEV', '_blank'); };
+  var openTokenBlueprint = function(token) { setSelectedToken(token); setIsBlueprintOpen(true); };
+  var closeBlueprint = function() { setIsBlueprintOpen(false); setTimeout(function() { setSelectedToken(null); }, 300); };
 
   var pillars = [
     { icon: Shield, label: 'AI Audit', desc: 'Contract security check', color: 'text-purple-400' },
@@ -247,494 +170,250 @@ export default function TntHouse() {
     { icon: Lock, label: 'DAO License', desc: 'Via $MRDT', color: 'text-purple-400' },
   ];
 
-  // --- Effects ---
-  useEffect(function () {
-    loadTokensFromSupabase().then(function (data) {
+  useEffect(function() {
+    loadTokensFromSupabase().then(function(data) {
       if (data.length > 0) setListedTokens(data);
-      // Calculate remaining free slots
-      var used = data.length;
-      setFreeSlots(Math.max(0, FREE_TOTAL - used));
+      setFreeSlots(Math.max(0, FREE_TOTAL - data.length));
     });
   }, []);
 
-  useEffect(function () {
-    var fetchPrice = async function () {
+  useEffect(function() {
+    var fetchPrice = async function() {
       try {
         var res = await fetch('https://api.dexscreener.com/latest/dex/tokens/' + MRDT_CA);
         var data = await res.json();
-        if (data.pairs && data.pairs.length) {
-          var p = parseFloat(data.pairs[0].priceUsd);
-          if (p > 0) { setMrdtPrice(p); mrdtPriceRef.current = p; }
-        }
-      } catch (e) { }
+        if (data.pairs && data.pairs.length) { var p = parseFloat(data.pairs[0].priceUsd); if (p > 0) { setMrdtPrice(p); mrdtPriceRef.current = p; } }
+      } catch (e) {}
       setPriceLoading(false);
     };
     fetchPrice();
     var i = setInterval(fetchPrice, 60000);
-    return function () { clearInterval(i); };
+    return function() { clearInterval(i); };
   }, []);
 
-  useEffect(function () {
+  useEffect(function() {
     var templates = ['New pool detected on Raydium!', 'Mint Authority disabled ✓', 'Threat level: LOW.', 'No bundles detected.', 'Connected to DexScreener.', 'Searching for new gems...', '[SUPABASE] Sync complete ✓'];
-    var i = setInterval(function () {
+    var i = setInterval(function() {
       var t = templates[Math.floor(Math.random() * templates.length)];
-      setLogs(function (prev) { return prev.slice(-12).concat(['[' + new Date().toLocaleTimeString() + '] ' + t]); });
+      setLogs(function(prev) { return prev.slice(-12).concat(['[' + new Date().toLocaleTimeString() + '] ' + t]); });
     }, 4200);
-    return function () { clearInterval(i); };
+    return function() { clearInterval(i); };
   }, []);
 
-  useEffect(function () {
-    var fetchTokens = async function () {
+  useEffect(function() {
+    var fetchTokens = async function() {
       try {
         setLoading(true);
         var cached = localStorage.getItem('tnt_cached_tokens');
         var time = localStorage.getItem('tnt_cached_time');
-        if (cached && time && Date.now() - parseInt(time) < 120000) {
-          setTokens(JSON.parse(cached)); setLoading(false); return;
-        }
+        if (cached && time && Date.now() - parseInt(time) < 120000) { setTokens(JSON.parse(cached)); setLoading(false); return; }
         var res = await fetch('https://api.dexscreener.com/latest/dex/tokens/So11111111111111111111111111111111111111112?limit=30');
         var data = await res.json();
         if (data.pairs && data.pairs.length) {
-          var filtered = data.pairs
-            .filter(function (p) { return (p.marketCap || 0) >= 1000 && (p.marketCap || 0) <= 300000; })
-            .slice(0, 9)
-            .map(function (p) {
-              return {
-                name: (p.baseToken && p.baseToken.name) || 'Unknown',
-                symbol: (p.baseToken && p.baseToken.symbol) || '???',
-                ca: (p.baseToken && p.baseToken.address) || '',
-                price: p.priceUsd ? parseFloat(p.priceUsd).toFixed(8) : '0',
-                liquidity: (p.liquidity && p.liquidity.usd) ? Math.round(p.liquidity.usd) : 0,
-                volume24h: (p.volume && p.volume.h24) ? Math.round(p.volume.h24) : 0,
-                priceChange24h: (p.priceChange && p.priceChange.h24) || 0,
-                verified: true, dexUrl: p.url || '', chain: p.chainId || 'solana',
-              };
-            });
-          if (filtered.length) {
-            setTokens(filtered);
-            localStorage.setItem('tnt_cached_tokens', JSON.stringify(filtered));
-            localStorage.setItem('tnt_cached_time', Date.now().toString());
-            setLoading(false); return;
-          }
+          var filtered = data.pairs.filter(function(p) { return (p.marketCap || 0) >= 1000 && (p.marketCap || 0) <= 300000; }).slice(0, 9).map(function(p) {
+            return { name: (p.baseToken && p.baseToken.name) || 'Unknown', symbol: (p.baseToken && p.baseToken.symbol) || '???', ca: (p.baseToken && p.baseToken.address) || '', price: p.priceUsd ? parseFloat(p.priceUsd).toFixed(8) : '0', liquidity: (p.liquidity && p.liquidity.usd) ? Math.round(p.liquidity.usd) : 0, volume24h: (p.volume && p.volume.h24) ? Math.round(p.volume.h24) : 0, priceChange24h: (p.priceChange && p.priceChange.h24) || 0, verified: true, dexUrl: p.url || '', chain: p.chainId || 'solana' };
+          });
+          if (filtered.length) { setTokens(filtered); localStorage.setItem('tnt_cached_tokens', JSON.stringify(filtered)); localStorage.setItem('tnt_cached_time', Date.now().toString()); setLoading(false); return; }
         }
         throw new Error('No pairs');
       } catch (e) { setTokens(FALLBACK_TOKENS); setLoading(false); }
     };
     fetchTokens();
     var i = setInterval(fetchTokens, 5 * 60 * 1000);
-    return function () { clearInterval(i); };
+    return function() { clearInterval(i); };
   }, []);
 
-  useEffect(function () {
-    if (chatEndRef.current) chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
-  }, [chatMessages]);
+  useEffect(function() { if (chatEndRef.current) chatEndRef.current.scrollIntoView({ behavior: 'smooth' }); }, [chatMessages]);
 
-  // Load banner from Supabase on mount + poll every 30s + live countdown every 1s
-  useEffect(function () {
-    var fetchBanner = async function () {
-      var banner = await loadBannerFromSupabase();
-      setActiveBanner(banner);
-    };
+  useEffect(function() {
+    var fetchBanner = async function() { var banner = await loadBannerFromSupabase(); setActiveBanner(banner); };
     fetchBanner();
     var pollInterval = setInterval(fetchBanner, 30000);
-
-    // Live countdown ticker every second
-    var countdownInterval = setInterval(function () {
-      setActiveBanner(function (current) {
+    var countdownInterval = setInterval(function() {
+      setActiveBanner(function(current) {
         if (!current) { setBannerCountdown(''); return current; }
         var msLeft = current.expiresAt - Date.now();
-        if (msLeft <= 0) { setBannerCountdown(''); return null; } // expired
+        if (msLeft <= 0) { setBannerCountdown(''); return null; }
         var totalSec = Math.floor(msLeft / 1000);
-        var days = Math.floor(totalSec / 86400);
-        var hours = Math.floor((totalSec % 86400) / 3600);
-        var mins = Math.floor((totalSec % 3600) / 60);
-        var secs = totalSec % 60;
+        var d = Math.floor(totalSec / 86400);
+        var h = Math.floor((totalSec % 86400) / 3600);
+        var m = Math.floor((totalSec % 3600) / 60);
+        var s = totalSec % 60;
         var parts = [];
-        if (days > 0) parts.push(days + 'д');
-        if (hours > 0) parts.push(hours + 'ч');
-        parts.push((mins < 10 ? '0' : '') + mins + 'м');
-        parts.push((secs < 10 ? '0' : '') + secs + 'с');
+        if (d > 0) parts.push(d + 'd');
+        if (h > 0) parts.push(h + 'h');
+        parts.push((m < 10 ? '0' : '') + m + 'm');
+        parts.push((s < 10 ? '0' : '') + s + 's');
         setBannerCountdown(parts.join(' '));
         return current;
       });
     }, 1000);
-
-    return function () { clearInterval(pollInterval); clearInterval(countdownInterval); };
+    return function() { clearInterval(pollInterval); clearInterval(countdownInterval); };
   }, []);
 
-  // --- PAYMENT FLOW (from 1.17.4) ---
-
-  // Step 1: Form submit → if free slot available skip payment, else show payment modal
-  var handleFormSubmit = function (e) {
+  var handleFormSubmit = function(e) {
     e.preventDefault();
-    if (!formData.projectName || !formData.contractAddress || !formData.telegram) {
-      showToast('Fill all fields', 'error'); return;
-    }
-
-    // FREE slot — skip payment, run audit directly
-    if (freeSlots > 0) {
-      setIsSending(true);
-      runAuditAndSave(formData.contractAddress, formData.projectName, true);
-      return;
-    }
-
-    // PAID flow
+    if (!formData.projectName || !formData.contractAddress || !formData.telegram) { showToast('Fill all fields', 'error'); return; }
+    if (freeSlots > 0) { setIsSending(true); runAuditAndSave(formData.contractAddress, formData.projectName, true); return; }
     var mrdtAmount = getAmountForTier(selectedTier);
     if (mrdtAmount <= 0) { showToast('Price error, try later', 'error'); return; }
     var tierName = selectedTier === 'fast' ? 'Fast' : selectedTier === 'vip' ? 'VIP' : 'Basic';
     var usd = selectedTier === 'fast' ? 25 : selectedTier === 'vip' ? 75 : 10;
-    setInvoiceAmount(mrdtAmount);
-    setInvoiceUsd(usd);
+    setInvoiceAmount(mrdtAmount); setInvoiceUsd(usd);
     setInvoiceLabel('TNT House ' + tierName + ' Audit - ' + formData.projectName);
     setShowPaymentModal(true);
   };
 
-  // Step 2: Choose payment method (MRDT / SOL)
-  var handlePaymentMethodSelect = function (method) {
-    setSelectedPaymentMethod(method);
-    setShowPaymentModal(false);
-    setShowWalletModal(true);
-  };
+  var handlePaymentMethodSelect = function(method) { setSelectedPaymentMethod(method); setShowPaymentModal(false); setShowWalletModal(true); };
+  var handleWalletSelect = function(wallet) { setSelectedWallet(wallet); setShowWalletModal(false); setShowInvoiceModal(true); };
 
-  // Step 3: Choose wallet (Phantom / Solflare)
-  var handleWalletSelect = function (wallet) {
-    setSelectedWallet(wallet);
-    setShowWalletModal(false);
-    setShowInvoiceModal(true);
-  };
-
-  // Shared audit + Supabase save (free and paid flows)
-  var runAuditAndSave = async function (ca, projectName, isFree) {
+  var runAuditAndSave = async function(ca, projectName, isFree) {
     var auditResult = { score: 75, mintAuthority: 'Unknown', freezeAuthority: 'Unknown', isHoneypot: 'Unknown' };
     var dexData = { price: '0.00000000', liquidity: 0, volume24h: 0, priceChange24h: 0 };
-
-    // 1. RugCheck audit
     try {
-      setLogs(function (prev) { return prev.slice(-12).concat(['[AUDIT] RugCheck API request for ' + ca + '...']); });
+      setLogs(function(prev) { return prev.slice(-12).concat(['[AUDIT] RugCheck API request for ' + ca + '...']); });
       var rugRes = await fetch('https://api.rugcheck.xyz/v1/tokens/' + ca + '/report/summary', { headers: { 'Accept': 'application/json' } });
       if (rugRes.ok) {
         var rugData = await rugRes.json();
-        var rawScore = rugData.score || 0;
-        var normalizedScore = Math.min(100, Math.max(0, Math.round(100 - rawScore / 10)));
+        var normalizedScore = Math.min(100, Math.max(0, Math.round(100 - (rugData.score || 0) / 10)));
         var risks = rugData.risks || [];
-        var hasMint = risks.some(function (r) { return r.name && r.name.toLowerCase().includes('mint'); });
-        var hasFreeze = risks.some(function (r) { return r.name && r.name.toLowerCase().includes('freeze'); });
-        var hasHoneypot = risks.some(function (r) { return r.name && r.name.toLowerCase().includes('honeypot'); });
-        auditResult = {
-          score: normalizedScore,
-          mintAuthority: hasMint ? 'Active ⚠️' : 'Revoked ✓',
-          freezeAuthority: hasFreeze ? 'Active ⚠️' : 'Revoked ✓',
-          isHoneypot: hasHoneypot ? 'Yes 🚨' : 'No ✓',
-        };
-        setLogs(function (prev) { return prev.slice(-12).concat(['[AUDIT ✓] ' + projectName + ' — Score: ' + normalizedScore]); });
-      } else {
-        setLogs(function (prev) { return prev.slice(-12).concat(['[AUDIT] RugCheck unavailable, using base data.']); });
+        auditResult = { score: normalizedScore, mintAuthority: risks.some(function(r) { return r.name && r.name.toLowerCase().includes('mint'); }) ? 'Active ⚠️' : 'Revoked ✓', freezeAuthority: risks.some(function(r) { return r.name && r.name.toLowerCase().includes('freeze'); }) ? 'Active ⚠️' : 'Revoked ✓', isHoneypot: risks.some(function(r) { return r.name && r.name.toLowerCase().includes('honeypot'); }) ? 'Yes 🚨' : 'No ✓' };
+        setLogs(function(prev) { return prev.slice(-12).concat(['[AUDIT ✓] ' + projectName + ' — Score: ' + normalizedScore]); });
       }
-    } catch (e) {
-      setLogs(function (prev) { return prev.slice(-12).concat(['[AUDIT] Error: ' + e.message]); });
-    }
-
-    // 2. Fetch real price/liq/vol from DexScreener
+    } catch (e) { setLogs(function(prev) { return prev.slice(-12).concat(['[AUDIT] Error: ' + e.message]); }); }
     try {
-      setLogs(function (prev) { return prev.slice(-12).concat(['[DEX] Fetching live market data...']); });
       var dexRes = await fetch('https://api.dexscreener.com/latest/dex/tokens/' + ca);
       var dexJson = await dexRes.json();
       if (dexJson.pairs && dexJson.pairs.length > 0) {
         var pair = dexJson.pairs[0];
-        dexData = {
-          price: pair.priceUsd ? parseFloat(pair.priceUsd).toFixed(8) : '0.00000000',
-          liquidity: (pair.liquidity && pair.liquidity.usd) ? Math.round(pair.liquidity.usd) : 0,
-          volume24h: (pair.volume && pair.volume.h24) ? Math.round(pair.volume.h24) : 0,
-          priceChange24h: (pair.priceChange && pair.priceChange.h24) ? pair.priceChange.h24 : 0,
-        };
-        setLogs(function (prev) { return prev.slice(-12).concat(['[DEX ✓] Price: $' + dexData.price + ' | Liq: $' + dexData.liquidity]); });
+        dexData = { price: pair.priceUsd ? parseFloat(pair.priceUsd).toFixed(8) : '0.00000000', liquidity: (pair.liquidity && pair.liquidity.usd) ? Math.round(pair.liquidity.usd) : 0, volume24h: (pair.volume && pair.volume.h24) ? Math.round(pair.volume.h24) : 0, priceChange24h: (pair.priceChange && pair.priceChange.h24) ? pair.priceChange.h24 : 0 };
       }
-    } catch (e) {
-      setLogs(function (prev) { return prev.slice(-12).concat(['[DEX] Could not fetch market data.']); });
-    }
-
-    setTimeout(function () {
-      var newToken = {
-        name: projectName.toUpperCase(), symbol: projectName.slice(0, 4).toUpperCase() || 'NEW',
-        ca: ca,
-        price: dexData.price,
-        liquidity: dexData.liquidity,
-        volume24h: dexData.volume24h,
-        priceChange24h: dexData.priceChange24h,
-        score: auditResult.score, verified: true,
-        dexUrl: 'https://dexscreener.com/solana/' + ca, chain: 'solana',
-        mintAuthority: auditResult.mintAuthority,
-        freezeAuthority: auditResult.freezeAuthority,
-        isHoneypot: auditResult.isHoneypot,
-        rugcheckUrl: 'https://rugcheck.xyz/tokens/' + ca,
-      };
+    } catch (e) {}
+    setTimeout(function() {
+      var newToken = { name: projectName.toUpperCase(), symbol: projectName.slice(0, 4).toUpperCase() || 'NEW', ca: ca, price: dexData.price, liquidity: dexData.liquidity, volume24h: dexData.volume24h, priceChange24h: dexData.priceChange24h, score: auditResult.score, verified: true, dexUrl: 'https://dexscreener.com/solana/' + ca, chain: 'solana', mintAuthority: auditResult.mintAuthority, freezeAuthority: auditResult.freezeAuthority, isHoneypot: auditResult.isHoneypot };
       saveTokenToSupabase(newToken);
-      setListedTokens(function (prev) { return [newToken].concat(prev); });
-      if (isFree) setFreeSlots(function (prev) { return Math.max(0, prev - 1); });
+      setListedTokens(function(prev) { return [newToken].concat(prev); });
+      if (isFree) setFreeSlots(function(prev) { return Math.max(0, prev - 1); });
       setSubmitted(true);
       setFormData({ projectName: '', contractAddress: '', telegram: '' });
-      setSelectedPaymentMethod(null);
-      setSelectedWallet(null);
+      setSelectedPaymentMethod(null); setSelectedWallet(null);
       showToast((isFree ? '🎁 Free audit complete! Score: ' : 'Audit complete! Score: ') + auditResult.score, 'success');
       setIsSending(false);
-      setTimeout(function () { setSubmitted(false); }, 5000);
+      setTimeout(function() { setSubmitted(false); }, 5000);
     }, 800);
   };
 
-  // Step 4: Run RugCheck audit first to get data, then poll for payment confirmation
-  var handleConfirmPayment = async function () {
-    setShowInvoiceModal(false);
-    setIsSending(true);
-
-    var ca = formData.contractAddress;
-    var projectName = formData.projectName;
-
-    // Run audit to get real data (RugCheck + DexScreener)
+  var handleConfirmPayment = async function() {
+    setShowInvoiceModal(false); setIsSending(true);
+    var ca = formData.contractAddress; var projectName = formData.projectName;
     var auditResult = { score: 75, mintAuthority: 'Unknown', freezeAuthority: 'Unknown', isHoneypot: 'Unknown' };
     var dexData = { price: '0.00000000', liquidity: 0, volume24h: 0, priceChange24h: 0 };
-
     try {
       var rugRes = await fetch('https://api.rugcheck.xyz/v1/tokens/' + ca + '/report/summary', { headers: { 'Accept': 'application/json' } });
       if (rugRes.ok) {
         var rugData = await rugRes.json();
-        var rawScore = rugData.score || 0;
-        var normalizedScore = Math.min(100, Math.max(0, Math.round(100 - rawScore / 10)));
         var risks = rugData.risks || [];
-        auditResult = {
-          score: normalizedScore,
-          mintAuthority: risks.some(function (r) { return r.name && r.name.toLowerCase().includes('mint'); }) ? 'Active ⚠️' : 'Revoked ✓',
-          freezeAuthority: risks.some(function (r) { return r.name && r.name.toLowerCase().includes('freeze'); }) ? 'Active ⚠️' : 'Revoked ✓',
-          isHoneypot: risks.some(function (r) { return r.name && r.name.toLowerCase().includes('honeypot'); }) ? 'Yes 🚨' : 'No ✓',
-        };
+        auditResult = { score: Math.min(100, Math.max(0, Math.round(100 - (rugData.score || 0) / 10))), mintAuthority: risks.some(function(r) { return r.name && r.name.toLowerCase().includes('mint'); }) ? 'Active ⚠️' : 'Revoked ✓', freezeAuthority: risks.some(function(r) { return r.name && r.name.toLowerCase().includes('freeze'); }) ? 'Active ⚠️' : 'Revoked ✓', isHoneypot: risks.some(function(r) { return r.name && r.name.toLowerCase().includes('honeypot'); }) ? 'Yes 🚨' : 'No ✓' };
       }
-    } catch (e) { console.error('RugCheck error:', e); }
-
+    } catch (e) {}
     try {
       var dexRes = await fetch('https://api.dexscreener.com/latest/dex/tokens/' + ca);
       var dexJson = await dexRes.json();
       if (dexJson.pairs && dexJson.pairs.length > 0) {
         var pair = dexJson.pairs[0];
-        dexData = {
-          price: pair.priceUsd ? parseFloat(pair.priceUsd).toFixed(8) : '0.00000000',
-          liquidity: (pair.liquidity && pair.liquidity.usd) ? Math.round(pair.liquidity.usd) : 0,
-          volume24h: (pair.volume && pair.volume.h24) ? Math.round(pair.volume.h24) : 0,
-          priceChange24h: (pair.priceChange && pair.priceChange.h24) ? pair.priceChange.h24 : 0,
-        };
+        dexData = { price: pair.priceUsd ? parseFloat(pair.priceUsd).toFixed(8) : '0.00000000', liquidity: (pair.liquidity && pair.liquidity.usd) ? Math.round(pair.liquidity.usd) : 0, volume24h: (pair.volume && pair.volume.h24) ? Math.round(pair.volume.h24) : 0, priceChange24h: (pair.priceChange && pair.priceChange.h24) ? pair.priceChange.h24 : 0 };
       }
-    } catch (e) { console.error('DexScreener error:', e); }
-
-    var tokenData = {
-      name: projectName.toUpperCase(), symbol: projectName.slice(0, 4).toUpperCase() || 'NEW',
-      ca: ca, price: dexData.price, liquidity: dexData.liquidity,
-      volume24h: dexData.volume24h, priceChange24h: dexData.priceChange24h,
-      score: auditResult.score, verified: true,
-      dexUrl: 'https://dexscreener.com/solana/' + ca, chain: 'solana',
-      mintAuthority: auditResult.mintAuthority, freezeAuthority: auditResult.freezeAuthority,
-      isHoneypot: auditResult.isHoneypot, rugcheckUrl: 'https://rugcheck.xyz/tokens/' + ca,
-    };
-
-    setFormData({ projectName: '', contractAddress: '', telegram: '' });
-    setIsSending(false);
-
-    // Start payment polling — only saves to Supabase after TX confirmed
+    } catch (e) {}
+    var tokenData = { name: projectName.toUpperCase(), symbol: projectName.slice(0, 4).toUpperCase() || 'NEW', ca: ca, price: dexData.price, liquidity: dexData.liquidity, volume24h: dexData.volume24h, priceChange24h: dexData.priceChange24h, score: auditResult.score, verified: true, dexUrl: 'https://dexscreener.com/solana/' + ca, chain: 'solana', mintAuthority: auditResult.mintAuthority, freezeAuthority: auditResult.freezeAuthority, isHoneypot: auditResult.isHoneypot };
+    setFormData({ projectName: '', contractAddress: '', telegram: '' }); setIsSending(false);
     startPaymentVerification('audit', invoiceAmount, null, tokenData);
-
-    // Fire Solana Pay deeplink
     var label = encodeURIComponent(invoiceLabel);
     var message = encodeURIComponent('Audit for ' + projectName + ' CA: ' + ca);
-    var solanaPayUrl = 'solana:' + WALLET_ADDRESS + '?amount=' + invoiceAmount + '&spl-token=' + MRDT_CA + '&label=' + label + '&message=' + message;
-    setTimeout(function () { window.location.href = solanaPayUrl; }, 300);
+    setTimeout(function() { window.location.href = 'solana:' + WALLET_ADDRESS + '?amount=' + invoiceAmount + '&spl-token=' + MRDT_CA + '&label=' + label + '&message=' + message; }, 300);
   };
 
-  // --- Banner submit ---
-  // --- Banner flow: Step 1 — validate form → check slot → open payment modal ---
-  var handleBannerSubmit = function (e) {
+  var handleBannerSubmit = function(e) {
     e.preventDefault();
-    if (!bannerFormData.tokenName || !bannerFormData.desc) {
-      setBannerError('Enter token name and description.'); return;
-    }
-    // Block if banner slot is currently taken
-    if (activeBanner) {
-      setBannerError('Slot taken! Available in ' + bannerCountdown); return;
-    }
+    if (!bannerFormData.tokenName || !bannerFormData.desc) { setBannerError('Enter token name and description.'); return; }
+    if (activeBanner) { setBannerError('Slot taken! Available in ' + bannerCountdown); return; }
     var mrdtAmount = getAmountForBanner(bannerFormData.days);
     if (mrdtAmount <= 0) { setBannerError('Price error, try later.'); return; }
     var usd = bannerFormData.days === '2' ? 35 : bannerFormData.days === '6' ? 100 : 20;
-    setBannerInvoiceAmount(mrdtAmount);
-    setBannerInvoiceUsd(usd);
-    setBannerError('');
+    setBannerInvoiceAmount(mrdtAmount); setBannerInvoiceUsd(usd); setBannerError('');
     setShowBannerPaymentModal(true);
   };
 
-  // --- Banner flow: Step 2 — choose payment method ---
-  var handleBannerPaymentMethodSelect = function (method) {
-    setSelectedBannerPaymentMethod(method);
-    setShowBannerPaymentModal(false);
-    setShowBannerWalletModal(true);
-  };
+  var handleBannerPaymentMethodSelect = function(method) { setSelectedBannerPaymentMethod(method); setShowBannerPaymentModal(false); setShowBannerWalletModal(true); };
+  var handleBannerWalletSelect = function(wallet) { setSelectedBannerWallet(wallet); setShowBannerWalletModal(false); setShowBannerInvoiceModal(true); };
 
-  // --- Banner flow: Step 3 — choose wallet ---
-  var handleBannerWalletSelect = function (wallet) {
-    setSelectedBannerWallet(wallet);
-    setShowBannerWalletModal(false);
-    setShowBannerInvoiceModal(true);
-  };
-
-  // --- Payment verification polling (every 10s, max 5 min) ---
-  var startPaymentVerification = function (type, expectedAmount, bannerData, auditData) {
+  var startPaymentVerification = function(type, expectedAmount, bannerData, auditData) {
     var startTime = Date.now();
-    setVerifyStartTime(startTime);
-    setVerifyType(type);
-    setVerifyStatus('waiting');
-    setVerifyAttempts(0);
-    setShowVerifyModal(true);
+    setVerifyStartTime(startTime); setVerifyType(type); setVerifyStatus('waiting'); setVerifyAttempts(0); setShowVerifyModal(true);
     if (bannerData) setPendingBannerData(bannerData);
     if (auditData) setPendingAuditData(auditData);
-
-    var attempts = 0;
-    var maxAttempts = 30; // 30 x 10s = 5 minutes
-
+    var attempts = 0; var maxAttempts = 30;
     if (verifyIntervalRef.current) clearInterval(verifyIntervalRef.current);
-
-    var interval = setInterval(async function () {
-      attempts++;
-      setVerifyAttempts(attempts);
-
+    var interval = setInterval(async function() {
+      attempts++; setVerifyAttempts(attempts);
       try {
-        var res = await fetch('/api/verify-payment', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ expectedAmount: expectedAmount, since: startTime }),
-        });
+        var res = await fetch('/api/verify-payment', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expectedAmount: expectedAmount, since: startTime }) });
         var data = await res.json();
-
         if (data.verified) {
-          clearInterval(interval);
-          verifyIntervalRef.current = null;
-          setVerifyStatus('success');
-
-          if (type === 'banner' && bannerData) {
-            await saveBannerToSupabase(bannerData);
-            setActiveBanner(bannerData);
-            showToast('✅ Payment confirmed! Banner is live for everyone.', 'success');
-          } else if (type === 'audit' && auditData) {
-            saveTokenToSupabase(auditData);
-            setListedTokens(function (prev) { return [auditData].concat(prev); });
-            showToast('✅ Payment confirmed! Token added to table. Score: ' + auditData.score, 'success');
-          }
-          setTimeout(function () { setShowVerifyModal(false); }, 3000);
-          return;
+          clearInterval(interval); verifyIntervalRef.current = null; setVerifyStatus('success');
+          if (type === 'banner' && bannerData) { await saveBannerToSupabase(bannerData); setActiveBanner(bannerData); showToast('✅ Payment confirmed! Banner is live for everyone.', 'success'); }
+          else if (type === 'audit' && auditData) { saveTokenToSupabase(auditData); setListedTokens(function(prev) { return [auditData].concat(prev); }); showToast('✅ Payment confirmed! Token added. Score: ' + auditData.score, 'success'); }
+          setTimeout(function() { setShowVerifyModal(false); }, 3000); return;
         }
-      } catch (e) { console.error('Verify poll error:', e); }
-
-      if (attempts >= maxAttempts) {
-        clearInterval(interval);
-        verifyIntervalRef.current = null;
-        setVerifyStatus('failed');
-      }
+      } catch (e) {}
+      if (attempts >= maxAttempts) { clearInterval(interval); verifyIntervalRef.current = null; setVerifyStatus('failed'); }
     }, 10000);
-
     verifyIntervalRef.current = interval;
   };
 
-  // Cleanup polling interval on unmount
-  useEffect(function () {
-    return function () { if (verifyIntervalRef.current) clearInterval(verifyIntervalRef.current); };
-  }, []);
+  useEffect(function() { return function() { if (verifyIntervalRef.current) clearInterval(verifyIntervalRef.current); }; }, []);
 
-  // --- Banner flow: Step 4 — open wallet, poll for real payment confirmation ---
-  var handleBannerConfirmPayment = function () {
-    setShowBannerInvoiceModal(false);
-    setIsBannerSending(true);
-
-    var banner = {
-      tokenName: bannerFormData.tokenName.toUpperCase(),
-      bannerImg: bannerFormData.bannerImg || '',
-      desc: bannerFormData.desc,
-      expiresAt: Date.now() + parseInt(bannerFormData.days) * 86400000,
-    };
-
+  var handleBannerConfirmPayment = function() {
+    setShowBannerInvoiceModal(false); setIsBannerSending(true);
+    var banner = { tokenName: bannerFormData.tokenName.toUpperCase(), bannerImg: bannerFormData.bannerImg || '', desc: bannerFormData.desc, expiresAt: Date.now() + parseInt(bannerFormData.days) * 86400000 };
     var mrdtAmount = bannerInvoiceAmount;
     var label = encodeURIComponent('TNT House VIP Banner ' + bannerFormData.days + 'd');
     var message = encodeURIComponent('VIP Banner for ' + banner.tokenName);
-    var solanaPayUrl = 'solana:' + WALLET_ADDRESS + '?amount=' + mrdtAmount + '&spl-token=' + MRDT_CA + '&label=' + label + '&message=' + message;
-
-    // Start polling BEFORE redirect — waits for real TX on-chain
     startPaymentVerification('banner', mrdtAmount, banner, null);
     setBannerFormData({ tokenName: '', bannerImg: '', desc: '', days: '1' });
-    setSelectedBannerPaymentMethod(null);
-    setSelectedBannerWallet(null);
-    setIsBannerSending(false);
-
-    // Open wallet after short delay
-    setTimeout(function () { window.location.href = solanaPayUrl; }, 300);
+    setSelectedBannerPaymentMethod(null); setSelectedBannerWallet(null); setIsBannerSending(false);
+    setTimeout(function() { window.location.href = 'solana:' + WALLET_ADDRESS + '?amount=' + mrdtAmount + '&spl-token=' + MRDT_CA + '&label=' + label + '&message=' + message; }, 300);
   };
 
-  // --- Chat rate-limit countdown ticker ---
-  useEffect(function () {
-    var t = setInterval(function () {
+  useEffect(function() {
+    var t = setInterval(function() {
       if (!chatResetTime) return;
       var msLeft = chatResetTime - Date.now();
-      if (msLeft <= 0) {
-        setChatBlocked(false);
-        setChatCount(0);
-        setChatResetTime(null);
-        setChatTimer('');
-      } else {
-        var m = Math.floor(msLeft / 60000);
-        var s = Math.floor((msLeft % 60000) / 1000);
-        setChatTimer(m + 'м ' + (s < 10 ? '0' : '') + s + 'с');
-      }
+      if (msLeft <= 0) { setChatBlocked(false); setChatCount(0); setChatResetTime(null); setChatTimer(''); }
+      else { var m = Math.floor(msLeft / 60000); var s = Math.floor((msLeft % 60000) / 1000); setChatTimer(m + 'm ' + (s < 10 ? '0' : '') + s + 's'); }
     }, 1000);
-    return function () { clearInterval(t); };
+    return function() { clearInterval(t); };
   }, [chatResetTime]);
 
-  // --- Chat send — Groq API via server route + rate limit ---
-  var handleSendChat = async function () {
+  var handleSendChat = async function() {
     if (!userMsg.trim() || isTyping) return;
-
-    // Rate limit check
     if (chatBlocked) return;
-    var newCount = chatCount + 1;
-    setChatCount(newCount);
-    if (newCount >= 5) {
-      var resetAt = Date.now() + 10 * 60 * 1000;
-      setChatResetTime(resetAt);
-      setChatBlocked(true);
-    }
-
+    var newCount = chatCount + 1; setChatCount(newCount);
+    if (newCount >= 5) { var resetAt = Date.now() + 10 * 60 * 1000; setChatResetTime(resetAt); setChatBlocked(true); }
     var text = userMsg.trim();
-    var updatedMessages = chatMessages
-      .filter(function (m) { return m.sender !== 'bot' || chatMessages.indexOf(m) > 0; })
-      .map(function (m) { return { role: m.sender === 'user' ? 'user' : 'assistant', content: m.text }; })
-      .concat([{ role: 'user', content: text }]);
-
-    setChatMessages(function (prev) { return prev.concat([{ sender: 'user', text: text }]); });
-    setUserMsg('');
-    setIsTyping(true);
-
+    var updatedMessages = chatMessages.filter(function(m) { return m.sender !== 'bot' || chatMessages.indexOf(m) > 0; }).map(function(m) { return { role: m.sender === 'user' ? 'user' : 'assistant', content: m.text }; }).concat([{ role: 'user', content: text }]);
+    setChatMessages(function(prev) { return prev.concat([{ sender: 'user', text: text }]); });
+    setUserMsg(''); setIsTyping(true);
     try {
-      var res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: updatedMessages }),
-      });
+      var res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages: updatedMessages }) });
       var data = await res.json();
-      var reply = data.reply || data.error || 'Error. Try again.';
-      setChatMessages(function (prev) { return prev.concat([{ sender: 'bot', text: reply }]); });
-    } catch (e) {
-      setChatMessages(function (prev) { return prev.concat([{ sender: 'bot', text: 'Connection error. 💎 Full audit → from $10' }]); });
-    }
+      setChatMessages(function(prev) { return prev.concat([{ sender: 'bot', text: data.reply || data.error || 'Error. Try again.' }]); });
+    } catch (e) { setChatMessages(function(prev) { return prev.concat([{ sender: 'bot', text: 'Connection error. 💎 Full audit → from $10' }]); }); }
     setIsTyping(false);
   };
 
-  // =====================
-  // RENDER
-  // =====================
   return (
     <div className="min-h-screen bg-slate-950 text-white font-mono relative overflow-hidden pb-12">
 
-      {/* Toast notification */}
       {toast.show && (
         <div className={'fixed bottom-6 left-1/2 -translate-x-1/2 z-[99999] flex items-center gap-3 px-6 py-3.5 rounded-2xl shadow-2xl border text-sm font-medium transition-all duration-300 ' + (toast.type === 'success' ? 'bg-emerald-950 border-emerald-500/40 text-emerald-300' : 'bg-red-950 border-red-500/40 text-red-300')}>
           {toast.type === 'success' ? <CheckCircle className="w-5 h-5 text-emerald-400" /> : <XCircle className="w-5 h-5 text-red-400" />}
@@ -742,25 +421,13 @@ export default function TntHouse() {
         </div>
       )}
 
-      {/* Background glows */}
       <div style={GLOW_PURPLE} />
       <div style={GLOW_GREEN} />
-
-      {/* Grid background */}
       <div className="absolute inset-0 opacity-5 pointer-events-none">
-        <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-              <path d="M 40 0 L 0 0 0 40" fill="none" stroke="white" strokeWidth="0.5" />
-            </pattern>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#grid)" />
-        </svg>
+        <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M 40 0 L 0 0 0 40" fill="none" stroke="white" strokeWidth="0.5" /></pattern></defs><rect width="100%" height="100%" fill="url(#grid)" /></svg>
       </div>
 
       <div className="relative z-10">
-
-        {/* Header */}
         <header className="border-b border-purple-500/30 backdrop-blur-lg bg-slate-950/60 sticky top-0 z-50">
           <div className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -769,51 +436,53 @@ export default function TntHouse() {
               </a>
               <div>
                 <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-emerald-400 tracking-wider">TNT HOUSE</h1>
-                <span className="text-[10px] text-purple-400 block font-bold tracking-widest">TOP NEW TOKENS v1.27</span>
+                <span className="text-[10px] text-purple-400 block font-bold tracking-widest">TOP NEW TOKENS v1.33</span>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <button onClick={function () { setIsBuyDropdownOpen(!isBuyDropdownOpen); }} className="bg-gradient-to-r from-purple-500 to-emerald-400 hover:from-purple-400 hover:to-emerald-300 text-slate-950 font-black px-4 py-2 rounded text-xs transition flex items-center gap-1 shadow-[0_0_15px_rgba(153,69,255,0.4)]">
-                  BUY $MRDT <ChevronDown className="w-3 h-3" />
-                </button>
-                {isBuyDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-slate-950 border border-purple-500/30 rounded-lg shadow-xl z-50 py-1">
-                    <button onClick={handleLaunchJupiter} className="w-full text-left px-4 py-2.5 hover:bg-purple-500/10 text-emerald-400 flex items-center gap-2 text-sm">
-                      <ExternalLink className="w-4 h-4" /> Jupiter Swap
-                    </button>
-                    <button onClick={handleOpenRaydium} className="w-full text-left px-4 py-2.5 hover:bg-purple-500/10 text-emerald-400 flex items-center gap-2 text-sm">
-                      <ExternalLink className="w-4 h-4" /> Raydium
-                    </button>
-                  </div>
-                )}
-              </div>
+            <div className="relative">
+              <button onClick={function() { setIsBuyDropdownOpen(!isBuyDropdownOpen); }} className="bg-gradient-to-r from-purple-500 to-emerald-400 hover:from-purple-400 hover:to-emerald-300 text-slate-950 font-black px-4 py-2 rounded text-xs transition flex items-center gap-1 shadow-[0_0_15px_rgba(153,69,255,0.4)]">
+                BUY $MRDT <ChevronDown className="w-3 h-3" />
+              </button>
+              {isBuyDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-48 bg-slate-950 border border-purple-500/30 rounded-lg shadow-xl z-50 py-1">
+                  <button onClick={handleLaunchJupiter} className="w-full text-left px-4 py-2.5 hover:bg-purple-500/10 text-emerald-400 flex items-center gap-2 text-sm"><ExternalLink className="w-4 h-4" /> Jupiter Swap</button>
+                  <button onClick={handleOpenRaydium} className="w-full text-left px-4 py-2.5 hover:bg-purple-500/10 text-emerald-400 flex items-center gap-2 text-sm"><ExternalLink className="w-4 h-4" /> Raydium</button>
+                </div>
+              )}
             </div>
           </div>
         </header>
 
-        {/* VIP Banner slot */}
+        {/* VIP Banner — FIXED: full image, text at bottom */}
         <section className="max-w-7xl mx-auto px-6 pt-6">
           {activeBanner ? (
-            <div className="border border-purple-500/40 rounded-2xl p-4 bg-gradient-to-r from-black via-purple-950/20 to-black flex flex-col sm:flex-row items-center justify-between gap-4 shadow-[0_0_20px_rgba(168,85,247,0.2)]">
-              <div className="flex items-center gap-4">
-                <span className="text-3xl bg-purple-500/10 p-2 rounded-xl border border-purple-500/20">
-                  {typeof activeBanner.bannerImg === 'string' && activeBanner.bannerImg.startsWith('data:')
-                    ? <img src={activeBanner.bannerImg} alt="logo" className="w-8 h-8 rounded-full object-cover" />
-                    : activeBanner.bannerImg || '🪙'}
-                </span>
+            <div className="relative border border-purple-500/40 rounded-2xl overflow-hidden shadow-[0_0_30px_rgba(168,85,247,0.25)] min-h-[160px]">
+              {/* Full background image */}
+              {activeBanner.bannerImg && activeBanner.bannerImg.startsWith('data:') ? (
+                <div className="absolute inset-0">
+                  <img src={activeBanner.bannerImg} alt="banner" className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/20" />
+                </div>
+              ) : (
+                <div className="absolute inset-0 bg-gradient-to-r from-black via-purple-950/30 to-black" />
+              )}
+              {/* VIP badge top-left */}
+              <div className="absolute top-3 left-3">
+                <span className="bg-purple-500 text-white font-black text-[9px] px-2 py-0.5 rounded tracking-widest">VIP BOOST</span>
+              </div>
+              {/* Content bottom */}
+              <div className="relative z-10 flex items-end justify-between p-4 pt-16">
                 <div>
-                  <span className="bg-purple-500 text-white font-black text-[9px] px-2 py-0.5 rounded tracking-widest block w-max mb-1">VIP BOOST</span>
-                  <h4 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400">${activeBanner.tokenName}</h4>
+                  <h4 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-300 to-emerald-300">${activeBanner.tokenName}</h4>
                   <p className="text-slate-300 text-xs mt-0.5">{activeBanner.desc}</p>
                   {bannerCountdown && (
-                    <p className="text-[10px] text-slate-500 mt-1">⏱ slot available in <span className="text-purple-400 font-bold">{bannerCountdown}</span></p>
+                    <p className="text-[10px] text-slate-400 mt-1">⏱ slot available in <span className="text-purple-400 font-bold">{bannerCountdown}</span></p>
                   )}
                 </div>
+                <button onClick={handleLaunchJupiter} className="bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-black text-xs px-5 py-2.5 rounded-xl transition shrink-0 ml-4">
+                  BUY ON JUPITER
+                </button>
               </div>
-              <button onClick={function () { window.open('https://jup.ag', '_blank'); }} className="bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-black text-xs px-6 py-2.5 rounded transition">
-                BUY ON JUPITER
-              </button>
             </div>
           ) : (
             <div onClick={scrollToForm} className="cursor-pointer border border-purple-500/30 rounded-2xl p-4 bg-gradient-to-r from-black via-purple-950/10 to-black flex flex-col sm:flex-row items-center justify-between gap-4 hover:border-purple-500/60 transition">
@@ -833,7 +502,6 @@ export default function TntHouse() {
           )}
         </section>
 
-        {/* Hero section */}
         <section className="max-w-7xl mx-auto px-6 py-12">
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <div className="space-y-6">
@@ -843,7 +511,7 @@ export default function TntHouse() {
                 <p className="text-slate-300 text-base leading-relaxed">Welcome to the Home of New Tokens! Our AI agent scans the blockchain.</p>
               </div>
               <div className="grid grid-cols-3 gap-4 mt-8">
-                {pillars.map(function (item, i) {
+                {pillars.map(function(item, i) {
                   return (
                     <div key={i} className="bg-slate-900/50 border border-purple-500/20 rounded-lg p-3 text-center hover:border-purple-500/60 transition">
                       <item.icon className={'w-5 h-5 ' + item.color + ' mx-auto mb-1'} />
@@ -854,26 +522,21 @@ export default function TntHouse() {
                 })}
               </div>
             </div>
-
-            {/* Live AI Scanner terminal */}
             <div className="bg-slate-950 border-2 border-purple-500/40 rounded-lg p-4 font-mono text-xs h-72 flex flex-col justify-between shadow-[0_0_20px_rgba(153,69,255,0.15)] relative">
               <div className="absolute top-3 right-4 flex gap-1.5">
-                <span className="w-2.5 h-2.5 bg-red-500 rounded-full" />
-                <span className="w-2.5 h-2.5 bg-yellow-500 rounded-full" />
-                <span className="w-2.5 h-2.5 bg-green-500 rounded-full" />
+                <span className="w-2.5 h-2.5 bg-red-500 rounded-full" /><span className="w-2.5 h-2.5 bg-yellow-500 rounded-full" /><span className="w-2.5 h-2.5 bg-green-500 rounded-full" />
               </div>
               <div className="text-purple-400 font-bold border-b border-purple-500/20 pb-2 mb-2 flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 animate-spin" /> AI SCANNER + SUPABASE
               </div>
               <div className="flex-1 overflow-y-auto space-y-1.5 text-emerald-400">
-                {logs.map(function (log, i) { return <div key={i} className="text-[11px]">{log}</div>; })}
+                {logs.map(function(log, i) { return <div key={i} className="text-[11px]">{log}</div>; })}
               </div>
               <div className="text-[10px] text-slate-500 border-t border-purple-500/20 pt-2 mt-2">Status: SCANNING AND SYNCING...</div>
             </div>
           </div>
         </section>
 
-        {/* Tokens table */}
         <section className="max-w-7xl mx-auto px-6 py-6">
           <div className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 backdrop-blur-md p-3 shadow-[0_0_25px_rgba(153,69,255,0.2)]">
             <div className="flex items-center justify-between mb-2">
@@ -891,123 +554,59 @@ export default function TntHouse() {
               <table className="w-full text-left border-collapse text-[9px]">
                 <thead>
                   <tr className="border-b border-purple-500/20 bg-purple-500/10 text-purple-400 font-bold sticky top-0 z-20 backdrop-blur-md">
-                    {['Token', 'Price', 'Liq', 'Vol/Chg', 'Score', 'Action'].map(function (h, i) {
-                      return (
-                        <th key={i} className={'p-1.5 text-[9px] font-bold whitespace-nowrap' + (i === 4 ? ' text-center' : i === 5 ? ' text-right' : ' text-left')}>
-                          {h}
-                        </th>
-                      );
+                    {['Token', 'Price', 'Liq', 'Vol/Chg', 'Score', 'Action'].map(function(h, i) {
+                      return <th key={i} className={'p-1.5 text-[9px] font-bold whitespace-nowrap' + (i === 4 ? ' text-center' : i === 5 ? ' text-right' : ' text-left')}>{h}</th>;
                     })}
                   </tr>
                 </thead>
                 <tbody>
-                  {/* Pinned MRDT row */}
-                  <tr onClick={function () { openTokenBlueprint({ symbol: 'MRDT', name: 'MARADONATOKEN', ca: MRDT_CA, price: mrdtPrice.toFixed(8), liquidity: 13000, volume24h: 0, priceChange24h: 12.4, verified: true, dexUrl: 'https://dexscreener.com/solana/' + MRDT_CA, chain: 'solana' }); }} className="border-b border-purple-500/30 bg-emerald-500/5 hover:bg-emerald-500/10 transition cursor-pointer">
-                    <td className="p-1 font-bold flex items-center gap-1">
-                      <span className="text-sm">⚽️</span>
-                      <div>
-                        <span className="text-emerald-400 font-extrabold text-[10px]">$MRDT</span>
-                        <div className="text-[7px] text-slate-400">MARADONATOKEN</div>
-                      </div>
-                    </td>
+                  <tr onClick={function() { openTokenBlueprint({ symbol: 'MRDT', name: 'MARADONATOKEN', ca: MRDT_CA, price: mrdtPrice.toFixed(8), liquidity: 13000, volume24h: 0, priceChange24h: 12.4, verified: true, dexUrl: 'https://dexscreener.com/solana/' + MRDT_CA, chain: 'solana' }); }} className="border-b border-purple-500/30 bg-emerald-500/5 hover:bg-emerald-500/10 transition cursor-pointer">
+                    <td className="p-1 font-bold flex items-center gap-1"><span className="text-sm">⚽️</span><div><span className="text-emerald-400 font-extrabold text-[10px]">$MRDT</span><div className="text-[7px] text-slate-400">MARADONATOKEN</div></div></td>
                     <td className="p-1 font-mono text-emerald-400 font-bold text-[9px]">${mrdtPrice > 0 ? mrdtPrice.toFixed(8) : '...'}</td>
                     <td className="p-1 font-mono text-emerald-400 font-bold text-[9px]">$13K+</td>
                     <td className="p-1 font-mono text-emerald-400 font-bold text-[9px]">+12.4%</td>
-                    <td className="p-1 text-center">
-                      <div className="inline-flex items-center justify-center w-9 h-4 rounded-full bg-emerald-500/20 border border-emerald-500 text-emerald-400 text-[8px] font-extrabold shadow-[0_0_6px_rgba(16,185,129,0.5)]">98</div>
-                    </td>
-                    <td className="p-1 text-right">
-                      <button onClick={function (e) { e.stopPropagation(); handleLaunchJupiter(); }} className="text-[8px] text-emerald-400 hover:text-emerald-300 font-bold hover:underline inline-flex items-center gap-0.5">
-                        Buy <ExternalLink className="w-2 h-2" />
-                      </button>
-                    </td>
+                    <td className="p-1 text-center"><div className="inline-flex items-center justify-center w-9 h-4 rounded-full bg-emerald-500/20 border border-emerald-500 text-emerald-400 text-[8px] font-extrabold shadow-[0_0_6px_rgba(16,185,129,0.5)]">98</div></td>
+                    <td className="p-1 text-right"><button onClick={function(e) { e.stopPropagation(); handleLaunchJupiter(); }} className="text-[8px] text-emerald-400 hover:text-emerald-300 font-bold hover:underline inline-flex items-center gap-0.5">Buy <ExternalLink className="w-2 h-2" /></button></td>
                   </tr>
-                  {/* Supabase listed tokens */}
-                  {listedTokens.map(function (token, i) {
-                    var score = getSafetyScore(token);
-                    var style = getScoreStyle(score);
+                  {listedTokens.map(function(token, i) {
+                    var score = getSafetyScore(token); var style = getScoreStyle(score);
                     return (
-                      <tr key={'sb-' + i} onClick={function () { openTokenBlueprint(token); }} className="border-b border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10 transition cursor-pointer">
-                        <td className="p-1">
-                          <div className="flex items-center gap-1">
-                            <span className="text-emerald-400 text-[9px] font-bold">${token.symbol}</span>
-                            <span className="text-[6px] bg-emerald-500/20 text-emerald-400 px-1 rounded font-bold">AI</span>
-                          </div>
-                          <span className="text-[7px] text-slate-500 block truncate max-w-[80px]">{token.name}</span>
-                        </td>
+                      <tr key={'sb-' + i} onClick={function() { openTokenBlueprint(token); }} className="border-b border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10 transition cursor-pointer">
+                        <td className="p-1"><div className="flex items-center gap-1"><span className="text-emerald-400 text-[9px] font-bold">${token.symbol}</span><span className="text-[6px] bg-emerald-500/20 text-emerald-400 px-1 rounded font-bold">AI</span></div><span className="text-[7px] text-slate-500 block truncate max-w-[80px]">{token.name}</span></td>
                         <td className="p-1 font-mono text-slate-300 text-[9px]">${token.price}</td>
                         <td className="p-1 font-mono text-slate-300 text-[9px]">{typeof token.liquidity === 'number' ? formatNumber(token.liquidity) : token.liquidity}</td>
-                        <td className={'p-1 font-mono text-[9px] ' + (token.priceChange24h > 0 ? 'text-emerald-400' : 'text-red-400')}>
-                          {formatNumber(token.volume24h)} ({token.priceChange24h > 0 ? '+' : ''}{token.priceChange24h}%)
-                        </td>
-                        <td className="p-1 text-center">
-                          <div className={'inline-flex items-center justify-center w-9 h-4 rounded-full ' + style.bg + ' ' + style.border + ' ' + style.color + ' text-[8px] font-extrabold ' + style.glow}>{score}</div>
-                        </td>
-                        <td className="p-1 text-right">
-                          <a href={token.dexUrl} onClick={function (e) { e.stopPropagation(); }} target="_blank" rel="noopener noreferrer" className="text-[8px] text-purple-400 hover:text-emerald-400 inline-flex items-center gap-0.5">
-                            DEX <ExternalLink className="w-2 h-2" />
-                          </a>
-                        </td>
+                        <td className={'p-1 font-mono text-[9px] ' + (token.priceChange24h > 0 ? 'text-emerald-400' : 'text-red-400')}>{formatNumber(token.volume24h)} ({token.priceChange24h > 0 ? '+' : ''}{token.priceChange24h}%)</td>
+                        <td className="p-1 text-center"><div className={'inline-flex items-center justify-center w-9 h-4 rounded-full ' + style.bg + ' ' + style.border + ' ' + style.color + ' text-[8px] font-extrabold ' + style.glow}>{score}</div></td>
+                        <td className="p-1 text-right"><a href={token.dexUrl} onClick={function(e) { e.stopPropagation(); }} target="_blank" rel="noopener noreferrer" className="text-[8px] text-purple-400 hover:text-emerald-400 inline-flex items-center gap-0.5">DEX <ExternalLink className="w-2 h-2" /></a></td>
                       </tr>
                     );
                   })}
-                  {/* DexScreener live tokens */}
                   {loading && tokens.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="p-6 text-center text-purple-400 font-bold">
-                        <RefreshCw className="w-4 h-4 animate-spin mx-auto mb-1" />Scanning...
-                      </td>
-                    </tr>
-                  ) : tokens.map(function (token, i) {
-                    var score = getSafetyScore(token);
-                    var style = getScoreStyle(score);
+                    <tr><td colSpan={6} className="p-6 text-center text-purple-400 font-bold"><RefreshCw className="w-4 h-4 animate-spin mx-auto mb-1" />Scanning...</td></tr>
+                  ) : tokens.map(function(token, i) {
+                    var score = getSafetyScore(token); var style = getScoreStyle(score);
                     return (
-                      <tr key={'dx-' + i} onClick={function () { openTokenBlueprint(token); }} className="border-b border-purple-500/10 hover:bg-purple-500/5 transition cursor-pointer">
-                        <td className="p-1">
-                          <span className="text-purple-400 text-[9px] font-bold">${token.symbol}</span>
-                          <span className="text-[7px] text-slate-500 block truncate max-w-[80px]">{token.name}</span>
-                        </td>
+                      <tr key={'dx-' + i} onClick={function() { openTokenBlueprint(token); }} className="border-b border-purple-500/10 hover:bg-purple-500/5 transition cursor-pointer">
+                        <td className="p-1"><span className="text-purple-400 text-[9px] font-bold">${token.symbol}</span><span className="text-[7px] text-slate-500 block truncate max-w-[80px]">{token.name}</span></td>
                         <td className="p-1 font-mono text-slate-300 text-[9px]">${token.price}</td>
                         <td className="p-1 font-mono text-slate-300 text-[9px]">{typeof token.liquidity === 'number' ? formatNumber(token.liquidity) : token.liquidity}</td>
-                        <td className={'p-1 font-mono text-[9px] ' + (token.priceChange24h > 0 ? 'text-emerald-400' : 'text-red-400')}>
-                          {formatNumber(token.volume24h)} ({token.priceChange24h > 0 ? '+' : ''}{token.priceChange24h}%)
-                        </td>
-                        <td className="p-1 text-center">
-                          <div className={'inline-flex items-center justify-center w-9 h-4 rounded-full ' + style.bg + ' ' + style.border + ' ' + style.color + ' text-[8px] font-extrabold ' + style.glow}>{score}</div>
-                        </td>
-                        <td className="p-1 text-right">
-                          <a href={token.dexUrl} onClick={function (e) { e.stopPropagation(); }} target="_blank" rel="noopener noreferrer" className="text-[8px] text-purple-400 hover:text-emerald-400 inline-flex items-center gap-0.5">
-                            DEX <ExternalLink className="w-2 h-2" />
-                          </a>
-                        </td>
+                        <td className={'p-1 font-mono text-[9px] ' + (token.priceChange24h > 0 ? 'text-emerald-400' : 'text-red-400')}>{formatNumber(token.volume24h)} ({token.priceChange24h > 0 ? '+' : ''}{token.priceChange24h}%)</td>
+                        <td className="p-1 text-center"><div className={'inline-flex items-center justify-center w-9 h-4 rounded-full ' + style.bg + ' ' + style.border + ' ' + style.color + ' text-[8px] font-extrabold ' + style.glow}>{score}</div></td>
+                        <td className="p-1 text-right"><a href={token.dexUrl} onClick={function(e) { e.stopPropagation(); }} target="_blank" rel="noopener noreferrer" className="text-[8px] text-purple-400 hover:text-emerald-400 inline-flex items-center gap-0.5">DEX <ExternalLink className="w-2 h-2" /></a></td>
                       </tr>
                     );
                   })}
-                  {/* Empty placeholder rows */}
-                  {[1, 2, 3, 4].map(function (n) {
-                    return (
-                      <tr key={'e' + n} className="border-b border-purple-500/5 opacity-40">
-                        {[0, 1, 2, 3, 4, 5].map(function (i) { return <td key={i} className="p-1 text-slate-600 text-[8px] italic">-</td>; })}
-                      </tr>
-                    );
-                  })}
+                  {[1,2,3,4].map(function(n) { return <tr key={'e'+n} className="border-b border-purple-500/5 opacity-40">{[0,1,2,3,4,5].map(function(i) { return <td key={i} className="p-1 text-slate-600 text-[8px] italic">-</td>; })}</tr>; })}
                 </tbody>
               </table>
             </div>
-            {error && (
-              <div className="mt-2 p-1.5 bg-red-950/40 border border-red-500/30 rounded-lg flex items-center gap-1 text-red-300 text-[9px]">
-                <AlertCircle className="w-2.5 h-2.5" /> {error}
-              </div>
-            )}
+            {error && <div className="mt-2 p-1.5 bg-red-950/40 border border-red-500/30 rounded-lg flex items-center gap-1 text-red-300 text-[9px]"><AlertCircle className="w-2.5 h-2.5" /> {error}</div>}
           </div>
         </section>
 
-        {/* Order forms section */}
         <section id="orderFormsSection" className="max-w-7xl mx-auto px-6 py-8">
           <div className="grid md:grid-cols-2 gap-12 items-start">
             <div className="space-y-8">
-
-              {/* AI Inspection form */}
               <div className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 p-6 backdrop-blur-md">
                 <div className="flex items-start justify-between mb-2">
                   <h3 className="text-lg font-black text-purple-400">ORDER AI INSPECTION</h3>
@@ -1023,23 +622,19 @@ export default function TntHouse() {
                     </div>
                   )}
                 </div>
-                <p className="text-slate-400 text-xs mb-4">
-                  {freeSlots > 0
-                    ? '🎁 ' + freeSlots + ' free slots left! Fill the form — audit starts immediately.'
-                    : 'Fill the form — choose wallet — pay via Solana Pay — token appears in table.'}
-                </p>
+                <p className="text-slate-400 text-xs mb-4">{freeSlots > 0 ? '🎁 ' + freeSlots + ' free slots left! Fill the form — audit starts immediately.' : 'Fill the form — choose wallet — pay via Solana Pay — token appears in table.'}</p>
                 <form onSubmit={handleFormSubmit} className="space-y-4">
                   <div>
                     <label className="block text-purple-400 text-xs font-bold mb-1">Project Name</label>
-                    <input type="text" placeholder="Your token..." value={formData.projectName} onChange={function (e) { setFormData(Object.assign({}, formData, { projectName: e.target.value })); }} className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" />
+                    <input type="text" placeholder="Your token..." value={formData.projectName} onChange={function(e) { setFormData(Object.assign({}, formData, { projectName: e.target.value })); }} className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" />
                   </div>
                   <div>
                     <label className="block text-purple-400 text-xs font-bold mb-1">Contract Address (Solana)</label>
-                    <input type="text" placeholder="Enter contract address..." value={formData.contractAddress} onChange={function (e) { setFormData(Object.assign({}, formData, { contractAddress: e.target.value })); }} className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none font-mono" />
+                    <input type="text" placeholder="Enter contract address..." value={formData.contractAddress} onChange={function(e) { setFormData(Object.assign({}, formData, { contractAddress: e.target.value })); }} className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none font-mono" />
                   </div>
                   <div>
                     <label className="block text-purple-400 text-xs font-bold mb-1">Select tier</label>
-                    <select value={selectedTier} onChange={function (e) { setSelectedTier(e.target.value); }} className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white focus:border-purple-500 focus:outline-none font-mono">
+                    <select value={selectedTier} onChange={function(e) { setSelectedTier(e.target.value); }} className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white focus:border-purple-500 focus:outline-none font-mono">
                       <option value="basic">Basic Audit — $10 in $MRDT (~{priceLoading ? '...' : getAmountForTier('basic').toLocaleString()} $MRDT)</option>
                       <option value="fast">Fast Listing — $25 in $MRDT (~{priceLoading ? '...' : getAmountForTier('fast').toLocaleString()} $MRDT)</option>
                       <option value="vip">VIP Boost — $75 in $MRDT (~{priceLoading ? '...' : getAmountForTier('vip').toLocaleString()} $MRDT)</option>
@@ -1049,7 +644,7 @@ export default function TntHouse() {
                     <label className="block text-purple-400 text-xs font-bold mb-1">Telegram handle</label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-purple-400 text-xs font-bold">@</span>
-                      <input type="text" placeholder="your_telegram" value={formData.telegram} onChange={function (e) { setFormData(Object.assign({}, formData, { telegram: e.target.value })); }} className="w-full bg-slate-950 border border-purple-500/20 rounded pl-7 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" />
+                      <input type="text" placeholder="your_telegram" value={formData.telegram} onChange={function(e) { setFormData(Object.assign({}, formData, { telegram: e.target.value })); }} className="w-full bg-slate-950 border border-purple-500/20 rounded pl-7 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" />
                     </div>
                   </div>
                   <button type="submit" disabled={isSending} className={'w-full font-black py-2.5 rounded text-xs transition flex items-center justify-center gap-1.5 disabled:opacity-50 ' + (freeSlots > 0 ? 'bg-gradient-to-r from-emerald-400 to-purple-500 hover:from-emerald-300 hover:to-purple-400 text-slate-950' : 'bg-gradient-to-r from-purple-500 to-emerald-400 hover:from-purple-400 hover:to-emerald-300 text-slate-950')}>
@@ -1059,7 +654,6 @@ export default function TntHouse() {
                 </form>
               </div>
 
-              {/* Banner form */}
               <div className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 p-6 backdrop-blur-md">
                 <h3 className="text-lg font-black text-purple-400 mb-2">BUY VIP BANNER</h3>
                 <p className="text-slate-400 text-xs mb-4">Your token replaces the ad slot automatically.</p>
@@ -1067,20 +661,20 @@ export default function TntHouse() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-purple-400 text-[11px] font-bold mb-1">Token name / Ticker</label>
-                      <input type="text" value={bannerFormData.tokenName} onChange={function (e) { setBannerFormData(Object.assign({}, bannerFormData, { tokenName: e.target.value })); }} placeholder="SOLANA" className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" />
+                      <input type="text" value={bannerFormData.tokenName} onChange={function(e) { setBannerFormData(Object.assign({}, bannerFormData, { tokenName: e.target.value })); }} placeholder="SOLANA" className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" />
                     </div>
                     <div>
                       <label className="block text-purple-400 text-[11px] font-bold mb-1">Upload image</label>
-                      <input type="file" accept="image/*" onChange={function (e) { var f = e.target.files && e.target.files[0]; if (f) { var r = new FileReader(); r.onload = function (ev) { setBannerFormData(Object.assign({}, bannerFormData, { bannerImg: ev.target.result })); }; r.readAsDataURL(f); } }} className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-bold file:bg-gradient-to-r file:from-purple-500 file:to-emerald-400 file:text-slate-950 hover:file:from-purple-400 hover:file:to-emerald-300" />
+                      <input type="file" accept="image/*" onChange={function(e) { var f = e.target.files && e.target.files[0]; if (f) { var r = new FileReader(); r.onload = function(ev) { setBannerFormData(Object.assign({}, bannerFormData, { bannerImg: ev.target.result })); }; r.readAsDataURL(f); } }} className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-bold file:bg-gradient-to-r file:from-purple-500 file:to-emerald-400 file:text-slate-950 hover:file:from-purple-400 hover:file:to-emerald-300" />
                     </div>
                   </div>
                   <div>
                     <label className="block text-purple-400 text-[11px] font-bold mb-1">Short ad slogan</label>
-                    <input type="text" value={bannerFormData.desc} onChange={function (e) { setBannerFormData(Object.assign({}, bannerFormData, { desc: e.target.value })); }} placeholder="The fastest memecoin..." className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" />
+                    <input type="text" value={bannerFormData.desc} onChange={function(e) { setBannerFormData(Object.assign({}, bannerFormData, { desc: e.target.value })); }} placeholder="The fastest memecoin..." className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" />
                   </div>
                   <div>
                     <label className="block text-purple-400 text-[11px] font-bold mb-1">Duration</label>
-                    <select value={bannerFormData.days} onChange={function (e) { setBannerFormData(Object.assign({}, bannerFormData, { days: e.target.value })); }} className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white focus:border-purple-500 focus:outline-none font-mono">
+                    <select value={bannerFormData.days} onChange={function(e) { setBannerFormData(Object.assign({}, bannerFormData, { days: e.target.value })); }} className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white focus:border-purple-500 focus:outline-none font-mono">
                       <option value="1">1 Day - $20 (~{priceLoading ? '...' : getAmountForBanner('1').toLocaleString()} $MRDT)</option>
                       <option value="2">2 Days - $35 (~{priceLoading ? '...' : getAmountForBanner('2').toLocaleString()} $MRDT)</option>
                       <option value="6">6 Days - $100 (~{priceLoading ? '...' : getAmountForBanner('6').toLocaleString()} $MRDT)</option>
@@ -1101,7 +695,6 @@ export default function TntHouse() {
               </div>
             </div>
 
-            {/* Pricing info panel */}
             <div className="space-y-4 bg-slate-900/20 border-2 border-purple-500/20 rounded-xl p-6">
               <h3 className="text-xl font-black text-purple-400">Investor Information</h3>
               <p className="text-slate-300 text-xs leading-relaxed">All payments are accepted in $MRDT via Solana Pay. After payment, the token appears in the table automatically.</p>
@@ -1110,21 +703,8 @@ export default function TntHouse() {
                   <Download className="w-4 h-4 text-purple-400 animate-pulse" /> CURRENT PRICING:
                 </h4>
                 <div className="grid grid-cols-1 gap-2 text-xs font-mono">
-                  {[
-                    ['🎁 First 10 tokens', 'FREE'],
-                    ['Basic AI Audit', '$10 ~ ' + (priceLoading ? '...' : getAmountForTier('basic').toLocaleString()) + ' $MRDT'],
-                    ['Fast Listing', '$25 ~ ' + (priceLoading ? '...' : getAmountForTier('fast').toLocaleString()) + ' $MRDT'],
-                    ['VIP Boost', '$75 ~ ' + (priceLoading ? '...' : getAmountForTier('vip').toLocaleString()) + ' $MRDT'],
-                    ['Banner 1 day', '$20 ~ ' + (priceLoading ? '...' : getAmountForBanner('1').toLocaleString()) + ' $MRDT'],
-                    ['Banner 2 days', '$35 ~ ' + (priceLoading ? '...' : getAmountForBanner('2').toLocaleString()) + ' $MRDT'],
-                    ['Banner 6 days', '$100 ~ ' + (priceLoading ? '...' : getAmountForBanner('6').toLocaleString()) + ' $MRDT'],
-                  ].map(function (row, i) {
-                    return (
-                      <div key={i} className={'flex justify-between p-2.5 border rounded-lg ' + (i === 0 ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-slate-950 border-purple-500/10')}>
-                        <span className={i === 0 ? 'text-emerald-300 font-bold' : 'text-slate-300'}>{row[0]}</span>
-                        <span className={i === 0 ? 'text-emerald-400 font-black' : 'text-emerald-400 font-bold'}>{row[1]}</span>
-                      </div>
-                    );
+                  {[['🎁 First 10 tokens','FREE'],['Basic AI Audit','$10 ~ '+(priceLoading?'...':getAmountForTier('basic').toLocaleString())+' $MRDT'],['Fast Listing','$25 ~ '+(priceLoading?'...':getAmountForTier('fast').toLocaleString())+' $MRDT'],['VIP Boost','$75 ~ '+(priceLoading?'...':getAmountForTier('vip').toLocaleString())+' $MRDT'],['Banner 1 day','$20 ~ '+(priceLoading?'...':getAmountForBanner('1').toLocaleString())+' $MRDT'],['Banner 2 days','$35 ~ '+(priceLoading?'...':getAmountForBanner('2').toLocaleString())+' $MRDT'],['Banner 6 days','$100 ~ '+(priceLoading?'...':getAmountForBanner('6').toLocaleString())+' $MRDT']].map(function(row,i) {
+                    return <div key={i} className={'flex justify-between p-2.5 border rounded-lg '+(i===0?'bg-emerald-500/10 border-emerald-500/30':'bg-slate-950 border-purple-500/10')}><span className={i===0?'text-emerald-300 font-bold':'text-slate-300'}>{row[0]}</span><span className={i===0?'text-emerald-400 font-black':'text-emerald-400 font-bold'}>{row[1]}</span></div>;
                   })}
                 </div>
               </div>
@@ -1132,7 +712,6 @@ export default function TntHouse() {
           </div>
         </section>
 
-        {/* DAO CTA */}
         <section className="max-w-7xl mx-auto px-6 py-6">
           <div className="relative bg-gradient-to-r from-purple-500/10 via-transparent to-emerald-500/10 border-2 border-purple-500/30 rounded-lg p-10 overflow-hidden">
             <div className="absolute top-0 right-0 w-40 h-40 bg-purple-500/10 rounded-full blur-3xl" />
@@ -1146,24 +725,17 @@ export default function TntHouse() {
           </div>
         </section>
 
-        {/* Footer */}
         <footer className="border-t border-purple-500/20 mt-12 py-8 bg-slate-950/60 backdrop-blur-lg">
           <div className="max-w-7xl mx-auto px-6">
             <div className="flex flex-wrap items-center justify-center gap-8 mb-4">
               <a href="https://x.com/Crypto_D10S" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-white transition-colors">
-                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                </svg>
+                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>
               </a>
-              <a href="https://t.me/D10S_Solana_Stadium" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-blue-400 transition-colors">
-                <span className="text-2xl">✈️</span>
-              </a>
-              <a href="https://www.maradonatoken-mrdt.xyz" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400 transition-colors">
-                <ExternalLink className="w-6 h-6" />
-              </a>
+              <a href="https://t.me/D10S_Solana_Stadium" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-blue-400 transition-colors"><span className="text-2xl">✈️</span></a>
+              <a href="https://www.maradonatoken-mrdt.xyz" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400 transition-colors"><ExternalLink className="w-6 h-6" /></a>
             </div>
             <div className="text-center space-y-1">
-              <div className="text-purple-400 font-bold text-sm tracking-widest">TNT HOUSE v1.27</div>
+              <div className="text-purple-400 font-bold text-sm tracking-widest">TNT HOUSE v1.33</div>
               <div className="text-slate-400 text-xs">Powered by $MRDT · AI Audits · Supabase</div>
               <div className="text-slate-500 text-[10px]">Built with Next.js + Tailwind CSS · Solana Pay</div>
             </div>
@@ -1171,193 +743,99 @@ export default function TntHouse() {
         </footer>
       </div>
 
-      {/* ============================================================ */}
-      {/* PAYMENT MODALS (transplanted from v1.17.4)                  */}
-      {/* ============================================================ */}
-
-      {/* MODAL 1: Choose payment method */}
+      {/* PAYMENT MODALS */}
       {showPaymentModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4" onClick={function () { setShowPaymentModal(false); }}>
-          <div className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-md p-6 shadow-[0_0_40px_rgba(168,85,247,0.25)]" onClick={function (e) { e.stopPropagation(); }}>
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-black text-purple-400">Choose payment method</h3>
-              <button onClick={function () { setShowPaymentModal(false); }} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
-            </div>
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4" onClick={function() { setShowPaymentModal(false); }}>
+          <div className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-md p-6 shadow-[0_0_40px_rgba(168,85,247,0.25)]" onClick={function(e) { e.stopPropagation(); }}>
+            <div className="flex items-center justify-between mb-6"><h3 className="text-xl font-black text-purple-400">Choose payment method</h3><button onClick={function() { setShowPaymentModal(false); }} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button></div>
             <div className="grid grid-cols-2 gap-4">
-              <button onClick={function () { handlePaymentMethodSelect('MRDT'); }} className="bg-purple-500/10 border-2 border-purple-500/30 hover:border-purple-500 rounded-xl p-6 text-center transition group">
-                <div className="text-3xl mb-2">⚽️</div>
-                <div className="font-bold text-purple-400 group-hover:text-white transition">$MRDT</div>
-                <div className="text-[10px] text-slate-500 mt-1">Recommended</div>
-              </button>
-              <button onClick={function () { handlePaymentMethodSelect('SOL'); }} className="bg-emerald-500/10 border-2 border-emerald-500/30 hover:border-emerald-500 rounded-xl p-6 text-center transition group">
+              <button onClick={function() { handlePaymentMethodSelect('MRDT'); }} className="bg-purple-500/10 border-2 border-purple-500/30 hover:border-purple-500 rounded-xl p-6 text-center transition group"><div className="text-3xl mb-2">⚽️</div><div className="font-bold text-purple-400 group-hover:text-white transition">$MRDT</div><div className="text-[10px] text-slate-500 mt-1">Recommended</div></button>
+              <button onClick={function() { handlePaymentMethodSelect('SOL'); }} className="bg-emerald-500/10 border-2 border-emerald-500/30 hover:border-emerald-500 rounded-xl p-6 text-center transition group">
                 <div className="flex justify-center mb-2">
-                  <svg width="36" height="36" viewBox="0 0 397 311" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M64.6 237.9c2.4-2.4 5.7-3.8 9.2-3.8h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1l62.7-62.7z" fill="url(#sol_a)"/>
-                    <path d="M64.6 3.8C67.1 1.4 70.4 0 73.8 0h317.4c5.8 0 8.7 7 4.6 11.1L333.1 73.8c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1L64.6 3.8z" fill="url(#sol_b)"/>
-                    <path d="M333.1 120.1c-2.4-2.4-5.7-3.8-9.2-3.8H6.5c-5.8 0-8.7 7-4.6 11.1l62.7 62.7c2.4 2.4 5.7 3.8 9.2 3.8h317.4c5.8 0 8.7-7 4.6-11.1l-62.7-62.7z" fill="url(#sol_c)"/>
-                    <defs>
-                      <linearGradient id="sol_a" x1="360.9" y1="351.4" x2="141.2" y2="-69.2" gradientUnits="userSpaceOnUse">
-                        <stop stopColor="#00FFA3"/>
-                        <stop offset="1" stopColor="#DC1FFF"/>
-                      </linearGradient>
-                      <linearGradient id="sol_b" x1="264.8" y1="351.4" x2="45.2" y2="-69.2" gradientUnits="userSpaceOnUse">
-                        <stop stopColor="#00FFA3"/>
-                        <stop offset="1" stopColor="#DC1FFF"/>
-                      </linearGradient>
-                      <linearGradient id="sol_c" x1="312.5" y1="351.4" x2="92.9" y2="-69.2" gradientUnits="userSpaceOnUse">
-                        <stop stopColor="#00FFA3"/>
-                        <stop offset="1" stopColor="#DC1FFF"/>
-                      </linearGradient>
-                    </defs>
-                  </svg>
+                  <svg width="36" height="36" viewBox="0 0 397 311" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M64.6 237.9c2.4-2.4 5.7-3.8 9.2-3.8h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1l62.7-62.7z" fill="url(#sol_a)"/><path d="M64.6 3.8C67.1 1.4 70.4 0 73.8 0h317.4c5.8 0 8.7 7 4.6 11.1L333.1 73.8c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1L64.6 3.8z" fill="url(#sol_b)"/><path d="M333.1 120.1c-2.4-2.4-5.7-3.8-9.2-3.8H6.5c-5.8 0-8.7 7-4.6 11.1l62.7 62.7c2.4 2.4 5.7 3.8 9.2 3.8h317.4c5.8 0 8.7-7 4.6-11.1l-62.7-62.7z" fill="url(#sol_c)"/><defs><linearGradient id="sol_a" x1="360.9" y1="351.4" x2="141.2" y2="-69.2" gradientUnits="userSpaceOnUse"><stop stopColor="#00FFA3"/><stop offset="1" stopColor="#DC1FFF"/></linearGradient><linearGradient id="sol_b" x1="264.8" y1="351.4" x2="45.2" y2="-69.2" gradientUnits="userSpaceOnUse"><stop stopColor="#00FFA3"/><stop offset="1" stopColor="#DC1FFF"/></linearGradient><linearGradient id="sol_c" x1="312.5" y1="351.4" x2="92.9" y2="-69.2" gradientUnits="userSpaceOnUse"><stop stopColor="#00FFA3"/><stop offset="1" stopColor="#DC1FFF"/></linearGradient></defs></svg>
                 </div>
-                <div className="font-bold text-emerald-400 group-hover:text-white transition">SOL</div>
-                <div className="text-[10px] text-slate-500 mt-1">Solana</div>
+                <div className="font-bold text-emerald-400 group-hover:text-white transition">SOL</div><div className="text-[10px] text-slate-500 mt-1">Solana</div>
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* MODAL 2: Choose wallet */}
       {showWalletModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4" onClick={function () { setShowWalletModal(false); setShowPaymentModal(true); }}>
-          <div className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-md p-6 shadow-[0_0_40px_rgba(168,85,247,0.25)]" onClick={function (e) { e.stopPropagation(); }}>
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-black text-purple-400">Choose wallet</h3>
-              <button onClick={function () { setShowWalletModal(false); setShowPaymentModal(true); }} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
-            </div>
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4" onClick={function() { setShowWalletModal(false); setShowPaymentModal(true); }}>
+          <div className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-md p-6 shadow-[0_0_40px_rgba(168,85,247,0.25)]" onClick={function(e) { e.stopPropagation(); }}>
+            <div className="flex items-center justify-between mb-6"><h3 className="text-xl font-black text-purple-400">Choose wallet</h3><button onClick={function() { setShowWalletModal(false); setShowPaymentModal(true); }} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button></div>
             <div className="grid grid-cols-2 gap-4">
-              <button onClick={function () { handleWalletSelect('Phantom'); }} className="bg-purple-500/10 border-2 border-purple-500/30 hover:border-purple-500 rounded-xl p-6 text-center transition group">
-                <div className="text-3xl mb-2">👻</div>
-                <div className="font-bold text-purple-400 group-hover:text-white transition">Phantom</div>
-              </button>
-              <button onClick={function () { handleWalletSelect('Solflare'); }} className="bg-yellow-500/10 border-2 border-yellow-500/30 hover:border-yellow-400 rounded-xl p-6 text-center transition group">
-                <div className="flex justify-center mb-2">
-                  <svg width="40" height="40" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect width="128" height="128" rx="24" fill="#FBBF24"/>
-                    <text x="64" y="95" textAnchor="middle" fontFamily="Georgia, serif" fontWeight="900" fontSize="82" fill="#1a0a00" fontStyle="italic">S</text>
-                  </svg>
-                </div>
+              <button onClick={function() { handleWalletSelect('Phantom'); }} className="bg-purple-500/10 border-2 border-purple-500/30 hover:border-purple-500 rounded-xl p-6 text-center transition group"><div className="text-3xl mb-2">👻</div><div className="font-bold text-purple-400 group-hover:text-white transition">Phantom</div></button>
+              <button onClick={function() { handleWalletSelect('Solflare'); }} className="bg-yellow-500/10 border-2 border-yellow-500/30 hover:border-yellow-400 rounded-xl p-6 text-center transition group">
+                <div className="flex justify-center mb-2"><svg width="40" height="40" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="128" height="128" rx="24" fill="#FBBF24"/><text x="64" y="95" textAnchor="middle" fontFamily="Georgia, serif" fontWeight="900" fontSize="82" fill="#1a0a00" fontStyle="italic">S</text></svg></div>
                 <div className="font-bold text-yellow-400 group-hover:text-white transition">Solflare</div>
               </button>
             </div>
-            <button onClick={function () { setShowWalletModal(false); setShowPaymentModal(true); }} className="mt-4 w-full text-center text-slate-400 hover:text-white text-xs py-2">
-              ← Back
-            </button>
+            <button onClick={function() { setShowWalletModal(false); setShowPaymentModal(true); }} className="mt-4 w-full text-center text-slate-400 hover:text-white text-xs py-2">← Back</button>
           </div>
         </div>
       )}
 
-      {/* MODAL 3: Invoice / confirm */}
       {showInvoiceModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4" onClick={function () { setShowInvoiceModal(false); }}>
-          <div className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-md p-6 shadow-[0_0_40px_rgba(168,85,247,0.25)]" onClick={function (e) { e.stopPropagation(); }}>
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-black text-purple-400">Payment Invoice</h3>
-              <button onClick={function () { setShowInvoiceModal(false); }} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
-            </div>
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4" onClick={function() { setShowInvoiceModal(false); }}>
+          <div className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-md p-6 shadow-[0_0_40px_rgba(168,85,247,0.25)]" onClick={function(e) { e.stopPropagation(); }}>
+            <div className="flex items-center justify-between mb-6"><h3 className="text-xl font-black text-purple-400">Payment Invoice</h3><button onClick={function() { setShowInvoiceModal(false); }} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button></div>
             <div className="bg-slate-900 border border-purple-500/20 rounded-xl p-6 text-center space-y-4">
               <div className="text-xs text-purple-400 font-bold">{selectedWallet} · {selectedPaymentMethod}</div>
               <div className="text-3xl font-black text-emerald-400">{invoiceAmount.toLocaleString()} $MRDT</div>
               <div className="text-sm font-bold text-slate-300">≈ ${invoiceUsd} USD</div>
               <div className="text-xs text-slate-400">{invoiceLabel}</div>
-              <div className="text-xs text-slate-500 font-mono break-all">Wallet: {WALLET_ADDRESS.slice(0, 8)}...{WALLET_ADDRESS.slice(-8)}</div>
+              <div className="text-xs text-slate-500 font-mono break-all">Wallet: {WALLET_ADDRESS.slice(0,8)}...{WALLET_ADDRESS.slice(-8)}</div>
             </div>
-            <div className="mt-2 p-2 bg-purple-950/30 border border-purple-500/20 rounded-lg text-[10px] text-purple-300 text-center">
-              Tapping will open {selectedWallet}. Confirm the transaction and return to the site.
-            </div>
+            <div className="mt-2 p-2 bg-purple-950/30 border border-purple-500/20 rounded-lg text-[10px] text-purple-300 text-center">Tapping will open {selectedWallet}. Confirm the transaction and return to the site.</div>
             <div className="mt-6 flex gap-3">
-              <button onClick={function () { setShowInvoiceModal(false); }} className="flex-1 px-5 py-2.5 text-sm rounded-lg border border-purple-500/40 hover:bg-purple-500/10 transition text-slate-300">
-                Cancel
-              </button>
-              <button onClick={handleConfirmPayment} className="flex-1 px-5 py-2.5 text-sm rounded-lg bg-gradient-to-r from-purple-500 to-emerald-400 text-slate-950 font-black hover:from-purple-400 hover:to-emerald-300 transition">
-                ✅ Pay Now
-              </button>
+              <button onClick={function() { setShowInvoiceModal(false); }} className="flex-1 px-5 py-2.5 text-sm rounded-lg border border-purple-500/40 hover:bg-purple-500/10 transition text-slate-300">Cancel</button>
+              <button onClick={handleConfirmPayment} className="flex-1 px-5 py-2.5 text-sm rounded-lg bg-gradient-to-r from-purple-500 to-emerald-400 text-slate-950 font-black hover:from-purple-400 hover:to-emerald-300 transition">✅ Pay Now</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ============================================================ */}
-      {/* BANNER PAYMENT MODALS                                        */}
-      {/* ============================================================ */}
-
-      {/* BANNER MODAL 1: Choose payment method */}
+      {/* BANNER PAYMENT MODALS */}
       {showBannerPaymentModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4" onClick={function () { setShowBannerPaymentModal(false); }}>
-          <div className="bg-slate-950 border-2 border-emerald-500/40 rounded-2xl w-full max-w-md p-6 shadow-[0_0_40px_rgba(16,185,129,0.2)]" onClick={function (e) { e.stopPropagation(); }}>
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-xl font-black text-emerald-400">VIP Banner Payment</h3>
-              <button onClick={function () { setShowBannerPaymentModal(false); }} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
-            </div>
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4" onClick={function() { setShowBannerPaymentModal(false); }}>
+          <div className="bg-slate-950 border-2 border-emerald-500/40 rounded-2xl w-full max-w-md p-6 shadow-[0_0_40px_rgba(16,185,129,0.2)]" onClick={function(e) { e.stopPropagation(); }}>
+            <div className="flex items-center justify-between mb-2"><h3 className="text-xl font-black text-emerald-400">VIP Banner Payment</h3><button onClick={function() { setShowBannerPaymentModal(false); }} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button></div>
             <p className="text-slate-500 text-xs mb-6">Banner goes live on homepage right after payment</p>
             <div className="grid grid-cols-2 gap-4">
-              <button onClick={function () { handleBannerPaymentMethodSelect('MRDT'); }} className="bg-purple-500/10 border-2 border-purple-500/30 hover:border-purple-500 rounded-xl p-6 text-center transition group">
-                <div className="text-3xl mb-2">⚽️</div>
-                <div className="font-bold text-purple-400 group-hover:text-white transition">$MRDT</div>
-                <div className="text-[10px] text-slate-500 mt-1">Recommended</div>
-              </button>
-              <button onClick={function () { handleBannerPaymentMethodSelect('SOL'); }} className="bg-emerald-500/10 border-2 border-emerald-500/30 hover:border-emerald-500 rounded-xl p-6 text-center transition group">
+              <button onClick={function() { handleBannerPaymentMethodSelect('MRDT'); }} className="bg-purple-500/10 border-2 border-purple-500/30 hover:border-purple-500 rounded-xl p-6 text-center transition group"><div className="text-3xl mb-2">⚽️</div><div className="font-bold text-purple-400 group-hover:text-white transition">$MRDT</div><div className="text-[10px] text-slate-500 mt-1">Recommended</div></button>
+              <button onClick={function() { handleBannerPaymentMethodSelect('SOL'); }} className="bg-emerald-500/10 border-2 border-emerald-500/30 hover:border-emerald-500 rounded-xl p-6 text-center transition group">
                 <div className="flex justify-center mb-2">
-                  <svg width="36" height="36" viewBox="0 0 397 311" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M64.6 237.9c2.4-2.4 5.7-3.8 9.2-3.8h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1l62.7-62.7z" fill="url(#bs1)"/>
-                    <path d="M64.6 3.8C67.1 1.4 70.4 0 73.8 0h317.4c5.8 0 8.7 7 4.6 11.1L333.1 73.8c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1L64.6 3.8z" fill="url(#bs2)"/>
-                    <path d="M333.1 120.1c-2.4-2.4-5.7-3.8-9.2-3.8H6.5c-5.8 0-8.7 7-4.6 11.1l62.7 62.7c2.4 2.4 5.7 3.8 9.2 3.8h317.4c5.8 0 8.7-7 4.6-11.1l-62.7-62.7z" fill="url(#bs3)"/>
-                    <defs>
-                      <linearGradient id="bs1" x1="360.9" y1="351.4" x2="141.2" y2="-69.2" gradientUnits="userSpaceOnUse"><stop stopColor="#00FFA3"/><stop offset="1" stopColor="#DC1FFF"/></linearGradient>
-                      <linearGradient id="bs2" x1="264.8" y1="351.4" x2="45.2" y2="-69.2" gradientUnits="userSpaceOnUse"><stop stopColor="#00FFA3"/><stop offset="1" stopColor="#DC1FFF"/></linearGradient>
-                      <linearGradient id="bs3" x1="312.5" y1="351.4" x2="92.9" y2="-69.2" gradientUnits="userSpaceOnUse"><stop stopColor="#00FFA3"/><stop offset="1" stopColor="#DC1FFF"/></linearGradient>
-                    </defs>
-                  </svg>
+                  <svg width="36" height="36" viewBox="0 0 397 311" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M64.6 237.9c2.4-2.4 5.7-3.8 9.2-3.8h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1l62.7-62.7z" fill="url(#bs1)"/><path d="M64.6 3.8C67.1 1.4 70.4 0 73.8 0h317.4c5.8 0 8.7 7 4.6 11.1L333.1 73.8c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1L64.6 3.8z" fill="url(#bs2)"/><path d="M333.1 120.1c-2.4-2.4-5.7-3.8-9.2-3.8H6.5c-5.8 0-8.7 7-4.6 11.1l62.7 62.7c2.4 2.4 5.7 3.8 9.2 3.8h317.4c5.8 0 8.7-7 4.6-11.1l-62.7-62.7z" fill="url(#bs3)"/><defs><linearGradient id="bs1" x1="360.9" y1="351.4" x2="141.2" y2="-69.2" gradientUnits="userSpaceOnUse"><stop stopColor="#00FFA3"/><stop offset="1" stopColor="#DC1FFF"/></linearGradient><linearGradient id="bs2" x1="264.8" y1="351.4" x2="45.2" y2="-69.2" gradientUnits="userSpaceOnUse"><stop stopColor="#00FFA3"/><stop offset="1" stopColor="#DC1FFF"/></linearGradient><linearGradient id="bs3" x1="312.5" y1="351.4" x2="92.9" y2="-69.2" gradientUnits="userSpaceOnUse"><stop stopColor="#00FFA3"/><stop offset="1" stopColor="#DC1FFF"/></linearGradient></defs></svg>
                 </div>
-                <div className="font-bold text-emerald-400 group-hover:text-white transition">SOL</div>
-                <div className="text-[10px] text-slate-500 mt-1">Solana</div>
+                <div className="font-bold text-emerald-400 group-hover:text-white transition">SOL</div><div className="text-[10px] text-slate-500 mt-1">Solana</div>
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* BANNER MODAL 2: Choose wallet */}
       {showBannerWalletModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4" onClick={function () { setShowBannerWalletModal(false); setShowBannerPaymentModal(true); }}>
-          <div className="bg-slate-950 border-2 border-emerald-500/40 rounded-2xl w-full max-w-md p-6 shadow-[0_0_40px_rgba(16,185,129,0.2)]" onClick={function (e) { e.stopPropagation(); }}>
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-black text-emerald-400">Choose wallet</h3>
-              <button onClick={function () { setShowBannerWalletModal(false); setShowBannerPaymentModal(true); }} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
-            </div>
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4" onClick={function() { setShowBannerWalletModal(false); setShowBannerPaymentModal(true); }}>
+          <div className="bg-slate-950 border-2 border-emerald-500/40 rounded-2xl w-full max-w-md p-6 shadow-[0_0_40px_rgba(16,185,129,0.2)]" onClick={function(e) { e.stopPropagation(); }}>
+            <div className="flex items-center justify-between mb-6"><h3 className="text-xl font-black text-emerald-400">Choose wallet</h3><button onClick={function() { setShowBannerWalletModal(false); setShowBannerPaymentModal(true); }} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button></div>
             <div className="grid grid-cols-2 gap-4">
-              <button onClick={function () { handleBannerWalletSelect('Phantom'); }} className="bg-purple-500/10 border-2 border-purple-500/30 hover:border-purple-500 rounded-xl p-6 text-center transition group">
-                <div className="text-3xl mb-2">👻</div>
-                <div className="font-bold text-purple-400 group-hover:text-white transition">Phantom</div>
-              </button>
-              <button onClick={function () { handleBannerWalletSelect('Solflare'); }} className="bg-yellow-500/10 border-2 border-yellow-500/30 hover:border-yellow-400 rounded-xl p-6 text-center transition group">
-                <div className="flex justify-center mb-2">
-                  <svg width="40" height="40" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect width="128" height="128" rx="24" fill="#FBBF24"/>
-                    <text x="64" y="95" textAnchor="middle" fontFamily="Georgia, serif" fontWeight="900" fontSize="82" fill="#1a0a00" fontStyle="italic">S</text>
-                  </svg>
-                </div>
+              <button onClick={function() { handleBannerWalletSelect('Phantom'); }} className="bg-purple-500/10 border-2 border-purple-500/30 hover:border-purple-500 rounded-xl p-6 text-center transition group"><div className="text-3xl mb-2">👻</div><div className="font-bold text-purple-400 group-hover:text-white transition">Phantom</div></button>
+              <button onClick={function() { handleBannerWalletSelect('Solflare'); }} className="bg-yellow-500/10 border-2 border-yellow-500/30 hover:border-yellow-400 rounded-xl p-6 text-center transition group">
+                <div className="flex justify-center mb-2"><svg width="40" height="40" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="128" height="128" rx="24" fill="#FBBF24"/><text x="64" y="95" textAnchor="middle" fontFamily="Georgia, serif" fontWeight="900" fontSize="82" fill="#1a0a00" fontStyle="italic">S</text></svg></div>
                 <div className="font-bold text-yellow-400 group-hover:text-white transition">Solflare</div>
               </button>
             </div>
-            <button onClick={function () { setShowBannerWalletModal(false); setShowBannerPaymentModal(true); }} className="mt-4 w-full text-center text-slate-400 hover:text-white text-xs py-2">
-              ← Back
-            </button>
+            <button onClick={function() { setShowBannerWalletModal(false); setShowBannerPaymentModal(true); }} className="mt-4 w-full text-center text-slate-400 hover:text-white text-xs py-2">← Back</button>
           </div>
         </div>
       )}
 
-      {/* BANNER MODAL 3: Invoice / confirm */}
       {showBannerInvoiceModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4" onClick={function () { setShowBannerInvoiceModal(false); }}>
-          <div className="bg-slate-950 border-2 border-emerald-500/40 rounded-2xl w-full max-w-md p-6 shadow-[0_0_40px_rgba(16,185,129,0.2)]" onClick={function (e) { e.stopPropagation(); }}>
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-black text-emerald-400">Invoice — VIP Banner</h3>
-              <button onClick={function () { setShowBannerInvoiceModal(false); }} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
-            </div>
-            {/* Preview of banner image */}
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4" onClick={function() { setShowBannerInvoiceModal(false); }}>
+          <div className="bg-slate-950 border-2 border-emerald-500/40 rounded-2xl w-full max-w-md p-6 shadow-[0_0_40px_rgba(16,185,129,0.2)]" onClick={function(e) { e.stopPropagation(); }}>
+            <div className="flex items-center justify-between mb-6"><h3 className="text-xl font-black text-emerald-400">Invoice — VIP Banner</h3><button onClick={function() { setShowBannerInvoiceModal(false); }} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button></div>
             {bannerFormData.bannerImg && (
               <div className="flex items-center gap-3 bg-slate-900 border border-emerald-500/20 rounded-xl p-3 mb-4">
                 <img src={bannerFormData.bannerImg} alt="banner preview" className="w-12 h-12 rounded-xl object-cover border border-emerald-500/30" />
@@ -1372,18 +850,12 @@ export default function TntHouse() {
               <div className="text-xs text-emerald-400 font-bold">{selectedBannerWallet} · {selectedBannerPaymentMethod}</div>
               <div className="text-3xl font-black text-emerald-400">{bannerInvoiceAmount.toLocaleString()} $MRDT</div>
               <div className="text-sm font-bold text-slate-300">≈ ${bannerInvoiceUsd} USD</div>
-              <div className="text-xs text-slate-500 font-mono break-all">Wallet: {WALLET_ADDRESS.slice(0, 8)}...{WALLET_ADDRESS.slice(-8)}</div>
+              <div className="text-xs text-slate-500 font-mono break-all">Wallet: {WALLET_ADDRESS.slice(0,8)}...{WALLET_ADDRESS.slice(-8)}</div>
             </div>
-            <div className="mt-2 p-2 bg-emerald-950/30 border border-emerald-500/20 rounded-lg text-[10px] text-emerald-300 text-center">
-              Banner goes live automatically after payment 🚀
-            </div>
+            <div className="mt-2 p-2 bg-emerald-950/30 border border-emerald-500/20 rounded-lg text-[10px] text-emerald-300 text-center">Banner goes live automatically after payment 🚀</div>
             <div className="mt-6 flex gap-3">
-              <button onClick={function () { setShowBannerInvoiceModal(false); }} className="flex-1 px-5 py-2.5 text-sm rounded-lg border border-emerald-500/40 hover:bg-emerald-500/10 transition text-slate-300">
-                Cancel
-              </button>
-              <button onClick={handleBannerConfirmPayment} className="flex-1 px-5 py-2.5 text-sm rounded-lg bg-gradient-to-r from-emerald-400 to-purple-500 text-slate-950 font-black hover:from-emerald-300 hover:to-purple-400 transition">
-                ✅ Pay Now
-              </button>
+              <button onClick={function() { setShowBannerInvoiceModal(false); }} className="flex-1 px-5 py-2.5 text-sm rounded-lg border border-emerald-500/40 hover:bg-emerald-500/10 transition text-slate-300">Cancel</button>
+              <button onClick={handleBannerConfirmPayment} className="flex-1 px-5 py-2.5 text-sm rounded-lg bg-gradient-to-r from-emerald-400 to-purple-500 text-slate-950 font-black hover:from-emerald-300 hover:to-purple-400 transition">✅ Pay Now</button>
             </div>
           </div>
         </div>
@@ -1400,14 +872,10 @@ export default function TntHouse() {
                 <p className="text-slate-400 text-xs mb-4">Complete the transaction in your wallet and return here. We'll detect it automatically.</p>
                 <div className="bg-slate-900 rounded-lg p-3 mb-4">
                   <p className="text-[10px] text-slate-500">Checking blockchain... attempt {verifyAttempts}/30</p>
-                  <div className="w-full bg-slate-800 rounded-full h-1.5 mt-2">
-                    <div className="bg-purple-500 h-1.5 rounded-full transition-all" style={{ width: Math.round((verifyAttempts / 30) * 100) + '%' }} />
-                  </div>
+                  <div className="w-full bg-slate-800 rounded-full h-1.5 mt-2"><div className="bg-purple-500 h-1.5 rounded-full transition-all" style={{ width: Math.round((verifyAttempts / 30) * 100) + '%' }} /></div>
                   <p className="text-[10px] text-slate-500 mt-1">Timeout in {Math.max(0, 5 - Math.floor(verifyAttempts / 6))} min</p>
                 </div>
-                <button onClick={function () { if (verifyIntervalRef.current) clearInterval(verifyIntervalRef.current); setShowVerifyModal(false); }} className="text-slate-500 hover:text-white text-xs">
-                  Cancel
-                </button>
+                <button onClick={function() { if (verifyIntervalRef.current) clearInterval(verifyIntervalRef.current); setShowVerifyModal(false); }} className="text-slate-500 hover:text-white text-xs">Cancel</button>
               </>
             )}
             {verifyStatus === 'success' && (
@@ -1422,164 +890,89 @@ export default function TntHouse() {
                 <div className="text-5xl mb-4">⏱</div>
                 <h3 className="text-lg font-black text-red-400 mb-2">Payment Not Detected</h3>
                 <p className="text-slate-400 text-xs mb-4">We couldn't confirm your payment within 5 minutes. If you paid, contact admin in Telegram.</p>
-                <a href="https://t.me/tnt_house2026" target="_blank" rel="noopener noreferrer" className="inline-block bg-purple-500 hover:bg-purple-400 text-white font-bold py-2 px-4 rounded text-xs mb-3">
-                  Contact Admin
-                </a>
+                <a href="https://t.me/tnt_house2026" target="_blank" rel="noopener noreferrer" className="inline-block bg-purple-500 hover:bg-purple-400 text-white font-bold py-2 px-4 rounded text-xs mb-3">Contact Admin</a>
                 <br />
-                <button onClick={function () { setShowVerifyModal(false); }} className="text-slate-500 hover:text-white text-xs">
-                  Close
-                </button>
+                <button onClick={function() { setShowVerifyModal(false); }} className="text-slate-500 hover:text-white text-xs">Close</button>
               </>
             )}
           </div>
         </div>
       )}
 
-      {/* TNT Security Blueprint modal */}
+      {/* TNT Security Blueprint */}
       {isBlueprintOpen && selectedToken && (
         <div className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={closeBlueprint}>
-          <div className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-lg p-6 shadow-[0_0_40px_rgba(168,85,247,0.2)]" onClick={function (e) { e.stopPropagation(); }}>
-            {/* Header */}
+          <div className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-lg p-6 shadow-[0_0_40px_rgba(168,85,247,0.2)]" onClick={function(e) { e.stopPropagation(); }}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-black text-white">TNT Security Blueprint</h2>
               <button onClick={closeBlueprint} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
             </div>
-
-            {/* Token identity */}
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-lg">
-                {selectedToken.symbol === 'MRDT' ? '⚽️' : '🪙'}
-              </div>
+              <div className="w-10 h-10 rounded-full bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-lg">{selectedToken.symbol === 'MRDT' ? '⚽️' : '🪙'}</div>
               <div>
                 <p className="text-purple-400 font-black text-base">${selectedToken.symbol} <span className="text-slate-400 font-normal text-sm">{selectedToken.name}</span></p>
                 <p className="text-slate-500 text-[10px] font-mono break-all">{selectedToken.ca}</p>
               </div>
             </div>
-
-            {/* Score badge */}
             <div className="flex items-center gap-3 mb-4 p-3 bg-slate-900 rounded-xl border border-purple-500/20">
-              <div className={'w-14 h-14 rounded-full flex items-center justify-center text-xl font-black border-2 ' + (getSafetyScore(selectedToken) >= 90 ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : getSafetyScore(selectedToken) >= 50 ? 'bg-yellow-500/20 border-yellow-500 text-yellow-400' : 'bg-red-500/20 border-red-500 text-red-400')}>
-                {getSafetyScore(selectedToken)}
-              </div>
-              <div>
-                <p className="text-white font-bold text-sm">Safety Score</p>
-                <p className="text-slate-400 text-xs">{getSafetyScore(selectedToken) >= 90 ? 'Ironclad Safe ★' : getSafetyScore(selectedToken) >= 50 ? 'Moderate Risk ⚠️' : 'High Risk 🚨'}</p>
-              </div>
+              <div className={'w-14 h-14 rounded-full flex items-center justify-center text-xl font-black border-2 ' + (getSafetyScore(selectedToken) >= 90 ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : getSafetyScore(selectedToken) >= 50 ? 'bg-yellow-500/20 border-yellow-500 text-yellow-400' : 'bg-red-500/20 border-red-500 text-red-400')}>{getSafetyScore(selectedToken)}</div>
+              <div><p className="text-white font-bold text-sm">Safety Score</p><p className="text-slate-400 text-xs">{getSafetyScore(selectedToken) >= 90 ? 'Ironclad Safe ★' : getSafetyScore(selectedToken) >= 50 ? 'Moderate Risk ⚠️' : 'High Risk 🚨'}</p></div>
             </div>
-
-            {/* Market data */}
             <div className="grid grid-cols-3 gap-2 mb-4">
-              {[
-                { label: 'Price', value: '$' + (selectedToken.price || '0.00000000') },
-                { label: 'Liquidity', value: selectedToken.liquidity ? '$' + (selectedToken.liquidity >= 1000 ? (selectedToken.liquidity/1000).toFixed(1)+'K' : selectedToken.liquidity) : '$0' },
-                { label: 'Volume 24h', value: selectedToken.volume24h ? '$' + (selectedToken.volume24h >= 1000 ? (selectedToken.volume24h/1000).toFixed(1)+'K' : selectedToken.volume24h) : '$0' },
-              ].map(function(item, i) {
-                return (
-                  <div key={i} className="bg-slate-900 border border-purple-500/10 rounded-lg p-2.5 text-center">
-                    <p className="text-slate-500 text-[9px] mb-0.5">{item.label}</p>
-                    <p className="text-emerald-400 font-bold text-xs font-mono">{item.value}</p>
-                  </div>
-                );
+              {[{ label: 'Price', value: '$' + (selectedToken.price || '0.00000000') }, { label: 'Liquidity', value: selectedToken.liquidity ? '$' + (selectedToken.liquidity >= 1000 ? (selectedToken.liquidity/1000).toFixed(1)+'K' : selectedToken.liquidity) : '$0' }, { label: 'Volume 24h', value: selectedToken.volume24h ? '$' + (selectedToken.volume24h >= 1000 ? (selectedToken.volume24h/1000).toFixed(1)+'K' : selectedToken.volume24h) : '$0' }].map(function(item, i) {
+                return <div key={i} className="bg-slate-900 border border-purple-500/10 rounded-lg p-2.5 text-center"><p className="text-slate-500 text-[9px] mb-0.5">{item.label}</p><p className="text-emerald-400 font-bold text-xs font-mono">{item.value}</p></div>;
               })}
             </div>
-
-            {/* Security flags */}
             <div className="space-y-2 mb-4">
-              {[
-                { label: 'Mint Authority', value: selectedToken.mintAuthority },
-                { label: 'Freeze Authority', value: selectedToken.freezeAuthority },
-                { label: 'Honeypot', value: selectedToken.isHoneypot },
-              ].map(function(item, i) {
+              {[{ label: 'Mint Authority', value: selectedToken.mintAuthority }, { label: 'Freeze Authority', value: selectedToken.freezeAuthority }, { label: 'Honeypot', value: selectedToken.isHoneypot }].map(function(item, i) {
                 if (!item.value) return null;
                 var isSafe = item.value.includes('Revoked') || item.value.includes('No ✓');
-                return (
-                  <div key={i} className="flex items-center justify-between px-3 py-2 bg-slate-900 rounded-lg border border-purple-500/10">
-                    <span className="text-slate-400 text-xs">{item.label}</span>
-                    <span className={'text-xs font-bold ' + (isSafe ? 'text-emerald-400' : 'text-red-400')}>{item.value}</span>
-                  </div>
-                );
+                return <div key={i} className="flex items-center justify-between px-3 py-2 bg-slate-900 rounded-lg border border-purple-500/10"><span className="text-slate-400 text-xs">{item.label}</span><span className={'text-xs font-bold ' + (isSafe ? 'text-emerald-400' : 'text-red-400')}>{item.value}</span></div>;
               })}
             </div>
-
-            {/* Links */}
-            <div className="flex gap-3">
-              <a href={selectedToken.dexUrl} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border border-purple-500/30 text-purple-400 hover:text-emerald-400 hover:border-emerald-500/30 transition text-xs font-bold">
-                DexScreener <ExternalLink className="w-3 h-3" />
-              </a>
-              <a href={'https://rugcheck.xyz/tokens/' + selectedToken.ca} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border border-purple-500/30 text-purple-400 hover:text-emerald-400 hover:border-emerald-500/30 transition text-xs font-bold">
-                RugCheck <ExternalLink className="w-3 h-3" />
-              </a>
+            {/* Links + Buy $MRDT button */}
+            <div className="flex gap-2">
+              <a href={selectedToken.dexUrl} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg border border-purple-500/30 text-purple-400 hover:text-emerald-400 hover:border-emerald-500/30 transition text-xs font-bold">DexScreener <ExternalLink className="w-3 h-3" /></a>
+              <a href={'https://rugcheck.xyz/tokens/' + selectedToken.ca} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg border border-purple-500/30 text-purple-400 hover:text-emerald-400 hover:border-emerald-500/30 transition text-xs font-bold">RugCheck <ExternalLink className="w-3 h-3" /></a>
+              <button onClick={handleLaunchJupiter} className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg bg-gradient-to-r from-purple-500 to-emerald-400 text-slate-950 font-black text-xs hover:from-purple-400 hover:to-emerald-300 transition">Buy $MRDT ⚽️</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Floating AI chat button */}
-      <button onClick={function () { setIsChatOpen(!isChatOpen); }} className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-tr from-purple-500 to-emerald-400 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(153,69,255,0.5)] hover:scale-105 transition z-50 animate-bounce">
+      <button onClick={function() { setIsChatOpen(!isChatOpen); }} className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-tr from-purple-500 to-emerald-400 rounded-full flex items-center justify-center shadow-[0_0_20px_rgba(153,69,255,0.5)] hover:scale-105 transition z-50 animate-bounce">
         {isChatOpen ? <X className="w-6 h-6 text-slate-950" /> : <MessageSquare className="w-6 h-6 text-slate-950" />}
       </button>
 
-      {/* AI Chat window */}
       {isChatOpen && (
         <div className="fixed bottom-24 right-6 w-80 md:w-96 h-[450px] bg-slate-900 border-2 border-purple-500 rounded-xl shadow-[0_0_30px_rgba(153,69,255,0.4)] flex flex-col overflow-hidden z-50 font-mono">
           <div className="bg-gradient-to-r from-purple-600 to-emerald-500 p-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-xl">🤖</span>
-              <div>
-                <h4 className="font-bold text-xs text-white">TNT AI INSPECTOR</h4>
-                <span className="text-[9px] text-slate-100 font-bold tracking-widest">Trench Agent D10S</span>
-              </div>
-            </div>
+            <div className="flex items-center gap-2"><span className="text-xl">🤖</span><div><h4 className="font-bold text-xs text-white">TNT AI INSPECTOR</h4><span className="text-[9px] text-slate-100 font-bold tracking-widest">Trench Agent D10S</span></div></div>
             <div className="flex items-center gap-3">
-              {/* Rate limit counter */}
-              <div className="text-[9px] text-white/70 text-right">
-                {chatBlocked
-                  ? <span className="text-red-300 font-bold">🔒 {chatTimer}</span>
-                  : <span>{5 - chatCount}/5 questions</span>
-                }
-              </div>
-              <button onClick={function () { setIsChatOpen(false); }} className="text-white"><X className="w-4 h-4" /></button>
+              <div className="text-[9px] text-white/70">{chatBlocked ? <span className="text-red-300 font-bold">🔒 {chatTimer}</span> : <span>{5 - chatCount}/5 questions</span>}</div>
+              <button onClick={function() { setIsChatOpen(false); }} className="text-white"><X className="w-4 h-4" /></button>
             </div>
           </div>
           <div className="flex-1 p-4 overflow-y-auto space-y-3 text-xs">
-            {chatMessages.map(function (msg, i) {
-              return (
-                <div key={i} className={'flex ' + (msg.sender === 'user' ? 'justify-end' : 'justify-start')}>
-                  <div className={'max-w-[80%] rounded-lg p-2.5 leading-relaxed whitespace-pre-wrap ' + (msg.sender === 'user' ? 'bg-purple-500/20 text-purple-200 border border-purple-500/30' : 'bg-slate-950 text-emerald-400 border border-emerald-500/30')}>
-                    {msg.text}
-                  </div>
-                </div>
-              );
+            {chatMessages.map(function(msg, i) {
+              return <div key={i} className={'flex ' + (msg.sender === 'user' ? 'justify-end' : 'justify-start')}><div className={'max-w-[80%] rounded-lg p-2.5 leading-relaxed whitespace-pre-wrap ' + (msg.sender === 'user' ? 'bg-purple-500/20 text-purple-200 border border-purple-500/30' : 'bg-slate-950 text-emerald-400 border border-emerald-500/30')}>{msg.text}</div></div>;
             })}
-            {isTyping && (
-              <div className="flex justify-start">
-                <div className="bg-slate-950 text-emerald-400 border border-emerald-500/30 rounded-lg p-2.5 animate-pulse text-[11px]">Analyzing...</div>
-              </div>
-            )}
+            {isTyping && <div className="flex justify-start"><div className="bg-slate-950 text-emerald-400 border border-emerald-500/30 rounded-lg p-2.5 animate-pulse text-[11px]">Analyzing...</div></div>}
             <div ref={chatEndRef} />
           </div>
-
-          {/* Blocked state */}
           {chatBlocked ? (
             <div className="p-3 border-t border-purple-500/20 bg-slate-950 space-y-2">
-              <div className="text-center text-[11px] text-slate-400">
-                Limit of 5 questions reached. Unlocks in <span className="text-purple-400 font-bold">{chatTimer}</span>
-              </div>
-              <button onClick={scrollToForm} className="w-full bg-gradient-to-r from-purple-500 to-emerald-400 text-slate-950 font-black py-2 rounded text-[11px]">
-                💎 Order full audit from $10
-              </button>
+              <div className="text-center text-[11px] text-slate-400">Limit of 5 questions reached. Unlocks in <span className="text-purple-400 font-bold">{chatTimer}</span></div>
+              <button onClick={scrollToForm} className="w-full bg-gradient-to-r from-purple-500 to-emerald-400 text-slate-950 font-black py-2 rounded text-[11px]">💎 Order full audit from $10</button>
             </div>
           ) : (
             <div className="p-3 border-t border-purple-500/20 bg-slate-950 flex gap-2">
-              <input type="text" value={userMsg} onChange={function (e) { setUserMsg(e.target.value); }} onKeyDown={function (e) { if (e.key === 'Enter') handleSendChat(); }} placeholder="Paste CA or ask a question..." className="flex-1 bg-slate-900 border border-purple-500/20 rounded px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" />
-              <button onClick={handleSendChat} disabled={isTyping} className="bg-purple-500 hover:bg-purple-400 text-slate-950 px-3 rounded text-xs font-bold disabled:opacity-50">
-                <Send className="w-3.5 h-3.5" />
-              </button>
+              <input type="text" value={userMsg} onChange={function(e) { setUserMsg(e.target.value); }} onKeyDown={function(e) { if (e.key === 'Enter') handleSendChat(); }} placeholder="Paste CA or ask a question..." className="flex-1 bg-slate-900 border border-purple-500/20 rounded px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none" />
+              <button onClick={handleSendChat} disabled={isTyping} className="bg-purple-500 hover:bg-purple-400 text-slate-950 px-3 rounded text-xs font-bold disabled:opacity-50"><Send className="w-3.5 h-3.5" /></button>
             </div>
           )}
         </div>
       )}
-
     </div>
   );
 }
