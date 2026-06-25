@@ -1,7 +1,10 @@
 import { performFullAudit } from '@/lib/helius-client';
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+const supabase = createClient(
+  'https://pjtvjslcffuulsqxerpx.supabase.co',
+  'sb_publishable__gmhE8SE_blCu-v90fV2OQ_YmFCkfFU'
+);
 
 export async function POST(request) {
   try {
@@ -44,7 +47,11 @@ export async function GET(request) {
       return Response.json({ error: 'CA параметр требуется' }, { status: 400 });
     }
 
-    const { data: existing } = await supabase.from('audit_results').select('*').eq('ca', ca).single();
+    const { data: existing } = await supabase
+      .from('audit_results')
+      .select('*')
+      .eq('ca', ca)
+      .single();
 
     if (existing) {
       return Response.json({ cached: true, auditResult: existing });
