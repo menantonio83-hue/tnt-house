@@ -1,10 +1,17 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+const supabase = createClient(
+  'https://pjtvjslcffuulsqxerpx.supabase.co',
+  'sb_publishable__gmhE8SE_blCu-v90fV2OQ_YmFCkfFU'
+);
 
 export async function GET(request) {
   try {
-    const { data, error } = await supabase.from('submissions').select('*').eq('status', 'pending_admin_review').order('created_at', { ascending: false });
+    const { data, error } = await supabase
+      .from('submissions')
+      .select('*')
+      .eq('status', 'pending_admin_review')
+      .order('created_at', { ascending: false });
 
     if (error) throw error;
 
@@ -16,7 +23,7 @@ export async function GET(request) {
 
 export async function POST(request) {
   const url = new URL(request.url);
-  
+
   if (url.pathname.includes('/approve')) {
     try {
       const body = await request.json();
@@ -27,7 +34,11 @@ export async function POST(request) {
         return Response.json({ error: 'Unauthorized' }, { status: 401 });
       }
 
-      const { data: submission } = await supabase.from('submissions').select('*').eq('id', submissionId).single();
+      const { data: submission } = await supabase
+        .from('submissions')
+        .select('*')
+        .eq('id', submissionId)
+        .single();
 
       if (!submission) {
         return Response.json({ error: 'Submission not found' }, { status: 404 });
@@ -69,13 +80,13 @@ export async function POST(request) {
       return Response.json({ error: error.message }, { status: 500 });
     }
   }
-  
+
   return Response.json({ error: 'Not found' }, { status: 404 });
 }
 
 export async function PUT(request) {
   const url = new URL(request.url);
-  
+
   if (url.pathname.includes('/reject')) {
     try {
       const body = await request.json();
@@ -86,7 +97,11 @@ export async function PUT(request) {
         return Response.json({ error: 'Unauthorized' }, { status: 401 });
       }
 
-      const { data: submission } = await supabase.from('submissions').select('*').eq('id', submissionId).single();
+      const { data: submission } = await supabase
+        .from('submissions')
+        .select('*')
+        .eq('id', submissionId)
+        .single();
 
       if (!submission) {
         return Response.json({ error: 'Submission not found' }, { status: 404 });
