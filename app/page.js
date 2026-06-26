@@ -66,22 +66,20 @@ async function loadBannerFromSupabase() {
   } catch (e) { return null; }
 }
 
-// FIX v1.39: buildSolanaPayUri — rawAmount is already human-readable integer (e.g. 769230 MRDT).
-// DO NOT divide by 10^MRDT_DECIMALS — that was causing 0 MRDT in Phantom wallet.
-// Phantom expects amount as plain float string, e.g. "769230.000000"
+// FIX v1.42: Transaction Request API — Phantom calls our backend, gets ready transaction.
+// This bypasses the Phantom strict-list bug where amount=0 for custom SPL tokens.
+// Instead of solana:WALLET?amount=X, we use solana:https://tnt-audit.com/api/pay-mrdt?amount=X
 function buildSolanaPayUri(walletAddress, tokenMint, rawAmount, label, message) {
-  // Guard: ensure we never send NaN, Infinity or 0 to Phantom
   var safeAmount = parseFloat(rawAmount);
   if (isNaN(safeAmount) || !isFinite(safeAmount) || safeAmount <= 0) {
     safeAmount = 1;
   }
-  // Format as fixed decimal string (Phantom needs this format for SPL tokens)
-  var decimalAmount = Math.round(safeAmount).toString();
-  var uri = 'solana:' + walletAddress
-    + '?amount=' + decimalAmount
-    + '&spl-token=' + tokenMint
+  var amount = Math.round(safeAmount).toString();
+  // Transaction Request URL — Phantom fetches transaction from our API
+  var apiUrl = 'https://tnt-audit.com/api/pay-mrdt?amount=' + amount
     + '&label=' + encodeURIComponent(label)
     + '&message=' + encodeURIComponent(message);
+  var uri = 'solana:' + encodeURIComponent(apiUrl);
   return uri;
 }
 
@@ -487,7 +485,7 @@ export default function TntHouse() {
               </a>
               <div>
                 <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-emerald-400 tracking-wider">TNT HOUSE</h1>
-                <span className="text-[10px] text-purple-400 block font-bold tracking-widest">TOP NEW TOKENS v1.41</span>
+                <span className="text-[10px] text-purple-400 block font-bold tracking-widest">TOP NEW TOKENS v1.42</span>
               </div>
             </div>
             <div className="flex items-center gap-0.5 mr-1">
@@ -741,7 +739,7 @@ export default function TntHouse() {
               <a href="https://www.maradonatoken-mrdt.xyz" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400 transition-colors"><ExternalLink className="w-6 h-6" /></a>
             </div>
             <div className="text-center space-y-1">
-              <div className="text-purple-400 font-bold text-sm tracking-widest">TNT HOUSE v1.41</div>
+              <div className="text-purple-400 font-bold text-sm tracking-widest">TNT HOUSE v1.42</div>
               <div className="text-slate-400 text-xs">Powered by $MRDT · AI Audits · Supabase</div>
               <div className="text-slate-500 text-[10px]">Built with Next.js + Tailwind CSS · Solana Pay</div>
             </div>
