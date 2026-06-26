@@ -97,8 +97,8 @@ export default function TntHouse() {
   var [bannerCountdown, setBannerCountdown] = useState('');
   var [isBlueprintOpen, setIsBlueprintOpen] = useState(false);
   var [selectedToken, setSelectedToken] = useState(null);
-  var [mrdtPrice, setMrdtPrice] = useState(0.000013);
-  var mrdtPriceRef = useRef(0.000013);
+  var [mrdtPrice, setMrdtPrice] = useState(0.000008);
+  var mrdtPriceRef = useRef(0.000008);
   var [priceLoading, setPriceLoading] = useState(true);
   var [toast, setToast] = useState({ show: false, message: '', type: 'success' });
   var [lang, setLang] = useState('en');
@@ -167,14 +167,14 @@ export default function TntHouse() {
     return { color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/50', glow: 'shadow-[0_0_12px_rgba(239,68,68,0.6)] animate-pulse' };
   };
 
-  // Safe price getter — never returns 0 or NaN, fallback to $0.000013
+  // Safe price getter — never returns 0 or NaN, fallback to $0.000008
   var getSafePrice = function() {
-    var p = mrdtPriceRef.current || mrdtPrice || 0.000013;
-    return (p > 0 && isFinite(p) && !isNaN(p)) ? p : 0.000013;
+    var p = mrdtPriceRef.current || mrdtPrice || 0.000008;
+    return (p > 0 && isFinite(p) && !isNaN(p)) ? p : 0.000008;
   };
 
   // Returns human-readable MRDT integer amount for given tier
-  // e.g. $10 / $0.000013 = 769230 MRDT
+  // e.g. $10 / $0.000008 = 1250000 MRDT
   var getAmountForTier = function(tier) {
     var usd = tier === 'fast' ? 25 : tier === 'vip' ? 75 : 10;
     var price = getSafePrice();
@@ -293,10 +293,22 @@ export default function TntHouse() {
     return function() { clearInterval(pollInterval); clearInterval(countdownInterval); };
   }, []);
 
-  var handleFormSubmit = function(e) {
+  var handleFormSubmit = async function(e) {
     e.preventDefault();
     if (!formData.projectName || !formData.contractAddress || !formData.telegram) { showToast(t.fillFields, 'error'); return; }
     if (freeSlots > 0) { setIsSending(true); runAuditAndSave(formData.contractAddress, formData.projectName, true); return; }
+    // FIX v1.41: Force fresh price fetch before opening payment modal
+    try {
+      var freshRes = await fetch('https://api.dexscreener.com/latest/dex/tokens/' + MRDT_CA);
+      var freshData = await freshRes.json();
+      if (freshData.pairs && freshData.pairs.length) {
+        var freshPrice = parseFloat(freshData.pairs[0].priceUsd);
+        if (freshPrice > 0 && isFinite(freshPrice) && !isNaN(freshPrice)) {
+          setMrdtPrice(freshPrice);
+          mrdtPriceRef.current = freshPrice;
+        }
+      }
+    } catch (e) {}
     var mrdtAmount = getAmountForTier(selectedTier);
     if (!mrdtAmount || mrdtAmount <= 0) { showToast(t.priceError, 'error'); return; }
     var tierName = selectedTier === 'fast' ? 'Fast' : selectedTier === 'vip' ? 'VIP' : 'Basic';
@@ -356,10 +368,21 @@ export default function TntHouse() {
     setTimeout(function() { window.location.href = uri; }, 300);
   };
 
-  var handleBannerSubmit = function(e) {
+  var handleBannerSubmit = async function(e) {
     e.preventDefault();
     if (!bannerFormData.tokenName || !bannerFormData.desc) { setBannerError('Enter token name and description.'); return; }
     if (activeBanner) { setBannerError(t.btnSlotTaken + ' ' + bannerCountdown); return; }
+    try {
+      var freshRes = await fetch('https://api.dexscreener.com/latest/dex/tokens/' + MRDT_CA);
+      var freshData = await freshRes.json();
+      if (freshData.pairs && freshData.pairs.length) {
+        var freshPrice = parseFloat(freshData.pairs[0].priceUsd);
+        if (freshPrice > 0 && isFinite(freshPrice) && !isNaN(freshPrice)) {
+          setMrdtPrice(freshPrice);
+          mrdtPriceRef.current = freshPrice;
+        }
+      }
+    } catch (err) {}
     var mrdtAmount = getAmountForBanner(bannerFormData.days);
     if (!mrdtAmount || mrdtAmount <= 0) { setBannerError('Price error, try later.'); return; }
     var usd = bannerFormData.days === '2' ? 35 : bannerFormData.days === '6' ? 100 : 20;
@@ -464,7 +487,7 @@ export default function TntHouse() {
               </a>
               <div>
                 <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-emerald-400 tracking-wider">TNT HOUSE</h1>
-                <span className="text-[10px] text-purple-400 block font-bold tracking-widest">TOP NEW TOKENS v1.40</span>
+                <span className="text-[10px] text-purple-400 block font-bold tracking-widest">TOP NEW TOKENS v1.41</span>
               </div>
             </div>
             <div className="flex items-center gap-0.5 mr-1">
@@ -718,7 +741,7 @@ export default function TntHouse() {
               <a href="https://www.maradonatoken-mrdt.xyz" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400 transition-colors"><ExternalLink className="w-6 h-6" /></a>
             </div>
             <div className="text-center space-y-1">
-              <div className="text-purple-400 font-bold text-sm tracking-widest">TNT HOUSE v1.40</div>
+              <div className="text-purple-400 font-bold text-sm tracking-widest">TNT HOUSE v1.41</div>
               <div className="text-slate-400 text-xs">Powered by $MRDT · AI Audits · Supabase</div>
               <div className="text-slate-500 text-[10px]">Built with Next.js + Tailwind CSS · Solana Pay</div>
             </div>
@@ -893,8 +916,7 @@ export default function TntHouse() {
           </div>
           {chatBlocked && (<div className="px-3 py-2 bg-purple-950/60 border-t border-purple-500/30 text-center"><p className="text-[10px] text-purple-300">{t.limitReached} <span className="font-black text-purple-400">{chatTimer}</span></p><button onClick={scrollToForm} className="text-[10px] text-emerald-400 hover:text-emerald-300 font-bold mt-0.5">{t.orderAudit}</button></div>)}
           <div className="flex items-center gap-2 p-3 border-t border-purple-500/30 bg-slate-950">
-            <input type="text" value={userMsg} onChange={function(e) { setUserMsg(e.target.value); }} onKeyDown={function(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendChat(); } }} disabled={chatBlocked} placeholder={chatBlocked ? t.limitReached.slice(0, 30) + '...' : t.pasteCa} className="flex-1 bg-slate-900 border border-purple-500/20 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-600 focus:border-purple-500 focus:outline-none disabled:opacity-40" />
-            <button onClick={handleSendChat} disabled={chatBlocked || isTyping || !userMsg.trim()} className="w-8 h-8 bg-gradient-to-tr from-purple-500 to-emerald-400 rounded-lg flex items-center justify-center disabled:opacity-40 transition hover:scale-105"><Send className="w-3.5 h-3.5 text-slate-950" /></button>
+            <input type="text" value={userMsg} onChange={function(e) { setUserMsg(e.target.value); }} onKeyDown={function(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendChat(); } }} disabled={chatBlocked} placeholder={chatBlocked ? t.limitReached.slice(0, 30) + '...' : t.pasteCa} className="flex-1 bg-slate-900 border border-purple-500/20 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-600 focus:border-purple-500 focus:outline-none disabled:opacity-40" />            <button onClick={handleSendChat} disabled={chatBlocked || isTyping || !userMsg.trim()} className="w-8 h-8 bg-gradient-to-tr from-purple-500 to-emerald-400 rounded-lg flex items-center justify-center disabled:opacity-40 transition hover:scale-105"><Send className="w-3.5 h-3.5 text-slate-950" /></button>
           </div>
         </div>
       )}
