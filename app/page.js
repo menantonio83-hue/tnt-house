@@ -66,11 +66,17 @@ async function loadBannerFromSupabase() {
   } catch (e) { return null; }
 }
 
-// FIX v1.38: Build Solana Pay URI with correct decimal amount for SPL tokens
-// Phantom requires amount as human-readable float (e.g. 1.538462), not raw integer
+// FIX v1.39: buildSolanaPayUri — rawAmount is already human-readable integer (e.g. 769230 MRDT).
+// DO NOT divide by 10^MRDT_DECIMALS — that was causing 0 MRDT in Phantom wallet.
+// Phantom expects amount as plain float string, e.g. "769230.000000"
 function buildSolanaPayUri(walletAddress, tokenMint, rawAmount, label, message) {
-  // Convert integer token amount to decimal string using MRDT_DECIMALS
-  var decimalAmount = (rawAmount / Math.pow(10, MRDT_DECIMALS)).toFixed(MRDT_DECIMALS);
+  // Guard: ensure we never send NaN, Infinity or 0 to Phantom
+  var safeAmount = parseFloat(rawAmount);
+  if (isNaN(safeAmount) || !isFinite(safeAmount) || safeAmount <= 0) {
+    safeAmount = 1;
+  }
+  // Format as fixed decimal string (Phantom needs this format for SPL tokens)
+  var decimalAmount = safeAmount.toFixed(MRDT_DECIMALS);
   var uri = 'solana:' + walletAddress
     + '?amount=' + decimalAmount
     + '&spl-token=' + tokenMint
@@ -161,23 +167,27 @@ export default function TntHouse() {
     return { color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/50', glow: 'shadow-[0_0_12px_rgba(239,68,68,0.6)] animate-pulse' };
   };
 
-  // FIX v1.38: Safe price getter — never returns 0 or NaN
+  // Safe price getter — never returns 0 or NaN, fallback to $0.000013
   var getSafePrice = function() {
     var p = mrdtPriceRef.current || mrdtPrice || 0.000013;
-    return (p > 0) ? p : 0.000013;
+    return (p > 0 && isFinite(p) && !isNaN(p)) ? p : 0.000013;
   };
 
-  // Returns human-readable MRDT amount (integer, for display)
+  // Returns human-readable MRDT integer amount for given tier
+  // e.g. $10 / $0.000013 = 769230 MRDT
   var getAmountForTier = function(tier) {
     var usd = tier === 'fast' ? 25 : tier === 'vip' ? 75 : 10;
     var price = getSafePrice();
-    return Math.round(usd / price);
+    var amount = Math.round(usd / price);
+    return (isNaN(amount) || amount <= 0) ? 1000 : amount;
   };
 
+  // Returns human-readable MRDT integer amount for banner duration
   var getAmountForBanner = function(days) {
     var usd = days === '2' ? 35 : days === '6' ? 100 : 20;
     var price = getSafePrice();
-    return Math.round(usd / price);
+    var amount = Math.round(usd / price);
+    return (isNaN(amount) || amount <= 0) ? 1000 : amount;
   };
 
   var formatNumber = function(num) {
@@ -214,7 +224,13 @@ export default function TntHouse() {
       try {
         var res = await fetch('https://api.dexscreener.com/latest/dex/tokens/' + MRDT_CA);
         var data = await res.json();
-        if (data.pairs && data.pairs.length) { var p = parseFloat(data.pairs[0].priceUsd); if (p > 0) { setMrdtPrice(p); mrdtPriceRef.current = p; } }
+        if (data.pairs && data.pairs.length) {
+          var p = parseFloat(data.pairs[0].priceUsd);
+          if (p > 0 && isFinite(p) && !isNaN(p)) {
+            setMrdtPrice(p);
+            mrdtPriceRef.current = p;
+          }
+        }
       } catch (e) {}
       setPriceLoading(false);
     };
@@ -334,7 +350,8 @@ export default function TntHouse() {
     setFormData({ projectName: '', contractAddress: '', telegram: '' });
     setSelectedPaymentMethod(null); setSelectedWallet(null); setIsSending(false);
     startPaymentVerification('audit', invoiceAmount, null, tokenData);
-    // FIX v1.38: Use buildSolanaPayUri for correct decimal amount
+    // FIX v1.39: invoiceAmount is already human-readable integer (e.g. 769230)
+    // buildSolanaPayUri will format it as "769230.000000" for Phantom
     var uri = buildSolanaPayUri(WALLET_ADDRESS, MRDT_CA, invoiceAmount, invoiceLabel, 'Audit for ' + projectName + ' CA: ' + ca);
     setTimeout(function() { window.location.href = uri; }, 300);
   };
@@ -387,7 +404,7 @@ export default function TntHouse() {
     startPaymentVerification('banner', mrdtAmount, banner, null);
     setBannerFormData({ tokenName: '', bannerImg: '', desc: '', days: '1' });
     setSelectedBannerPaymentMethod(null); setSelectedBannerWallet(null); setIsBannerSending(false);
-    // FIX v1.38: Use buildSolanaPayUri for correct decimal amount
+    // FIX v1.39: bannerInvoiceAmount is already human-readable integer
     var uri = buildSolanaPayUri(WALLET_ADDRESS, MRDT_CA, mrdtAmount, 'TNT House VIP Banner ' + bannerFormData.days + 'd', 'VIP Banner for ' + banner.tokenName);
     setTimeout(function() { window.location.href = uri; }, 300);
   };
@@ -447,7 +464,7 @@ export default function TntHouse() {
               </a>
               <div>
                 <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-emerald-400 tracking-wider">TNT HOUSE</h1>
-                <span className="text-[10px] text-purple-400 block font-bold tracking-widest">TOP NEW TOKENS v1.38</span>
+                <span className="text-[10px] text-purple-400 block font-bold tracking-widest">TOP NEW TOKENS v1.39</span>
               </div>
             </div>
             <div className="flex items-center gap-0.5 mr-1">
@@ -701,7 +718,7 @@ export default function TntHouse() {
               <a href="https://www.maradonatoken-mrdt.xyz" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400 transition-colors"><ExternalLink className="w-6 h-6" /></a>
             </div>
             <div className="text-center space-y-1">
-              <div className="text-purple-400 font-bold text-sm tracking-widest">TNT HOUSE v1.38</div>
+              <div className="text-purple-400 font-bold text-sm tracking-widest">TNT HOUSE v1.39</div>
               <div className="text-slate-400 text-xs">Powered by $MRDT · AI Audits · Supabase</div>
               <div className="text-slate-500 text-[10px]">Built with Next.js + Tailwind CSS · Solana Pay</div>
             </div>
