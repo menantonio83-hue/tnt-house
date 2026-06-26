@@ -1,6 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+const supabase = createClient(
+  'https://pjtvjslcffuulsqxerpx.supabase.co',
+  'sb_publishable__gmhE8SE_blCu-v90fV2OQ_YmFCkfFU'
+);
 
 export async function GET(request) {
   try {
@@ -54,7 +57,12 @@ export async function GET(request) {
       });
     }
 
-    return Response.json({ success: true, count: enrichedTokens.length, tokens: enrichedTokens, mrdt: mrdt || null });
+    return Response.json({
+      success: true,
+      count: enrichedTokens.length,
+      tokens: enrichedTokens,
+      mrdt: mrdt || null
+    });
   } catch (error) {
     console.error('/api/tokens Error:', error);
     return Response.json({ error: error.message }, { status: 500 });
@@ -64,7 +72,11 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { name, symbol, ca, price, liquidity, volume24h, priceChange24h, security_score, audit_report, adminWallet } = body;
+    const {
+      name, symbol, ca, price, liquidity,
+      volume24h, priceChange24h, security_score,
+      audit_report, adminWallet
+    } = body;
 
     const ADMIN_WALLET = 'AZyzUySu6HP9ocJYhZECG5syycYNV6ubTQKyfB2mDWgG';
     if (adminWallet !== ADMIN_WALLET) {
@@ -75,9 +87,14 @@ export async function POST(request) {
       return Response.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    const { data, error } = await supabase.from('verified_tokens').insert([{
-      name, symbol, ca, price, liquidity, volume24h, priceChange24h, security_score, audit_report, status: 'approved'
-    }]).select();
+    const { data, error } = await supabase
+      .from('verified_tokens')
+      .insert([{
+        name, symbol, ca, price, liquidity,
+        volume24h, priceChange24h, security_score,
+        audit_report, status: 'approved'
+      }])
+      .select();
 
     if (error) {
       console.error('Insert error:', error);
