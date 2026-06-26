@@ -1,7 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
 import { performFullAudit } from '@/lib/helius-client';
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+const supabase = createClient(
+  'https://pjtvjslcffuulsqxerpx.supabase.co',
+  'sb_publishable__gmhE8SE_blCu-v90fV2OQ_YmFCkfFU'
+);
 
 const ADMIN_WALLET = 'AZyzUySu6HP9ocJYhZECG5syycYNV6ubTQKyfB2mDWgG';
 const MRDT_MINT = '8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg';
@@ -18,7 +21,11 @@ export async function POST(request) {
       return Response.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    const { data: existing } = await supabase.from('verified_tokens').select('id').eq('ca', ca).single();
+    const { data: existing } = await supabase
+      .from('verified_tokens')
+      .select('id')
+      .eq('ca', ca)
+      .single();
 
     if (existing) {
       return Response.json({ error: 'Этот токен уже в нашей базе!' }, { status: 409 });
@@ -31,9 +38,18 @@ export async function POST(request) {
       if (price === 0) freeSubmissionsCount++;
     }
 
-    const { data: submission, error: submitError } = await supabase.from('submissions').insert([{
-      ca, project_name: projectName, description, creator_wallet: creatorWallet, tier, payment_amount: price, status: price === 0 ? 'auditing' : 'pending_payment'
-    }]).select();
+    const { data: submission, error: submitError } = await supabase
+      .from('submissions')
+      .insert([{
+        ca,
+        project_name: projectName,
+        description,
+        creator_wallet: creatorWallet,
+        tier,
+        payment_amount: price,
+        status: price === 0 ? 'auditing' : 'pending_payment'
+      }])
+      .select();
 
     if (submitError) {
       console.error('Submit error:', submitError);
@@ -63,7 +79,9 @@ export async function POST(request) {
       price,
       paymentRequired: price > 0,
       solanaPayUri: price > 0 ? generateSolanaPayUri(price, submissionId) : null,
-      message: price === 0 ? 'Ваша заявка принята! Начинается проверка...' : `Требуется оплата: ${price} MRDT. Отсканируйте QR или отправьте платёж.`
+      message: price === 0
+        ? 'Ваша заявка принята! Начинается проверка...'
+        : `Требуется оплата: ${price} MRDT. Отсканируйте QR или отправьте платёж.`
     });
   } catch (error) {
     console.error('POST /api/submit-audit Error:', error);
@@ -80,7 +98,11 @@ export async function GET(request) {
       return Response.json({ error: 'submissionId required' }, { status: 400 });
     }
 
-    const { data, error } = await supabase.from('submissions').select('*').eq('id', submissionId).single();
+    const { data, error } = await supabase
+      .from('submissions')
+      .select('*')
+      .eq('id', submissionId)
+      .single();
 
     if (error) {
       return Response.json({ error: 'Заявка не найдена' }, { status: 404 });
@@ -120,17 +142,24 @@ export async function PUT(request) {
       return Response.json({ error: 'submissionId and transactionSignature required' }, { status: 400 });
     }
 
-    const { data: submission } = await supabase.from('submissions').select('*').eq('id', submissionId).single();
+    const { data: submission } = await supabase
+      .from('submissions')
+      .select('*')
+      .eq('id', submissionId)
+      .single();
 
     if (!submission) {
       return Response.json({ error: 'Submission not found' }, { status: 404 });
     }
 
-    const { error: updateError } = await supabase.from('submissions').update({
-      payment_verified: true,
-      payment_signature: transactionSignature,
-      status: 'auditing'
-    }).eq('id', submissionId);
+    const { error: updateError } = await supabase
+      .from('submissions')
+      .update({
+        payment_verified: true,
+        payment_signature: transactionSignature,
+        status: 'auditing'
+      })
+      .eq('id', submissionId);
 
     if (updateError) {
       return Response.json({ error: 'Failed to update submission' }, { status: 500 });
@@ -145,7 +174,11 @@ export async function PUT(request) {
       }).eq('id', submissionId);
     });
 
-    return Response.json({ success: true, message: 'Платёж подтвержден! Начинается проверка...', submissionId });
+    return Response.json({
+      success: true,
+      message: 'Платёж подтвержден! Начинается проверка...',
+      submissionId
+    });
   } catch (error) {
     console.error('PUT /api/submit-audit Error:', error);
     return Response.json({ error: error.message }, { status: 500 });
