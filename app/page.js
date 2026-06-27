@@ -1,4 +1,4 @@
-use client';
+'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Shield, Send, MessageSquare, X, RefreshCw, AlertCircle, Sparkles, ExternalLink, ChevronDown, Download, Zap, Lock, CheckCircle, XCircle } from 'lucide-react';
