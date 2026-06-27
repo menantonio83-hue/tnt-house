@@ -24,7 +24,7 @@ export const dynamic = 'force-dynamic';
 
 const WALLET_ADDRESS = "Ev6oXBXo6qyoaT5wypJ2Umxch91F7cFvE1SarYLaUn8Z";
 const MRDT_CA        = "8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg";
-const MRDT_DECIMALS  = 6;
+const MRDT_DECIMALS  = 9;
 const SITE_URL       = 'https://tnt-house.vercel.app';
 const SUPABASE_URL   = 'https://pjtvjslcffuulsqxerpx.supabase.co';
 const SUPABASE_KEY   = 'sb_publishable__gmhE8SE_blCu-v90fV2OQ_YmFCkfFU';
