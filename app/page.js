@@ -7,6 +7,7 @@ export const dynamic = 'force-dynamic';
 
 const WALLET_ADDRESS = "Ev6oXBXo6qyoaT5wypJ2Umxch91F7cFvE1SarYLaUn8Z";
 const MRDT_CA = "8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg";
+const MRDT_DECIMALS = 9;
 const SITE_URL = 'https://tnt-house.vercel.app';
 const SUPABASE_URL = 'https://pjtvjslcffuulsqxerpx.supabase.co';
 const SUPABASE_KEY = 'sb_publishable__gmhE8SE_blCu-v90fV2OQ_YmFCkfFU';
@@ -171,6 +172,7 @@ export default function TntHouse() {
   var [pendingBannerData, setPendingBannerData] = useState(null);
   var [pendingAuditData, setPendingAuditData] = useState(null);
   var verifyIntervalRef = useRef(null);
+  var [deeplinkFallbackUri, setDeeplinkFallbackUri] = useState('');
   var [bannerFormData, setBannerFormData] = useState({ tokenName: '', bannerImg: '', desc: '', days: '1' });
   var [bannerSubmitted, setBannerSubmitted] = useState(false);
   var [bannerError, setBannerError] = useState('');
@@ -230,7 +232,8 @@ export default function TntHouse() {
   // FIX v1.37: Always fallback to 0.000013 so division never yields NaN/Infinity
   var getSafePrice = function() {
     var p = mrdtPriceRef.current || mrdtPrice || 0.000013;
-    return (p > 0) ? p : 0.000013;
+    if (!isFinite(p) || p <= 0) return 0.000013;
+    return p;
   };
 
   var getAmountForTier = function(tier) {
@@ -294,7 +297,7 @@ export default function TntHouse() {
         var data = await res.json();
         if (data.pairs && data.pairs.length) {
           var p = parseFloat(data.pairs[0].priceUsd);
-          if (p > 0) { setMrdtPrice(p); mrdtPriceRef.current = p; }
+          if (isFinite(p) && p > 0) { setMrdtPrice(p); mrdtPriceRef.current = p; }
         }
       } catch (e) {}
       setPriceLoading(false);
@@ -534,6 +537,21 @@ export default function TntHouse() {
     return tokenData;
   };
 
+  // FIX v1.44: Open deeplink via click on hidden <a> to preserve user gesture.
+  // If wallet doesn't open within 2s (desktop without extension), show fallback.
+  var openDeeplink = function(uri) {
+    var a = document.createElement('a');
+    a.href = uri;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function() { document.body.removeChild(a); }, 100);
+    // Show fallback after 2s if protocol handler didn't fire
+    setTimeout(function() {
+      setDeeplinkFallbackUri(uri);
+    }, 2000);
+  };
+
   var handleConfirmPayment = async function() {
     // FIX v1.37: Double-check amount is valid before launching wallet deeplink
     if (!invoiceAmount || invoiceAmount <= 0) {
@@ -553,13 +571,14 @@ export default function TntHouse() {
     startPaymentVerification('audit', invoiceAmount, null, tokenData);
     var label = encodeURIComponent(invoiceLabel);
     var message = encodeURIComponent('Audit for ' + projectName + ' CA: ' + ca);
-    // Build Solana Pay SPL-token URI with integer token amount
+    // Build Solana Pay SPL-token URI with integer token amount (in smallest units)
+    var rawAmount = Math.round(invoiceAmount * Math.pow(10, MRDT_DECIMALS));
     var uri = 'solana:' + WALLET_ADDRESS
-      + '?amount=' + invoiceAmount
+      + '?amount=' + rawAmount
       + '&spl-token=' + MRDT_CA
       + '&label=' + label
       + '&message=' + message;
-    setTimeout(function() { window.location.href = uri; }, 300);
+    openDeeplink(uri);
   };
 
   var handleBannerSubmit = function(e) {
@@ -634,7 +653,17 @@ export default function TntHouse() {
           setTimeout(function() { setShowVerifyModal(false); }, 3000);
           return;
         }
-      } catch (e) {}
+        // FIX v1.44: Show API error reason in UI instead of silently ignoring
+        if (data.reason) {
+          console.log('[Verify] Attempt ' + attempts + ': ' + data.reason);
+        }
+      } catch (e) {
+        // FIX v1.44: Log fetch errors so user can see what's happening
+        console.error('[Verify] Network error on attempt ' + attempts + ':', e.message || e);
+        if (attempts >= 5) {
+          setVerifyStatus('slow');
+        }
+      }
       if (attempts >= maxAttempts) {
         clearInterval(interval);
         verifyIntervalRef.current = null;
@@ -674,13 +703,14 @@ export default function TntHouse() {
     setSelectedBannerPaymentMethod(null);
     setSelectedBannerWallet(null);
     setIsBannerSending(false);
-    // Build Solana Pay SPL-token URI with integer token amount
+    // Build Solana Pay SPL-token URI with integer token amount (in smallest units)
+    var rawBannerAmount = Math.round(mrdtAmount * Math.pow(10, MRDT_DECIMALS));
     var uri = 'solana:' + WALLET_ADDRESS
-      + '?amount=' + mrdtAmount
+      + '?amount=' + rawBannerAmount
       + '&spl-token=' + MRDT_CA
       + '&label=' + label
       + '&message=' + message;
-    setTimeout(function() { window.location.href = uri; }, 300);
+    openDeeplink(uri);
   };
 
   // Chat countdown timer for rate limiting
@@ -1832,6 +1862,46 @@ export default function TntHouse() {
               </>
             )}
           </div>
+        </div>
+      )}
+
+      {/* ═══ Deeplink Fallback (desktop without wallet extension) ═══ */}
+      {deeplinkFallbackUri && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[110] bg-slate-900 border-2 border-yellow-500/50 rounded-2xl p-4 shadow-[0_0_30px_rgba(234,179,8,0.3)] max-w-md w-full">
+          <div className="flex items-center gap-3 mb-3">
+            <span className="text-2xl">🔗</span>
+            <div>
+              <p className="text-white font-bold text-sm">Open in wallet</p>
+              <p className="text-slate-400 text-xs">If wallet didn't open, click below or copy link</p>
+            </div>
+            <button
+              onClick={function() { setDeeplinkFallbackUri(''); }}
+              className="ml-auto text-slate-500 hover:text-white text-lg"
+            >✕</button>
+          </div>
+          <div className="flex gap-2">
+            <a
+              href={deeplinkFallbackUri}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 bg-gradient-to-r from-purple-500 to-emerald-500 hover:from-purple-400 hover:to-emerald-400 text-white font-bold py-2.5 px-4 rounded-lg text-sm text-center transition"
+            >
+              🚀 Open Wallet
+            </a>
+            <button
+              onClick={function() {
+                navigator.clipboard.writeText(deeplinkFallbackUri).then(function() {
+                  showToast('Link copied! Paste in wallet browser.', 'success');
+                });
+              }}
+              className="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-2.5 px-4 rounded-lg text-sm transition border border-slate-700"
+            >
+              📋 Copy
+            </button>
+          </div>
+          <p className="text-[10px] text-slate-500 mt-3 text-center">
+            Works on mobile with Phantom/Solflare. On desktop, install a Solana wallet extension.
+          </p>
         </div>
       )}
 
