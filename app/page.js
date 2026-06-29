@@ -183,21 +183,26 @@ export default function TntHouse() {
     return parseFloat((usd / mp).toFixed(2));
   };
 
-  // Build Solana Pay URI — SOL vs SPL token
-  var buildPayUri = function(amount, method, label, message) {
-    var base = 'solana:' + WALLET_ADDRESS + '?';
-    var params = [];
-    if (method === 'SOL') {
-      // Native SOL — no spl-token param
-      params.push('amount=' + amount);
-    } else {
-      // SPL token (MRDT)
-      params.push('amount=' + amount);
+  // Build Solana Pay URI wrapped in Universal Link for Phantom or Solflare
+  // Raw solana: deeplink does NOT pre-fill amount on mobile browsers
+  // Universal Link wrapper forces wallet app to parse the full Solana Pay spec
+  var buildPayUri = function(amount, method, label, message, wallet) {
+    // Build base Solana Pay transfer request URL
+    var params = ['amount=' + amount];
+    if (method === 'MRDT') {
+      // SPL token payment — include spl-token param
       params.push('spl-token=' + MRDT_CA);
     }
+    // Native SOL — no spl-token param needed
     if (label) params.push('label=' + encodeURIComponent(label));
     if (message) params.push('message=' + encodeURIComponent(message));
-    return base + params.join('&');
+    var solanaPayUrl = 'solana:' + WALLET_ADDRESS + '?' + params.join('&');
+    // Wrap in Universal Link based on wallet choice
+    if (wallet === 'Solflare') {
+      return 'https://solflare.com/ul/v1/browse/' + encodeURIComponent(solanaPayUrl);
+    }
+    // Default: Phantom Universal Link
+    return 'https://phantom.app/ul/browse/' + encodeURIComponent(solanaPayUrl);
   };
 
   var formatNumber = function(num) {
@@ -380,12 +385,13 @@ export default function TntHouse() {
     setFormData({ projectName: '', contractAddress: '', telegram: '' });
     setSelectedPaymentMethod(null); setSelectedWallet(null); setIsSending(false);
     startPaymentVerification('audit', invoiceAmount, null, tokenData);
-    // Build correct URI based on payment method (SOL vs MRDT)
+    // Build Universal Link URI — passes wallet choice for correct wrapper
     var uri = buildPayUri(
       invoiceAmount,
       selectedPaymentMethod,
       invoiceLabel,
-      'Audit for ' + projectName + ' CA: ' + ca
+      'Audit for ' + projectName + ' CA: ' + ca,
+      selectedWallet
     );
     setTimeout(function() { window.location.href = uri; }, 300);
   };
@@ -442,12 +448,13 @@ export default function TntHouse() {
     startPaymentVerification('banner', bannerInvoiceAmount, banner, null);
     setBannerFormData({ tokenName: '', bannerImg: '', desc: '', days: '1' });
     setSelectedBannerPaymentMethod(null); setSelectedBannerWallet(null); setIsBannerSending(false);
-    // Build correct URI based on payment method (SOL vs MRDT)
+    // Build Universal Link URI — passes wallet choice for correct wrapper
     var uri = buildPayUri(
       bannerInvoiceAmount,
       selectedBannerPaymentMethod,
       'TNT House VIP Banner ' + bannerFormData.days + 'd',
-      'VIP Banner for ' + banner.tokenName
+      'VIP Banner for ' + banner.tokenName,
+      selectedBannerWallet
     );
     setTimeout(function() { window.location.href = uri; }, 300);
   };
@@ -512,7 +519,7 @@ export default function TntHouse() {
               </a>
               <div>
                 <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-emerald-400 tracking-wider">TNT HOUSE</h1>
-                <span className="text-[10px] text-purple-400 block font-bold tracking-widest">TOP NEW TOKENS v0.1</span>
+                <span className="text-[10px] text-purple-400 block font-bold tracking-widest">TOP NEW TOKENS v0.2</span>
               </div>
             </div>
             <div className="flex items-center gap-0.5 mr-1">
@@ -777,7 +784,7 @@ export default function TntHouse() {
               <a href="https://www.maradonatoken-mrdt.xyz" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400 transition-colors"><ExternalLink className="w-6 h-6" /></a>
             </div>
             <div className="text-center space-y-1">
-              <div className="text-purple-400 font-bold text-sm tracking-widest">TNT HOUSE v0.1</div>
+              <div className="text-purple-400 font-bold text-sm tracking-widest">TNT HOUSE v0.2</div>
               <div className="text-slate-400 text-xs">Powered by $MRDT · AI Audits · Supabase</div>
               <div className="text-slate-500 text-[10px]">Built with Next.js + Tailwind CSS · Solana Pay</div>
             </div>
