@@ -183,59 +183,45 @@ export default function TntHouse() {
     return parseFloat((usd / mp).toFixed(2));
   };
 
-  // Detect user platform
-  var isAndroid = function() { return /Android/i.test(navigator.userAgent); };
-  var isIOS = function() { return /iPhone|iPad|iPod/i.test(navigator.userAgent); };
+  // Platform detection helpers
+  var isMobile = function() { return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent); };
   var isInsidePhantom = function() { return !!(window.phantom && window.phantom.solana && window.phantom.solana.isPhantom); };
   var isInsideSolflare = function() { return !!(window.solflare && window.solflare.isSolflare); };
 
-  // Build raw Solana Pay URI string
-  var buildSolanaPayUri = function(amount, method, label, message) {
-    var params = ['amount=' + amount];
-    if (method === 'MRDT') params.push('spl-token=' + MRDT_CA);
-    if (label) params.push('label=' + encodeURIComponent(label));
-    if (message) params.push('message=' + encodeURIComponent(message));
-    return 'solana:' + WALLET_ADDRESS + '?' + params.join('&');
+  // Build Solana Pay Transaction Request URI pointing to our API
+  // Phantom/Solflare will GET metadata then POST with user pubkey → we return serialized tx
+  var buildTransactionRequestUri = function(amount, method, label) {
+    var apiUrl = 'https://tnt-audit.com/api/pay?amount=' + amount + '&method=' + method + '&label=' + encodeURIComponent(label);
+    return 'solana:' + encodeURIComponent(apiUrl);
   };
 
-  // Smart payment trigger — picks best method per platform
-  // Android Chrome blocks Universal Links via JS — must use Android Intent scheme
-  // iOS supports Universal Links natively
-  // Inside Phantom/Solflare browser — use raw solana: URI (injected provider handles it)
+  // Trigger payment — Transaction Request API (works on all platforms)
+  // Phantom fetches tx from our server → shows exact amount → user signs
   var triggerPayment = function(amount, method, label, message, wallet) {
-    var solanaPayUri = buildSolanaPayUri(amount, method, label, message);
+    var txRequestUri = buildTransactionRequestUri(amount, method, label);
 
-    // 1. Already inside Phantom or Solflare in-app browser
+    // 1. Inside Phantom/Solflare in-app browser — Transaction Request works directly
     if (isInsidePhantom() || isInsideSolflare()) {
-      window.location.href = solanaPayUri;
+      window.location.href = txRequestUri;
       return;
     }
 
-    // 2. Android — Chrome blocks Universal Links, use Android Intent scheme
-    if (isAndroid()) {
-      var intentUrl;
-      if (wallet === 'Solflare') {
-        intentUrl = 'intent://v1/browse?url=' + encodeURIComponent(solanaPayUri) + '#Intent;scheme=solflare;package=com.solflare.mobile;end;';
+    // 2. Mobile browser — open via Phantom Universal Link (iOS) or browse intent (Android)
+    if (isMobile()) {
+      var isSolflare = wallet === 'Solflare';
+      if (isSolflare) {
+        // Solflare Universal Link with Transaction Request
+        window.location.href = 'https://solflare.com/ul/v1/browse?url=' + encodeURIComponent(txRequestUri);
       } else {
-        // Phantom Android Intent with solana: scheme
-        intentUrl = 'intent://' + WALLET_ADDRESS + '?amount=' + amount + (method === 'MRDT' ? '&spl-token=' + MRDT_CA : '') + (label ? '&label=' + encodeURIComponent(label) : '') + '#Intent;scheme=solana;package=app.phantom;end;';
-      }
-      window.location.href = intentUrl;
-      return;
-    }
-
-    // 3. iOS — Universal Links work natively
-    if (isIOS()) {
-      if (wallet === 'Solflare') {
-        window.location.href = 'https://solflare.com/ul/v1/browse?url=' + encodeURIComponent(solanaPayUri);
-      } else {
-        window.location.href = 'https://phantom.app/ul/browse?url=' + encodeURIComponent(solanaPayUri);
+        // Phantom Universal Link with Transaction Request
+        // Opens Phantom in-app browser which processes the Transaction Request
+        window.location.href = 'https://phantom.app/ul/browse?url=' + encodeURIComponent('https://tnt-audit.com/api/pay?amount=' + amount + '&method=' + method + '&label=' + encodeURIComponent(label));
       }
       return;
     }
 
-    // 4. Desktop / unknown — raw solana: URI
-    window.open(solanaPayUri, '_blank');
+    // 3. Desktop — raw Transaction Request URI
+    window.open(txRequestUri, '_blank');
   };
 
   var formatNumber = function(num) {
@@ -542,7 +528,7 @@ export default function TntHouse() {
               </a>
               <div>
                 <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-emerald-400 tracking-wider">TNT HOUSE</h1>
-                <span className="text-[10px] text-purple-400 block font-bold tracking-widest">TOP NEW TOKENS v0.3</span>
+                <span className="text-[10px] text-purple-400 block font-bold tracking-widest">TOP NEW TOKENS v0.4</span>
               </div>
             </div>
             <div className="flex items-center gap-0.5 mr-1">
@@ -807,7 +793,7 @@ export default function TntHouse() {
               <a href="https://www.maradonatoken-mrdt.xyz" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-emerald-400 transition-colors"><ExternalLink className="w-6 h-6" /></a>
             </div>
             <div className="text-center space-y-1">
-              <div className="text-purple-400 font-bold text-sm tracking-widest">TNT HOUSE v0.3</div>
+              <div className="text-purple-400 font-bold text-sm tracking-widest">TNT HOUSE v0.4</div>
               <div className="text-slate-400 text-xs">Powered by $MRDT · AI Audits · Supabase</div>
               <div className="text-slate-500 text-[10px]">Built with Next.js + Tailwind CSS · Solana Pay</div>
             </div>
