@@ -139,6 +139,10 @@ export default function TntHouse() {
   var [selectedToken, setSelectedToken] = useState(null);
   var [mrdtPrice, setMrdtPrice] = useState(0.000013);
   var mrdtPriceRef = useRef(0.000013);
+  // FIX v1.45: track SOL/USD price so SOL payments charge the correct SOL amount
+  // instead of accidentally reusing the MRDT token amount.
+  var [solPrice, setSolPrice] = useState(150);
+  var solPriceRef = useRef(150);
   var [priceLoading, setPriceLoading] = useState(true);
   var [toast, setToast] = useState({ show: false, message: '', type: 'success' });
   var [lang, setLang] = useState('en');
@@ -248,6 +252,17 @@ export default function TntHouse() {
     return parseFloat((usd / price).toFixed(2));
   };
 
+  // FIX v1.45: returns SOL amount (not MRDT) for a given USD price, used when
+  // the user selects SOL as the payment method instead of $MRDT.
+  var getSafeSolPrice = function() {
+    var p = solPriceRef.current || solPrice || 150;
+    if (!isFinite(p) || p <= 0) return 150;
+    return p;
+  };
+  var getSOLAmountForUsd = function(usd) {
+    return (usd / getSafeSolPrice()).toFixed(6);
+  };
+
   var formatNumber = function(num) {
     if (num >= 1e6) return '$' + (num / 1e6).toFixed(1) + 'M';
     if (num >= 1e3) return '$' + (num / 1e3).toFixed(1) + 'K';
@@ -298,6 +313,17 @@ export default function TntHouse() {
         if (data.pairs && data.pairs.length) {
           var p = parseFloat(data.pairs[0].priceUsd);
           if (isFinite(p) && p > 0) { setMrdtPrice(p); mrdtPriceRef.current = p; }
+        }
+      } catch (e) {}
+      // FIX v1.45: fetch SOL/USD price too, needed for the SOL payment option
+      try {
+        var solRes = await fetch(
+          'https://api.dexscreener.com/latest/dex/tokens/So11111111111111111111111111111111111111112'
+        );
+        var solData = await solRes.json();
+        if (solData.pairs && solData.pairs.length) {
+          var sp = parseFloat(solData.pairs[0].priceUsd);
+          if (isFinite(sp) && sp > 0) { setSolPrice(sp); solPriceRef.current = sp; }
         }
       } catch (e) {}
       setPriceLoading(false);
@@ -559,6 +585,9 @@ export default function TntHouse() {
       setShowInvoiceModal(false);
       return;
     }
+    // FIX v1.45: capture method/wallet into locals BEFORE resetting state,
+    // so the URI builder below always uses the value the user actually picked.
+    var paymentMethod = selectedPaymentMethod;
     setShowInvoiceModal(false);
     setIsSending(true);
     var ca = formData.contractAddress;
@@ -568,14 +597,19 @@ export default function TntHouse() {
     setSelectedPaymentMethod(null);
     setSelectedWallet(null);
     setIsSending(false);
-    startPaymentVerification('audit', invoiceAmount, null, tokenData);
     var label = encodeURIComponent(invoiceLabel);
     var message = encodeURIComponent('Audit for ' + projectName + ' CA: ' + ca);
-    // Build Solana Pay SPL-token URI with integer token amount (in smallest units)
-    var rawAmount = Math.round(invoiceAmount * Math.pow(10, MRDT_DECIMALS));
+    // FIX v1.45: Solana Pay 'amount' param must be UI amount (human-readable),
+    // NOT raw smallest-unit amount — Phantom multiplies by decimals internally.
+    // Sending pre-multiplied amount made Phantom show 0 (overflow/guard).
+    // Also: only attach spl-token when paying in MRDT — SOL must be a native
+    // transfer with its own SOL amount, not the MRDT token amount.
+    var isSol = paymentMethod === 'SOL';
+    var payAmount = isSol ? getSOLAmountForUsd(invoiceUsd) : invoiceAmount;
+    startPaymentVerification('audit', invoiceAmount, null, tokenData);
     var uri = 'solana:' + WALLET_ADDRESS
-      + '?amount=' + rawAmount
-      + '&spl-token=' + MRDT_CA
+      + '?amount=' + payAmount
+      + (isSol ? '' : '&spl-token=' + MRDT_CA)
       + '&label=' + label
       + '&message=' + message;
     openDeeplink(uri);
@@ -687,6 +721,8 @@ export default function TntHouse() {
       setShowBannerInvoiceModal(false);
       return;
     }
+    // FIX v1.45: capture method into local before resetting state below.
+    var paymentMethod = selectedBannerPaymentMethod;
     setShowBannerInvoiceModal(false);
     setIsBannerSending(true);
     var banner = {
@@ -703,11 +739,14 @@ export default function TntHouse() {
     setSelectedBannerPaymentMethod(null);
     setSelectedBannerWallet(null);
     setIsBannerSending(false);
-    // Build Solana Pay SPL-token URI with integer token amount (in smallest units)
-    var rawBannerAmount = Math.round(mrdtAmount * Math.pow(10, MRDT_DECIMALS));
+    // FIX v1.45: Solana Pay 'amount' param must be UI amount, not raw smallest-unit
+    // amount. Also: only attach spl-token when paying in MRDT, not for SOL —
+    // and use the correct SOL amount (not the MRDT token amount) for SOL pays.
+    var isSol = paymentMethod === 'SOL';
+    var payAmount = isSol ? getSOLAmountForUsd(bannerInvoiceUsd) : mrdtAmount;
     var uri = 'solana:' + WALLET_ADDRESS
-      + '?amount=' + rawBannerAmount
-      + '&spl-token=' + MRDT_CA
+      + '?amount=' + payAmount
+      + (isSol ? '' : '&spl-token=' + MRDT_CA)
       + '&label=' + label
       + '&message=' + message;
     openDeeplink(uri);
@@ -819,7 +858,7 @@ export default function TntHouse() {
                   TNT HOUSE
                 </h1>
                 <span className="text-[10px] text-purple-400 block font-bold tracking-widest">
-                  TOP NEW TOKENS v1.43
+                  TOP NEW TOKENS v1.45
                 </span>
               </div>
             </div>
@@ -1479,7 +1518,7 @@ export default function TntHouse() {
               </a>
             </div>
             <div className="text-center space-y-1">
-              <div className="text-purple-400 font-bold text-sm tracking-widest">TNT HOUSE v1.43</div>
+              <div className="text-purple-400 font-bold text-sm tracking-widest">TNT HOUSE v1.45</div>
               <div className="text-slate-400 text-xs">Powered by $MRDT · AI Audits · Supabase</div>
               <div className="text-slate-500 text-[10px]">Built with Next.js + Tailwind CSS · Solana Pay</div>
             </div>
@@ -1606,7 +1645,11 @@ export default function TntHouse() {
             </div>
             <div className="bg-slate-900 border border-purple-500/20 rounded-xl p-6 text-center space-y-4">
               <div className="text-xs text-purple-400 font-bold">{selectedWallet} · {selectedPaymentMethod}</div>
-              <div className="text-3xl font-black text-emerald-400">{invoiceAmount.toLocaleString()} $MRDT</div>
+              <div className="text-3xl font-black text-emerald-400">
+                {selectedPaymentMethod === 'SOL'
+                  ? getSOLAmountForUsd(invoiceUsd) + ' SOL'
+                  : invoiceAmount.toLocaleString() + ' $MRDT'}
+              </div>
               <div className="text-sm font-bold text-slate-300">≈ ${invoiceUsd} USD</div>
               <div className="text-xs text-slate-400">{invoiceLabel}</div>
               <div className="text-xs text-slate-500 font-mono break-all">
@@ -1770,7 +1813,9 @@ export default function TntHouse() {
                 {selectedBannerWallet} · {selectedBannerPaymentMethod}
               </div>
               <div className="text-3xl font-black text-emerald-400">
-                {bannerInvoiceAmount.toLocaleString()} $MRDT
+                {selectedBannerPaymentMethod === 'SOL'
+                  ? getSOLAmountForUsd(bannerInvoiceUsd) + ' SOL'
+                  : bannerInvoiceAmount.toLocaleString() + ' $MRDT'}
               </div>
               <div className="text-sm font-bold text-slate-300">≈ ${bannerInvoiceUsd} USD</div>
               <div className="text-xs text-slate-500 font-mono break-all">
