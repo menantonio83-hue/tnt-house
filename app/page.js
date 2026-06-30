@@ -861,52 +861,31 @@ export default function TntHouse() {
     });
   }, []);
 
-  // Fetch $MRDT price from DexScreener every 60s
+  // FIX v1.55: Jupiter Price API v3 — single request, both MRDT + SOL.
+  // Jupiter aggregates all Solana DEXes: same price the user sees in Jupiter swap UI.
+  // Public endpoint, no API key: https://lite-api.jup.ag/price/v3?ids=MINT1,MINT2
+  var SOL_MINT = 'So11111111111111111111111111111111111111112';
   useEffect(function () {
     var fetchPrice = async function () {
       try {
-        var res = await fetch('https://api.dexscreener.com/latest/dex/tokens/' + MRDT_CA);
+        var res = await fetch(
+          'https://lite-api.jup.ag/price/v3?ids=' + MRDT_CA + ',' + SOL_MINT
+        );
         var data = await res.json();
-        if (data.pairs && data.pairs.length) {
-          var solanaPairs = data.pairs.filter(function(pr) { return pr.chainId === 'solana'; });
-          var bestPair = solanaPairs.sort(function(a, b) { return ((b.liquidity && b.liquidity.usd) || 0) - ((a.liquidity && a.liquidity.usd) || 0); })[0];
-          var p = bestPair ? parseFloat(bestPair.priceUsd) : NaN;
+        if (data && data[MRDT_CA] && data[MRDT_CA].usdPrice) {
+          var p = parseFloat(data[MRDT_CA].usdPrice);
           if (isFinite(p) && p > 0) { setMrdtPrice(p); mrdtPriceRef.current = p; }
         }
-      } catch (e) {}
-      // FIX v1.46: dexscreener returns pairs from ANY chain that happens to reuse
-      // the same mint address string (e.g. chainId 'fogo' also uses
-      // So111...112) — pairs[0] is not guaranteed to be real Solana SOL.
-      // Must filter explicitly for chainId === 'solana' and a stablecoin quote.
-      try {
-        var solRes = await fetch(
-          'https://api.dexscreener.com/latest/dex/tokens/So11111111111111111111111111111111111111112',
-        );
-        var solData = await solRes.json();
-        if (solData.pairs && solData.pairs.length) {
-          var solPair = solData.pairs.find(function (p) {
-            return (
-              p.chainId === 'solana' &&
-              p.baseToken &&
-              p.baseToken.symbol === 'SOL' &&
-              p.quoteToken &&
-              (p.quoteToken.symbol === 'USDC' || p.quoteToken.symbol === 'USDT')
-            );
-          });
-          var sp = solPair ? parseFloat(solPair.priceUsd) : NaN;
-          if (isFinite(sp) && sp > 0) {
-            setSolPrice(sp);
-            solPriceRef.current = sp;
-          }
+        if (data && data[SOL_MINT] && data[SOL_MINT].usdPrice) {
+          var sp = parseFloat(data[SOL_MINT].usdPrice);
+          if (isFinite(sp) && sp > 0) { setSolPrice(sp); solPriceRef.current = sp; }
         }
       } catch (e) {}
       setPriceLoading(false);
     };
     fetchPrice();
     var i = setInterval(fetchPrice, 60000);
-    return function () {
-      clearInterval(i);
-    };
+    return function () { clearInterval(i); };
   }, []);
 
   // Rotating terminal log messages
