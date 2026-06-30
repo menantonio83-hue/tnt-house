@@ -783,13 +783,13 @@ export default function TntHouse() {
   var getAmountForTier = function (tier) {
     var usd = tier === 'fast' ? 25 : tier === 'vip' ? 75 : 10;
     var price = getSafePrice();
-    return parseFloat((usd / price).toFixed(2));
+    return Math.round(usd / price);
   };
 
   var getAmountForBanner = function (days) {
     var usd = days === '2' ? 35 : days === '6' ? 100 : 20;
     var price = getSafePrice();
-    return parseFloat((usd / price).toFixed(2));
+    return Math.round(usd / price);
   };
 
   // FIX v1.45: returns SOL amount (not MRDT) for a given USD price, used when
