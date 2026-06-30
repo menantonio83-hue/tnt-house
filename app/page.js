@@ -868,11 +868,10 @@ export default function TntHouse() {
         var res = await fetch('https://api.dexscreener.com/latest/dex/tokens/' + MRDT_CA);
         var data = await res.json();
         if (data.pairs && data.pairs.length) {
-          var p = parseFloat(data.pairs[0].priceUsd);
-          if (isFinite(p) && p > 0) {
-            setMrdtPrice(p);
-            mrdtPriceRef.current = p;
-          }
+          var solanaPairs = data.pairs.filter(function(pr) { return pr.chainId === 'solana'; });
+          var bestPair = solanaPairs.sort(function(a, b) { return ((b.liquidity && b.liquidity.usd) || 0) - ((a.liquidity && a.liquidity.usd) || 0); })[0];
+          var p = bestPair ? parseFloat(bestPair.priceUsd) : NaN;
+          if (isFinite(p) && p > 0) { setMrdtPrice(p); mrdtPriceRef.current = p; }
         }
       } catch (e) {}
       // FIX v1.46: dexscreener returns pairs from ANY chain that happens to reuse
