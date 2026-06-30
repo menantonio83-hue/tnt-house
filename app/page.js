@@ -17,6 +17,20 @@ import {
   CheckCircle,
   XCircle,
 } from 'lucide-react';
+import {
+  Connection,
+  PublicKey,
+  Transaction,
+  SystemProgram,
+  LAMPORTS_PER_SOL,
+} from '@solana/web3.js';
+import {
+  getAssociatedTokenAddress,
+  createTransferInstruction,
+  createAssociatedTokenAccountInstruction,
+  getAccount,
+  getMint,
+} from '@solana/spl-token';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,6 +40,92 @@ const MRDT_DECIMALS = 9;
 const SITE_URL = 'https://tnt-house.vercel.app';
 const SUPABASE_URL = 'https://pjtvjslcffuulsqxerpx.supabase.co';
 const SUPABASE_KEY = 'sb_publishable__gmhE8SE_blCu-v90fV2OQ_YmFCkfFU';
+const SOLANA_RPC_URL = 'https://api.mainnet-beta.solana.com';
+
+// FIX v1.57: direct-sign payment path — see signAndSendTransfer below. Ported
+// from the pre-restructure build (frozen copy still at repo root, page.js,
+// "Version 1.10") which never relied on Phantom parsing an `amount` query
+// param from a solana: deep link at all. Instead it opened the dApp inside
+// Phantom/Solflare's own in-app browser (window.solana / window.solflare is
+// injected there) and built + signed the transfer transaction directly with
+// @solana/web3.js + @solana/spl-token. That's the mechanism that reportedly
+// "just worked" on Android before the app/ restructure replaced it with a
+// static solana:...&amount=...&spl-token=... URI, which depends entirely on
+// Phantom's own deep-link query parsing — the part that broke.
+function isMobileUA() {
+  return typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+function getActiveWalletProvider(walletName) {
+  if (typeof window === 'undefined') return null;
+  if (walletName === 'Solflare') {
+    return window.solflare && window.solflare.isSolflare ? window.solflare : null;
+  }
+  return window.solana && window.solana.isPhantom ? window.solana : null;
+}
+function redirectIntoWalletBrowser(walletName, resumePayload) {
+  var resumeParam = encodeURIComponent(btoa(JSON.stringify(resumePayload)));
+  var targetUrl = SITE_URL + '/?tnt_resume=' + resumeParam;
+  var encoded = encodeURIComponent(targetUrl);
+  var ref = encodeURIComponent(SITE_URL);
+  if (walletName === 'Solflare') {
+    window.location.href = 'solflare://v1/browse/' + encoded;
+    setTimeout(function () {
+      window.location.href = 'https://solflare.com/ul/v1/browse/' + encoded + '?ref=' + ref;
+    }, 500);
+  } else {
+    window.location.href = 'phantom://v1/browse/' + encoded;
+    setTimeout(function () {
+      window.location.href = 'https://phantom.app/ul/browse/' + encoded + '?ref=' + ref;
+    }, 500);
+  }
+}
+// Builds and signs the transfer directly through the wallet's injected
+// provider — the amount is baked into the transaction itself, so there is no
+// deep-link query string for the wallet to (mis)parse.
+async function signAndSendTransfer(provider, method, uiAmount) {
+  var connection = new Connection(SOLANA_RPC_URL, 'confirmed');
+  if (!provider.publicKey) {
+    await provider.connect();
+  }
+  var senderPubkey = provider.publicKey;
+  var recipientPubkey = new PublicKey(WALLET_ADDRESS);
+  var tx = new Transaction();
+  tx.feePayer = senderPubkey;
+  tx.recentBlockhash = (await connection.getLatestBlockhash('finalized')).blockhash;
+
+  if (method === 'SOL') {
+    var lamports = Math.round(uiAmount * LAMPORTS_PER_SOL);
+    tx.add(
+      SystemProgram.transfer({ fromPubkey: senderPubkey, toPubkey: recipientPubkey, lamports: lamports }),
+    );
+  } else {
+    var mintPubkey = new PublicKey(MRDT_CA);
+    var mintInfo = await getMint(connection, mintPubkey);
+    var rawAmount = BigInt(Math.round(uiAmount * Math.pow(10, mintInfo.decimals)));
+    var senderAta = await getAssociatedTokenAddress(mintPubkey, senderPubkey);
+    var recipientAta = await getAssociatedTokenAddress(mintPubkey, recipientPubkey);
+    await getAccount(connection, senderAta).catch(function () {
+      throw new Error('No $MRDT found in this wallet.');
+    });
+    var recipientAtaExists = true;
+    try {
+      await getAccount(connection, recipientAta);
+    } catch (e) {
+      recipientAtaExists = false;
+    }
+    if (!recipientAtaExists) {
+      tx.add(
+        createAssociatedTokenAccountInstruction(senderPubkey, recipientAta, recipientPubkey, mintPubkey),
+      );
+    }
+    tx.add(createTransferInstruction(senderAta, recipientAta, senderPubkey, rawAmount));
+  }
+
+  var signedTx = await provider.signTransaction(tx);
+  var signature = await connection.sendRawTransaction(signedTx.serialize(), { skipPreflight: false });
+  await connection.confirmTransaction(signature, 'confirmed');
+  return signature;
+}
 
 const GLOW_PURPLE = {
   position: 'absolute',
@@ -1213,15 +1313,15 @@ export default function TntHouse() {
     );
   };
 
-  // FIX v1.56: no longer `async` / no leading `await`. This used to await
-  // runAuditAndSave (two network round-trips: RugCheck + DexScreener) before
-  // ever building the URI or calling openDeeplink, which moved the deeplink
-  // navigation seconds away from the user's tap — see openDeeplink above for
-  // why that risks the wallet handoff. The deeplink now fires first, with
-  // everything it needs (amount/method/label/message) already available
-  // synchronously from state; the audit run + Supabase save happen after, in
-  // the background, and only need to finish before the payment verification
-  // polling (10s interval) actually confirms a transfer.
+  // FIX v1.57: prefer signing the transaction directly through the wallet's
+  // injected provider (see signAndSendTransfer) instead of the solana:
+  // deep-link, which depends on Phantom/Solflare correctly parsing `amount`
+  // from a URI — the part that broke on Android. If the wallet isn't already
+  // injected (i.e. we're in a regular mobile browser tab, not the wallet's
+  // own in-app browser), hop into that browser first via
+  // redirectIntoWalletBrowser and resume the payment there — see the
+  // tnt_resume effect below. The static deep link is now only the fallback
+  // for desktop without a wallet extension installed.
   var handleConfirmPayment = function () {
     // FIX v1.37: Double-check amount is valid before launching wallet deeplink
     if (!invoiceAmount || invoiceAmount <= 0) {
@@ -1232,8 +1332,10 @@ export default function TntHouse() {
     // FIX v1.45: capture method/wallet into locals BEFORE resetting state,
     // so the URI builder below always uses the value the user actually picked.
     var paymentMethod = selectedPaymentMethod;
+    var wallet = selectedWallet;
     var ca = formData.contractAddress;
     var projectName = formData.projectName;
+    var telegram = formData.telegram;
     var label = invoiceLabel;
     var message = 'Audit for ' + projectName + ' CA: ' + ca;
     // FIX v0.1.2: MRDT and SOL are now two fully independent payment paths —
@@ -1244,11 +1346,22 @@ export default function TntHouse() {
     var isSol = paymentMethod === 'SOL';
     var payAmount = isSol ? getSOLAmountForUsd(invoiceUsd) : invoiceAmount;
     var verifyMethod = isSol ? 'SOL' : 'MRDT';
-    // FIX v1.49: static transfer-request URI — see buildTransferRequestUri above.
-    var uri = buildTransferRequestUri(payAmount, verifyMethod, label, message);
-    openDeeplink(uri);
-
     setShowInvoiceModal(false);
+
+    var provider = getActiveWalletProvider(wallet);
+    if (!provider && isMobileUA()) {
+      redirectIntoWalletBrowser(wallet, {
+        k: 'audit',
+        ca: ca,
+        projectName: projectName,
+        telegram: telegram,
+        wallet: wallet,
+        method: verifyMethod,
+        payAmount: payAmount,
+      });
+      return;
+    }
+
     setIsSending(true);
     runAuditAndSave(ca, projectName, false).then(function (tokenData) {
       setFormData({ projectName: '', contractAddress: '', telegram: '' });
@@ -1257,6 +1370,16 @@ export default function TntHouse() {
       setIsSending(false);
       startPaymentVerification('audit', payAmount, null, tokenData, verifyMethod);
     });
+
+    if (provider) {
+      signAndSendTransfer(provider, verifyMethod, payAmount).catch(function (e) {
+        showToast('❌ ' + (e && e.message ? e.message : 'Payment failed'), 'error');
+      });
+    } else {
+      // Desktop without a wallet extension — keep the deep-link fallback.
+      var uri = buildTransferRequestUri(payAmount, verifyMethod, label, message);
+      openDeeplink(uri);
+    }
   };
 
   var handleBannerSubmit = function (e) {
@@ -1374,6 +1497,7 @@ export default function TntHouse() {
     };
   }, []);
 
+  // FIX v1.57: same direct-sign-first strategy as handleConfirmPayment above.
   var handleBannerConfirmPayment = function () {
     // FIX v1.37: Guard against zero/invalid banner amount before launching wallet deeplink
     if (!bannerInvoiceAmount || bannerInvoiceAmount <= 0) {
@@ -1383,32 +1507,104 @@ export default function TntHouse() {
     }
     // FIX v1.45: capture method into local before resetting state below.
     var paymentMethod = selectedBannerPaymentMethod;
+    var wallet = selectedBannerWallet;
+    var days = bannerFormData.days;
     setShowBannerInvoiceModal(false);
-    setIsBannerSending(true);
     var banner = {
       tokenName: bannerFormData.tokenName.toUpperCase(),
       bannerImg: bannerFormData.bannerImg || '',
       desc: bannerFormData.desc,
-      expiresAt: Date.now() + parseInt(bannerFormData.days) * 86400000,
+      expiresAt: Date.now() + parseInt(days) * 86400000,
     };
     var mrdtAmount = bannerInvoiceAmount;
-    var label = 'TNT House VIP Banner ' + bannerFormData.days + 'd';
+    var label = 'TNT House VIP Banner ' + days + 'd';
     var message = 'VIP Banner for ' + banner.tokenName;
-    setBannerFormData({ tokenName: '', bannerImg: '', desc: '', days: '1' });
-    setSelectedBannerPaymentMethod(null);
-    setSelectedBannerWallet(null);
-    setIsBannerSending(false);
     // FIX v0.1.2: build payAmount/method BEFORE calling startPaymentVerification,
     // and pass method through so SOL banner payments verify against the SOL
     // amount on the backend instead of silently comparing against MRDT.
     var isSol = paymentMethod === 'SOL';
     var payAmount = isSol ? getSOLAmountForUsd(bannerInvoiceUsd) : mrdtAmount;
     var verifyMethod = isSol ? 'SOL' : 'MRDT';
+
+    var provider = getActiveWalletProvider(wallet);
+    if (!provider && isMobileUA()) {
+      redirectIntoWalletBrowser(wallet, {
+        k: 'banner',
+        tokenName: bannerFormData.tokenName,
+        bannerImg: bannerFormData.bannerImg,
+        desc: bannerFormData.desc,
+        days: days,
+        wallet: wallet,
+        method: verifyMethod,
+        payAmount: payAmount,
+      });
+      return;
+    }
+
+    setIsBannerSending(true);
+    setBannerFormData({ tokenName: '', bannerImg: '', desc: '', days: '1' });
+    setSelectedBannerPaymentMethod(null);
+    setSelectedBannerWallet(null);
+    setIsBannerSending(false);
     startPaymentVerification('banner', payAmount, banner, null, verifyMethod);
-    // FIX v1.49: static transfer-request URI — see buildTransferRequestUri above.
-    var uri = buildTransferRequestUri(payAmount, verifyMethod, label, message);
-    openDeeplink(uri);
+
+    if (provider) {
+      signAndSendTransfer(provider, verifyMethod, payAmount).catch(function (e) {
+        showToast('❌ ' + (e && e.message ? e.message : 'Payment failed'), 'error');
+      });
+    } else {
+      // Desktop without a wallet extension — keep the deep-link fallback.
+      var uri = buildTransferRequestUri(payAmount, verifyMethod, label, message);
+      openDeeplink(uri);
+    }
   };
+
+  // FIX v1.57: resume a payment after redirectIntoWalletBrowser hops the user
+  // into Phantom/Solflare's own in-app browser. That browser is a separate
+  // app context (its own storage), so the pending payment is carried across
+  // as a `tnt_resume` query param instead of component state. By the time
+  // this page reloads here, the wallet's provider is injected, so we sign
+  // and send immediately rather than re-showing the multi-step form.
+  useEffect(function () {
+    if (typeof window === 'undefined') return;
+    var params = new URLSearchParams(window.location.search);
+    var resumeParam = params.get('tnt_resume');
+    if (!resumeParam) return;
+    window.history.replaceState({}, '', window.location.pathname);
+    var payload;
+    try {
+      payload = JSON.parse(atob(decodeURIComponent(resumeParam)));
+    } catch (e) {
+      return;
+    }
+    var provider = getActiveWalletProvider(payload.wallet);
+    if (!provider) {
+      showToast('Wallet not detected in this browser.', 'error');
+      return;
+    }
+    if (payload.k === 'audit') {
+      setIsSending(true);
+      runAuditAndSave(payload.ca, payload.projectName, false).then(function (tokenData) {
+        setIsSending(false);
+        startPaymentVerification('audit', payload.payAmount, null, tokenData, payload.method);
+      });
+      signAndSendTransfer(provider, payload.method, payload.payAmount).catch(function (e) {
+        showToast('❌ ' + (e && e.message ? e.message : 'Payment failed'), 'error');
+      });
+    } else if (payload.k === 'banner') {
+      var banner = {
+        tokenName: (payload.tokenName || '').toUpperCase(),
+        bannerImg: payload.bannerImg || '',
+        desc: payload.desc,
+        expiresAt: Date.now() + parseInt(payload.days) * 86400000,
+      };
+      startPaymentVerification('banner', payload.payAmount, banner, null, payload.method);
+      signAndSendTransfer(provider, payload.method, payload.payAmount).catch(function (e) {
+        showToast('❌ ' + (e && e.message ? e.message : 'Payment failed'), 'error');
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Chat countdown timer for rate limiting
   useEffect(
