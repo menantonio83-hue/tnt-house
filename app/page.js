@@ -1178,20 +1178,10 @@ export default function TntHouse() {
   // FIX v1.44: Open deeplink via click on hidden <a> to preserve user gesture.
   // If wallet doesn't open within 2s (desktop without extension), show fallback.
   var openDeeplink = function (uri) {
-    // FIX v1.52: Chrome on Android strips or mishandles query params when
-    // navigating to custom URI schemes (solana:) via window.location.href.
-    // Android Intent URI format bypasses Chrome and passes the full URI
-    // directly to the Android Intent system — query params are preserved.
-    // Format: intent://<data>#Intent;scheme=<scheme>;package=<pkg>;end
-    // Extract everything after "solana:" to use as Intent data
-    var solanaData = uri.replace(/^solana:/, '');
-    var intentUri =
-      'intent://' +
-      solanaData +
-      '#Intent;scheme=solana;package=app.phantom;' +
-      'S.browser_fallback_url=https%3A%2F%2Fphantom.app%2Fdownload;end';
+    // Proven mechanism: simple window.location.href with 300ms delay.
+    // Android Intent URI (v1.52) broke Phantom invoice display — reverted.
     setTimeout(function () {
-      window.location.href = intentUri;
+      window.location.href = uri;
     }, 300);
     // Show fallback after 2s if protocol handler didn't fire
     setTimeout(function () {
