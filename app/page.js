@@ -1203,11 +1203,19 @@ export default function TntHouse() {
   // Transaction Request approach, which blocks payments entirely.
   var buildTransferRequestUri = function (amount, method, label, message) {
     var isSol = method === 'SOL';
+    // FIX v1.51: v1.35 (the last confirmed working build) always sent MRDT
+    // amount as a whole integer (Math.round). Phantom on Android correctly
+    // parses integer amounts for SPL tokens but silently drops fractional
+    // amounts like 1538461.54, showing 0 instead. SOL stays as a 6-decimal
+    // string since it's a native transfer and Phantom handles decimals fine.
+    var amountStr = isSol
+      ? parseFloat(amount).toFixed(6)
+      : String(Math.round(amount));
     return (
       'solana:' +
       WALLET_ADDRESS +
       '?amount=' +
-      amount +
+      amountStr +
       (isSol ? '' : '&spl-token=' + MRDT_CA) +
       '&label=' +
       encodeURIComponent(label) +
