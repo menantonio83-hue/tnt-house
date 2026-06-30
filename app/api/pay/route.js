@@ -1,4 +1,3 @@
-
 // app/api/pay/route.js
 // Solana Pay Transaction Request API
 // Phantom sends GET (metadata) then POST (transaction) to this endpoint
@@ -9,7 +8,9 @@ import { createTransferInstruction, getAssociatedTokenAddress, TOKEN_PROGRAM_ID 
 
 const WALLET_ADDRESS = 'Ev6oXBXo6qyoaT5wypJ2Umxch91F7cFvE1SarYLaUn8Z';
 const MRDT_CA = '8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg';
+const MRDT_DECIMALS = 9;
 const RPC_URL = 'https://api.mainnet-beta.solana.com';
+const SITE_URL = 'https://tnt-house.vercel.app';
 
 // GET — Phantom fetches label/icon metadata first
 export async function GET(request) {
@@ -19,7 +20,7 @@ export async function GET(request) {
 
   return NextResponse.json({
     label,
-    icon: 'https://tnt-audit.com/favicon.ico',
+    icon: `${SITE_URL}/favicon.ico`,
   }, {
     headers: {
       'Access-Control-Allow-Origin': '*',
@@ -63,8 +64,8 @@ export async function POST(request) {
       const senderATA = await getAssociatedTokenAddress(mintPubkey, senderPubkey);
       const recipientATA = await getAssociatedTokenAddress(mintPubkey, recipientPubkey);
 
-      // MRDT has 6 decimals
-      const tokenAmount = Math.round(amount * 1e6);
+      // FIX: MRDT has 9 decimals (not 6!)
+      const tokenAmount = Math.round(amount * Math.pow(10, MRDT_DECIMALS));
 
       transaction.add(
         createTransferInstruction(
