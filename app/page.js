@@ -1153,14 +1153,27 @@ export default function TntHouse() {
     return tokenData;
   };
 
-  // FIX v1.44: Open deeplink via click on hidden <a> to preserve user gesture.
-  // If wallet doesn't open within 2s (desktop without extension), show fallback.
+  // FIX v1.56: fire the deeplink synchronously, in the same tick as the user's
+  // tap — no setTimeout before the first attempt. Android Chrome/WebView only
+  // hands a custom scheme like solana: off to Phantom as a trusted,
+  // user-initiated navigation while the tap's "user activation" is still
+  // live; the previous 300ms setTimeout (plus, on the audit flow, an awaited
+  // network round-trip before openDeeplink was even called — see
+  // handleConfirmPayment) pushed the actual navigation well outside that
+  // window. Try a synchronous hidden-<a> click first (most reliable for
+  // custom schemes across mobile browsers), then window.location.href right
+  // behind it as a second attempt — both still inside the same gesture.
   var openDeeplink = function (uri) {
-    // Proven mechanism: simple window.location.href with 300ms delay.
-    // Android Intent URI (v1.52) broke Phantom invoice display — reverted.
-    setTimeout(function () {
-      window.location.href = uri;
-    }, 300);
+    try {
+      var a = document.createElement('a');
+      a.href = uri;
+      a.rel = 'noopener';
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (e) {}
+    window.location.href = uri;
     // Show fallback after 2s if protocol handler didn't fire
     setTimeout(function () {
       setDeeplinkFallbackUri(uri);
@@ -1200,7 +1213,16 @@ export default function TntHouse() {
     );
   };
 
-  var handleConfirmPayment = async function () {
+  // FIX v1.56: no longer `async` / no leading `await`. This used to await
+  // runAuditAndSave (two network round-trips: RugCheck + DexScreener) before
+  // ever building the URI or calling openDeeplink, which moved the deeplink
+  // navigation seconds away from the user's tap — see openDeeplink above for
+  // why that risks the wallet handoff. The deeplink now fires first, with
+  // everything it needs (amount/method/label/message) already available
+  // synchronously from state; the audit run + Supabase save happen after, in
+  // the background, and only need to finish before the payment verification
+  // polling (10s interval) actually confirms a transfer.
+  var handleConfirmPayment = function () {
     // FIX v1.37: Double-check amount is valid before launching wallet deeplink
     if (!invoiceAmount || invoiceAmount <= 0) {
       showToast(t.priceError, 'error');
@@ -1210,15 +1232,8 @@ export default function TntHouse() {
     // FIX v1.45: capture method/wallet into locals BEFORE resetting state,
     // so the URI builder below always uses the value the user actually picked.
     var paymentMethod = selectedPaymentMethod;
-    setShowInvoiceModal(false);
-    setIsSending(true);
     var ca = formData.contractAddress;
     var projectName = formData.projectName;
-    var tokenData = await runAuditAndSave(ca, projectName, false);
-    setFormData({ projectName: '', contractAddress: '', telegram: '' });
-    setSelectedPaymentMethod(null);
-    setSelectedWallet(null);
-    setIsSending(false);
     var label = invoiceLabel;
     var message = 'Audit for ' + projectName + ' CA: ' + ca;
     // FIX v0.1.2: MRDT and SOL are now two fully independent payment paths —
@@ -1229,10 +1244,19 @@ export default function TntHouse() {
     var isSol = paymentMethod === 'SOL';
     var payAmount = isSol ? getSOLAmountForUsd(invoiceUsd) : invoiceAmount;
     var verifyMethod = isSol ? 'SOL' : 'MRDT';
-    startPaymentVerification('audit', payAmount, null, tokenData, verifyMethod);
     // FIX v1.49: static transfer-request URI — see buildTransferRequestUri above.
     var uri = buildTransferRequestUri(payAmount, verifyMethod, label, message);
     openDeeplink(uri);
+
+    setShowInvoiceModal(false);
+    setIsSending(true);
+    runAuditAndSave(ca, projectName, false).then(function (tokenData) {
+      setFormData({ projectName: '', contractAddress: '', telegram: '' });
+      setSelectedPaymentMethod(null);
+      setSelectedWallet(null);
+      setIsSending(false);
+      startPaymentVerification('audit', payAmount, null, tokenData, verifyMethod);
+    });
   };
 
   var handleBannerSubmit = function (e) {
