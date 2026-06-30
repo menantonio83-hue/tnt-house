@@ -1178,14 +1178,13 @@ export default function TntHouse() {
   // FIX v1.44: Open deeplink via click on hidden <a> to preserve user gesture.
   // If wallet doesn't open within 2s (desktop without extension), show fallback.
   var openDeeplink = function (uri) {
-    var a = document.createElement('a');
-    a.href = uri;
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
+    // FIX v1.50: v1.35 used window.location.href (with a short setTimeout)
+    // to trigger the solana: deeplink and that build's payments actually
+    // worked on this exact device. Today's code instead clicked a hidden
+    // <a> tag — switching back to the proven mechanism.
     setTimeout(function () {
-      document.body.removeChild(a);
-    }, 100);
+      window.location.href = uri;
+    }, 300);
     // Show fallback after 2s if protocol handler didn't fire
     setTimeout(function () {
       setDeeplinkFallbackUri(uri);
