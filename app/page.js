@@ -2384,6 +2384,258 @@ export default function TntHouse() {
             <div className="grid grid-cols-2 gap-4">
               <button
                 onClick={function () {
+                  handlePaymentMethodSelect('MRDT');
+                }}
+                className="bg-purple-500/10 border-2 border-purple-500/30 hover:border-purple-500 rounded-xl p-6 text-center transition group"
+              >
+                <div className="text-3xl mb-2">⚽️</div>
+                <div className="font-bold text-purple-400 group-hover:text-white transition">
+                  $MRDT
+                </div>
+                <div className="text-[10px] text-slate-500 mt-1">{t.recommended}</div>
+              </button>
+              <button
+                onClick={function () {
+                  handlePaymentMethodSelect('SOL');
+                }}
+                className="bg-emerald-500/10 border-2 border-emerald-500/30 hover:border-emerald-500 rounded-xl p-6 text-center transition group"
+              >
+                <div className="flex justify-center mb-2">
+                  <svg
+                    width="36"
+                    height="36"
+                    viewBox="0 0 397 311"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M64.6 237.9c2.4-2.4 5.7-3.8 9.2-3.8h317.4c5.8 0 8.7 7 4.6 11.1l-62.7 62.7c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1l62.7-62.7z"
+                      fill="url(#sol_a)"
+                    />
+                    <path
+                      d="M64.6 3.8C67.1 1.4 70.4 0 73.8 0h317.4c5.8 0 8.7 7 4.6 11.1L333.1 73.8c-2.4 2.4-5.7 3.8-9.2 3.8H6.5c-5.8 0-8.7-7-4.6-11.1L64.6 3.8z"
+                      fill="url(#sol_b)"
+                    />
+                    <path
+                      d="M333.1 120.1c-2.4-2.4-5.7-3.8-9.2-3.8H6.5c-5.8 0-8.7 7-4.6 11.1l62.7 62.7c2.4 2.4 5.7 3.8 9.2 3.8h317.4c5.8 0 8.7-7 4.6-11.1l-62.7-62.7z"
+                      fill="url(#sol_c)"
+                    />
+                    <defs>
+                      <linearGradient
+                        id="sol_a"
+                        x1="360.9"
+                        y1="351.4"
+                        x2="141.2"
+                        y2="-69.2"
+                        gradientUnits="userSpaceOnUse"
+                      >
+                        <stop stopColor="#00FFA3" />
+                        <stop offset="1" stopColor="#DC1FFF" />
+                      </linearGradient>
+                      <linearGradient
+                        id="sol_b"
+                        x1="264.8"
+                        y1="351.4"
+                        x2="45.2"
+                        y2="-69.2"
+                        gradientUnits="userSpaceOnUse"
+                      >
+                        <stop stopColor="#00FFA3" />
+                        <stop offset="1" stopColor="#DC1FFF" />
+                      </linearGradient>
+                      <linearGradient
+                        id="sol_c"
+                        x1="312.5"
+                        y1="351.4"
+                        x2="92.9"
+                        y2="-69.2"
+                        gradientUnits="userSpaceOnUse"
+                      >
+                        <stop stopColor="#00FFA3" />
+                        <stop offset="1" stopColor="#DC1FFF" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                </div>
+                <div className="font-bold text-emerald-400 group-hover:text-white transition">
+                  SOL
+                </div>
+                <div className="text-[10px] text-slate-500 mt-1">Solana</div>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Step 2: Choose wallet (Audit) */}
+      {showWalletModal && (
+        <div
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4"
+          onClick={function () {
+            setShowWalletModal(false);
+            setShowPaymentModal(true);
+          }}
+        >
+          <div
+            className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-md p-6 shadow-[0_0_40px_rgba(168,85,247,0.25)]"
+            onClick={function (e) {
+              e.stopPropagation();
+            }}
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-black text-purple-400">{t.chooseWallet}</h3>
+              <button
+                onClick={function () {
+                  setShowWalletModal(false);
+                  setShowPaymentModal(true);
+                }}
+                className="text-slate-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <button
+                onClick={function () {
+                  handleWalletSelect('Phantom');
+                }}
+                className="bg-purple-500/10 border-2 border-purple-500/30 hover:border-purple-500 rounded-xl p-6 text-center transition group"
+              >
+                <div className="text-3xl mb-2">👻</div>
+                <div className="font-bold text-purple-400 group-hover:text-white transition">
+                  Phantom
+                </div>
+              </button>
+              <button
+                onClick={function () {
+                  handleWalletSelect('Solflare');
+                }}
+                className="bg-yellow-500/10 border-2 border-yellow-500/30 hover:border-yellow-400 rounded-xl p-6 text-center transition group"
+              >
+                <div className="flex justify-center mb-2">
+                  <svg
+                    width="40"
+                    height="40"
+                    viewBox="0 0 128 128"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <rect width="128" height="128" rx="24" fill="#FBBF24" />
+                    <text
+                      x="64"
+                      y="95"
+                      textAnchor="middle"
+                      fontFamily="Georgia, serif"
+                      fontWeight="900"
+                      fontSize="82"
+                      fill="#1a0a00"
+                      fontStyle="italic"
+                    >
+                      S
+                    </text>
+                  </svg>
+                </div>
+                <div className="font-bold text-yellow-400 group-hover:text-white transition">
+                  Solflare
+                </div>
+              </button>
+            </div>
+            <button
+              onClick={function () {
+                setShowWalletModal(false);
+                setShowPaymentModal(true);
+              }}
+              className="mt-4 w-full text-center text-slate-400 hover:text-white text-xs py-2"
+            >
+              {t.back}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Step 3: Invoice (Audit) */}
+      {showInvoiceModal && (
+        <div
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4"
+          onClick={function () {
+            setShowInvoiceModal(false);
+          }}
+        >
+          <div
+            className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-md p-6 shadow-[0_0_40px_rgba(168,85,247,0.25)]"
+            onClick={function (e) {
+              e.stopPropagation();
+            }}
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-black text-purple-400">{t.invoice}</h3>
+              <button
+                onClick={function () {
+                  setShowInvoiceModal(false);
+                }}
+                className="text-slate-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="bg-slate-900 border border-purple-500/20 rounded-xl p-6 text-center space-y-4">
+              <div className="text-xs text-purple-400 font-bold">
+                {selectedWallet} · {selectedPaymentMethod}
+              </div>
+              <div className="text-3xl font-black text-emerald-400">
+                {selectedPaymentMethod === 'SOL'
+                  ? formatSOLAmount(invoiceUsd) + ' SOL'
+                  : invoiceAmount.toLocaleString() + ' $MRDT'}
+              </div>
+              <div className="text-sm font-bold text-slate-300">≈ ${invoiceUsd} USD</div>
+              <div className="text-xs text-slate-400">{invoiceLabel}</div>
+              <div className="text-xs text-slate-500 font-mono break-all">
+                Wallet: {WALLET_ADDRESS.slice(0, 8)}...{WALLET_ADDRESS.slice(-8)}
+              </div>
+            </div>
+            <div className="mt-2 p-2 bg-purple-950/30 border border-purple-500/20 rounded-lg text-[10px] text-purple-300 text-center">
+              Tapping will open {selectedWallet}. Confirm the transaction and return to the site.
+            </div>
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={function () {
+                  setShowInvoiceModal(false);
+                }}
+                className="flex-1 px-5 py-2.5 text-sm rounded-lg border border-purple-500/40 hover:bg-purple-500/10 transition text-slate-300"
+              >
+                {t.cancel}
+              </button>
+              <button
+                onClick={handleConfirmPayment}
+                className="flex-1 px-5 py-2.5 text-sm rounded-lg bg-gradient-to-r from-purple-500 to-emerald-400 text-slate-950 font-black hover:from-purple-400 hover:to-emerald-300 transition"
+              >
+                {t.payNow}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════ BANNER PAYMENT MODALS ═══════════════ */}
+
+      {/* Step 1: Choose payment method (Banner) */}
+      {showBannerPaymentModal && (
+        <div
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4"
+          onClick={function () {
+            setShowBannerPaymentModal(false);
+          }}
+        >
+          <div
+            className="bg-slate-950 border-2 border-emerald-500/40 rounded-2xl w-full max-w-md p-6 shadow-[0_0_40px_rgba(16,185,129,0.2)]"
+            onClick={function (e) {
+              e.stopPropagation();
+            }}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-xl font-black text-emerald-400">VIP Banner Payment</h3>
+              <button
+                onClick={function () {
                   setShowBannerPaymentModal(false);
                 }}
                 className="text-slate-400 hover:text-white"
