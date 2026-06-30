@@ -1192,24 +1192,29 @@ export default function TntHouse() {
     }, 2000);
   };
 
-  // FIX v1.47: switch from a static Solana Pay "transfer request" URI
-  // (solana:<address>?amount=...) to a Solana Pay "transaction request" URI
-  // (solana:<encoded link to /api/pay>). Testing showed Phantom rendered
-  // 0 SOL/MRDT for the static format both from external Chrome AND from
-  // Phantom's own in-app browser — the wallet was not reliably reading the
-  // `amount` query param at all. With a transaction request, our backend
-  // builds and serializes the exact transaction (amount baked in as real
-  // lamports/token units) — the wallet only has to sign what it's given,
-  // there is no client-side amount-parsing step left for it to get wrong.
-  var buildTransactionRequestUri = function (amount, method, label, message) {
-    var apiUrl = window.location.origin + '/api/pay';
-    var params = new URLSearchParams();
-    params.set('amount', String(amount));
-    params.set('method', method);
-    params.set('label', label);
-    params.set('message', message);
-    var fullUrl = apiUrl + '?' + params.toString();
-    return 'solana:' + encodeURIComponent(fullUrl);
+  // FIX v1.49: REVERT v1.47's switch to Transaction Request API. Real-world
+  // testing showed Phantom now actively BLOCKS our Transaction Request URI
+  // with "This dApp may be malicious" on BOTH domains (tnt-house.vercel.app
+  // AND tnt-audit.com) — it killed payments that previously worked fine.
+  // Confirmed via Solscan: a real MRDT payment completed successfully on
+  // the OLD static transfer-request URI before today's change. Going back
+  // to that proven format. The known remaining issue is that Phantom
+  // sometimes shows 0 for the SOL amount specifically (not MRDT) on this
+  // static format — tracked separately, NOT a reason to keep the
+  // Transaction Request approach, which blocks payments entirely.
+  var buildTransferRequestUri = function (amount, method, label, message) {
+    var isSol = method === 'SOL';
+    return (
+      'solana:' +
+      WALLET_ADDRESS +
+      '?amount=' +
+      amount +
+      (isSol ? '' : '&spl-token=' + MRDT_CA) +
+      '&label=' +
+      encodeURIComponent(label) +
+      '&message=' +
+      encodeURIComponent(message)
+    );
   };
 
   var handleConfirmPayment = async function () {
@@ -1242,8 +1247,8 @@ export default function TntHouse() {
     var payAmount = isSol ? getSOLAmountForUsd(invoiceUsd) : invoiceAmount;
     var verifyMethod = isSol ? 'SOL' : 'MRDT';
     startPaymentVerification('audit', payAmount, null, tokenData, verifyMethod);
-    // FIX v1.47: Transaction Request URI — see buildTransactionRequestUri above.
-    var uri = buildTransactionRequestUri(payAmount, verifyMethod, label, message);
+    // FIX v1.49: static transfer-request URI — see buildTransferRequestUri above.
+    var uri = buildTransferRequestUri(payAmount, verifyMethod, label, message);
     openDeeplink(uri);
   };
 
@@ -1393,8 +1398,8 @@ export default function TntHouse() {
     var payAmount = isSol ? getSOLAmountForUsd(bannerInvoiceUsd) : mrdtAmount;
     var verifyMethod = isSol ? 'SOL' : 'MRDT';
     startPaymentVerification('banner', payAmount, banner, null, verifyMethod);
-    // FIX v1.47: Transaction Request URI — see buildTransactionRequestUri above.
-    var uri = buildTransactionRequestUri(payAmount, verifyMethod, label, message);
+    // FIX v1.49: static transfer-request URI — see buildTransferRequestUri above.
+    var uri = buildTransferRequestUri(payAmount, verifyMethod, label, message);
     openDeeplink(uri);
   };
 
