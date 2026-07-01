@@ -1207,6 +1207,22 @@ export default function TntHouse() {
     }
   };
 
+  // FIX v1.65: Solana Pay TRANSACTION REQUEST (not Transfer Request).
+  // Instead of asking the wallet to parse an `amount` query param (proven
+  // unreliable — wallet shows 0), the wallet fetches this link, POSTs its
+  // public key to our /api/pay route, and OUR SERVER builds and returns a
+  // fully-formed transaction with the exact amount already baked in as a
+  // real instruction. The wallet just has to simulate + sign it — there is
+  // no query-param parsing step for the amount to get lost in.
+  var buildTransactionRequestUri = function (amount, method, label) {
+    var origin = window.location.origin;
+    var link =
+      origin + '/api/pay?amount=' + encodeURIComponent(amount) +
+      '&method=' + encodeURIComponent(method) +
+      '&label=' + encodeURIComponent(label);
+    return 'solana:' + encodeURIComponent(link);
+  };
+
   var handleConfirmPayment = async function () {
     // FIX v1.37: Double-check amount is valid before launching wallet deeplink
     if (!invoiceAmount || invoiceAmount <= 0) {
@@ -1225,13 +1241,10 @@ export default function TntHouse() {
     var verifyMethod = isSol ? 'SOL' : 'MRDT';
     var ca = formData.contractAddress;
     var projectName = formData.projectName;
-    var message = 'Audit for ' + projectName + ' CA: ' + ca;
-    // FIX v1.63: open the wallet deeplink IMMEDIATELY, synchronously, in the
-    // same tick as the click — BEFORE any `await`. Any async work before
-    // navigating breaks the browser's "direct user gesture" trust chain on
-    // Android, which was silently dropping the entire query string (amount,
-    // spl-token, etc.) and causing wallets to show 0.
-    var uri = buildTransferRequestUri(payAmount, verifyMethod, label, message);
+    // FIX v1.65: use Transaction Request — server builds the real tx with
+    // the exact amount baked in, instead of relying on the wallet to parse
+    // an amount query param.
+    var uri = buildTransactionRequestUri(payAmount, verifyMethod, label);
     openDeeplink(uri);
     setShowInvoiceModal(false);
     setIsSending(true);
@@ -1384,14 +1397,13 @@ export default function TntHouse() {
       expiresAt: Date.now() + parseInt(bannerFormData.days) * 86400000,
     };
     var label = 'TNT House VIP Banner ' + bannerFormData.days + 'd';
-    var message = 'VIP Banner for ' + banner.tokenName;
     var isSol = paymentMethod === 'SOL';
     var payAmount = isSol ? getSOLAmountForUsd(bannerUsd) : mrdtAmount;
     var verifyMethod = isSol ? 'SOL' : 'MRDT';
-    // FIX v1.63: open the wallet deeplink IMMEDIATELY, synchronously, as the
-    // very first thing — before any setState calls — to keep it as close as
-    // possible to the raw click event for Android's user-gesture trust chain.
-    var uri = buildTransferRequestUri(payAmount, verifyMethod, label, message);
+    // FIX v1.65: use Transaction Request — server builds the real tx with
+    // the exact amount baked in, instead of relying on the wallet to parse
+    // an amount query param.
+    var uri = buildTransactionRequestUri(payAmount, verifyMethod, label);
     openDeeplink(uri);
     setShowBannerInvoiceModal(false);
     setIsBannerSending(true);

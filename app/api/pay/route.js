@@ -10,7 +10,7 @@
 
 import { NextResponse } from 'next/server';
 import { Connection, PublicKey, SystemProgram, Transaction, LAMPORTS_PER_SOL } from '@solana/web3.js';
-import { createTransferInstruction, getAssociatedTokenAddress, getMint, TOKEN_PROGRAM_ID } from '@solana/spl-token';
+import { createTransferInstruction, createAssociatedTokenAccountInstruction, getAssociatedTokenAddress, getMint, TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID } from '@solana/spl-token';
 
 const WALLET_ADDRESS = 'Ev6oXBXo6qyoaT5wypJ2Umxch91F7cFvE1SarYLaUn8Z';
 const MRDT_CA = '8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg';
@@ -81,6 +81,26 @@ export async function POST(request) {
 
       const senderATA = await getAssociatedTokenAddress(mintPubkey, senderPubkey);
       const recipientATA = await getAssociatedTokenAddress(mintPubkey, recipientPubkey);
+
+      // FIX v1.2: Phantom simulates the transaction before asking the user
+      // to sign it. If the recipient's associated token account doesn't
+      // exist, the transfer instruction fails simulation, and Phantom shows
+      // "This dApp could be malicious" — NOT because of a domain reputation
+      // issue, but because the tx would genuinely fail on-chain. Create the
+      // recipient ATA (paid for by the sender) if it doesn't exist yet.
+      const recipientATAInfo = await connection.getAccountInfo(recipientATA);
+      if (!recipientATAInfo) {
+        transaction.add(
+          createAssociatedTokenAccountInstruction(
+            senderPubkey, // payer
+            recipientATA, // ata to create
+            recipientPubkey, // owner
+            mintPubkey,
+            TOKEN_PROGRAM_ID,
+            ASSOCIATED_TOKEN_PROGRAM_ID
+          )
+        );
+      }
 
       transaction.add(
         createTransferInstruction(
