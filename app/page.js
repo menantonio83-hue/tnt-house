@@ -1366,6 +1366,12 @@ export default function TntHouse() {
     }
     // FIX v1.45: capture method into local before resetting state below.
     var paymentMethod = selectedBannerPaymentMethod;
+    var banner = {
+      tokenName: bannerFormData.tokenName.toUpperCase(),
+      bannerImg: bannerFormData.bannerImg || '',
+      desc: bannerFormData.desc,
+      expiresAt: Date.now() + parseInt(bannerFormData.days) * 86400000,
+    };
     var mrdtAmount = bannerInvoiceAmount;
     var label = 'TNT House VIP Banner ' + bannerFormData.days + 'd';
     var message = 'VIP Banner for ' + banner.tokenName;
@@ -1374,12 +1380,6 @@ export default function TntHouse() {
     var verifyMethod = isSol ? 'SOL' : 'MRDT';
     setShowBannerInvoiceModal(false);
     setIsBannerSending(true);
-    var banner = {
-      tokenName: bannerFormData.tokenName.toUpperCase(),
-      bannerImg: bannerFormData.bannerImg || '',
-      desc: bannerFormData.desc,
-      expiresAt: Date.now() + parseInt(bannerFormData.days) * 86400000,
-    };
     setBannerFormData({ tokenName: '', bannerImg: '', desc: '', days: '1' });
     setSelectedBannerPaymentMethod(null);
     setSelectedBannerWallet(null);
