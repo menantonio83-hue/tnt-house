@@ -561,7 +561,8 @@ async function postAuditToTelegram(token) {
         freezeAuthority: token.freezeAuthority || 'Unknown',
         top10Percent: token.top10Percent != null ? token.top10Percent : 'N/A',
         liquidityUSD: typeof token.liquidity === 'number' ? token.liquidity : 0,
-        lpLocked: token.lpLocked || 'Unknown',
+        lpLocked:
+          token.lpLockedPercent != null ? token.lpLockedPercent + '% locked' : 'Unknown',
         dexUrl: token.dexUrl,
       }),
     });
@@ -630,6 +631,11 @@ async function saveTokenToSupabase(token) {
         mint_authority: token.mintAuthority || '-',
         freeze_authority: token.freezeAuthority || '-',
         is_honeypot: token.isHoneypot || '-',
+        top10_percent: token.top10Percent != null ? token.top10Percent : null,
+        lp_locked_percent: token.lpLockedPercent != null ? token.lpLockedPercent : null,
+        holder_count: token.holderCount != null ? token.holderCount : null,
+        creator_balance_percent:
+          token.creatorBalancePercent != null ? token.creatorBalancePercent : null,
       }),
     });
   } catch (e) {
@@ -661,6 +667,10 @@ async function loadTokensFromSupabase() {
         mintAuthority: row.mint_authority,
         freezeAuthority: row.freeze_authority,
         isHoneypot: row.is_honeypot,
+        top10Percent: row.top10_percent,
+        lpLockedPercent: row.lp_locked_percent,
+        holderCount: row.holder_count,
+        creatorBalancePercent: row.creator_balance_percent,
         fromSupabase: true,
       };
     });
@@ -1164,13 +1174,23 @@ export default function TntHouse() {
       mintAuthority: 'Unknown',
       freezeAuthority: 'Unknown',
       isHoneypot: 'Unknown',
+      top10Percent: null,
+      lpLockedPercent: null,
+      holderCount: null,
+      creatorBalancePercent: null,
     };
     var dexData = { price: '0.00000000', liquidity: 0, volume24h: 0, priceChange24h: 0 };
     try {
       setLogs(function (prev) {
         return prev.slice(-12).concat(['[AUDIT] RugCheck API request for ' + ca + '...']);
       });
-      var rugRes = await fetch('https://api.rugcheck.xyz/v1/tokens/' + ca + '/report/summary', {
+      // FIX v1.66: use the FULL /report endpoint instead of /report/summary.
+      // The summary endpoint doesn't include topHolders/markets data, which
+      // forced Holders/LP Lock fields to always show "Unknown" for every
+      // token except MRDT (which had manually hardcoded real numbers).
+      // The full report includes real, computable holder concentration and
+      // LP-lock data for every audited token, not just MRDT.
+      var rugRes = await fetch('https://api.rugcheck.xyz/v1/tokens/' + ca + '/report', {
         headers: { Accept: 'application/json' },
       });
       if (rugRes.ok) {
@@ -1180,6 +1200,45 @@ export default function TntHouse() {
           Math.max(0, Math.round(100 - (rugData.score || 0) / 10)),
         );
         var risks = rugData.risks || [];
+
+        // Real top-10 holder concentration, computed from actual holder list.
+        var top10Percent = null;
+        if (Array.isArray(rugData.topHolders) && rugData.topHolders.length > 0) {
+          var sumPct = rugData.topHolders.slice(0, 10).reduce(function (acc, h) {
+            return acc + (typeof h.pct === 'number' ? h.pct : 0);
+          }, 0);
+          top10Percent = Math.round(sumPct * 10) / 10;
+        }
+
+        // Real total holder count, if RugCheck reports it.
+        var holderCount = null;
+        if (typeof rugData.totalHolders === 'number') {
+          holderCount = rugData.totalHolders;
+        } else if (Array.isArray(rugData.topHolders)) {
+          holderCount = rugData.topHolders.length;
+        }
+
+        // Real LP-locked percentage, averaged across reported markets.
+        var lpLockedPercent = null;
+        if (Array.isArray(rugData.markets) && rugData.markets.length > 0) {
+          var lpVals = rugData.markets
+            .map(function (m) {
+              return m && m.lp && typeof m.lp.lpLockedPct === 'number' ? m.lp.lpLockedPct : null;
+            })
+            .filter(function (v) {
+              return v !== null;
+            });
+          if (lpVals.length > 0) {
+            lpLockedPercent =
+              Math.round((lpVals.reduce(function (a, b) { return a + b; }, 0) / lpVals.length) * 10) / 10;
+          }
+        }
+
+        var creatorBalancePercent =
+          rugData.creatorBalance && rugData.token && rugData.token.supply
+            ? Math.round((rugData.creatorBalance / rugData.token.supply) * 1000) / 10
+            : null;
+
         auditResult = {
           score: normalizedScore,
           mintAuthority: risks.some(function (r) {
@@ -1197,6 +1256,10 @@ export default function TntHouse() {
           })
             ? 'Yes 🚨'
             : 'No ✓',
+          top10Percent: top10Percent,
+          lpLockedPercent: lpLockedPercent,
+          holderCount: holderCount,
+          creatorBalancePercent: creatorBalancePercent,
         };
         setLogs(function (prev) {
           return prev
@@ -1212,8 +1275,19 @@ export default function TntHouse() {
     try {
       var dexRes = await fetch('https://api.dexscreener.com/latest/dex/tokens/' + ca);
       var dexJson = await dexRes.json();
-      if (dexJson.pairs && dexJson.pairs.length > 0) {
-        var pair = dexJson.pairs[0];
+      // FIX: filter to Solana pairs only — DexScreener can return pairs
+      // from other chains sharing the same token address format, which
+      // would silently show wrong price/liquidity/volume data.
+      var solPairs = (dexJson.pairs || []).filter(function (p) {
+        return p.chainId === 'solana';
+      });
+      if (solPairs.length > 0) {
+        // Prefer the pair with the highest liquidity, not just pairs[0].
+        var pair = solPairs.reduce(function (best, p) {
+          var bestLiq = best.liquidity && best.liquidity.usd ? best.liquidity.usd : 0;
+          var pLiq = p.liquidity && p.liquidity.usd ? p.liquidity.usd : 0;
+          return pLiq > bestLiq ? p : best;
+        }, solPairs[0]);
         dexData = {
           price: pair.priceUsd ? parseFloat(pair.priceUsd).toFixed(8) : '0.00000000',
           liquidity: pair.liquidity && pair.liquidity.usd ? Math.round(pair.liquidity.usd) : 0,
@@ -1238,6 +1312,10 @@ export default function TntHouse() {
       mintAuthority: auditResult.mintAuthority,
       freezeAuthority: auditResult.freezeAuthority,
       isHoneypot: auditResult.isHoneypot,
+      top10Percent: auditResult.top10Percent,
+      lpLockedPercent: auditResult.lpLockedPercent,
+      holderCount: auditResult.holderCount,
+      creatorBalancePercent: auditResult.creatorBalancePercent,
     };
 
     if (isFree) {
@@ -3335,19 +3413,21 @@ export default function TntHouse() {
                   { label: t.freezeAuth, value: selectedToken.freezeAuthority },
                   { label: t.honeypot, value: selectedToken.isHoneypot },
                   {
-                    label: 'LP Tokens',
+                    label: 'Top 10 Holders',
                     value:
                       selectedToken.symbol === 'MRDT'
-                        ? '🔥 Burned Forever'
-                        : selectedToken.lpStatus || 'Unknown',
+                        ? '~9% (team+DAO)'
+                        : selectedToken.top10Percent != null
+                          ? selectedToken.top10Percent + '%'
+                          : 'Unknown',
                   },
                   {
                     label: 'Holders',
                     value:
                       selectedToken.symbol === 'MRDT'
                         ? '718 wallets'
-                        : selectedToken.holders
-                          ? selectedToken.holders + ' wallets'
+                        : selectedToken.holderCount != null
+                          ? selectedToken.holderCount + ' wallets'
                           : 'Unknown',
                   },
                   {
@@ -3355,17 +3435,20 @@ export default function TntHouse() {
                     value:
                       selectedToken.symbol === 'MRDT'
                         ? '❄️ 670M locked 1yr'
-                        : selectedToken.lpLock || 'Unknown',
+                        : selectedToken.lpLockedPercent != null
+                          ? selectedToken.lpLockedPercent + '% locked'
+                          : 'Unknown',
                   },
                 ].map(function (item, i) {
                   if (!item.value) return null;
-                  var isUnknown = item.value === 'Unknown';
+                  var valueStr = String(item.value);
+                  var isUnknown = valueStr === 'Unknown';
                   var isSafe =
-                    item.value.includes('Revoked') ||
-                    item.value.includes('No ✓') ||
-                    item.value.includes('Burned') ||
-                    item.value.includes('locked') ||
-                    item.value.includes('wallets');
+                    valueStr.includes('Revoked') ||
+                    valueStr.includes('No ✓') ||
+                    valueStr.includes('Burned') ||
+                    valueStr.includes('locked') ||
+                    valueStr.includes('wallets');
                   return (
                     <div
                       key={i}
@@ -3382,7 +3465,7 @@ export default function TntHouse() {
                               : 'text-red-400')
                         }
                       >
-                        {item.value}
+                        {valueStr}
                       </span>
                     </div>
                   );
