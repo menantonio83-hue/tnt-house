@@ -2601,9 +2601,23 @@ export default function TntHouse() {
               <div className="text-xs text-slate-500 font-mono break-all">
                 Wallet: {WALLET_ADDRESS.slice(0, 8)}...{WALLET_ADDRESS.slice(-8)}
               </div>
+              <button
+                onClick={function () {
+                  var amtStr =
+                    selectedPaymentMethod === 'SOL'
+                      ? formatSOLAmount(invoiceUsd)
+                      : String(invoiceAmount);
+                  navigator.clipboard.writeText(amtStr).then(function () {
+                    showToast('✅ Amount copied: ' + amtStr, 'success');
+                  });
+                }}
+                className="w-full text-xs px-3 py-2 rounded-lg border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10 transition"
+              >
+                📋 Copy exact amount
+              </button>
             </div>
             <div className="mt-2 p-2 bg-purple-950/30 border border-purple-500/20 rounded-lg text-[10px] text-purple-300 text-center">
-              Tapping will open {selectedWallet}. Confirm the transaction and return to the site.
+              Tapping will open {selectedWallet}. If the amount shows 0 there, paste the copied amount manually before confirming.
             </div>
             <div className="mt-6 flex gap-3">
               <button
@@ -2884,9 +2898,23 @@ export default function TntHouse() {
               <div className="text-xs text-slate-500 font-mono break-all">
                 Wallet: {WALLET_ADDRESS.slice(0, 8)}...{WALLET_ADDRESS.slice(-8)}
               </div>
+              <button
+                onClick={function () {
+                  var amtStr =
+                    selectedBannerPaymentMethod === 'SOL'
+                      ? formatSOLAmount(bannerInvoiceUsd)
+                      : String(bannerInvoiceAmount);
+                  navigator.clipboard.writeText(amtStr).then(function () {
+                    showToast('✅ Amount copied: ' + amtStr, 'success');
+                  });
+                }}
+                className="w-full text-xs px-3 py-2 rounded-lg border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/10 transition"
+              >
+                📋 Copy exact amount
+              </button>
             </div>
             <div className="mt-2 p-2 bg-emerald-950/30 border border-emerald-500/20 rounded-lg text-[10px] text-emerald-300 text-center">
-              {t.bannerLive}
+              {t.bannerLive} If the amount shows 0 in your wallet, paste the copied amount manually before confirming.
             </div>
             <div className="mt-6 flex gap-3">
               <button
