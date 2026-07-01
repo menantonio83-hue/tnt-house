@@ -1214,9 +1214,11 @@ export default function TntHouse() {
     // FIX v1.45: capture method/wallet into locals BEFORE resetting state,
     // so the URI builder below always uses the value the user actually picked.
     var paymentMethod = selectedPaymentMethod;
+    var auditAmount = invoiceAmount;
+    var auditUsd = invoiceUsd;
     var label = invoiceLabel;
     var isSol = paymentMethod === 'SOL';
-    var payAmount = isSol ? getSOLAmountForUsd(invoiceUsd) : invoiceAmount;
+    var payAmount = isSol ? getSOLAmountForUsd(auditUsd) : auditAmount;
     var verifyMethod = isSol ? 'SOL' : 'MRDT';
     setShowInvoiceModal(false);
     setIsSending(true);
@@ -1366,17 +1368,18 @@ export default function TntHouse() {
     }
     // FIX v1.45: capture method into local before resetting state below.
     var paymentMethod = selectedBannerPaymentMethod;
+    var mrdtAmount = bannerInvoiceAmount;
+    var bannerUsd = bannerInvoiceUsd;
     var banner = {
       tokenName: bannerFormData.tokenName.toUpperCase(),
       bannerImg: bannerFormData.bannerImg || '',
       desc: bannerFormData.desc,
       expiresAt: Date.now() + parseInt(bannerFormData.days) * 86400000,
     };
-    var mrdtAmount = bannerInvoiceAmount;
     var label = 'TNT House VIP Banner ' + bannerFormData.days + 'd';
     var message = 'VIP Banner for ' + banner.tokenName;
     var isSol = paymentMethod === 'SOL';
-    var payAmount = isSol ? getSOLAmountForUsd(bannerInvoiceUsd) : mrdtAmount;
+    var payAmount = isSol ? getSOLAmountForUsd(bannerUsd) : mrdtAmount;
     var verifyMethod = isSol ? 'SOL' : 'MRDT';
     setShowBannerInvoiceModal(false);
     setIsBannerSending(true);
