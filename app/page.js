@@ -16,6 +16,8 @@ import {
   Lock,
   CheckCircle,
   XCircle,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -544,6 +546,66 @@ const TRANSLATIONS = {
 };
 
 // --- Supabase helpers ---
+// Post a newly-audited token to the Telegram group via /api/sendTelegram.
+// Best-effort: failures are logged but never block the audit flow.
+async function postAuditToTelegram(token) {
+  try {
+    await fetch('/api/sendTelegram', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tokenName: token.name,
+        symbol: token.symbol,
+        ca: token.ca,
+        mintAuthority: token.mintAuthority || 'Unknown',
+        freezeAuthority: token.freezeAuthority || 'Unknown',
+        top10Percent: token.top10Percent != null ? token.top10Percent : 'N/A',
+        liquidityUSD: typeof token.liquidity === 'number' ? token.liquidity : 0,
+        lpLocked: token.lpLocked || 'Unknown',
+        dexUrl: token.dexUrl,
+      }),
+    });
+  } catch (e) {
+    console.error('Telegram post failed:', e);
+  }
+}
+
+async function loadTokenVotes() {
+  try {
+    var res = await fetch(SUPABASE_URL + '/rest/v1/token_votes?select=*', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY },
+    });
+    if (!res.ok) return {};
+    var data = await res.json();
+    var map = {};
+    data.forEach(function (row) {
+      map[row.ca] = { upvotes: row.upvotes || 0, downvotes: row.downvotes || 0 };
+    });
+    return map;
+  } catch (e) {
+    return {};
+  }
+}
+
+async function castVoteRpc(ca, direction) {
+  try {
+    var res = await fetch(SUPABASE_URL + '/rest/v1/rpc/cast_vote', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: SUPABASE_KEY,
+        Authorization: 'Bearer ' + SUPABASE_KEY,
+      },
+      body: JSON.stringify({ p_ca: ca, p_direction: direction }),
+    });
+    if (!res.ok) return null;
+    var data = await res.json();
+    return data && data[0] ? data[0] : null;
+  } catch (e) {
+    return null;
+  }
+}
+
 async function saveTokenToSupabase(token) {
   try {
     await fetch(SUPABASE_URL + '/rest/v1/listed_tokens', {
@@ -657,6 +719,8 @@ const FALLBACK_TOKENS = [];
 export default function TntHouse() {
   var [tokens, setTokens] = useState([]);
   var [listedTokens, setListedTokens] = useState([]);
+  var [tokenVotes, setTokenVotes] = useState({}); // { [ca]: { upvotes, downvotes } }
+  var [votedTokens, setVotedTokens] = useState({}); // { [ca]: 'up' | 'down' } — this browser's own votes
   var [loading, setLoading] = useState(true);
   var [error, setError] = useState('');
   var [isBuyDropdownOpen, setIsBuyDropdownOpen] = useState(false);
@@ -860,6 +924,49 @@ export default function TntHouse() {
       setFreeSlots(Math.max(0, FREE_TOTAL - data.length));
     });
   }, []);
+
+  // Load token votes + this browser's own past votes (localStorage) on mount
+  useEffect(function () {
+    loadTokenVotes().then(function (map) {
+      setTokenVotes(map);
+    });
+    try {
+      var stored = localStorage.getItem('tnt_voted_tokens');
+      if (stored) setVotedTokens(JSON.parse(stored));
+    } catch (e) {}
+  }, []);
+
+  var handleVote = async function (ca, direction) {
+    // One vote per token per browser
+    if (votedTokens[ca]) {
+      showToast('Already voted for this token', 'error');
+      return;
+    }
+    // Optimistic UI update
+    setTokenVotes(function (prev) {
+      var current = prev[ca] || { upvotes: 0, downvotes: 0 };
+      var updated = Object.assign({}, current);
+      if (direction === 'up') updated.upvotes = current.upvotes + 1;
+      else updated.downvotes = current.downvotes + 1;
+      var next = Object.assign({}, prev);
+      next[ca] = updated;
+      return next;
+    });
+    var newVoted = Object.assign({}, votedTokens);
+    newVoted[ca] = direction;
+    setVotedTokens(newVoted);
+    try {
+      localStorage.setItem('tnt_voted_tokens', JSON.stringify(newVoted));
+    } catch (e) {}
+    var result = await castVoteRpc(ca, direction);
+    if (result) {
+      setTokenVotes(function (prev) {
+        var next = Object.assign({}, prev);
+        next[ca] = { upvotes: result.upvotes, downvotes: result.downvotes };
+        return next;
+      });
+    }
+  };
 
   // FIX v1.55: Jupiter Price API v3 — single request, both MRDT + SOL.
   // Jupiter aggregates all Solana DEXes: same price the user sees in Jupiter swap UI.
@@ -1135,6 +1242,7 @@ export default function TntHouse() {
 
     if (isFree) {
       saveTokenToSupabase(tokenData);
+      postAuditToTelegram(tokenData);
       setListedTokens(function (prev) {
         return [tokenData].concat(prev);
       });
@@ -1342,6 +1450,7 @@ export default function TntHouse() {
             showToast('✅ Payment confirmed! Banner is live for everyone.', 'success');
           } else if (type === 'audit' && auditData) {
             saveTokenToSupabase(auditData);
+            postAuditToTelegram(auditData);
             setListedTokens(function (prev) {
               return [auditData].concat(prev);
             });
@@ -1846,8 +1955,8 @@ export default function TntHouse() {
                             <span className="text-emerald-400 text-[9px] font-bold">
                               ${token.symbol}
                             </span>
-                            <span className="text-[6px] bg-emerald-500/20 text-emerald-400 px-1 rounded font-bold">
-                              AI
+                            <span className="text-[6px] bg-emerald-500/20 text-emerald-400 px-1 rounded font-bold border border-emerald-500/40 shadow-[0_0_4px_rgba(16,185,129,0.5)]">
+                              ✓ AUDITED
                             </span>
                           </div>
                           <span className="text-[7px] text-slate-500 block truncate max-w-[80px]">
@@ -1998,6 +2107,71 @@ export default function TntHouse() {
                 </tbody>
               </table>
             </div>
+
+            {/* ═══ Community Voting — vote for your favorite listed token ═══ */}
+            {listedTokens.length > 0 && (
+              <div className="mt-3 border border-purple-500/20 rounded-lg p-3 bg-slate-900/40">
+                <h4 className="text-[10px] font-black text-purple-400 mb-2 flex items-center gap-1">
+                  🗳️ Vote for your favorite token
+                </h4>
+                <div className="space-y-1.5 max-h-[200px] overflow-y-auto">
+                  {listedTokens.map(function (token, i) {
+                    var votes = tokenVotes[token.ca] || { upvotes: 0, downvotes: 0 };
+                    var myVote = votedTokens[token.ca];
+                    return (
+                      <div
+                        key={'vote-' + i}
+                        className="flex items-center justify-between gap-2 p-1.5 rounded-lg bg-slate-950/60 border border-purple-500/10"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <span className="text-emerald-400 text-[9px] font-bold">
+                            ${token.symbol}
+                          </span>
+                          <span className="text-slate-500 text-[8px] ml-1 truncate">
+                            {token.name}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            onClick={function () {
+                              handleVote(token.ca, 'up');
+                            }}
+                            disabled={!!myVote}
+                            className={
+                              'flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[8px] font-bold transition ' +
+                              (myVote === 'up'
+                                ? 'bg-emerald-500/30 text-emerald-300 border border-emerald-500'
+                                : myVote
+                                  ? 'text-slate-600 cursor-not-allowed'
+                                  : 'text-emerald-400 hover:bg-emerald-500/10 border border-emerald-500/30')
+                            }
+                          >
+                            <ArrowUp className="w-2.5 h-2.5" /> {votes.upvotes}
+                          </button>
+                          <button
+                            onClick={function () {
+                              handleVote(token.ca, 'down');
+                            }}
+                            disabled={!!myVote}
+                            className={
+                              'flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[8px] font-bold transition ' +
+                              (myVote === 'down'
+                                ? 'bg-red-500/30 text-red-300 border border-red-500'
+                                : myVote
+                                  ? 'text-slate-600 cursor-not-allowed'
+                                  : 'text-red-400 hover:bg-red-500/10 border border-red-500/30')
+                            }
+                          >
+                            <ArrowDown className="w-2.5 h-2.5" /> {votes.downvotes}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {error && (
               <div className="mt-2 p-1.5 bg-red-950/40 border border-red-500/30 rounded-lg flex items-center gap-1 text-red-300 text-[9px]">
                 <AlertCircle className="w-2.5 h-2.5" /> {error}
