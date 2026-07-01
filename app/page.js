@@ -2629,7 +2629,7 @@ export default function TntHouse() {
               </button>
             </div>
             <div className="mt-2 p-2 bg-purple-950/30 border border-purple-500/20 rounded-lg text-[10px] text-purple-300 text-center">
-              Tapping will open {selectedWallet}. If the amount shows 0 there, paste the copied amount manually before confirming.
+              Tapping will open {selectedWallet}. You may see a "domain not yet reviewed" warning — this is expected while Phantom reviews the site; tap "Continue anyway" to proceed.
             </div>
             <div className="mt-6 flex gap-3">
               <button
@@ -2926,7 +2926,7 @@ export default function TntHouse() {
               </button>
             </div>
             <div className="mt-2 p-2 bg-emerald-950/30 border border-emerald-500/20 rounded-lg text-[10px] text-emerald-300 text-center">
-              {t.bannerLive} If the amount shows 0 in your wallet, paste the copied amount manually before confirming.
+              {t.bannerLive} You may see a "domain not yet reviewed" warning — tap "Continue anyway" to proceed.
             </div>
             <div className="mt-6 flex gap-3">
               <button
