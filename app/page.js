@@ -1222,6 +1222,9 @@ export default function TntHouse() {
     setFormData({ projectName: '', contractAddress: '', telegram: '' });
     setSelectedPaymentMethod(null);
     setSelectedWallet(null);
+    setInvoiceAmount(0);
+    setInvoiceUsd(0);
+    setInvoiceLabel('');
     setIsSending(false);
     var label = invoiceLabel;
     var message = 'Audit for ' + projectName + ' CA: ' + ca;
@@ -1377,6 +1380,8 @@ export default function TntHouse() {
     setBannerFormData({ tokenName: '', bannerImg: '', desc: '', days: '1' });
     setSelectedBannerPaymentMethod(null);
     setSelectedBannerWallet(null);
+    setBannerInvoiceAmount(0);
+    setBannerInvoiceUsd(0);
     setIsBannerSending(false);
     // FIX v0.1.2: build payAmount/method BEFORE calling startPaymentVerification,
     // and pass method through so SOL banner payments verify against the SOL
