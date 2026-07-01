@@ -1214,6 +1214,10 @@ export default function TntHouse() {
     // FIX v1.45: capture method/wallet into locals BEFORE resetting state,
     // so the URI builder below always uses the value the user actually picked.
     var paymentMethod = selectedPaymentMethod;
+    var label = invoiceLabel;
+    var isSol = paymentMethod === 'SOL';
+    var payAmount = isSol ? getSOLAmountForUsd(invoiceUsd) : invoiceAmount;
+    var verifyMethod = isSol ? 'SOL' : 'MRDT';
     setShowInvoiceModal(false);
     setIsSending(true);
     var ca = formData.contractAddress;
@@ -1226,16 +1230,12 @@ export default function TntHouse() {
     setInvoiceUsd(0);
     setInvoiceLabel('');
     setIsSending(false);
-    var label = invoiceLabel;
     var message = 'Audit for ' + projectName + ' CA: ' + ca;
     // FIX v0.1.2: MRDT and SOL are now two fully independent payment paths —
     // each has its own amount AND is verified against its own currency on
     // the backend (method param), so neither can block or interfere with
     // the other. Previously both always verified against the MRDT amount,
     // which made SOL payments impossible to confirm.
-    var isSol = paymentMethod === 'SOL';
-    var payAmount = isSol ? getSOLAmountForUsd(invoiceUsd) : invoiceAmount;
-    var verifyMethod = isSol ? 'SOL' : 'MRDT';
     startPaymentVerification('audit', payAmount, null, tokenData, verifyMethod);
     // FIX v1.49: static transfer-request URI — see buildTransferRequestUri above.
     var uri = buildTransferRequestUri(payAmount, verifyMethod, label, message);
@@ -1366,6 +1366,12 @@ export default function TntHouse() {
     }
     // FIX v1.45: capture method into local before resetting state below.
     var paymentMethod = selectedBannerPaymentMethod;
+    var mrdtAmount = bannerInvoiceAmount;
+    var label = 'TNT House VIP Banner ' + bannerFormData.days + 'd';
+    var message = 'VIP Banner for ' + banner.tokenName;
+    var isSol = paymentMethod === 'SOL';
+    var payAmount = isSol ? getSOLAmountForUsd(bannerInvoiceUsd) : mrdtAmount;
+    var verifyMethod = isSol ? 'SOL' : 'MRDT';
     setShowBannerInvoiceModal(false);
     setIsBannerSending(true);
     var banner = {
@@ -1374,9 +1380,6 @@ export default function TntHouse() {
       desc: bannerFormData.desc,
       expiresAt: Date.now() + parseInt(bannerFormData.days) * 86400000,
     };
-    var mrdtAmount = bannerInvoiceAmount;
-    var label = 'TNT House VIP Banner ' + bannerFormData.days + 'd';
-    var message = 'VIP Banner for ' + banner.tokenName;
     setBannerFormData({ tokenName: '', bannerImg: '', desc: '', days: '1' });
     setSelectedBannerPaymentMethod(null);
     setSelectedBannerWallet(null);
@@ -1386,9 +1389,6 @@ export default function TntHouse() {
     // FIX v0.1.2: build payAmount/method BEFORE calling startPaymentVerification,
     // and pass method through so SOL banner payments verify against the SOL
     // amount on the backend instead of silently comparing against MRDT.
-    var isSol = paymentMethod === 'SOL';
-    var payAmount = isSol ? getSOLAmountForUsd(bannerInvoiceUsd) : mrdtAmount;
-    var verifyMethod = isSol ? 'SOL' : 'MRDT';
     startPaymentVerification('banner', payAmount, banner, null, verifyMethod);
     // FIX v1.49: static transfer-request URI — see buildTransferRequestUri above.
     var uri = buildTransferRequestUri(payAmount, verifyMethod, label, message);
