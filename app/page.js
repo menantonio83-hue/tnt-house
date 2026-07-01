@@ -1153,14 +1153,17 @@ export default function TntHouse() {
     return tokenData;
   };
 
-  // FIX v1.44: Open deeplink via click on hidden <a> to preserve user gesture.
-  // If wallet doesn't open within 2s (desktop without extension), show fallback.
+  // FIX v1.63: Navigate IMMEDIATELY (synchronously) instead of via setTimeout.
+  // Root cause of the "0 amount" bug: delaying window.location.href inside
+  // setTimeout breaks the browser's "direct user gesture" trust chain on
+  // Android (especially Samsung Internet). Once that trust is lost, the OS
+  // intent resolver sometimes opens Phantom via a generic app-launch that
+  // drops the ENTIRE query string (amount, spl-token, label, message) while
+  // keeping only the recipient (which lives in the URI path, before "?").
+  // That exactly matches the symptom: correct recipient shown, but amount=0
+  // and default/last-used token, as if Phantom got no query params at all.
   var openDeeplink = function (uri) {
-    // Proven mechanism: simple window.location.href with 300ms delay.
-    // Android Intent URI (v1.52) broke Phantom invoice display — reverted.
-    setTimeout(function () {
-      window.location.href = uri;
-    }, 300);
+    window.location.href = uri;
     // Show fallback after 2s if protocol handler didn't fire
     setTimeout(function () {
       setDeeplinkFallbackUri(uri);
@@ -1220,10 +1223,18 @@ export default function TntHouse() {
     var isSol = paymentMethod === 'SOL';
     var payAmount = isSol ? getSOLAmountForUsd(auditUsd) : auditAmount;
     var verifyMethod = isSol ? 'SOL' : 'MRDT';
-    setShowInvoiceModal(false);
-    setIsSending(true);
     var ca = formData.contractAddress;
     var projectName = formData.projectName;
+    var message = 'Audit for ' + projectName + ' CA: ' + ca;
+    // FIX v1.63: open the wallet deeplink IMMEDIATELY, synchronously, in the
+    // same tick as the click — BEFORE any `await`. Any async work before
+    // navigating breaks the browser's "direct user gesture" trust chain on
+    // Android, which was silently dropping the entire query string (amount,
+    // spl-token, etc.) and causing wallets to show 0.
+    var uri = buildTransferRequestUri(payAmount, verifyMethod, label, message);
+    openDeeplink(uri);
+    setShowInvoiceModal(false);
+    setIsSending(true);
     var tokenData = await runAuditAndSave(ca, projectName, false);
     setFormData({ projectName: '', contractAddress: '', telegram: '' });
     setSelectedPaymentMethod(null);
@@ -1232,16 +1243,12 @@ export default function TntHouse() {
     setInvoiceUsd(0);
     setInvoiceLabel('');
     setIsSending(false);
-    var message = 'Audit for ' + projectName + ' CA: ' + ca;
     // FIX v0.1.2: MRDT and SOL are now two fully independent payment paths —
     // each has its own amount AND is verified against its own currency on
     // the backend (method param), so neither can block or interfere with
     // the other. Previously both always verified against the MRDT amount,
     // which made SOL payments impossible to confirm.
     startPaymentVerification('audit', payAmount, null, tokenData, verifyMethod);
-    // FIX v1.49: static transfer-request URI — see buildTransferRequestUri above.
-    var uri = buildTransferRequestUri(payAmount, verifyMethod, label, message);
-    openDeeplink(uri);
   };
 
   var handleBannerSubmit = function (e) {
@@ -1381,6 +1388,11 @@ export default function TntHouse() {
     var isSol = paymentMethod === 'SOL';
     var payAmount = isSol ? getSOLAmountForUsd(bannerUsd) : mrdtAmount;
     var verifyMethod = isSol ? 'SOL' : 'MRDT';
+    // FIX v1.63: open the wallet deeplink IMMEDIATELY, synchronously, as the
+    // very first thing — before any setState calls — to keep it as close as
+    // possible to the raw click event for Android's user-gesture trust chain.
+    var uri = buildTransferRequestUri(payAmount, verifyMethod, label, message);
+    openDeeplink(uri);
     setShowBannerInvoiceModal(false);
     setIsBannerSending(true);
     setBannerFormData({ tokenName: '', bannerImg: '', desc: '', days: '1' });
@@ -1393,9 +1405,6 @@ export default function TntHouse() {
     // and pass method through so SOL banner payments verify against the SOL
     // amount on the backend instead of silently comparing against MRDT.
     startPaymentVerification('banner', payAmount, banner, null, verifyMethod);
-    // FIX v1.49: static transfer-request URI — see buildTransferRequestUri above.
-    var uri = buildTransferRequestUri(payAmount, verifyMethod, label, message);
-    openDeeplink(uri);
   };
 
   // Chat countdown timer for rate limiting
