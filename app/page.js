@@ -793,6 +793,8 @@ export default function TntHouse() {
   var [bannerCountdown, setBannerCountdown] = useState('');
   var [isBlueprintOpen, setIsBlueprintOpen] = useState(false);
   var [selectedToken, setSelectedToken] = useState(null);
+  var [clusterResult, setClusterResult] = useState(null);
+  var [clusterLoading, setClusterLoading] = useState(false);
   var [mrdtPrice, setMrdtPrice] = useState(0.000013);
   var mrdtPriceRef = useRef(0.000013);
   // FIX v1.45: track SOL/USD price so SOL payments charge the correct SOL amount
@@ -973,6 +975,20 @@ export default function TntHouse() {
   var openTokenBlueprint = function (token) {
     setSelectedToken(token);
     setIsBlueprintOpen(true);
+    setClusterResult(null);
+  };
+  var checkClusters = async function () {
+    if (!selectedToken || clusterLoading) return;
+    setClusterLoading(true);
+    setClusterResult(null);
+    try {
+      var res = await fetch('/api/cluster-check?ca=' + selectedToken.ca);
+      var data = await res.json();
+      setClusterResult(data);
+    } catch (e) {
+      setClusterResult({ error: 'Check failed. Try again.' });
+    }
+    setClusterLoading(false);
   };
   var closeBlueprint = function () {
     setIsBlueprintOpen(false);
@@ -3688,6 +3704,63 @@ export default function TntHouse() {
                   <span className="text-emerald-400 text-xs font-bold">
                     DexScreener Audit Passed
                   </span>
+                </div>
+              )}
+              {selectedToken.symbol !== 'MRDT' && (
+                <div className="mb-3">
+                  {!clusterResult && !clusterLoading && (
+                    <button
+                      onClick={checkClusters}
+                      className="w-full text-xs font-bold py-2 rounded-lg border border-purple-500/30 text-purple-300 hover:bg-purple-500/10 transition"
+                    >
+                      🔍 Check Insider Clusters (top holders)
+                    </button>
+                  )}
+                  {clusterLoading && (
+                    <div className="w-full text-xs font-bold py-2 rounded-lg border border-purple-500/30 text-purple-300 flex items-center justify-center gap-1.5">
+                      <RefreshCw className="w-3 h-3 animate-spin" /> Tracing on-chain funding — 10-30s...
+                    </div>
+                  )}
+                  {clusterResult && !clusterResult.error && (
+                    <div
+                      className={
+                        'text-xs px-3 py-2 rounded-lg border ' +
+                        (clusterResult.clusterCount > 0
+                          ? 'bg-red-500/10 border-red-500/30 text-red-300'
+                          : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300')
+                      }
+                    >
+                      {clusterResult.clusterCount > 0 ? (
+                        <>
+                          <div className="font-bold mb-1">
+                            🚨 {clusterResult.clusterCount} funding cluster
+                            {clusterResult.clusterCount > 1 ? 's' : ''} found
+                          </div>
+                          {clusterResult.clusters.map(function (c, i) {
+                            return (
+                              <div key={i} className="text-[10px] font-mono opacity-80">
+                                {c.holders.length} wallets funded by {c.funder.slice(0, 6)}...
+                                {c.funder.slice(-4)}
+                              </div>
+                            );
+                          })}
+                          <div className="text-[9px] mt-1 opacity-70">
+                            Same wallet funded multiple top holders — likely same owner.
+                          </div>
+                        </>
+                      ) : (
+                        <div className="font-bold">
+                          ✓ No shared funding source found among top {clusterResult.checked}{' '}
+                          holders
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {clusterResult && clusterResult.error && (
+                    <div className="text-xs px-3 py-2 rounded-lg border border-slate-600/30 text-slate-400">
+                      {clusterResult.error}
+                    </div>
+                  )}
                 </div>
               )}
               <div className="flex gap-2">
