@@ -3591,11 +3591,9 @@ export default function TntHouse() {
                   {
                     label: 'Top 10 Holders',
                     value:
-                      selectedToken.symbol === 'MRDT'
-                        ? '~9% (team+DAO)'
-                        : selectedToken.top10Percent != null
-                          ? selectedToken.top10Percent + '%'
-                          : 'Unknown',
+                      selectedToken.top10Percent != null
+                        ? selectedToken.top10Percent + '%'
+                        : 'Unknown',
                   },
                   {
                     label: 'Holders',
@@ -3706,15 +3704,14 @@ export default function TntHouse() {
                   </span>
                 </div>
               )}
-              {selectedToken.symbol !== 'MRDT' && (
-                <div className="mb-3">
-                  {!clusterResult && !clusterLoading && (
-                    <button
-                      onClick={checkClusters}
-                      className="w-full text-xs font-bold py-2 rounded-lg border border-purple-500/30 text-purple-300 hover:bg-purple-500/10 transition"
-                    >
-                      🔍 Check Insider Clusters (top holders)
-                    </button>
+              <div className="mb-3">
+                {!clusterResult && !clusterLoading && (
+                  <button
+                    onClick={checkClusters}
+                    className="w-full text-xs font-bold py-2 rounded-lg border border-purple-500/30 text-purple-300 hover:bg-purple-500/10 transition"
+                  >
+                    🔍 Check Insider Clusters (top holders)
+                  </button>
                   )}
                   {clusterLoading && (
                     <div className="w-full text-xs font-bold py-2 rounded-lg border border-purple-500/30 text-purple-300 flex items-center justify-center gap-1.5">
@@ -3762,7 +3759,6 @@ export default function TntHouse() {
                     </div>
                   )}
                 </div>
-              )}
               <div className="flex gap-2">
                 <a
                   href={selectedToken.dexUrl}
