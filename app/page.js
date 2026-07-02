@@ -607,6 +607,47 @@ async function castVoteRpc(ca, direction) {
   }
 }
 
+// Deterministic fallback avatar for tokens without an uploaded logo:
+// picks a color from a fixed palette based on a hash of the token symbol,
+// so the same token always gets the same color across renders/sessions.
+var AVATAR_COLORS = [
+  '#a855f7', '#10b981', '#06b6d4', '#f59e0b', '#ef4444',
+  '#ec4899', '#3b82f6', '#22c55e', '#eab308', '#8b5cf6',
+];
+function getAvatarColor(str) {
+  var s = str || '?';
+  var hash = 0;
+  for (var i = 0; i < s.length; i++) {
+    hash = s.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
+function TokenAvatar({ token, size }) {
+  var px = size || 20;
+  if (token.logoUrl) {
+    return (
+      <img
+        src={token.logoUrl}
+        alt=""
+        style={{ width: px, height: px }}
+        className="rounded-full object-cover border border-purple-500/30 shrink-0"
+      />
+    );
+  }
+  var letter = (token.symbol || token.name || '?').charAt(0).toUpperCase();
+  var color = getAvatarColor(token.symbol || token.name || token.ca || '');
+  return (
+    <div
+      style={{ width: px, height: px, backgroundColor: color }}
+      className="rounded-full flex items-center justify-center text-white font-black shrink-0"
+    >
+      <span style={{ fontSize: px * 0.5 }}>{letter}</span>
+    </div>
+  );
+}
+
+
 async function saveTokenToSupabase(token) {
   try {
     await fetch(SUPABASE_URL + '/rest/v1/listed_tokens', {
@@ -636,6 +677,7 @@ async function saveTokenToSupabase(token) {
         holder_count: token.holderCount != null ? token.holderCount : null,
         creator_balance_percent:
           token.creatorBalancePercent != null ? token.creatorBalancePercent : null,
+        logo_url: token.logoUrl || null,
       }),
     });
   } catch (e) {
@@ -671,6 +713,7 @@ async function loadTokensFromSupabase() {
         lpLockedPercent: row.lp_locked_percent,
         holderCount: row.holder_count,
         creatorBalancePercent: row.creator_balance_percent,
+        logoUrl: row.logo_url || '',
         fromSupabase: true,
       };
     });
@@ -748,7 +791,12 @@ export default function TntHouse() {
   var [toast, setToast] = useState({ show: false, message: '', type: 'success' });
   var [lang, setLang] = useState('en');
   var t = TRANSLATIONS[lang] || TRANSLATIONS.en;
-  var [formData, setFormData] = useState({ projectName: '', contractAddress: '', telegram: '' });
+  var [formData, setFormData] = useState({
+    projectName: '',
+    contractAddress: '',
+    telegram: '',
+    logoImg: '',
+  });
   var [selectedTier, setSelectedTier] = useState('basic');
   var [isSending, setIsSending] = useState(false);
   var [submitted, setSubmitted] = useState(false);
@@ -1139,7 +1187,7 @@ export default function TntHouse() {
     }
     if (freeSlots > 0) {
       setIsSending(true);
-      runAuditAndSave(formData.contractAddress, formData.projectName, true);
+      runAuditAndSave(formData.contractAddress, formData.projectName, true, formData.logoImg);
       return;
     }
     var mrdtAmount = getAmountForTier(selectedTier);
@@ -1168,7 +1216,7 @@ export default function TntHouse() {
   };
 
   // Run RugCheck + DexScreener audit
-  var runAuditAndSave = async function (ca, projectName, isFree) {
+  var runAuditAndSave = async function (ca, projectName, isFree, logoImg) {
     var auditResult = {
       score: 75,
       mintAuthority: 'Unknown',
@@ -1316,6 +1364,7 @@ export default function TntHouse() {
       lpLockedPercent: auditResult.lpLockedPercent,
       holderCount: auditResult.holderCount,
       creatorBalancePercent: auditResult.creatorBalancePercent,
+      logoUrl: logoImg || '',
     };
 
     if (isFree) {
@@ -1328,7 +1377,7 @@ export default function TntHouse() {
         return Math.max(0, prev - 1);
       });
       setSubmitted(true);
-      setFormData({ projectName: '', contractAddress: '', telegram: '' });
+      setFormData({ projectName: '', contractAddress: '', telegram: '', logoImg: '' });
       showToast('🎁 Free audit complete! Score: ' + auditResult.score, 'success');
       setIsSending(false);
       setTimeout(function () {
@@ -1427,6 +1476,7 @@ export default function TntHouse() {
     var verifyMethod = isSol ? 'SOL' : 'MRDT';
     var ca = formData.contractAddress;
     var projectName = formData.projectName;
+    var logoImg = formData.logoImg;
     // FIX v1.65: use Transaction Request — server builds the real tx with
     // the exact amount baked in, instead of relying on the wallet to parse
     // an amount query param.
@@ -1434,8 +1484,8 @@ export default function TntHouse() {
     openDeeplink(uri);
     setShowInvoiceModal(false);
     setIsSending(true);
-    var tokenData = await runAuditAndSave(ca, projectName, false);
-    setFormData({ projectName: '', contractAddress: '', telegram: '' });
+    var tokenData = await runAuditAndSave(ca, projectName, false, logoImg);
+    setFormData({ projectName: '', contractAddress: '', telegram: '', logoImg: '' });
     setSelectedPaymentMethod(null);
     setSelectedWallet(null);
     setInvoiceAmount(0);
@@ -1936,22 +1986,29 @@ export default function TntHouse() {
 
         {/* ═══ TOKEN TABLE ═══ */}
         <section className="max-w-7xl mx-auto px-6 py-6">
-          <div className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 backdrop-blur-md p-3 shadow-[0_0_25px_rgba(153,69,255,0.2)]">
+          <div
+            className="border-2 border-cyan-400/40 rounded-lg bg-slate-950/60 backdrop-blur-md p-3 shadow-[0_0_30px_rgba(34,211,238,0.25)]"
+            style={{
+              backgroundImage:
+                'linear-gradient(rgba(34,211,238,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(34,211,238,0.06) 1px, transparent 1px)',
+              backgroundSize: '18px 18px',
+            }}
+          >
             <div className="flex items-center justify-between mb-2">
               <div>
-                <h3 className="text-base font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400 flex items-center gap-1.5">
-                  <Shield className="w-3.5 h-3.5 text-emerald-400" /> {t.tableTitle}
+                <h3 className="text-base font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400 flex items-center gap-1.5">
+                  <Shield className="w-3.5 h-3.5 text-cyan-400" /> {t.tableTitle}
                 </h3>
                 <p className="text-slate-400 text-[10px] mt-0.5">{t.tableClick}</p>
               </div>
-              <div className="hidden md:flex items-center gap-1 text-[9px] text-purple-400">
+              <div className="hidden md:flex items-center gap-1 text-[9px] text-cyan-400">
                 <RefreshCw className="w-2.5 h-2.5 animate-spin" /> Live
               </div>
             </div>
-            <div className="max-h-[320px] overflow-y-auto border border-purple-500/20 rounded-lg">
+            <div className="max-h-[320px] overflow-y-auto border border-cyan-400/25 rounded-lg">
               <table className="w-full text-left border-collapse text-[9px]">
                 <thead>
-                  <tr className="border-b border-purple-500/20 bg-purple-500/10 text-purple-400 font-bold sticky top-0 z-20 backdrop-blur-md">
+                  <tr className="border-b border-cyan-400/25 bg-cyan-500/10 text-cyan-300 font-bold sticky top-0 z-20 backdrop-blur-md">
                     {['Token', 'Price', 'Liq', 'Vol/Chg', 'Score', 'Action'].map(function (h, i) {
                       return (
                         <th
@@ -2026,14 +2083,15 @@ export default function TntHouse() {
                         onClick={function () {
                           openTokenBlueprint(token);
                         }}
-                        className="border-b border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10 transition cursor-pointer"
+                        className="border-b border-cyan-400/15 bg-cyan-500/5 hover:bg-cyan-500/10 transition cursor-pointer"
                       >
                         <td className="p-1">
                           <div className="flex items-center gap-1">
-                            <span className="text-emerald-400 text-[9px] font-bold">
+                            <TokenAvatar token={token} size={16} />
+                            <span className="text-cyan-300 text-[9px] font-bold">
                               ${token.symbol}
                             </span>
-                            <span className="text-[6px] bg-emerald-500/20 text-emerald-400 px-1 rounded font-bold border border-emerald-500/40 shadow-[0_0_4px_rgba(16,185,129,0.5)]">
+                            <span className="text-[6px] bg-cyan-500/20 text-cyan-300 px-1 rounded font-bold border border-cyan-400/40 shadow-[0_0_4px_rgba(34,211,238,0.5)]">
                               ✓ AUDITED
                             </span>
                           </div>
@@ -2080,7 +2138,7 @@ export default function TntHouse() {
                             }}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-[8px] text-purple-400 hover:text-emerald-400 inline-flex items-center gap-0.5"
+                            className="text-[8px] text-cyan-300 hover:text-cyan-200 inline-flex items-center gap-0.5 border border-cyan-400/40 rounded-full px-1.5 py-0.5"
                           >
                             DEX <ExternalLink className="w-2 h-2" />
                           </a>
@@ -2107,12 +2165,15 @@ export default function TntHouse() {
                           onClick={function () {
                             openTokenBlueprint(token);
                           }}
-                          className="border-b border-purple-500/10 hover:bg-purple-500/5 transition cursor-pointer"
+                          className="border-b border-cyan-400/10 hover:bg-cyan-500/5 transition cursor-pointer"
                         >
                           <td className="p-1">
-                            <span className="text-purple-400 text-[9px] font-bold">
-                              ${token.symbol}
-                            </span>
+                            <div className="flex items-center gap-1">
+                              <TokenAvatar token={token} size={16} />
+                              <span className="text-purple-300 text-[9px] font-bold">
+                                ${token.symbol}
+                              </span>
+                            </div>
                             <span className="text-[7px] text-slate-500 block truncate max-w-[80px]">
                               {token.name}
                             </span>
@@ -2313,6 +2374,33 @@ export default function TntHouse() {
                       }}
                       className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none font-mono"
                     />
+                  </div>
+                  <div>
+                    <label className="block text-purple-400 text-xs font-bold mb-1">
+                      Token Logo (optional)
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={function (e) {
+                        var f = e.target.files && e.target.files[0];
+                        if (f) {
+                          var r = new FileReader();
+                          r.onload = function (ev) {
+                            setFormData(
+                              Object.assign({}, formData, { logoImg: ev.target.result }),
+                            );
+                          };
+                          r.readAsDataURL(f);
+                        }
+                      }}
+                      className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-bold file:bg-gradient-to-r file:from-purple-500 file:to-emerald-400 file:text-slate-950 hover:file:from-purple-400 hover:file:to-emerald-300"
+                    />
+                    {!formData.logoImg && (
+                      <p className="text-slate-500 text-[9px] mt-1">
+                        No logo? We'll auto-generate one from the token name.
+                      </p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-purple-400 text-xs font-bold mb-1">
