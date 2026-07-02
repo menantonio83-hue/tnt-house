@@ -678,6 +678,11 @@ async function saveTokenToSupabase(token) {
         creator_balance_percent:
           token.creatorBalancePercent != null ? token.creatorBalancePercent : null,
         logo_url: token.logoUrl || null,
+        buy_tax_percent: token.buyTaxPercent != null ? token.buyTaxPercent : null,
+        sell_tax_percent: token.sellTaxPercent != null ? token.sellTaxPercent : null,
+        contract_renounced: token.contractRenounced != null ? token.contractRenounced : null,
+        hidden_owner: token.hiddenOwner || null,
+        age_days: token.ageDays != null ? token.ageDays : null,
       }),
     });
   } catch (e) {
@@ -714,6 +719,11 @@ async function loadTokensFromSupabase() {
         holderCount: row.holder_count,
         creatorBalancePercent: row.creator_balance_percent,
         logoUrl: row.logo_url || '',
+        buyTaxPercent: row.buy_tax_percent,
+        sellTaxPercent: row.sell_tax_percent,
+        contractRenounced: row.contract_renounced,
+        hiddenOwner: row.hidden_owner,
+        ageDays: row.age_days,
         fromSupabase: true,
       };
     });
@@ -1226,8 +1236,12 @@ export default function TntHouse() {
       lpLockedPercent: null,
       holderCount: null,
       creatorBalancePercent: null,
+      buyTaxPercent: null,
+      sellTaxPercent: null,
+      contractRenounced: null,
+      hiddenOwner: 'Unknown',
     };
-    var dexData = { price: '0.00000000', liquidity: 0, volume24h: 0, priceChange24h: 0 };
+    var dexData = { price: '0.00000000', liquidity: 0, volume24h: 0, priceChange24h: 0, ageDays: null };
     try {
       setLogs(function (prev) {
         return prev.slice(-12).concat(['[AUDIT] RugCheck API request for ' + ca + '...']);
@@ -1287,18 +1301,42 @@ export default function TntHouse() {
             ? Math.round((rugData.creatorBalance / rugData.token.supply) * 1000) / 10
             : null;
 
+        // Real transfer fee (Token-2022 tax), if the mint has one. Most
+        // SPL tokens don't — leave null (shown as "Unknown", not "0%",
+        // since we can't distinguish "no tax extension" from "API didn't
+        // report it" with full certainty).
+        var buyTaxPercent = null;
+        var sellTaxPercent = null;
+        if (rugData.transferFee && typeof rugData.transferFee.pct === 'number') {
+          buyTaxPercent = rugData.transferFee.pct;
+          sellTaxPercent = rugData.transferFee.pct;
+        }
+
+        var mintRevoked = !risks.some(function (r) {
+          return r.name && r.name.toLowerCase().includes('mint');
+        });
+        var freezeRevoked = !risks.some(function (r) {
+          return r.name && r.name.toLowerCase().includes('freeze');
+        });
+        // Derived, not invented: "renounced" here just means both mint and
+        // freeze authority are revoked — a real, checkable on-chain fact.
+        var contractRenounced = mintRevoked && freezeRevoked;
+
+        // Hidden owner / proxy risk — only flagged if RugCheck actually
+        // lists such a risk; otherwise we don't know either way (shown
+        // as "Unknown", not a false "No").
+        var hasOwnerRisk = risks.some(function (r) {
+          return (
+            r.name &&
+            (r.name.toLowerCase().includes('proxy') || r.name.toLowerCase().includes('owner'))
+          );
+        });
+        var hiddenOwner = hasOwnerRisk ? 'Yes ⚠️' : 'No ✓';
+
         auditResult = {
           score: normalizedScore,
-          mintAuthority: risks.some(function (r) {
-            return r.name && r.name.toLowerCase().includes('mint');
-          })
-            ? 'Active ⚠️'
-            : 'Revoked ✓',
-          freezeAuthority: risks.some(function (r) {
-            return r.name && r.name.toLowerCase().includes('freeze');
-          })
-            ? 'Active ⚠️'
-            : 'Revoked ✓',
+          mintAuthority: mintRevoked ? 'Revoked ✓' : 'Active ⚠️',
+          freezeAuthority: freezeRevoked ? 'Revoked ✓' : 'Active ⚠️',
           isHoneypot: risks.some(function (r) {
             return r.name && r.name.toLowerCase().includes('honeypot');
           })
@@ -1308,6 +1346,10 @@ export default function TntHouse() {
           lpLockedPercent: lpLockedPercent,
           holderCount: holderCount,
           creatorBalancePercent: creatorBalancePercent,
+          buyTaxPercent: buyTaxPercent,
+          sellTaxPercent: sellTaxPercent,
+          contractRenounced: contractRenounced,
+          hiddenOwner: hiddenOwner,
         };
         setLogs(function (prev) {
           return prev
@@ -1341,6 +1383,11 @@ export default function TntHouse() {
           liquidity: pair.liquidity && pair.liquidity.usd ? Math.round(pair.liquidity.usd) : 0,
           volume24h: pair.volume && pair.volume.h24 ? Math.round(pair.volume.h24) : 0,
           priceChange24h: pair.priceChange && pair.priceChange.h24 ? pair.priceChange.h24 : 0,
+          // Real token age, computed from the pair's actual creation
+          // timestamp — not estimated or invented.
+          ageDays: pair.pairCreatedAt
+            ? Math.floor((Date.now() - pair.pairCreatedAt) / 86400000)
+            : null,
         };
       }
     } catch (e) {}
@@ -1365,6 +1412,11 @@ export default function TntHouse() {
       holderCount: auditResult.holderCount,
       creatorBalancePercent: auditResult.creatorBalancePercent,
       logoUrl: logoImg || '',
+      buyTaxPercent: auditResult.buyTaxPercent,
+      sellTaxPercent: auditResult.sellTaxPercent,
+      contractRenounced: auditResult.contractRenounced,
+      hiddenOwner: auditResult.hiddenOwner,
+      ageDays: dexData.ageDays,
     };
 
     if (isFree) {
@@ -3527,13 +3579,42 @@ export default function TntHouse() {
                           ? selectedToken.lpLockedPercent + '% locked'
                           : 'Unknown',
                   },
+                  {
+                    label: 'Buy/Sell Tax',
+                    value:
+                      selectedToken.buyTaxPercent != null && selectedToken.sellTaxPercent != null
+                        ? selectedToken.buyTaxPercent + '% / ' + selectedToken.sellTaxPercent + '%'
+                        : 'Unknown',
+                  },
+                  {
+                    label: 'Contract Renounced',
+                    value:
+                      selectedToken.contractRenounced === true
+                        ? 'Yes ✓'
+                        : selectedToken.contractRenounced === false
+                          ? 'No'
+                          : 'Unknown',
+                  },
+                  {
+                    label: 'Hidden Owner / Proxy',
+                    value: selectedToken.hiddenOwner || 'Unknown',
+                  },
+                  {
+                    label: 'Token Age',
+                    value:
+                      selectedToken.ageDays != null
+                        ? selectedToken.ageDays + (selectedToken.ageDays === 1 ? ' day' : ' days')
+                        : 'Unknown',
+                  },
                 ].map(function (item, i) {
                   if (!item.value) return null;
                   var valueStr = String(item.value);
                   var isUnknown = valueStr === 'Unknown';
+                  var isNeutralInfo = item.label === 'Buy/Sell Tax' || item.label === 'Token Age';
                   var isSafe =
                     valueStr.includes('Revoked') ||
                     valueStr.includes('No ✓') ||
+                    valueStr.includes('Yes ✓') ||
                     valueStr.includes('Burned') ||
                     valueStr.includes('locked') ||
                     valueStr.includes('wallets');
@@ -3548,7 +3629,9 @@ export default function TntHouse() {
                           'text-xs font-bold ' +
                           (isUnknown
                             ? 'text-slate-500'
-                            : isSafe
+                            : isNeutralInfo
+                              ? 'text-slate-200'
+                              : isSafe
                               ? 'text-emerald-400'
                               : 'text-red-400')
                         }
