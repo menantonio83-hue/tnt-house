@@ -684,6 +684,7 @@ async function saveTokenToSupabase(token) {
         hidden_owner: token.hiddenOwner || null,
         age_days: token.ageDays != null ? token.ageDays : null,
         standard_program: token.standardProgram != null ? token.standardProgram : null,
+        permanent_delegate: token.permanentDelegate || null,
       }),
     });
   } catch (e) {
@@ -726,6 +727,7 @@ async function loadTokensFromSupabase() {
         hiddenOwner: row.hidden_owner,
         ageDays: row.age_days,
         standardProgram: row.standard_program,
+        permanentDelegate: row.permanent_delegate,
         fromSupabase: true,
       };
     });
@@ -799,6 +801,8 @@ export default function TntHouse() {
   var [tokenVotes, setTokenVotes] = useState({}); // { [ca]: { upvotes, downvotes } }
   var [tableSearch, setTableSearch] = useState('');
   var [tableSort, setTableSort] = useState('default'); // default | score | volume | liquidity
+  var [watchlist, setWatchlist] = useState([]); // array of CA strings, persisted to localStorage
+  var [showWatchlistOnly, setShowWatchlistOnly] = useState(false);
   var [votedTokens, setVotedTokens] = useState({}); // { [ca]: 'up' | 'down' } — this browser's own votes
   var [loading, setLoading] = useState(true);
   var [error, setError] = useState('');
@@ -905,6 +909,11 @@ export default function TntHouse() {
           );
         })
       : list;
+    if (showWatchlistOnly) {
+      filtered = filtered.filter(function (tk) {
+        return watchlist.includes(tk.ca);
+      });
+    }
     if (tableSort === 'default') return filtered;
     var sorted = filtered.slice();
     if (tableSort === 'score') {
@@ -1069,7 +1078,23 @@ export default function TntHouse() {
       var stored = localStorage.getItem('tnt_voted_tokens');
       if (stored) setVotedTokens(JSON.parse(stored));
     } catch (e) {}
+    try {
+      var storedWatchlist = localStorage.getItem('tnt_watchlist');
+      if (storedWatchlist) setWatchlist(JSON.parse(storedWatchlist));
+    } catch (e) {}
   }, []);
+
+  // Toggle a token's watchlist (starred) state, persisted to localStorage —
+  // no account/backend needed, just per-browser favorites.
+  var toggleWatchlist = function (ca) {
+    setWatchlist(function (prev) {
+      var next = prev.includes(ca) ? prev.filter(function (c) { return c !== ca; }) : prev.concat([ca]);
+      try {
+        localStorage.setItem('tnt_watchlist', JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
+  };
 
   var handleVote = async function (ca, direction) {
     // One vote per token per browser
@@ -1428,6 +1453,17 @@ export default function TntHouse() {
         });
         var hiddenOwner = hasOwnerRisk ? 'Yes ⚠️' : 'No ✓';
 
+        // Permanent Delegate check (Token-2022 extension). A permanent
+        // delegate can transfer or burn ANY holder's tokens without their
+        // permission — a serious, real scam vector that bypasses normal
+        // mint/freeze checks entirely. Only flagged if RugCheck's risk
+        // list actually names it; same "don't assume No falsely" pattern
+        // as the other checks above.
+        var hasPermanentDelegate = risks.some(function (r) {
+          return r.name && r.name.toLowerCase().includes('delegate');
+        });
+        var permanentDelegate = hasPermanentDelegate ? 'Yes 🚨' : 'No ✓';
+
         auditResult = {
           score: normalizedScore,
           mintAuthority: mintRevoked ? 'Revoked ✓' : 'Active ⚠️',
@@ -1446,6 +1482,7 @@ export default function TntHouse() {
           contractRenounced: contractRenounced,
           hiddenOwner: hiddenOwner,
           standardProgram: standardProgram,
+          permanentDelegate: permanentDelegate,
         };
         setLogs(function (prev) {
           return prev
@@ -1514,6 +1551,7 @@ export default function TntHouse() {
       hiddenOwner: auditResult.hiddenOwner,
       ageDays: dexData.ageDays,
       standardProgram: auditResult.standardProgram,
+      permanentDelegate: auditResult.permanentDelegate,
     };
 
     if (isFree) {
@@ -2241,6 +2279,20 @@ export default function TntHouse() {
                 <option value="volume">Sort: Volume</option>
                 <option value="liquidity">Sort: Liquidity</option>
               </select>
+              <button
+                onClick={function () {
+                  setShowWatchlistOnly(!showWatchlistOnly);
+                }}
+                title="Show only my watchlist"
+                className={
+                  'shrink-0 px-2 py-1.5 rounded-lg border text-[10px] font-bold transition ' +
+                  (showWatchlistOnly
+                    ? 'bg-yellow-500/20 border-yellow-400 text-yellow-300'
+                    : 'bg-slate-950 border-cyan-400/25 text-slate-400 hover:text-yellow-300')
+                }
+              >
+                ⭐ {watchlist.length > 0 ? watchlist.length : ''}
+              </button>
             </div>
             <div className="max-h-[320px] overflow-y-auto border border-cyan-400/25 rounded-lg">
               <table className="w-full text-left border-collapse text-[9px]">
@@ -2324,6 +2376,15 @@ export default function TntHouse() {
                       >
                         <td className="p-1">
                           <div className="flex items-center gap-1">
+                            <button
+                              onClick={function (e) {
+                                e.stopPropagation();
+                                toggleWatchlist(token.ca);
+                              }}
+                              className="shrink-0 text-[10px] leading-none"
+                            >
+                              {watchlist.includes(token.ca) ? '⭐' : '☆'}
+                            </button>
                             <TokenAvatar token={token} size={16} />
                             <span className="text-cyan-300 text-[9px] font-bold">
                               ${token.symbol}
@@ -2406,6 +2467,15 @@ export default function TntHouse() {
                         >
                           <td className="p-1">
                             <div className="flex items-center gap-1">
+                              <button
+                                onClick={function (e) {
+                                  e.stopPropagation();
+                                  toggleWatchlist(token.ca);
+                                }}
+                                className="shrink-0 text-[10px] leading-none"
+                              >
+                                {watchlist.includes(token.ca) ? '⭐' : '☆'}
+                              </button>
                               <TokenAvatar token={token} size={16} />
                               <span className="text-purple-300 text-[9px] font-bold">
                                 ${token.symbol}
@@ -3808,6 +3878,10 @@ export default function TntHouse() {
                         : selectedToken.standardProgram === false
                           ? 'Custom ⚠️'
                           : 'Unknown',
+                  },
+                  {
+                    label: 'Permanent Delegate',
+                    value: selectedToken.permanentDelegate || 'Unknown',
                   },
                 ].map(function (item, i) {
                   if (!item.value) return null;
