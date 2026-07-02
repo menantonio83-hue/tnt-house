@@ -147,7 +147,7 @@ const TRANSLATIONS = {
     volume24h: 'Volume 24h',
     noFreeSlots: 'no slots',
     questions: 'questions',
-    limitReached: 'Limit of 5 questions reached. Unlocks in',
+    limitReached: 'Message limit reached. Unlocks in',
     orderAudit: '💎 Order full audit from $10',
     pasteCa: 'Paste CA or ask a question...',
     analyzing: 'Analyzing...',
@@ -244,7 +244,7 @@ const TRANSLATIONS = {
     volume24h: 'Volumen 24h',
     noFreeSlots: 'sin lugares',
     questions: 'preguntas',
-    limitReached: 'Límite de 5 preguntas. Se desbloquea en',
+    limitReached: 'Límite de mensajes alcanzado. Se desbloquea en',
     orderAudit: '💎 Pedir auditoría desde $10',
     pasteCa: 'Pega CA o haz una pregunta...',
     analyzing: 'Analizando...',
@@ -341,7 +341,7 @@ const TRANSLATIONS = {
     volume24h: 'Volume 24h',
     noFreeSlots: 'plus de places',
     questions: 'questions',
-    limitReached: 'Limite de 5 questions. Débloqué dans',
+    limitReached: 'Limite de messages atteinte. Débloqué dans',
     orderAudit: '💎 Commander audit dès $10',
     pasteCa: 'Collez CA ou posez une question...',
     analyzing: 'Analyse...',
@@ -438,7 +438,7 @@ const TRANSLATIONS = {
     volume24h: 'Όγκος 24ω',
     noFreeSlots: 'χωρίς θέσεις',
     questions: 'ερωτήσεις',
-    limitReached: 'Όριο 5 ερωτήσεων. Ξεκλειδώνει σε',
+    limitReached: 'Το όριο μηνυμάτων εξαντλήθηκε. Ξεκλειδώνει σε',
     orderAudit: '💎 Παραγγελία ελέγχου από $10',
     pasteCa: 'Επικόλληση CA ή ερώτηση...',
     analyzing: 'Ανάλυση...',
@@ -536,7 +536,7 @@ const TRANSLATIONS = {
     volume24h: 'Объём 24ч',
     noFreeSlots: 'мест нет',
     questions: 'вопросов',
-    limitReached: 'Лимит 5 вопросов исчерпан. Разблокировка через',
+    limitReached: 'Лимит сообщений исчерпан. Разблокировка через',
     orderAudit: '💎 Заказать полный аудит от $10',
     pasteCa: 'Вставь CA или задай вопрос...',
     analyzing: 'Анализирую...',
@@ -851,7 +851,7 @@ export default function TntHouse() {
   var [chatMessages, setChatMessages] = useState([
     {
       sender: 'bot',
-      text: "Hey! I'm TNT House AI Inspector 🤖\n\nPaste a CA — I'll give a quick breakdown. You have 5 free questions per 10 min.",
+      text: "Hey! I'm TNT House AI Inspector 🤖\n\nAsk me anything about TNT House, $MRDT or token audits — paste a CA for a quick breakdown.",
     },
   ]);
   var [userMsg, setUserMsg] = useState('');
@@ -1757,7 +1757,7 @@ export default function TntHouse() {
     if (chatBlocked) return;
     var newCount = chatCount + 1;
     setChatCount(newCount);
-    if (newCount >= 5) {
+    if (newCount >= 30) {
       var resetAt = Date.now() + 10 * 60 * 1000;
       setChatResetTime(resetAt);
       setChatBlocked(true);
@@ -3759,9 +3759,7 @@ export default function TntHouse() {
               <span className="text-xs font-black text-purple-400">TNT AI Inspector 🤖</span>
             </div>
             <div className="text-[9px] text-slate-500">
-              {chatBlocked
-                ? t.limitReached + ' ' + chatTimer
-                : 5 - chatCount + ' ' + t.questions + ' left'}
+              {chatBlocked ? t.limitReached + ' ' + chatTimer : 'Online'}
             </div>
           </div>
 
