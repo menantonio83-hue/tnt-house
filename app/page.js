@@ -1856,9 +1856,34 @@ export default function TntHouse() {
                 href="https://t.me/tnt_house2026"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-10 h-10 border-2 border-purple-500 rounded-lg flex items-center justify-center bg-purple-500/10 shadow-[0_0_15px_rgba(153,69,255,0.4)] animate-pulse"
+                className="w-12 h-12 flex items-center justify-center shrink-0"
               >
-                <span className="text-xl">🧨</span>
+                {/* TNT House shield logo — replaces the old dynamite emoji icon */}
+                <svg viewBox="0 0 100 116" className="w-full h-full drop-shadow-[0_0_10px_rgba(153,69,255,0.6)]">
+                  <defs>
+                    <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#a855f7" />
+                      <stop offset="100%" stopColor="#22d3ee" />
+                    </linearGradient>
+                  </defs>
+                  <path
+                    d="M50 2 L94 20 V54 C94 84 74 104 50 114 C26 104 6 84 6 54 V20 Z"
+                    fill="rgba(10,10,20,0.6)"
+                    stroke="url(#shieldGrad)"
+                    strokeWidth="4"
+                  />
+                  <text
+                    x="50"
+                    y="58"
+                    textAnchor="middle"
+                    fontSize="30"
+                    fontWeight="900"
+                    fill="url(#shieldGrad)"
+                    fontFamily="monospace"
+                  >
+                    TNT
+                  </text>
+                </svg>
               </a>
               <div>
                 <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-emerald-400 tracking-wider">
