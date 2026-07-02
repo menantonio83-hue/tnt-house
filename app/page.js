@@ -734,7 +734,11 @@ async function loadTokensFromSupabase() {
   }
 }
 
-async function saveBannerToSupabase(banner) {
+// FEAT v1.76: Multiple VIP banner slots instead of a single one.
+// Each slot is a separate row in active_banner (id 1..BANNER_SLOTS).
+const BANNER_SLOTS = 3;
+
+async function saveBannerToSupabase(banner, slot) {
   try {
     await fetch(SUPABASE_URL + '/rest/v1/active_banner', {
       method: 'POST',
@@ -745,7 +749,7 @@ async function saveBannerToSupabase(banner) {
         Prefer: 'resolution=merge-duplicates,return=minimal',
       },
       body: JSON.stringify({
-        id: 1,
+        id: slot || 1,
         token_name: banner.tokenName,
         banner_img: banner.bannerImg || '',
         description: banner.desc,
@@ -757,25 +761,33 @@ async function saveBannerToSupabase(banner) {
   }
 }
 
-async function loadBannerFromSupabase() {
+// Loads all banner slots (ids 1..BANNER_SLOTS) and returns only the
+// ones that haven't expired yet, each tagged with its slot number so
+// the purchase flow knows which slots are free.
+async function loadBannersFromSupabase() {
   try {
-    var res = await fetch(SUPABASE_URL + '/rest/v1/active_banner?id=eq.1&select=*', {
-      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY },
-    });
-    if (!res.ok) return null;
+    var res = await fetch(
+      SUPABASE_URL + '/rest/v1/active_banner?id=lte.' + BANNER_SLOTS + '&select=*',
+      { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } },
+    );
+    if (!res.ok) return [];
     var data = await res.json();
-    if (!data || !data[0]) return null;
-    var row = data[0];
-    var expiresAt = new Date(row.expires_at).getTime();
-    if (Date.now() > expiresAt) return null;
-    return {
-      tokenName: row.token_name,
-      bannerImg: row.banner_img || '',
-      desc: row.description,
-      expiresAt: expiresAt,
-    };
+    var now = Date.now();
+    return (data || [])
+      .map(function (row) {
+        return {
+          slot: row.id,
+          tokenName: row.token_name,
+          bannerImg: row.banner_img || '',
+          desc: row.description,
+          expiresAt: new Date(row.expires_at).getTime(),
+        };
+      })
+      .filter(function (b) {
+        return b.expiresAt > now;
+      });
   } catch (e) {
-    return null;
+    return [];
   }
 }
 
@@ -789,7 +801,8 @@ export default function TntHouse() {
   var [loading, setLoading] = useState(true);
   var [error, setError] = useState('');
   var [isBuyDropdownOpen, setIsBuyDropdownOpen] = useState(false);
-  var [activeBanner, setActiveBanner] = useState(null);
+  var [activeBanners, setActiveBanners] = useState([]);
+  var [bannerDisplayIndex, setBannerDisplayIndex] = useState(0);
   var [bannerCountdown, setBannerCountdown] = useState('');
   var [isBlueprintOpen, setIsBlueprintOpen] = useState(false);
   var [selectedToken, setSelectedToken] = useState(null);
@@ -1168,25 +1181,30 @@ export default function TntHouse() {
     [chatMessages],
   );
 
-  // Load banner + countdown timer
+  // Load banners (all slots) + countdown timer + auto-rotate display
   useEffect(function () {
-    var fetchBanner = async function () {
-      var banner = await loadBannerFromSupabase();
-      setActiveBanner(banner);
+    var fetchBanners = async function () {
+      var banners = await loadBannersFromSupabase();
+      setActiveBanners(banners);
     };
-    fetchBanner();
-    var pollInterval = setInterval(fetchBanner, 30000);
+    fetchBanners();
+    var pollInterval = setInterval(fetchBanners, 30000);
     var countdownInterval = setInterval(function () {
-      setActiveBanner(function (current) {
-        if (!current) {
+      setActiveBanners(function (current) {
+        var now = Date.now();
+        var stillActive = current.filter(function (b) {
+          return b.expiresAt > now;
+        });
+        if (stillActive.length === 0) {
           setBannerCountdown('');
-          return current;
+          return stillActive;
         }
-        var msLeft = current.expiresAt - Date.now();
-        if (msLeft <= 0) {
-          setBannerCountdown('');
-          return null;
-        }
+        // Countdown shown is for the soonest slot to free up (relevant
+        // for the "all slots taken, next one free in..." purchase prompt).
+        var soonest = stillActive.reduce(function (min, b) {
+          return b.expiresAt < min.expiresAt ? b : min;
+        }, stillActive[0]);
+        var msLeft = soonest.expiresAt - now;
         var totalSec = Math.floor(msLeft / 1000);
         var d = Math.floor(totalSec / 86400);
         var h = Math.floor((totalSec % 86400) / 3600);
@@ -1198,12 +1216,19 @@ export default function TntHouse() {
         parts.push((m < 10 ? '0' : '') + m + 'm');
         parts.push((s < 10 ? '0' : '') + s + 's');
         setBannerCountdown(parts.join(' '));
-        return current;
+        return stillActive;
       });
     }, 1000);
+    // Rotate between multiple active banners every 6s.
+    var rotateInterval = setInterval(function () {
+      setBannerDisplayIndex(function (i) {
+        return i + 1;
+      });
+    }, 6000);
     return function () {
       clearInterval(pollInterval);
       clearInterval(countdownInterval);
+      clearInterval(rotateInterval);
     };
   }, []);
 
@@ -1594,7 +1619,7 @@ export default function TntHouse() {
       setBannerError('Enter token name and description.');
       return;
     }
-    if (activeBanner) {
+    if (activeBanners.length >= BANNER_SLOTS) {
       setBannerError(t.btnSlotTaken + ' ' + bannerCountdown);
       return;
     }
@@ -1661,8 +1686,14 @@ export default function TntHouse() {
           verifyIntervalRef.current = null;
           setVerifyStatus('success');
           if (type === 'banner' && bannerData) {
-            await saveBannerToSupabase(bannerData);
-            setActiveBanner(bannerData);
+            await saveBannerToSupabase(bannerData, bannerData.slot);
+            setActiveBanners(function (prev) {
+              return prev
+                .filter(function (b) {
+                  return b.slot !== bannerData.slot;
+                })
+                .concat([bannerData]);
+            });
             showToast('✅ Payment confirmed! Banner is live for everyone.', 'success');
           } else if (type === 'audit' && auditData) {
             saveTokenToSupabase(auditData);
@@ -1715,7 +1746,19 @@ export default function TntHouse() {
     var paymentMethod = selectedBannerPaymentMethod;
     var mrdtAmount = bannerInvoiceAmount;
     var bannerUsd = bannerInvoiceUsd;
+    // Pick the first free slot (1..BANNER_SLOTS) not currently occupied.
+    var takenSlots = activeBanners.map(function (b) {
+      return b.slot;
+    });
+    var assignedSlot = 1;
+    for (var s = 1; s <= BANNER_SLOTS; s++) {
+      if (takenSlots.indexOf(s) === -1) {
+        assignedSlot = s;
+        break;
+      }
+    }
     var banner = {
+      slot: assignedSlot,
       tokenName: bannerFormData.tokenName.toUpperCase(),
       bannerImg: bannerFormData.bannerImg || '',
       desc: bannerFormData.desc,
@@ -1948,39 +1991,61 @@ export default function TntHouse() {
 
         {/* ═══ VIP BANNER SECTION ═══ */}
         <section className="max-w-7xl mx-auto px-6 pt-6">
-          {activeBanner ? (
+          {activeBanners.length > 0 ? (
             <>
-              <div className="relative border border-purple-500/40 rounded-2xl overflow-hidden shadow-[0_0_30px_rgba(168,85,247,0.25)] min-h-[160px]">
-                {activeBanner.bannerImg && activeBanner.bannerImg.startsWith('data:') ? (
-                  <div className="absolute inset-0">
-                    <img
-                      src={activeBanner.bannerImg}
-                      alt="banner"
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/20" />
+              {(function () {
+                var displayedBanner = activeBanners[bannerDisplayIndex % activeBanners.length];
+                return (
+                  <div className="relative border border-purple-500/40 rounded-2xl overflow-hidden shadow-[0_0_30px_rgba(168,85,247,0.25)] min-h-[160px]">
+                    {displayedBanner.bannerImg && displayedBanner.bannerImg.startsWith('data:') ? (
+                      <div className="absolute inset-0">
+                        <img
+                          src={displayedBanner.bannerImg}
+                          alt="banner"
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/20" />
+                      </div>
+                    ) : (
+                      <div className="absolute inset-0 bg-gradient-to-r from-black via-purple-950/30 to-black" />
+                    )}
+                    <div className="absolute top-3 left-3">
+                      <span className="bg-purple-500 text-white font-black text-[9px] px-2 py-0.5 rounded tracking-widest">
+                        VIP BOOST
+                      </span>
+                    </div>
+                    {activeBanners.length > 1 && (
+                      <div className="absolute top-3 right-3 flex gap-1">
+                        {activeBanners.map(function (_, i) {
+                          return (
+                            <span
+                              key={i}
+                              className={
+                                'w-1.5 h-1.5 rounded-full ' +
+                                (i === bannerDisplayIndex % activeBanners.length
+                                  ? 'bg-emerald-400'
+                                  : 'bg-white/30')
+                              }
+                            />
+                          );
+                        })}
+                      </div>
+                    )}
+                    <div className="relative z-10 p-4 pt-16">
+                      <h4 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-300 to-emerald-300">
+                        ${displayedBanner.tokenName}
+                      </h4>
+                      <p className="text-slate-300 text-xs mt-0.5">{displayedBanner.desc}</p>
+                      {activeBanners.length < BANNER_SLOTS && (
+                        <p className="text-[10px] text-emerald-400 mt-1">
+                          {BANNER_SLOTS - activeBanners.length} banner slot
+                          {BANNER_SLOTS - activeBanners.length > 1 ? 's' : ''} still available!
+                        </p>
+                      )}
+                    </div>
                   </div>
-                ) : (
-                  <div className="absolute inset-0 bg-gradient-to-r from-black via-purple-950/30 to-black" />
-                )}
-                <div className="absolute top-3 left-3">
-                  <span className="bg-purple-500 text-white font-black text-[9px] px-2 py-0.5 rounded tracking-widest">
-                    VIP BOOST
-                  </span>
-                </div>
-                <div className="relative z-10 p-4 pt-16">
-                  <h4 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-300 to-emerald-300">
-                    ${activeBanner.tokenName}
-                  </h4>
-                  <p className="text-slate-300 text-xs mt-0.5">{activeBanner.desc}</p>
-                  {bannerCountdown && (
-                    <p className="text-[10px] text-slate-400 mt-1">
-                      ⏱ slot available in{' '}
-                      <span className="text-purple-400 font-bold">{bannerCountdown}</span>
-                    </p>
-                  )}
-                </div>
-              </div>
+                );
+              })()}
               <div className="grid grid-cols-3 gap-2 mt-2">
                 <button
                   onClick={handleLaunchJupiter}
@@ -2670,13 +2735,17 @@ export default function TntHouse() {
                   </div>
                   <button
                     type="submit"
-                    disabled={isBannerSending || !!activeBanner}
+                    disabled={isBannerSending || activeBanners.length >= BANNER_SLOTS}
                     className="w-full bg-gradient-to-r from-emerald-400 to-purple-500 hover:from-emerald-300 hover:to-purple-400 text-slate-950 font-black py-2.5 rounded text-xs transition flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Zap className="w-3.5 h-3.5" />
-                    {isBannerSending ? t.btnSending : activeBanner ? t.btnSlotTaken : t.btnBanner}
+                    {isBannerSending
+                      ? t.btnSending
+                      : activeBanners.length >= BANNER_SLOTS
+                        ? t.btnSlotTaken
+                        : t.btnBanner}
                   </button>
-                  {activeBanner && bannerCountdown && (
+                  {activeBanners.length >= BANNER_SLOTS && bannerCountdown && (
                     <div className="p-2.5 bg-slate-900 border border-purple-500/20 rounded text-center">
                       <p className="text-slate-400 text-[11px]">{t.slotAvailIn}</p>
                       <p className="text-purple-400 font-black text-sm mt-0.5">{bannerCountdown}</p>
