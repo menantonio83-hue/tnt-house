@@ -683,6 +683,7 @@ async function saveTokenToSupabase(token) {
         contract_renounced: token.contractRenounced != null ? token.contractRenounced : null,
         hidden_owner: token.hiddenOwner || null,
         age_days: token.ageDays != null ? token.ageDays : null,
+        standard_program: token.standardProgram != null ? token.standardProgram : null,
       }),
     });
   } catch (e) {
@@ -724,6 +725,7 @@ async function loadTokensFromSupabase() {
         contractRenounced: row.contract_renounced,
         hiddenOwner: row.hidden_owner,
         ageDays: row.age_days,
+        standardProgram: row.standard_program,
         fromSupabase: true,
       };
     });
@@ -1322,6 +1324,22 @@ export default function TntHouse() {
         // freeze authority are revoked — a real, checkable on-chain fact.
         var contractRenounced = mintRevoked && freezeRevoked;
 
+        // Real check: does this mint use Solana's standard, audited Token
+        // Program (or Token-2022), or some custom/unknown program? A
+        // non-standard program is a real red flag worth surfacing —
+        // Solana doesn't have EVM-style "verified source code", so this
+        // is the honest equivalent for this chain.
+        var STANDARD_TOKEN_PROGRAMS = [
+          'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
+          'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb',
+        ];
+        var standardProgram =
+          rugData.tokenProgram && STANDARD_TOKEN_PROGRAMS.includes(rugData.tokenProgram)
+            ? true
+            : rugData.tokenProgram
+              ? false
+              : null;
+
         // Hidden owner / proxy risk — only flagged if RugCheck actually
         // lists such a risk; otherwise we don't know either way (shown
         // as "Unknown", not a false "No").
@@ -1350,6 +1368,7 @@ export default function TntHouse() {
           sellTaxPercent: sellTaxPercent,
           contractRenounced: contractRenounced,
           hiddenOwner: hiddenOwner,
+          standardProgram: standardProgram,
         };
         setLogs(function (prev) {
           return prev
@@ -1417,6 +1436,7 @@ export default function TntHouse() {
       contractRenounced: auditResult.contractRenounced,
       hiddenOwner: auditResult.hiddenOwner,
       ageDays: dexData.ageDays,
+      standardProgram: auditResult.standardProgram,
     };
 
     if (isFree) {
@@ -3606,15 +3626,35 @@ export default function TntHouse() {
                         ? selectedToken.ageDays + (selectedToken.ageDays === 1 ? ' day' : ' days')
                         : 'Unknown',
                   },
+                  {
+                    label: 'Dev Wallet %',
+                    value:
+                      selectedToken.creatorBalancePercent != null
+                        ? selectedToken.creatorBalancePercent + '%'
+                        : 'Unknown',
+                  },
+                  {
+                    label: 'Token Program',
+                    value:
+                      selectedToken.standardProgram === true
+                        ? 'Standard ✓'
+                        : selectedToken.standardProgram === false
+                          ? 'Custom ⚠️'
+                          : 'Unknown',
+                  },
                 ].map(function (item, i) {
                   if (!item.value) return null;
                   var valueStr = String(item.value);
                   var isUnknown = valueStr === 'Unknown';
-                  var isNeutralInfo = item.label === 'Buy/Sell Tax' || item.label === 'Token Age';
+                  var isNeutralInfo =
+                    item.label === 'Buy/Sell Tax' ||
+                    item.label === 'Token Age' ||
+                    item.label === 'Dev Wallet %';
                   var isSafe =
                     valueStr.includes('Revoked') ||
                     valueStr.includes('No ✓') ||
                     valueStr.includes('Yes ✓') ||
+                    valueStr.includes('Standard ✓') ||
                     valueStr.includes('Burned') ||
                     valueStr.includes('locked') ||
                     valueStr.includes('wallets');
