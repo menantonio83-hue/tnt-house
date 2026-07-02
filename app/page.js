@@ -797,6 +797,8 @@ export default function TntHouse() {
   var [tokens, setTokens] = useState([]);
   var [listedTokens, setListedTokens] = useState([]);
   var [tokenVotes, setTokenVotes] = useState({}); // { [ca]: { upvotes, downvotes } }
+  var [tableSearch, setTableSearch] = useState('');
+  var [tableSort, setTableSort] = useState('default'); // default | score | volume | liquidity
   var [votedTokens, setVotedTokens] = useState({}); // { [ca]: 'up' | 'down' } — this browser's own votes
   var [loading, setLoading] = useState(true);
   var [error, setError] = useState('');
@@ -887,6 +889,40 @@ export default function TntHouse() {
     setTimeout(function () {
       setToast({ show: false, message: '', type: 'success' });
     }, 4200);
+  };
+
+  // FEAT v1.77: table search + sort — filters by name/symbol/CA substring
+  // match, then sorts by the chosen column. Applied to both the
+  // Supabase-listed (audited) tokens and the live DexScreener feed.
+  var filterAndSortTokens = function (list) {
+    var query = tableSearch.trim().toLowerCase();
+    var filtered = query
+      ? list.filter(function (tk) {
+          return (
+            (tk.name && tk.name.toLowerCase().includes(query)) ||
+            (tk.symbol && tk.symbol.toLowerCase().includes(query)) ||
+            (tk.ca && tk.ca.toLowerCase().includes(query))
+          );
+        })
+      : list;
+    if (tableSort === 'default') return filtered;
+    var sorted = filtered.slice();
+    if (tableSort === 'score') {
+      sorted.sort(function (a, b) {
+        return getSafetyScore(b) - getSafetyScore(a);
+      });
+    } else if (tableSort === 'volume') {
+      sorted.sort(function (a, b) {
+        return (b.volume24h || 0) - (a.volume24h || 0);
+      });
+    } else if (tableSort === 'liquidity') {
+      sorted.sort(function (a, b) {
+        var aLiq = typeof a.liquidity === 'number' ? a.liquidity : 0;
+        var bLiq = typeof b.liquidity === 'number' ? b.liquidity : 0;
+        return bLiq - aLiq;
+      });
+    }
+    return sorted;
   };
 
   var getSafetyScore = function (token) {
@@ -2183,6 +2219,29 @@ export default function TntHouse() {
                 <RefreshCw className="w-2.5 h-2.5 animate-spin" /> Live
               </div>
             </div>
+            <div className="flex items-center gap-2 mb-2">
+              <input
+                type="text"
+                value={tableSearch}
+                onChange={function (e) {
+                  setTableSearch(e.target.value);
+                }}
+                placeholder="🔍 Search name, ticker or CA..."
+                className="flex-1 bg-slate-950 border border-cyan-400/25 rounded-lg px-2.5 py-1.5 text-[10px] text-white placeholder-slate-500 focus:border-cyan-400 focus:outline-none"
+              />
+              <select
+                value={tableSort}
+                onChange={function (e) {
+                  setTableSort(e.target.value);
+                }}
+                className="bg-slate-950 border border-cyan-400/25 rounded-lg px-2 py-1.5 text-[10px] text-cyan-300 focus:border-cyan-400 focus:outline-none"
+              >
+                <option value="default">Sort: Newest</option>
+                <option value="score">Sort: Score</option>
+                <option value="volume">Sort: Volume</option>
+                <option value="liquidity">Sort: Liquidity</option>
+              </select>
+            </div>
             <div className="max-h-[320px] overflow-y-auto border border-cyan-400/25 rounded-lg">
               <table className="w-full text-left border-collapse text-[9px]">
                 <thead>
@@ -2252,7 +2311,7 @@ export default function TntHouse() {
                   </tr>
 
                   {/* Supabase listed tokens */}
-                  {listedTokens.map(function (token, i) {
+                  {filterAndSortTokens(listedTokens).map(function (token, i) {
                     var score = getSafetyScore(token);
                     var style = getScoreStyle(score);
                     return (
@@ -2334,7 +2393,7 @@ export default function TntHouse() {
                       </td>
                     </tr>
                   ) : (
-                    tokens.map(function (token, i) {
+                    filterAndSortTokens(tokens).map(function (token, i) {
                       var score = getSafetyScore(token);
                       var style = getScoreStyle(score);
                       return (
