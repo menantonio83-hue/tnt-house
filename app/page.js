@@ -1968,14 +1968,14 @@ export default function TntHouse() {
         {/* ═══ HEADER ═══ */}
         <header className="border-b border-purple-500/30 backdrop-blur-lg bg-slate-950/60 sticky top-0 z-50">
           <div className="max-w-7xl mx-auto px-6 py-6 flex items-center justify-between">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 -ml-2 sm:-ml-3">
+              {/* TNT House single shield logo — all text merged inside one big shield, no separate small icon */}
               <a
                 href="https://t.me/tnt_house2026"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-12 h-12 flex items-center justify-center shrink-0"
+                className="w-24 h-28 sm:w-28 sm:h-32 flex items-center justify-center shrink-0 relative"
               >
-                {/* TNT House shield logo — replaces the old dynamite emoji icon */}
                 <svg viewBox="0 0 100 116" className="w-full h-full drop-shadow-[0_0_10px_rgba(153,69,255,0.6)]">
                   <defs>
                     <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -1989,27 +1989,26 @@ export default function TntHouse() {
                     stroke="url(#shieldGrad)"
                     strokeWidth="4"
                   />
-                  <text
-                    x="50"
-                    y="58"
-                    textAnchor="middle"
-                    fontSize="30"
-                    fontWeight="900"
-                    fill="url(#shieldGrad)"
-                    fontFamily="monospace"
-                  >
-                    TNT
-                  </text>
                 </svg>
+                {/* Text overlay inside the shield: TNT HOUSE + tagline, replaces the separate <h1>/<span> block */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center px-2 text-center pointer-events-none">
+                  <span className="text-[13px] sm:text-[15px] font-black leading-tight text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400 tracking-wide">
+                    TNT
+                  </span>
+                  <span className="text-[13px] sm:text-[15px] font-black leading-tight text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400 tracking-wide -mt-0.5">
+                    HOUSE
+                  </span>
+                  <span className="text-[6px] sm:text-[7px] text-purple-300 font-bold tracking-widest mt-1 leading-tight">
+                    TOP NEW
+                  </span>
+                  <span className="text-[6px] sm:text-[7px] text-purple-300 font-bold tracking-widest leading-tight">
+                    TOKENS
+                  </span>
+                  <span className="text-[6px] sm:text-[7px] text-cyan-400 font-bold tracking-widest mt-0.5 leading-tight">
+                    v0.1.2
+                  </span>
+                </div>
               </a>
-              <div>
-                <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-emerald-400 tracking-wider">
-                  TNT HOUSE
-                </h1>
-                <span className="text-[10px] text-purple-400 block font-bold tracking-widest">
-                  TOP NEW TOKENS v0.1.2
-                </span>
-              </div>
             </div>
 
             {/* Language switcher */}
