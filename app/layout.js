@@ -1,5 +1,6 @@
 // app/layout.js
 import './globals.css';
+import { Analytics } from '@vercel/analytics/react';
 
 export const metadata = {
   title: 'TNT House — AI Token Audits',
@@ -15,6 +16,7 @@ export default function RootLayout({ children }) {
       </head>
       <body className="bg-black text-white" style={{ margin: 0 }}>
         {children}
+        <Analytics />
       </body>
     </html>
   );
