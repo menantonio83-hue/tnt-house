@@ -3707,12 +3707,26 @@ export default function TntHouse() {
                 >
                   RugCheck <ExternalLink className="w-3 h-3" />
                 </a>
-                <button
-                  onClick={handleLaunchJupiter}
-                  className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg bg-gradient-to-r from-purple-500 to-emerald-400 text-slate-950 font-black text-xs hover:from-purple-400 hover:to-emerald-300 transition"
-                >
-                  Buy $MRDT ⚽️
-                </button>
+                {selectedToken.symbol === 'MRDT' ? (
+                  <button
+                    onClick={handleLaunchJupiter}
+                    className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg bg-gradient-to-r from-purple-500 to-emerald-400 text-slate-950 font-black text-xs hover:from-purple-400 hover:to-emerald-300 transition"
+                  >
+                    Buy $MRDT ⚽️
+                  </button>
+                ) : (
+                  <a
+                    href={
+                      'https://jup.ag/swap?sell=So11111111111111111111111111111111111111112&buy=' +
+                      selectedToken.ca
+                    }
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg bg-gradient-to-r from-purple-500 to-emerald-400 text-slate-950 font-black text-xs hover:from-purple-400 hover:to-emerald-300 transition"
+                  >
+                    Buy ${selectedToken.symbol}
+                  </a>
+                )}
               </div>
             </div>
           </div>
