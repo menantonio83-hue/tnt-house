@@ -1018,6 +1018,20 @@ export default function TntHouse() {
     if (el) el.scrollIntoView({ behavior: 'smooth' });
   };
 
+  // NEW: scroll straight to the audit form specifically (used by the
+  // header "Order Audit" button), instead of just the general section.
+  var scrollToAuditForm = function () {
+    var el = document.getElementById('auditFormSection');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+
+  // NEW: scroll straight to the VIP banner form specifically (used by the
+  // header "Order VIP Banner" button).
+  var scrollToBannerForm = function () {
+    var el = document.getElementById('bannerFormSection');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+
   var handleLaunchJupiter = function () {
     window.open(
       'https://jup.ag/swap?sell=So11111111111111111111111111111111111111112&buy=8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg',
@@ -2082,53 +2096,73 @@ export default function TntHouse() {
               </a>
             </div>
 
-            {/* Language switcher */}
-            <div className="flex items-center gap-0.5 mr-1">
-              {Object.keys(TRANSLATIONS).map(function (l) {
-                return (
-                  <button
-                    key={l}
-                    onClick={function () {
-                      setLang(l);
-                    }}
-                    title={TRANSLATIONS[l].name}
-                    className={
-                      'text-base px-1 py-0.5 rounded transition ' +
-                      (lang === l ? 'opacity-100 scale-110' : 'opacity-40 hover:opacity-80')
-                    }
-                  >
-                    {TRANSLATIONS[l].flag}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* BUY $MRDT dropdown */}
-            <div className="relative">
+            <div className="flex flex-col items-end gap-2">
+              {/* NEW: Order Audit button — scrolls straight to the audit form */}
               <button
-                onClick={function () {
-                  setIsBuyDropdownOpen(!isBuyDropdownOpen);
-                }}
-                className="bg-gradient-to-r from-purple-500 to-emerald-400 hover:from-purple-400 hover:to-emerald-300 text-slate-950 font-black px-4 py-2 rounded text-xs transition flex items-center gap-1 shadow-[0_0_15px_rgba(153,69,255,0.4)]"
+                onClick={scrollToAuditForm}
+                className="bg-gradient-to-r from-purple-500 to-emerald-400 hover:from-purple-400 hover:to-emerald-300 text-slate-950 font-black px-4 py-2 rounded text-xs transition shadow-[0_0_15px_rgba(153,69,255,0.4)]"
               >
-                BUY $MRDT <ChevronDown className="w-3 h-3" />
+                🛡️ ORDER AUDIT
               </button>
-              {isBuyDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-slate-950 border border-purple-500/30 rounded-lg shadow-xl z-50 py-1">
-                  <button
-                    onClick={handleLaunchJupiter}
-                    className="w-full text-left px-4 py-2.5 hover:bg-purple-500/10 text-emerald-400 flex items-center gap-2 text-sm"
-                  >
-                    <ExternalLink className="w-4 h-4" /> Jupiter Swap
-                  </button>
-                  <button
-                    onClick={handleOpenRaydium}
-                    className="w-full text-left px-4 py-2.5 hover:bg-purple-500/10 text-emerald-400 flex items-center gap-2 text-sm"
-                  >
-                    <ExternalLink className="w-4 h-4" /> Raydium
-                  </button>
+
+              <div className="flex items-center gap-3">
+                {/* Language switcher */}
+                <div className="flex items-center gap-0.5 mr-1">
+                  {Object.keys(TRANSLATIONS).map(function (l) {
+                    return (
+                      <button
+                        key={l}
+                        onClick={function () {
+                          setLang(l);
+                        }}
+                        title={TRANSLATIONS[l].name}
+                        className={
+                          'text-base px-1 py-0.5 rounded transition ' +
+                          (lang === l ? 'opacity-100 scale-110' : 'opacity-40 hover:opacity-80')
+                        }
+                      >
+                        {TRANSLATIONS[l].flag}
+                      </button>
+                    );
+                  })}
                 </div>
-              )}
+
+                {/* BUY $MRDT dropdown */}
+                <div className="relative">
+                  <button
+                    onClick={function () {
+                      setIsBuyDropdownOpen(!isBuyDropdownOpen);
+                    }}
+                    className="bg-gradient-to-r from-purple-500 to-emerald-400 hover:from-purple-400 hover:to-emerald-300 text-slate-950 font-black px-4 py-2 rounded text-xs transition flex items-center gap-1 shadow-[0_0_15px_rgba(153,69,255,0.4)]"
+                  >
+                    BUY $MRDT <ChevronDown className="w-3 h-3" />
+                  </button>
+                  {isBuyDropdownOpen && (
+                    <div className="absolute right-0 mt-2 w-48 bg-slate-950 border border-purple-500/30 rounded-lg shadow-xl z-50 py-1">
+                      <button
+                        onClick={handleLaunchJupiter}
+                        className="w-full text-left px-4 py-2.5 hover:bg-purple-500/10 text-emerald-400 flex items-center gap-2 text-sm"
+                      >
+                        <ExternalLink className="w-4 h-4" /> Jupiter Swap
+                      </button>
+                      <button
+                        onClick={handleOpenRaydium}
+                        className="w-full text-left px-4 py-2.5 hover:bg-purple-500/10 text-emerald-400 flex items-center gap-2 text-sm"
+                      >
+                        <ExternalLink className="w-4 h-4" /> Raydium
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* NEW: Order VIP Banner button — scrolls straight to the banner form */}
+              <button
+                onClick={scrollToBannerForm}
+                className="bg-gradient-to-r from-purple-500 to-emerald-400 hover:from-purple-400 hover:to-emerald-300 text-slate-950 font-black px-4 py-2 rounded text-xs transition shadow-[0_0_15px_rgba(153,69,255,0.4)]"
+              >
+                ⭐ ORDER VIP BANNER
+              </button>
             </div>
           </div>
         </header>
@@ -2701,7 +2735,7 @@ export default function TntHouse() {
           <div className="grid md:grid-cols-2 gap-12 items-start">
             <div className="space-y-8">
               {/* Audit form */}
-              <div className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 p-6 backdrop-blur-md">
+              <div id="auditFormSection" className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 p-6 backdrop-blur-md">
                 <div className="flex items-start justify-between mb-2">
                   <h3 className="text-lg font-black text-purple-400">{t.formTitle}</h3>
                   {freeSlots > 0 ? (
@@ -2842,7 +2876,7 @@ export default function TntHouse() {
               </div>
 
               {/* Banner form */}
-              <div className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 p-6 backdrop-blur-md">
+              <div id="bannerFormSection" className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 p-6 backdrop-blur-md">
                 <div className="flex items-start justify-between mb-2">
                   <h3 className="text-lg font-black text-purple-400">{t.bannerTitle}</h3>
                   {BANNER_SLOTS - activeBanners.length > 0 ? (
