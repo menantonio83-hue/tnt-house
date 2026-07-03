@@ -40,15 +40,15 @@ export async function POST(request) {
   const safeLiquidity = typeof liquidityUSD === 'number' ? liquidityUSD : 0;
 
   const message =
-    `🔍 <b>Новый прошедший ИИ-аудит!</b>\n\n` +
-    `<b>Токен:</b> ${escapeHtml(tokenName)} ($${escapeHtml(symbol)})\n` +
+    `🔍 <b>New Token Passed AI Audit!</b>\n\n` +
+    `<b>Token:</b> ${escapeHtml(tokenName)} ($${escapeHtml(symbol)})\n` +
     `<b>CA:</b> <code>${escapeHtml(ca)}</code>\n` +
     `<b>Mint Authority:</b> ${escapeHtml(mintAuthority)}\n` +
     `<b>Freeze Authority:</b> ${escapeHtml(freezeAuthority)}\n` +
-    `<b>Концентрация топ-10 холдеров:</b> ${escapeHtml(top10Percent)}%\n` +
-    `<b>Ликвидность:</b> $${safeLiquidity.toLocaleString()}\n` +
-    `<b>LP заблокированы:</b> ${escapeHtml(lpLocked)}\n` +
-    `<b>DexScreener:</b> <a href="${escapeHtml(dexUrl)}">Открыть</a>`;
+    `<b>Top-10 Holder Concentration:</b> ${escapeHtml(top10Percent)}%\n` +
+    `<b>Liquidity:</b> $${safeLiquidity.toLocaleString()}\n` +
+    `<b>LP Locked:</b> ${escapeHtml(lpLocked)}\n` +
+    `<b>DexScreener:</b> <a href="${escapeHtml(dexUrl)}">Open</a>`;
 
   const telegramApiUrl = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
 
