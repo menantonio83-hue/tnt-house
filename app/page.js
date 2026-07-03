@@ -1587,6 +1587,24 @@ export default function TntHouse() {
   // when the wallet opens, so the user just has to paste it if the field
   // shows 0 — same idea as the existing "Copy exact amount" button, just
   // automatic instead of requiring an extra tap.
+  // FIX v1.6: root-caused the amount=0 bug for real — Phantom Android opens
+  // an EXTERNAL solana: deeplink (from Samsung Internet / Chrome) as its
+  // generic "Send" screen, not the real Solana Pay confirm screen, so the
+  // `amount` query param is never even read there — no URI-format fix could
+  // have worked. New approach: open our dedicated /pay page INSIDE
+  // Phantom's own in-app browser via its universal link. There,
+  // window.phantom.solana is injected directly and we build+sign the
+  // transaction on the client (see app/pay/page.js) — no query-string
+  // amount parsing involved, and no server-built tx being blind-signed
+  // (which is what got the old Transaction Request approach Blowfish-
+  // blocked). The original tab's startPaymentVerification() polling loop
+  // keeps running unchanged and will pick up the payment once it confirms
+  // on-chain, regardless of which browser tab actually sent it.
+  var openPhantomInAppBrowser = function (payUrl) {
+    var universalLink = 'https://phantom.app/ul/browse/' + encodeURIComponent(payUrl);
+    window.location.href = universalLink;
+  };
+
   var openDeeplink = function (uri, amountStr) {
     if (amountStr && navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(amountStr).catch(function () {
@@ -1707,8 +1725,14 @@ export default function TntHouse() {
     // mitigation, which is no longer needed here since Transaction Request
     // bakes the exact amount into the built transaction itself, so Phantom
     // always shows the real amount, no manual paste required).
-    var uri = buildTransactionRequestUri(payAmount, verifyMethod, label);
-    openDeeplink(uri);
+    // FIX v1.6: open /pay inside Phantom's in-app browser instead of a
+    // solana: deeplink — see openPhantomInAppBrowser comment for why.
+    var payUrl =
+      window.location.origin +
+      '/pay?amount=' + encodeURIComponent(payAmount) +
+      '&method=' + encodeURIComponent(verifyMethod) +
+      '&label=' + encodeURIComponent(label);
+    openPhantomInAppBrowser(payUrl);
     setShowInvoiceModal(false);
     setIsSending(true);
     var tokenData = await runAuditAndSave(ca, projectName, false, logoImg);
@@ -1886,8 +1910,14 @@ export default function TntHouse() {
     // FIX v1.5: back to Transaction Request — see handleConfirmPayment's
     // v1.5 comment for the reasoning (user accepts the Blowfish warning
     // over the amount=0 pre-fill issue).
-    var uri = buildTransactionRequestUri(payAmount, verifyMethod, label);
-    openDeeplink(uri);
+    // FIX v1.6: open /pay inside Phantom's in-app browser — see
+    // openPhantomInAppBrowser comment for why.
+    var payUrl =
+      window.location.origin +
+      '/pay?amount=' + encodeURIComponent(payAmount) +
+      '&method=' + encodeURIComponent(verifyMethod) +
+      '&label=' + encodeURIComponent(label);
+    openPhantomInAppBrowser(payUrl);
     setShowBannerInvoiceModal(false);
     setIsBannerSending(true);
     setBannerFormData({ tokenName: '', bannerImg: '', desc: '', days: '1' });
@@ -3296,7 +3326,7 @@ export default function TntHouse() {
               </button>
             </div>
             <div className="mt-2 p-2 bg-purple-950/30 border border-purple-500/20 rounded-lg text-[10px] text-purple-300 text-center">
-              Tapping will open {selectedWallet}. You may see a "This dApp could be malicious" or "domain not yet reviewed" warning — this is expected; tap "Continue anyway" to proceed.
+              Tapping will open our payment page inside {selectedWallet}'s app browser. Connect your wallet there and confirm the exact amount — you may see a "domain not yet reviewed" warning on connect, this is expected; tap "Continue anyway".
             </div>
             <div className="mt-6 flex gap-3">
               <button
@@ -3610,7 +3640,7 @@ export default function TntHouse() {
               </button>
             </div>
             <div className="mt-2 p-2 bg-emerald-950/30 border border-emerald-500/20 rounded-lg text-[10px] text-emerald-300 text-center">
-              {t.bannerLive} You may see a "This dApp could be malicious" or "domain not yet reviewed" warning — this is expected; tap "Continue anyway" to proceed.
+              {t.bannerLive} Connect your wallet on the payment page and confirm the exact amount — you may see a "domain not yet reviewed" warning on connect, this is expected; tap "Continue anyway".
             </div>
             <div className="mt-6 flex gap-3">
               <button
