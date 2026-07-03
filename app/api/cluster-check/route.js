@@ -1,5 +1,6 @@
 // app/api/cluster-check/route.js
-// Version 1.1
+// Version 1.4
+
 // First Funder Trace: for a token's top holders, find each wallet's very
 // first incoming SOL transfer (its "funder"). If multiple top holders
 // were funded by the SAME wallet, that's a real, on-chain-provable signal
@@ -140,22 +141,46 @@ export async function GET(request) {
       .filter(([, holders]) => holders.length >= 2)
       .map(([funder, holders]) => ({ funder, holders }));
 
-    // FIX v1.3: the frontend's "Safe New Tokens" table actually reads from
-    // the `listed_tokens` table (field `score`), populated directly by the
-    // client-side audit flow (saveTokenToSupabase) — NOT `verified_tokens`
-    // (field `security_score`), which turned out to be a separate,
-    // unused-by-the-live-UI table from an older admin-approval flow.
-    // v1.2 wrote to the wrong table, so the persisted penalty never showed
-    // up anywhere. Writing to `listed_tokens` here instead.
+    // Persists a penalty score to `listed_tokens` (the table the live UI
+    // actually reads — see v1.3) when a real cluster is found.
+    // FIX v1.4: capture and surface every Supabase error instead of
+    // firing blind. The v1.2/v1.3 update calls had no error handling at
+    // all — if the anon/publishable key's RLS policy allows SELECT/INSERT
+    // but not UPDATE (a common default Supabase setup), the write fails
+    // completely silently and looks exactly like what was reported: the
+    // Blueprint modal shows 39, but the table still shows 100 after
+    // refresh. `scoreUpdate` in the response now tells us definitively
+    // whether the DB write actually happened.
+    let scoreUpdate = { attempted: false };
     if (clusters.length > 0) {
-      const { data: existing } = await supabase
+      scoreUpdate.attempted = true;
+
+      const { data: existing, error: selectError } = await supabase
         .from('listed_tokens')
         .select('score')
         .eq('ca', ca)
         .maybeSingle();
 
-      if (existing && existing.score > 39) {
-        await supabase.from('listed_tokens').update({ score: 39 }).eq('ca', ca);
+      if (selectError) {
+        scoreUpdate.selectError = selectError.message;
+        console.error('[cluster-check] listed_tokens select failed:', selectError);
+      } else if (!existing) {
+        scoreUpdate.note = 'No matching row in listed_tokens for this ca';
+        console.error('[cluster-check] no listed_tokens row for ca:', ca);
+      } else if (existing.score <= 39) {
+        scoreUpdate.note = 'Score already <= 39, no update needed';
+      } else {
+        const { error: updateError } = await supabase
+          .from('listed_tokens')
+          .update({ score: 39 })
+          .eq('ca', ca);
+
+        if (updateError) {
+          scoreUpdate.updateError = updateError.message;
+          console.error('[cluster-check] listed_tokens update failed:', updateError);
+        } else {
+          scoreUpdate.success = true;
+        }
       }
     }
 
@@ -165,6 +190,7 @@ export async function GET(request) {
         clusters,
         clusterCount: clusters.length,
         errors: errors.length > 0 ? errors : undefined,
+        scoreUpdate,
       },
       { headers: CORS_HEADERS },
     );
