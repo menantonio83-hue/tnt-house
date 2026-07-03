@@ -2843,7 +2843,22 @@ export default function TntHouse() {
 
               {/* Banner form */}
               <div className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 p-6 backdrop-blur-md">
-                <h3 className="text-lg font-black text-purple-400 mb-2">{t.bannerTitle}</h3>
+                <div className="flex items-start justify-between mb-2">
+                  <h3 className="text-lg font-black text-purple-400">{t.bannerTitle}</h3>
+                  {BANNER_SLOTS - activeBanners.length > 0 ? (
+                    <div className="bg-emerald-500/20 border border-emerald-500/40 rounded-lg px-2 py-1 text-center">
+                      <div className="text-emerald-400 font-black text-sm">
+                        {BANNER_SLOTS - activeBanners.length}/{BANNER_SLOTS}
+                      </div>
+                      <div className="text-[9px] text-emerald-500">free</div>
+                    </div>
+                  ) : (
+                    <div className="bg-slate-800 border border-slate-600 rounded-lg px-2 py-1 text-center">
+                      <div className="text-slate-400 font-black text-sm">0/{BANNER_SLOTS}</div>
+                      <div className="text-[9px] text-slate-500">no slots</div>
+                    </div>
+                  )}
+                </div>
                 <p className="text-slate-400 text-xs mb-4">{t.bannerSub}</p>
                 <form onSubmit={handleBannerSubmit} className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
