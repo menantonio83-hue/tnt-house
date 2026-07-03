@@ -1,5 +1,5 @@
 // app/api/cluster-check/route.js
-// Version 1.4
+// Version 1.5
 
 // First Funder Trace: for a token's top holders, find each wallet's very
 // first incoming SOL transfer (its "funder"). If multiple top holders
@@ -142,22 +142,26 @@ export async function GET(request) {
       .map(([funder, holders]) => ({ funder, holders }));
 
     // Persists a penalty score to `listed_tokens` (the table the live UI
-    // actually reads — see v1.3) when a real cluster is found.
-    // FIX v1.4: capture and surface every Supabase error instead of
-    // firing blind. The v1.2/v1.3 update calls had no error handling at
-    // all — if the anon/publishable key's RLS policy allows SELECT/INSERT
-    // but not UPDATE (a common default Supabase setup), the write fails
-    // completely silently and looks exactly like what was reported: the
-    // Blueprint modal shows 39, but the table still shows 100 after
-    // refresh. `scoreUpdate` in the response now tells us definitively
-    // whether the DB write actually happened.
+    // actually reads — confirmed via direct table inspection) when a real
+    // cluster is found.
+    //
+    // FIX v1.5: v1.4's "success: true" was a false positive. Supabase's
+    // update() does NOT return an error when Row Level Security silently
+    // filters the target row out of the UPDATE's visibility — it just
+    // updates 0 rows and reports success. That's exactly what was
+    // happening: SELECT worked (read policy exists), but UPDATE touched
+    // nothing (no write policy for this key/role), and the table kept
+    // showing the original score. Adding .select() after .update() forces
+    // Supabase to return the actual affected rows, so we can tell real
+    // success (rows.length > 0) apart from a silently blocked write
+    // (rows.length === 0, no error).
     let scoreUpdate = { attempted: false };
     if (clusters.length > 0) {
       scoreUpdate.attempted = true;
 
       const { data: existing, error: selectError } = await supabase
         .from('listed_tokens')
-        .select('score')
+        .select('id, score')
         .eq('ca', ca)
         .maybeSingle();
 
@@ -170,16 +174,24 @@ export async function GET(request) {
       } else if (existing.score <= 39) {
         scoreUpdate.note = 'Score already <= 39, no update needed';
       } else {
-        const { error: updateError } = await supabase
+        const { data: updatedRows, error: updateError } = await supabase
           .from('listed_tokens')
           .update({ score: 39 })
-          .eq('ca', ca);
+          .eq('ca', ca)
+          .select('id, score');
 
         if (updateError) {
           scoreUpdate.updateError = updateError.message;
           console.error('[cluster-check] listed_tokens update failed:', updateError);
+        } else if (!updatedRows || updatedRows.length === 0) {
+          // This is the RLS-silent-block case: no error, but nothing changed.
+          scoreUpdate.blockedByRLS = true;
+          scoreUpdate.note =
+            'Update returned no error but affected 0 rows — likely blocked by a Row Level Security UPDATE policy on listed_tokens for this key/role.';
+          console.error('[cluster-check] update affected 0 rows (likely RLS):', ca);
         } else {
           scoreUpdate.success = true;
+          scoreUpdate.updatedRows = updatedRows;
         }
       }
     }
