@@ -2850,12 +2850,12 @@ export default function TntHouse() {
                       <div className="text-emerald-400 font-black text-sm">
                         {BANNER_SLOTS - activeBanners.length}/{BANNER_SLOTS}
                       </div>
-                      <div className="text-[9px] text-emerald-500">free</div>
+                      <div className="text-[9px] text-emerald-500">open</div>
                     </div>
                   ) : (
                     <div className="bg-slate-800 border border-slate-600 rounded-lg px-2 py-1 text-center">
                       <div className="text-slate-400 font-black text-sm">0/{BANNER_SLOTS}</div>
-                      <div className="text-[9px] text-slate-500">no slots</div>
+                      <div className="text-[9px] text-slate-500">full</div>
                     </div>
                   )}
                 </div>
