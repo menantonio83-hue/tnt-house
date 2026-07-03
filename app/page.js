@@ -1576,21 +1576,37 @@ export default function TntHouse() {
     return tokenData;
   };
 
-  // FIX v1.63: Navigate IMMEDIATELY (synchronously) instead of via setTimeout.
-  // Root cause of the "0 amount" bug: delaying window.location.href inside
-  // setTimeout breaks the browser's "direct user gesture" trust chain on
-  // Android (especially Samsung Internet). Once that trust is lost, the OS
-  // intent resolver sometimes opens Phantom via a generic app-launch that
-  // drops the ENTIRE query string (amount, spl-token, label, message) while
-  // keeping only the recipient (which lives in the URI path, before "?").
-  // That exactly matches the symptom: correct recipient shown, but amount=0
-  // and default/last-used token, as if Phantom got no query params at all.
-  var openDeeplink = function (uri) {
+  // FIX v1.4: Phantom on Android reliably parses the recipient AND the
+  // spl-token (correct token context shown: MRDT/USDC/SOL), but frequently
+  // fails to pre-fill `amount` — confirmed on all 3 currencies via
+  // real-device testing, not just SOL as earlier assumed in v1.49/v1.63.
+  // This looks like a wallet-side quirk with Transfer Request URIs opened
+  // via web redirect rather than a native QR/link tap, and is NOT something
+  // we can force-fix from the URI alone. Instead of chasing URI-format
+  // theories further, auto-copy the exact amount to the clipboard right
+  // when the wallet opens, so the user just has to paste it if the field
+  // shows 0 — same idea as the existing "Copy exact amount" button, just
+  // automatic instead of requiring an extra tap.
+  var openDeeplink = function (uri, amountStr) {
+    if (amountStr && navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(amountStr).catch(function () {
+        // Clipboard write can fail silently (permissions, non-HTTPS, etc.)
+        // — not fatal, the "Copy exact amount" button is still available.
+      });
+    }
     window.location.href = uri;
     // Show fallback after 2s if protocol handler didn't fire
     setTimeout(function () {
       setDeeplinkFallbackUri(uri);
     }, 2000);
+  };
+
+  // Shared amount formatter — used both to build the URI's `amount` param
+  // AND to populate the clipboard fallback, so the two can never disagree.
+  var formatPaymentAmountStr = function (amount, method) {
+    if (method === 'SOL') return parseFloat(amount).toFixed(6);
+    if (method === 'USDC') return (Math.round(amount * 100) / 100).toFixed(2);
+    return String(Math.round(amount)); // MRDT: always a whole token amount
   };
 
   // FIX v1.49: REVERT v1.47's switch to Transaction Request API. Real-world
@@ -1612,15 +1628,14 @@ export default function TntHouse() {
   // static Transfer Request URIs don't ask the wallet to fetch and
   // blind-sign a server-built tx, which is exactly the pattern Blowfish
   // flags. This function now also supports USDC (spl-token = USDC_CA).
+  //
+  // FIX v1.4: real-device testing showed amount=0 pre-fill on ALL THREE
+  // currencies (not just SOL) even though recipient + spl-token parse
+  // correctly — see openDeeplink's v1.4 comment for the clipboard mitigation.
   var buildTransferRequestUri = function (amount, method, label, message) {
     var isSol = method === 'SOL';
     var splTokenCA = method === 'USDC' ? USDC_CA : MRDT_CA;
-    var isUsdc = method === 'USDC';
-    var amountStr = isSol
-      ? parseFloat(amount).toFixed(6)
-      : isUsdc
-        ? (Math.round(amount * 100) / 100).toFixed(2) // USDC: 2 decimals
-        : String(Math.round(amount)); // MRDT: always a whole token amount
+    var amountStr = formatPaymentAmountStr(amount, method);
     // FIX v1.58: for SPL tokens, put spl-token BEFORE amount.
     // Phantom on Android sometimes parses URI params sequentially — seeing
     // spl-token first lets it correctly identify the token context before
@@ -1689,7 +1704,7 @@ export default function TntHouse() {
     // hard-blocked by Phantom's Blowfish "malicious dApp" check (Blowfish
     // appeal #11857 was rejected). See buildTransferRequestUri comment.
     var uri = buildTransferRequestUri(payAmount, verifyMethod, label, label);
-    openDeeplink(uri);
+    openDeeplink(uri, formatPaymentAmountStr(payAmount, verifyMethod));
     setShowInvoiceModal(false);
     setIsSending(true);
     var tokenData = await runAuditAndSave(ca, projectName, false, logoImg);
@@ -1868,7 +1883,7 @@ export default function TntHouse() {
     // hard-blocked by Phantom's Blowfish "malicious dApp" check (Blowfish
     // appeal #11857 was rejected). See buildTransferRequestUri comment.
     var uri = buildTransferRequestUri(payAmount, verifyMethod, label, label);
-    openDeeplink(uri);
+    openDeeplink(uri, formatPaymentAmountStr(payAmount, verifyMethod));
     setShowBannerInvoiceModal(false);
     setIsBannerSending(true);
     setBannerFormData({ tokenName: '', bannerImg: '', desc: '', days: '1' });
@@ -3277,7 +3292,7 @@ export default function TntHouse() {
               </button>
             </div>
             <div className="mt-2 p-2 bg-purple-950/30 border border-purple-500/20 rounded-lg text-[10px] text-purple-300 text-center">
-              Tapping will open {selectedWallet}. You may see a "domain not yet reviewed" warning — this is expected while Phantom reviews the site; tap "Continue anyway" to proceed.
+              Tapping will open {selectedWallet}. The amount field may show 0 — we've already copied the exact amount to your clipboard, just paste it in. You may also see a "domain not yet reviewed" warning — tap "Continue anyway" to proceed.
             </div>
             <div className="mt-6 flex gap-3">
               <button
@@ -3591,7 +3606,7 @@ export default function TntHouse() {
               </button>
             </div>
             <div className="mt-2 p-2 bg-emerald-950/30 border border-emerald-500/20 rounded-lg text-[10px] text-emerald-300 text-center">
-              {t.bannerLive} You may see a "domain not yet reviewed" warning — tap "Continue anyway" to proceed.
+              {t.bannerLive} The amount field may show 0 — we've already copied the exact amount to your clipboard, just paste it in. You may also see a "domain not yet reviewed" warning — tap "Continue anyway" to proceed.
             </div>
             <div className="mt-6 flex gap-3">
               <button
