@@ -99,7 +99,7 @@ const TRANSLATIONS = {
     slotAvailIn: 'Slot available in',
     investorTitle: 'Investor Information',
     investorSub:
-      'All payments accepted in $MRDT via Solana Pay. After payment, token appears in table automatically.',
+      'All payments accepted in $MRDT / SOL / USDC via Solana Pay. After payment, token appears in table automatically.',
     pricingTitle: 'CURRENT PRICING:',
     first10: '🎁 First 10 tokens',
     free: 'FREE',
@@ -199,7 +199,7 @@ const TRANSLATIONS = {
     btnSending: 'ENVIANDO...',
     slotAvailIn: 'Lugar disponible en',
     investorTitle: 'Información para Inversores',
-    investorSub: 'Todos los pagos se aceptan en $MRDT vía Solana Pay.',
+    investorSub: 'Todos los pagos se aceptan en $MRDT / SOL / USDC vía Solana Pay.',
     pricingTitle: 'PRECIOS ACTUALES:',
     first10: '🎁 Primeros 10 tokens',
     free: 'GRATIS',
@@ -296,7 +296,7 @@ const TRANSLATIONS = {
     btnSending: 'ENVOI...',
     slotAvailIn: 'Emplacement disponible dans',
     investorTitle: 'Informations Investisseurs',
-    investorSub: 'Tous les paiements sont acceptés en $MRDT via Solana Pay.',
+    investorSub: 'Tous les paiements sont acceptés en $MRDT / SOL / USDC via Solana Pay.',
     pricingTitle: 'TARIFS ACTUELS:',
     first10: '🎁 10 premiers tokens',
     free: 'GRATUIT',
@@ -393,7 +393,7 @@ const TRANSLATIONS = {
     btnSending: 'ΑΠΟΣΤΟΛΗ...',
     slotAvailIn: 'Θέση διαθέσιμη σε',
     investorTitle: 'Πληροφορίες Επενδυτών',
-    investorSub: 'Όλες οι πληρωμές γίνονται σε $MRDT μέσω Solana Pay.',
+    investorSub: 'Όλες οι πληρωμές γίνονται σε $MRDT / SOL / USDC μέσω Solana Pay.',
     pricingTitle: 'ΤΡΕΧΟΥΣΕΣ ΤΙΜΕΣ:',
     first10: '🎁 Πρώτα 10 tokens',
     free: 'ΔΩΡΕΑΝ',
@@ -491,7 +491,7 @@ const TRANSLATIONS = {
     slotAvailIn: 'Место освободится через',
     investorTitle: 'Информация для инвесторов',
     investorSub:
-      'Все платежи принимаются в $MRDT через Solana Pay. После оплаты токен появится в таблице автоматически.',
+      'Все платежи принимаются в $MRDT / SOL / USDC через Solana Pay. После оплаты токен появится в таблице автоматически.',
     pricingTitle: 'ТЕКУЩИЕ ТАРИФЫ:',
     first10: '🎁 Первые 10 токенов',
     free: 'БЕСПЛАТНО',
@@ -2848,18 +2848,9 @@ export default function TntHouse() {
                       }}
                       className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white focus:border-purple-500 focus:outline-none font-mono"
                     >
-                      <option value="1">
-                        {t.dur1} - $20 (~
-                        {priceLoading ? '...' : getAmountForBanner('1').toLocaleString()} $MRDT)
-                      </option>
-                      <option value="2">
-                        {t.dur2} - $35 (~
-                        {priceLoading ? '...' : getAmountForBanner('2').toLocaleString()} $MRDT)
-                      </option>
-                      <option value="6">
-                        {t.dur6} - $100 (~
-                        {priceLoading ? '...' : getAmountForBanner('6').toLocaleString()} $MRDT)
-                      </option>
+                      <option value="1">{t.dur1} - ~$20 $MRDT/SOL/USDC</option>
+                      <option value="2">{t.dur2} - ~$35 $MRDT/SOL/USDC</option>
+                      <option value="6">{t.dur6} - ~$100 $MRDT/SOL/USDC</option>
                     </select>
                   </div>
                   <button
@@ -2905,42 +2896,12 @@ export default function TntHouse() {
                 <div className="grid grid-cols-1 gap-2 text-xs font-mono">
                   {[
                     [t.first10, t.free],
-                    [
-                      'Basic AI Audit',
-                      '$10 ~ ' +
-                        (priceLoading ? '...' : getAmountForTier('basic').toLocaleString()) +
-                        ' $MRDT',
-                    ],
-                    [
-                      'Fast Listing',
-                      '$25 ~ ' +
-                        (priceLoading ? '...' : getAmountForTier('fast').toLocaleString()) +
-                        ' $MRDT',
-                    ],
-                    [
-                      'VIP Boost',
-                      '$75 ~ ' +
-                        (priceLoading ? '...' : getAmountForTier('vip').toLocaleString()) +
-                        ' $MRDT',
-                    ],
-                    [
-                      'Banner 1 day',
-                      '$20 ~ ' +
-                        (priceLoading ? '...' : getAmountForBanner('1').toLocaleString()) +
-                        ' $MRDT',
-                    ],
-                    [
-                      'Banner 2 days',
-                      '$35 ~ ' +
-                        (priceLoading ? '...' : getAmountForBanner('2').toLocaleString()) +
-                        ' $MRDT',
-                    ],
-                    [
-                      'Banner 6 days',
-                      '$100 ~ ' +
-                        (priceLoading ? '...' : getAmountForBanner('6').toLocaleString()) +
-                        ' $MRDT',
-                    ],
+                    ['Basic AI Audit', '~$10 $MRDT/SOL/USDC'],
+                    ['Fast Listing', '~$25 $MRDT/SOL/USDC'],
+                    ['VIP Boost', '~$75 $MRDT/SOL/USDC'],
+                    ['Banner 1 day', '~$20 $MRDT/SOL/USDC'],
+                    ['Banner 2 days', '~$35 $MRDT/SOL/USDC'],
+                    ['Banner 6 days', '~$100 $MRDT/SOL/USDC'],
                   ].map(function (row, i) {
                     var rowCls =
                       'flex justify-between p-2.5 border rounded-lg ' +
