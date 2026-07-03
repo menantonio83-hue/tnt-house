@@ -551,7 +551,7 @@ const TRANSLATIONS = {
 // Best-effort: failures are logged but never block the audit flow.
 async function postAuditToTelegram(token) {
   try {
-    await fetch('/api/sendTelegram', {
+    var res = await fetch('/api/sendTelegram', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -567,6 +567,16 @@ async function postAuditToTelegram(token) {
         dexUrl: token.dexUrl,
       }),
     });
+    // FIX v1.1: actually read + log the response instead of firing blind.
+    // Previously a failed Telegram post (bad token, bot not in group,
+    // Markdown parse error, etc.) was completely invisible — this at
+    // least surfaces it in the browser console for debugging.
+    if (!res.ok) {
+      var errBody = await res.json().catch(function () {
+        return null;
+      });
+      console.error('Telegram post failed:', res.status, errBody);
+    }
   } catch (e) {
     console.error('Telegram post failed:', e);
   }
