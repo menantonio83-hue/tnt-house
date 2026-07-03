@@ -955,6 +955,24 @@ export default function TntHouse() {
     return Math.max(85, Math.min(97, (hash % 12) + 85));
   };
 
+  // NEW: the base safety score is computed once at audit time and does NOT
+  // include funding-cluster analysis (that check is slow — walks each top
+  // holder's full signature history over RPC — so it only runs on-demand
+  // when the user taps "Check Insider Clusters", not during the automatic
+  // audit). This meant a token could show "100 Ironclad Safe" even after
+  // the user found a real insider cluster on the same screen, which is
+  // contradictory and misleading. This wrapper re-derives the DISPLAYED
+  // score/verdict once cluster results come back, without touching the
+  // stored DB score — a found cluster is a serious enough signal to force
+  // the badge into the "High Risk" bucket regardless of the base score.
+  var getDisplaySafetyScore = function (token, clusterRes) {
+    var base = getSafetyScore(token);
+    if (clusterRes && !clusterRes.error && clusterRes.clusterCount > 0) {
+      return Math.min(base, 39);
+    }
+    return base;
+  };
+
   var getScoreStyle = function (score) {
     if (score >= 90)
       return {
@@ -3875,23 +3893,25 @@ export default function TntHouse() {
                 <div
                   className={
                     'w-14 h-14 rounded-full flex items-center justify-center text-xl font-black border-2 shrink-0 ' +
-                    (getSafetyScore(selectedToken) >= 90
+                    (getDisplaySafetyScore(selectedToken, clusterResult) >= 90
                       ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400'
-                      : getSafetyScore(selectedToken) >= 50
+                      : getDisplaySafetyScore(selectedToken, clusterResult) >= 50
                         ? 'bg-yellow-500/20 border-yellow-500 text-yellow-400'
                         : 'bg-red-500/20 border-red-500 text-red-400')
                   }
                 >
-                  {getSafetyScore(selectedToken)}
+                  {getDisplaySafetyScore(selectedToken, clusterResult)}
                 </div>
                 <div>
                   <p className="text-white font-bold text-sm">{t.safetyScore}</p>
                   <p className="text-slate-400 text-xs">
-                    {getSafetyScore(selectedToken) >= 90
-                      ? t.ironclad
-                      : getSafetyScore(selectedToken) >= 50
-                        ? t.moderate
-                        : t.highRisk}
+                    {clusterResult && !clusterResult.error && clusterResult.clusterCount > 0
+                      ? '🚨 Insider Cluster Detected'
+                      : getDisplaySafetyScore(selectedToken, clusterResult) >= 90
+                        ? t.ironclad
+                        : getDisplaySafetyScore(selectedToken, clusterResult) >= 50
+                          ? t.moderate
+                          : t.highRisk}
                   </p>
                 </div>
               </div>
