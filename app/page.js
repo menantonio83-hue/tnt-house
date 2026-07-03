@@ -1086,6 +1086,21 @@ export default function TntHouse() {
       var res = await fetch('/api/cluster-check?ca=' + selectedToken.ca);
       var data = await res.json();
       setClusterResult(data);
+      // NEW: /api/cluster-check persists a penalized security_score to the
+      // DB server-side when it finds a real cluster (see route.js v1.2).
+      // Mirror that change into local state right away so the main table's
+      // Score column updates instantly instead of only showing it after a
+      // manual page refresh.
+      if (!data.error && data.clusterCount > 0) {
+        setListedTokens(function (prev) {
+          return prev.map(function (t) {
+            if (t.ca === selectedToken.ca && t.score > 39) {
+              return { ...t, score: 39 };
+            }
+            return t;
+          });
+        });
+      }
     } catch (e) {
       setClusterResult({ error: 'Check failed. Try again.' });
     }

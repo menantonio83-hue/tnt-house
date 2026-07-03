@@ -12,6 +12,12 @@
 
 import { NextResponse } from 'next/server';
 import { Connection, PublicKey } from '@solana/web3.js';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  'https://pjtvjslcffuulsqxerpx.supabase.co',
+  'sb_publishable__gmhE8SE_blCu-v90fV2OQ_YmFCkfFU',
+);
 
 const RPC_URL = process.env.HELIUS_RPC_URL || 'https://api.mainnet-beta.solana.com';
 const RUGCHECK_URL = 'https://api.rugcheck.xyz/v1/tokens';
@@ -133,6 +139,25 @@ export async function GET(request) {
     const clusters = Object.entries(funderMap)
       .filter(([, holders]) => holders.length >= 2)
       .map(([funder, holders]) => ({ funder, holders }));
+
+    // FIX v1.3: the frontend's "Safe New Tokens" table actually reads from
+    // the `listed_tokens` table (field `score`), populated directly by the
+    // client-side audit flow (saveTokenToSupabase) — NOT `verified_tokens`
+    // (field `security_score`), which turned out to be a separate,
+    // unused-by-the-live-UI table from an older admin-approval flow.
+    // v1.2 wrote to the wrong table, so the persisted penalty never showed
+    // up anywhere. Writing to `listed_tokens` here instead.
+    if (clusters.length > 0) {
+      const { data: existing } = await supabase
+        .from('listed_tokens')
+        .select('score')
+        .eq('ca', ca)
+        .maybeSingle();
+
+      if (existing && existing.score > 39) {
+        await supabase.from('listed_tokens').update({ score: 39 }).eq('ca', ca);
+      }
+    }
 
     return NextResponse.json(
       {
