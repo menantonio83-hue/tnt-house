@@ -1700,11 +1700,15 @@ export default function TntHouse() {
     var ca = formData.contractAddress;
     var projectName = formData.projectName;
     var logoImg = formData.logoImg;
-    // FIX v1.3: back to static Transfer Request — Transaction Request gets
-    // hard-blocked by Phantom's Blowfish "malicious dApp" check (Blowfish
-    // appeal #11857 was rejected). See buildTransferRequestUri comment.
-    var uri = buildTransferRequestUri(payAmount, verifyMethod, label, label);
-    openDeeplink(uri, formatPaymentAmountStr(payAmount, verifyMethod));
+    // FIX v1.5: back to Transaction Request. User decision: the Blowfish
+    // "malicious dApp" warning (dismissible via "Continue anyway") is
+    // preferable to the static Transfer Request's amount=0 pre-fill issue
+    // (confirmed on real device across SOL/MRDT/USDC — see v1.4 clipboard
+    // mitigation, which is no longer needed here since Transaction Request
+    // bakes the exact amount into the built transaction itself, so Phantom
+    // always shows the real amount, no manual paste required).
+    var uri = buildTransactionRequestUri(payAmount, verifyMethod, label);
+    openDeeplink(uri);
     setShowInvoiceModal(false);
     setIsSending(true);
     var tokenData = await runAuditAndSave(ca, projectName, false, logoImg);
@@ -1879,11 +1883,11 @@ export default function TntHouse() {
     var isUsdc = paymentMethod === 'USDC';
     var payAmount = isSol ? getSOLAmountForUsd(bannerUsd) : isUsdc ? bannerUsd : mrdtAmount;
     var verifyMethod = isSol ? 'SOL' : isUsdc ? 'USDC' : 'MRDT';
-    // FIX v1.3: back to static Transfer Request — Transaction Request gets
-    // hard-blocked by Phantom's Blowfish "malicious dApp" check (Blowfish
-    // appeal #11857 was rejected). See buildTransferRequestUri comment.
-    var uri = buildTransferRequestUri(payAmount, verifyMethod, label, label);
-    openDeeplink(uri, formatPaymentAmountStr(payAmount, verifyMethod));
+    // FIX v1.5: back to Transaction Request — see handleConfirmPayment's
+    // v1.5 comment for the reasoning (user accepts the Blowfish warning
+    // over the amount=0 pre-fill issue).
+    var uri = buildTransactionRequestUri(payAmount, verifyMethod, label);
+    openDeeplink(uri);
     setShowBannerInvoiceModal(false);
     setIsBannerSending(true);
     setBannerFormData({ tokenName: '', bannerImg: '', desc: '', days: '1' });
@@ -3292,7 +3296,7 @@ export default function TntHouse() {
               </button>
             </div>
             <div className="mt-2 p-2 bg-purple-950/30 border border-purple-500/20 rounded-lg text-[10px] text-purple-300 text-center">
-              Tapping will open {selectedWallet}. The amount field may show 0 — we've already copied the exact amount to your clipboard, just paste it in. You may also see a "domain not yet reviewed" warning — tap "Continue anyway" to proceed.
+              Tapping will open {selectedWallet}. You may see a "This dApp could be malicious" or "domain not yet reviewed" warning — this is expected; tap "Continue anyway" to proceed.
             </div>
             <div className="mt-6 flex gap-3">
               <button
@@ -3606,7 +3610,7 @@ export default function TntHouse() {
               </button>
             </div>
             <div className="mt-2 p-2 bg-emerald-950/30 border border-emerald-500/20 rounded-lg text-[10px] text-emerald-300 text-center">
-              {t.bannerLive} The amount field may show 0 — we've already copied the exact amount to your clipboard, just paste it in. You may also see a "domain not yet reviewed" warning — tap "Continue anyway" to proceed.
+              {t.bannerLive} You may see a "This dApp could be malicious" or "domain not yet reviewed" warning — this is expected; tap "Continue anyway" to proceed.
             </div>
             <div className="mt-6 flex gap-3">
               <button
