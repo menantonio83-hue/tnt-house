@@ -44,6 +44,12 @@ export async function POST(request) {
         return Response.json({ error: 'Submission not found' }, { status: 404 });
       }
 
+      // auditData is the audit_report produced by performFullAudit(). Its
+      // dbFields object already matches verified_tokens column names — spread
+      // it directly instead of hand-picking a few fields (this was the bug:
+      // only 3 fields were ever written, everything else stayed empty).
+      const dbFields = auditData?.dbFields || {};
+
       const { error: insertError } = await supabase.from('verified_tokens').insert([{
         name: submission.project_name,
         symbol: submission.ca.slice(0, 4).toUpperCase(),
@@ -51,9 +57,8 @@ export async function POST(request) {
         security_score: submission.security_score,
         audit_report: auditData,
         status: 'approved',
-        mint_authority: auditData?.checks?.mintAuthority?.revoked ? null : 'active',
-        freeze_authority: auditData?.checks?.freezeAuthority?.revoked ? null : 'active',
-        top_holders: auditData?.checks?.holderDistribution?.topHolders
+        top_holders: auditData?.checks?.holderDistribution?.topHolders,
+        ...dbFields,
       }]);
 
       if (insertError && !insertError.message.includes('duplicate')) {

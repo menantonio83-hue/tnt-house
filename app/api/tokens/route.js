@@ -45,7 +45,27 @@ export async function GET(request) {
         statusLabel = '🟡 Caution';
       }
 
-      return { ...token, statusColor, statusLabel };
+      // Supabase returns raw snake_case columns; the Blueprint modal (app/page.js)
+      // reads camelCase properties. Without this mapping every audit field in
+      // the modal silently renders "Unknown" even though the data exists in the DB.
+      return {
+        ...token,
+        statusColor,
+        statusLabel,
+        mintAuthority: token.mint_authority,
+        freezeAuthority: token.freeze_authority,
+        top10Percent: token.top10_percent,
+        holderCount: token.holder_count,
+        lpLockedPercent: token.lp_locked_percent,
+        buyTaxPercent: token.buy_tax_percent,
+        sellTaxPercent: token.sell_tax_percent,
+        contractRenounced: token.contract_renounced,
+        hiddenOwner: token.hidden_owner,
+        ageDays: token.age_days,
+        creatorBalancePercent: token.creator_balance_percent,
+        standardProgram: token.standard_program,
+        permanentDelegate: token.permanent_delegate,
+      };
     });
 
     const mrdt = enrichedTokens.find(t => t.symbol === 'MRDT');
