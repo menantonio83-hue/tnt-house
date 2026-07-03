@@ -24,6 +24,7 @@ export const dynamic = 'force-dynamic';
 
 const WALLET_ADDRESS = 'Ev6oXBXo6qyoaT5wypJ2Umxch91F7cFvE1SarYLaUn8Z';
 const MRDT_CA = '8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg';
+const USDC_CA = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'; // official Circle USDC mint (Solana mainnet)
 const MRDT_DECIMALS = 9;
 const SITE_URL = 'https://tnt-house.vercel.app';
 const SUPABASE_URL = 'https://pjtvjslcffuulsqxerpx.supabase.co';
@@ -1602,11 +1603,24 @@ export default function TntHouse() {
   // sometimes shows 0 for the SOL amount specifically (not MRDT) on this
   // static format — tracked separately, NOT a reason to keep the
   // Transaction Request approach, which blocks payments entirely.
+  //
+  // FIX v1.3 (USDC): the earlier Blowfish appeal (ticket #11857) was
+  // rejected, and real-world testing (July 2026) confirmed Transaction
+  // Request is STILL being hard-blocked by Phantom's "malicious dApp"
+  // check for SOL payments. Switching handleConfirmPayment /
+  // handleBannerPaymentSubmit back to THIS static builder for good —
+  // static Transfer Request URIs don't ask the wallet to fetch and
+  // blind-sign a server-built tx, which is exactly the pattern Blowfish
+  // flags. This function now also supports USDC (spl-token = USDC_CA).
   var buildTransferRequestUri = function (amount, method, label, message) {
     var isSol = method === 'SOL';
+    var splTokenCA = method === 'USDC' ? USDC_CA : MRDT_CA;
+    var isUsdc = method === 'USDC';
     var amountStr = isSol
       ? parseFloat(amount).toFixed(6)
-      : String(Math.round(amount));
+      : isUsdc
+        ? (Math.round(amount * 100) / 100).toFixed(2) // USDC: 2 decimals
+        : String(Math.round(amount)); // MRDT: always a whole token amount
     // FIX v1.58: for SPL tokens, put spl-token BEFORE amount.
     // Phantom on Android sometimes parses URI params sequentially — seeing
     // spl-token first lets it correctly identify the token context before
@@ -1621,7 +1635,7 @@ export default function TntHouse() {
     } else {
       return (
         'solana:' + WALLET_ADDRESS +
-        '?spl-token=' + MRDT_CA +
+        '?spl-token=' + splTokenCA +
         '&amount=' + amountStr +
         '&label=' + encodeURIComponent(label) +
         '&message=' + encodeURIComponent(message)
@@ -1636,6 +1650,10 @@ export default function TntHouse() {
   // fully-formed transaction with the exact amount already baked in as a
   // real instruction. The wallet just has to simulate + sign it — there is
   // no query-param parsing step for the amount to get lost in.
+  //
+  // NOTE v1.3: kept for reference / potential future use (e.g. if Blowfish
+  // whitelists us later), but NO LONGER CALLED — see buildTransferRequestUri
+  // above for why.
   var buildTransactionRequestUri = function (amount, method, label) {
     var origin = window.location.origin;
     var link =
@@ -1667,10 +1685,10 @@ export default function TntHouse() {
     var ca = formData.contractAddress;
     var projectName = formData.projectName;
     var logoImg = formData.logoImg;
-    // FIX v1.65: use Transaction Request — server builds the real tx with
-    // the exact amount baked in, instead of relying on the wallet to parse
-    // an amount query param.
-    var uri = buildTransactionRequestUri(payAmount, verifyMethod, label);
+    // FIX v1.3: back to static Transfer Request — Transaction Request gets
+    // hard-blocked by Phantom's Blowfish "malicious dApp" check (Blowfish
+    // appeal #11857 was rejected). See buildTransferRequestUri comment.
+    var uri = buildTransferRequestUri(payAmount, verifyMethod, label, label);
     openDeeplink(uri);
     setShowInvoiceModal(false);
     setIsSending(true);
@@ -1846,10 +1864,10 @@ export default function TntHouse() {
     var isUsdc = paymentMethod === 'USDC';
     var payAmount = isSol ? getSOLAmountForUsd(bannerUsd) : isUsdc ? bannerUsd : mrdtAmount;
     var verifyMethod = isSol ? 'SOL' : isUsdc ? 'USDC' : 'MRDT';
-    // FIX v1.65: use Transaction Request — server builds the real tx with
-    // the exact amount baked in, instead of relying on the wallet to parse
-    // an amount query param.
-    var uri = buildTransactionRequestUri(payAmount, verifyMethod, label);
+    // FIX v1.3: back to static Transfer Request — Transaction Request gets
+    // hard-blocked by Phantom's Blowfish "malicious dApp" check (Blowfish
+    // appeal #11857 was rejected). See buildTransferRequestUri comment.
+    var uri = buildTransferRequestUri(payAmount, verifyMethod, label, label);
     openDeeplink(uri);
     setShowBannerInvoiceModal(false);
     setIsBannerSending(true);
