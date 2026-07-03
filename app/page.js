@@ -661,43 +661,78 @@ function TokenAvatar({ token, size }) {
 
 async function saveTokenToSupabase(token) {
   try {
-    await fetch(SUPABASE_URL + '/rest/v1/listed_tokens', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        apikey: SUPABASE_KEY,
-        Authorization: 'Bearer ' + SUPABASE_KEY,
-        Prefer: 'return=minimal',
-      },
-      body: JSON.stringify({
-        name: token.name,
-        symbol: token.symbol,
-        ca: token.ca,
-        price: token.price,
-        liquidity: token.liquidity,
-        volume24h: token.volume24h,
-        price_change_24h: token.priceChange24h,
-        score: token.score || 95,
-        dex_url: token.dexUrl,
-        chain: token.chain || 'solana',
-        mint_authority: token.mintAuthority || '-',
-        freeze_authority: token.freezeAuthority || '-',
-        is_honeypot: token.isHoneypot || '-',
-        top10_percent: token.top10Percent != null ? token.top10Percent : null,
-        lp_locked_percent: token.lpLockedPercent != null ? token.lpLockedPercent : null,
-        holder_count: token.holderCount != null ? token.holderCount : null,
-        creator_balance_percent:
-          token.creatorBalancePercent != null ? token.creatorBalancePercent : null,
-        logo_url: token.logoUrl || null,
-        buy_tax_percent: token.buyTaxPercent != null ? token.buyTaxPercent : null,
-        sell_tax_percent: token.sellTaxPercent != null ? token.sellTaxPercent : null,
-        contract_renounced: token.contractRenounced != null ? token.contractRenounced : null,
-        hidden_owner: token.hiddenOwner || null,
-        age_days: token.ageDays != null ? token.ageDays : null,
-        standard_program: token.standardProgram != null ? token.standardProgram : null,
-        permanent_delegate: token.permanentDelegate || null,
-      }),
-    });
+    // FIX v1.1: check for an existing row with this ca first. Previously
+    // this always did a plain INSERT, so resubmitting/re-auditing the
+    // SAME token (which happens a lot during testing, and can also happen
+    // organically if someone re-submits) created a DUPLICATE row instead
+    // of updating the existing one. The table's SELECT (order by
+    // created_at desc) would then show whichever row is newest, silently
+    // reverting any later changes (like the cluster-check score penalty)
+    // made to the older row. Now: update if a row exists, insert only if
+    // it's genuinely new.
+    var checkRes = await fetch(
+      SUPABASE_URL + '/rest/v1/listed_tokens?select=id&ca=eq.' + encodeURIComponent(token.ca),
+      { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } },
+    );
+    var existingRows = checkRes.ok ? await checkRes.json() : [];
+
+    var payload = {
+      name: token.name,
+      symbol: token.symbol,
+      ca: token.ca,
+      price: token.price,
+      liquidity: token.liquidity,
+      volume24h: token.volume24h,
+      price_change_24h: token.priceChange24h,
+      score: token.score || 95,
+      dex_url: token.dexUrl,
+      chain: token.chain || 'solana',
+      mint_authority: token.mintAuthority || '-',
+      freeze_authority: token.freezeAuthority || '-',
+      is_honeypot: token.isHoneypot || '-',
+      top10_percent: token.top10Percent != null ? token.top10Percent : null,
+      lp_locked_percent: token.lpLockedPercent != null ? token.lpLockedPercent : null,
+      holder_count: token.holderCount != null ? token.holderCount : null,
+      creator_balance_percent:
+        token.creatorBalancePercent != null ? token.creatorBalancePercent : null,
+      logo_url: token.logoUrl || null,
+      buy_tax_percent: token.buyTaxPercent != null ? token.buyTaxPercent : null,
+      sell_tax_percent: token.sellTaxPercent != null ? token.sellTaxPercent : null,
+      contract_renounced: token.contractRenounced != null ? token.contractRenounced : null,
+      hidden_owner: token.hiddenOwner || null,
+      age_days: token.ageDays != null ? token.ageDays : null,
+      standard_program: token.standardProgram != null ? token.standardProgram : null,
+      permanent_delegate: token.permanentDelegate || null,
+    };
+
+    if (existingRows.length > 0) {
+      // Row already exists for this ca — update it (and clean up any
+      // extra duplicate rows from before this fix, keeping the first one).
+      await fetch(
+        SUPABASE_URL + '/rest/v1/listed_tokens?ca=eq.' + encodeURIComponent(token.ca),
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: SUPABASE_KEY,
+            Authorization: 'Bearer ' + SUPABASE_KEY,
+            Prefer: 'return=minimal',
+          },
+          body: JSON.stringify(payload),
+        },
+      );
+    } else {
+      await fetch(SUPABASE_URL + '/rest/v1/listed_tokens', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: SUPABASE_KEY,
+          Authorization: 'Bearer ' + SUPABASE_KEY,
+          Prefer: 'return=minimal',
+        },
+        body: JSON.stringify(payload),
+      });
+    }
   } catch (e) {
     console.error('Supabase save failed:', e);
   }
