@@ -1659,8 +1659,11 @@ export default function TntHouse() {
     var auditUsd = invoiceUsd;
     var label = invoiceLabel;
     var isSol = paymentMethod === 'SOL';
-    var payAmount = isSol ? getSOLAmountForUsd(auditUsd) : auditAmount;
-    var verifyMethod = isSol ? 'SOL' : 'MRDT';
+    var isUsdc = paymentMethod === 'USDC';
+    // USDC is a 1:1 USD stablecoin — no conversion needed, unlike SOL (price-dependent)
+    // or MRDT (priced via mrdt_per_usd rate).
+    var payAmount = isSol ? getSOLAmountForUsd(auditUsd) : isUsdc ? auditUsd : auditAmount;
+    var verifyMethod = isSol ? 'SOL' : isUsdc ? 'USDC' : 'MRDT';
     var ca = formData.contractAddress;
     var projectName = formData.projectName;
     var logoImg = formData.logoImg;
@@ -1840,8 +1843,9 @@ export default function TntHouse() {
     };
     var label = 'TNT House VIP Banner ' + bannerFormData.days + 'd';
     var isSol = paymentMethod === 'SOL';
-    var payAmount = isSol ? getSOLAmountForUsd(bannerUsd) : mrdtAmount;
-    var verifyMethod = isSol ? 'SOL' : 'MRDT';
+    var isUsdc = paymentMethod === 'USDC';
+    var payAmount = isSol ? getSOLAmountForUsd(bannerUsd) : isUsdc ? bannerUsd : mrdtAmount;
+    var verifyMethod = isSol ? 'SOL' : isUsdc ? 'USDC' : 'MRDT';
     // FIX v1.65: use Transaction Request — server builds the real tx with
     // the exact amount baked in, instead of relying on the wallet to parse
     // an amount query param.
@@ -3052,29 +3056,29 @@ export default function TntHouse() {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-3">
               <button
                 onClick={function () {
                   handlePaymentMethodSelect('MRDT');
                 }}
-                className="bg-purple-500/10 border-2 border-purple-500/30 hover:border-purple-500 rounded-xl p-6 text-center transition group"
+                className="bg-purple-500/10 border-2 border-purple-500/30 hover:border-purple-500 rounded-xl p-4 text-center transition group"
               >
                 <div className="text-3xl mb-2">⚽️</div>
-                <div className="font-bold text-purple-400 group-hover:text-white transition">
+                <div className="font-bold text-purple-400 group-hover:text-white transition text-sm">
                   $MRDT
                 </div>
-                <div className="text-[10px] text-slate-500 mt-1">{t.recommended}</div>
+                <div className="text-[9px] text-slate-500 mt-1">{t.recommended}</div>
               </button>
               <button
                 onClick={function () {
                   handlePaymentMethodSelect('SOL');
                 }}
-                className="bg-emerald-500/10 border-2 border-emerald-500/30 hover:border-emerald-500 rounded-xl p-6 text-center transition group"
+                className="bg-emerald-500/10 border-2 border-emerald-500/30 hover:border-emerald-500 rounded-xl p-4 text-center transition group"
               >
                 <div className="flex justify-center mb-2">
                   <svg
-                    width="36"
-                    height="36"
+                    width="30"
+                    height="30"
                     viewBox="0 0 397 311"
                     fill="none"
                     xmlns="http://www.w3.org/2000/svg"
@@ -3128,10 +3132,24 @@ export default function TntHouse() {
                     </defs>
                   </svg>
                 </div>
-                <div className="font-bold text-emerald-400 group-hover:text-white transition">
+                <div className="font-bold text-emerald-400 group-hover:text-white transition text-sm">
                   SOL
                 </div>
-                <div className="text-[10px] text-slate-500 mt-1">Solana</div>
+                <div className="text-[9px] text-slate-500 mt-1">Solana</div>
+              </button>
+              {/* NEW: USDC payment option — same Transaction Request flow as SOL/MRDT,
+                  amount is 1:1 with USD price, no conversion needed. */}
+              <button
+                onClick={function () {
+                  handlePaymentMethodSelect('USDC');
+                }}
+                className="bg-blue-500/10 border-2 border-blue-500/30 hover:border-blue-500 rounded-xl p-4 text-center transition group"
+              >
+                <div className="text-3xl mb-2">💵</div>
+                <div className="font-bold text-blue-400 group-hover:text-white transition text-sm">
+                  USDC
+                </div>
+                <div className="text-[9px] text-slate-500 mt-1">Stable</div>
               </button>
             </div>
           </div>
@@ -3256,7 +3274,9 @@ export default function TntHouse() {
               <div className="text-3xl font-black text-emerald-400">
                 {selectedPaymentMethod === 'SOL'
                   ? formatSOLAmount(invoiceUsd) + ' SOL'
-                  : invoiceAmount.toLocaleString() + ' $MRDT'}
+                  : selectedPaymentMethod === 'USDC'
+                    ? invoiceUsd.toFixed(2) + ' USDC'
+                    : invoiceAmount.toLocaleString() + ' $MRDT'}
               </div>
               <div className="text-sm font-bold text-slate-300">≈ ${invoiceUsd} USD</div>
               <div className="text-xs text-slate-400">{invoiceLabel}</div>
@@ -3268,7 +3288,9 @@ export default function TntHouse() {
                   var amtStr =
                     selectedPaymentMethod === 'SOL'
                       ? formatSOLAmount(invoiceUsd)
-                      : String(invoiceAmount);
+                      : selectedPaymentMethod === 'USDC'
+                        ? invoiceUsd.toFixed(2)
+                        : String(invoiceAmount);
                   navigator.clipboard.writeText(amtStr).then(function () {
                     showToast('✅ Amount copied: ' + amtStr, 'success');
                   });
@@ -3331,29 +3353,29 @@ export default function TntHouse() {
             <p className="text-slate-500 text-xs mb-6">
               Banner goes live on homepage right after payment
             </p>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-3">
               <button
                 onClick={function () {
                   handleBannerPaymentMethodSelect('MRDT');
                 }}
-                className="bg-purple-500/10 border-2 border-purple-500/30 hover:border-purple-500 rounded-xl p-6 text-center transition group"
+                className="bg-purple-500/10 border-2 border-purple-500/30 hover:border-purple-500 rounded-xl p-4 text-center transition group"
               >
                 <div className="text-3xl mb-2">⚽️</div>
-                <div className="font-bold text-purple-400 group-hover:text-white transition">
+                <div className="font-bold text-purple-400 group-hover:text-white transition text-sm">
                   $MRDT
                 </div>
-                <div className="text-[10px] text-slate-500 mt-1">{t.recommended}</div>
+                <div className="text-[9px] text-slate-500 mt-1">{t.recommended}</div>
               </button>
               <button
                 onClick={function () {
                   handleBannerPaymentMethodSelect('SOL');
                 }}
-                className="bg-emerald-500/10 border-2 border-emerald-500/30 hover:border-emerald-500 rounded-xl p-6 text-center transition group"
+                className="bg-emerald-500/10 border-2 border-emerald-500/30 hover:border-emerald-500 rounded-xl p-4 text-center transition group"
               >
                 <div className="flex justify-center mb-2">
                   <svg
-                    width="36"
-                    height="36"
+                    width="30"
+                    height="30"
                     viewBox="0 0 397 311"
                     fill="none"
                     xmlns="http://www.w3.org/2000/svg"
@@ -3407,10 +3429,23 @@ export default function TntHouse() {
                     </defs>
                   </svg>
                 </div>
-                <div className="font-bold text-emerald-400 group-hover:text-white transition">
+                <div className="font-bold text-emerald-400 group-hover:text-white transition text-sm">
                   SOL
                 </div>
-                <div className="text-[10px] text-slate-500 mt-1">Solana</div>
+                <div className="text-[9px] text-slate-500 mt-1">Solana</div>
+              </button>
+              {/* NEW: USDC option for VIP banner payment — same pattern as audit flow */}
+              <button
+                onClick={function () {
+                  handleBannerPaymentMethodSelect('USDC');
+                }}
+                className="bg-blue-500/10 border-2 border-blue-500/30 hover:border-blue-500 rounded-xl p-4 text-center transition group"
+              >
+                <div className="text-3xl mb-2">💵</div>
+                <div className="font-bold text-blue-400 group-hover:text-white transition text-sm">
+                  USDC
+                </div>
+                <div className="text-[9px] text-slate-500 mt-1">Stable</div>
               </button>
             </div>
           </div>
@@ -3554,7 +3589,9 @@ export default function TntHouse() {
               <div className="text-3xl font-black text-emerald-400">
                 {selectedBannerPaymentMethod === 'SOL'
                   ? formatSOLAmount(bannerInvoiceUsd) + ' SOL'
-                  : bannerInvoiceAmount.toLocaleString() + ' $MRDT'}
+                  : selectedBannerPaymentMethod === 'USDC'
+                    ? bannerInvoiceUsd.toFixed(2) + ' USDC'
+                    : bannerInvoiceAmount.toLocaleString() + ' $MRDT'}
               </div>
               <div className="text-sm font-bold text-slate-300">≈ ${bannerInvoiceUsd} USD</div>
               <div className="text-xs text-slate-500 font-mono break-all">
@@ -3565,7 +3602,9 @@ export default function TntHouse() {
                   var amtStr =
                     selectedBannerPaymentMethod === 'SOL'
                       ? formatSOLAmount(bannerInvoiceUsd)
-                      : String(bannerInvoiceAmount);
+                      : selectedBannerPaymentMethod === 'USDC'
+                        ? bannerInvoiceUsd.toFixed(2)
+                        : String(bannerInvoiceAmount);
                   navigator.clipboard.writeText(amtStr).then(function () {
                     showToast('✅ Amount copied: ' + amtStr, 'success');
                   });

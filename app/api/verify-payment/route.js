@@ -1,9 +1,17 @@
+// app/api/verify-payment/route.js
+// Version 1.1
+// FIX v1.1: added USDC verification branch. USDC is an SPL token transfer
+// just like MRDT — the only difference is which mint we're matching against
+// in tx.tokenTransfers, so this reuses the exact same tokenTransfers loop
+// shape as the MRDT check, just gated on method === 'USDC'.
+
 import { NextResponse } from 'next/server';
 
 export const runtime = 'edge';
 
 const RECIPIENT_WALLET = 'Ev6oXBXo6qyoaT5wypJ2Umxch91F7cFvE1SarYLaUn8Z';
 const MRDT_MINT = '8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg';
+const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 const LAMPORTS_PER_SOL = 1_000_000_000;
 
 export async function POST(request) {
@@ -55,7 +63,7 @@ export async function POST(request) {
 
     for (const tx of transactions) {
       // Check MRDT token transfers
-      if (paymentMethod !== 'SOL' && tx.tokenTransfers && tx.tokenTransfers.length > 0) {
+      if (paymentMethod === 'MRDT' && tx.tokenTransfers && tx.tokenTransfers.length > 0) {
         for (const transfer of tx.tokenTransfers) {
           const isMrdt = transfer.mint === MRDT_MINT;
           const isOurs = transfer.toUserAccount === RECIPIENT_WALLET;
@@ -63,6 +71,20 @@ export async function POST(request) {
             const received = parseFloat(transfer.tokenAmount ?? transfer.amount ?? 0);
             if (received >= expectedAmount * TOLERANCE) {
               return NextResponse.json({ verified: true, received, method: 'MRDT', signature: tx.signature });
+            }
+          }
+        }
+      }
+
+      // Check USDC token transfers
+      if (paymentMethod === 'USDC' && tx.tokenTransfers && tx.tokenTransfers.length > 0) {
+        for (const transfer of tx.tokenTransfers) {
+          const isUsdc = transfer.mint === USDC_MINT;
+          const isOurs = transfer.toUserAccount === RECIPIENT_WALLET;
+          if (isUsdc && isOurs) {
+            const received = parseFloat(transfer.tokenAmount ?? transfer.amount ?? 0);
+            if (received >= expectedAmount * TOLERANCE) {
+              return NextResponse.json({ verified: true, received, method: 'USDC', signature: tx.signature });
             }
           }
         }

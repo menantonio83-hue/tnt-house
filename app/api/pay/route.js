@@ -1,6 +1,9 @@
 
 // app/api/pay/route.js
-// Version 1.1
+// Version 1.2
+// FIX v1.2: added USDC support. USDC transfers reuse the exact same SPL
+// transfer instruction path as MRDT — only the mint address changes — so
+// no new branch logic was needed, just a lookup by `method`.
 // Solana Pay Transaction Request API — Phantom sends GET (metadata) then
 // POST (account pubkey) to this endpoint; we build and return a fully
 // serialized transaction with the exact amount baked in. This avoids
@@ -14,6 +17,7 @@ import { createTransferInstruction, createAssociatedTokenAccountInstruction, get
 
 const WALLET_ADDRESS = 'Ev6oXBXo6qyoaT5wypJ2Umxch91F7cFvE1SarYLaUn8Z';
 const MRDT_CA = '8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg';
+const USDC_CA = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'; // official Circle USDC mint on Solana mainnet
 const RPC_URL = process.env.HELIUS_RPC_URL || 'https://api.mainnet-beta.solana.com';
 
 const CORS_HEADERS = {
@@ -38,7 +42,7 @@ export async function POST(request) {
   try {
     const { searchParams } = new URL(request.url);
     const amount = parseFloat(searchParams.get('amount') || '0');
-    const method = searchParams.get('method') || 'SOL'; // 'SOL' or 'MRDT'
+    const method = searchParams.get('method') || 'SOL'; // 'SOL' | 'MRDT' | 'USDC'
     const label = searchParams.get('label') || 'TNT House Payment';
 
     if (!isFinite(amount) || amount <= 0) {
@@ -70,12 +74,15 @@ export async function POST(request) {
         })
       );
     } else {
-      // SPL token (MRDT) transfer.
+      // SPL token (MRDT or USDC) transfer.
       // FIX v1.1: read real decimals from the mint on-chain instead of
       // assuming a fixed value — the frontend constant (MRDT_DECIMALS=9)
       // and the old hardcoded 1e6 here disagreed, which would have sent
       // the wrong token amount (off by orders of magnitude).
-      const mintPubkey = new PublicKey(MRDT_CA);
+      // FIX v1.2: pick the mint by `method` — USDC uses 6 decimals, MRDT
+      // uses whatever getMint reports, so this stays correct either way.
+      const mintCA = method === 'USDC' ? USDC_CA : MRDT_CA;
+      const mintPubkey = new PublicKey(mintCA);
       const mintInfo = await getMint(connection, mintPubkey);
       const tokenAmount = Math.round(amount * Math.pow(10, mintInfo.decimals));
 
