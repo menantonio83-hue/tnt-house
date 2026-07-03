@@ -51,7 +51,10 @@ import {
 const WALLET_ADDRESS = 'Ev6oXBXo6qyoaT5wypJ2Umxch91F7cFvE1SarYLaUn8Z';
 const MRDT_CA = '8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg';
 const USDC_CA = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
-const RPC_URL = 'https://api.mainnet-beta.solana.com';
+// FIX v1.2: route through our own /api/rpc proxy (backed by the server-side
+// Helius key) instead of hitting the public Solana RPC directly from the
+// client — the public endpoint returned 403 Access forbidden almost
+// immediately when called from inside Phantom's in-app browser.
 
 function PayInner() {
   const searchParams = useSearchParams();
@@ -79,7 +82,8 @@ function PayInner() {
       const payer = resp.publicKey;
 
       setStatus('building');
-      const connection = new Connection(RPC_URL, 'confirmed');
+      const rpcProxyUrl = window.location.origin + '/api/rpc';
+      const connection = new Connection(rpcProxyUrl, 'confirmed');
       const tx = new Transaction();
 
       if (method === 'SOL') {
