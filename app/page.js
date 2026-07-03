@@ -133,7 +133,7 @@ const TRANSLATIONS = {
     slotAvailable: 'SLOT AVAILABLE',
     slotAvailClick: 'Click to buy VIP banner!',
     vipBoostFrom: 'VIP Boost from $20/day',
-    payInMrdt: 'Payment in $MRDT',
+    payInMrdt: 'Payment in $MRDT / SOL / USDC',
     buyOnJupiter: 'BUY ON JUPITER',
     safetyScore: 'Safety Score',
     ironclad: 'Ironclad Safe ★',
@@ -230,7 +230,7 @@ const TRANSLATIONS = {
     slotAvailable: 'LUGAR DISPONIBLE',
     slotAvailClick: '¡Haz clic para comprar banner VIP!',
     vipBoostFrom: 'VIP Boost desde $20/día',
-    payInMrdt: 'Pago en $MRDT',
+    payInMrdt: 'Pago en $MRDT / SOL / USDC',
     buyOnJupiter: 'COMPRAR EN JUPITER',
     safetyScore: 'Puntuación de Seguridad',
     ironclad: 'Totalmente Seguro ★',
@@ -327,7 +327,7 @@ const TRANSLATIONS = {
     slotAvailable: 'EMPLACEMENT DISPONIBLE',
     slotAvailClick: 'Cliquez pour acheter la bannière VIP!',
     vipBoostFrom: 'VIP Boost à partir de $20/jour',
-    payInMrdt: 'Paiement en $MRDT',
+    payInMrdt: 'Paiement en $MRDT / SOL / USDC',
     buyOnJupiter: 'ACHETER SUR JUPITER',
     safetyScore: 'Score de Sécurité',
     ironclad: 'Totalement Sécurisé ★',
@@ -424,7 +424,7 @@ const TRANSLATIONS = {
     slotAvailable: 'ΘΕΣΗ ΔΙΑΘΕΣΙΜΗ',
     slotAvailClick: 'Κλικ για αγορά VIP banner!',
     vipBoostFrom: 'VIP Boost από $20/ημέρα',
-    payInMrdt: 'Πληρωμή σε $MRDT',
+    payInMrdt: 'Πληρωμή σε $MRDT / SOL / USDC',
     buyOnJupiter: 'ΑΓΟΡΑ ΣΤΟ JUPITER',
     safetyScore: 'Βαθμολογία Ασφαλείας',
     ironclad: 'Απολύτως Ασφαλές ★',
@@ -522,7 +522,7 @@ const TRANSLATIONS = {
     slotAvailable: 'МЕСТО СВОБОДНО',
     slotAvailClick: 'Нажмите, чтобы купить VIP-баннер!',
     vipBoostFrom: 'VIP-Буст от $20/день',
-    payInMrdt: 'Оплата в $MRDT',
+    payInMrdt: 'Оплата в $MRDT / SOL / USDC',
     buyOnJupiter: 'КУПИТЬ НА JUPITER',
     safetyScore: 'Оценка безопасности',
     ironclad: 'Железобетонно безопасно ★',
@@ -2724,16 +2724,13 @@ export default function TntHouse() {
                       className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white focus:border-purple-500 focus:outline-none font-mono"
                     >
                       <option value="basic">
-                        {t.tierBasic} — $10 in $MRDT (~
-                        {priceLoading ? '...' : getAmountForTier('basic').toLocaleString()} $MRDT)
+                        {t.tierBasic} — ~$10 $MRDT/SOL/USDC
                       </option>
                       <option value="fast">
-                        {t.tierFast} — $25 in $MRDT (~
-                        {priceLoading ? '...' : getAmountForTier('fast').toLocaleString()} $MRDT)
+                        {t.tierFast} — ~$25 $MRDT/SOL/USDC
                       </option>
                       <option value="vip">
-                        {t.tierVIP} — $75 in $MRDT (~
-                        {priceLoading ? '...' : getAmountForTier('vip').toLocaleString()} $MRDT)
+                        {t.tierVIP} — ~$75 $MRDT/SOL/USDC
                       </option>
                     </select>
                   </div>
