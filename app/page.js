@@ -1812,19 +1812,14 @@ export default function TntHouse() {
     var logoImg = formData.logoImg;
     // FIX v1.5: back to Transaction Request. User decision: the Blowfish
     // "malicious dApp" warning (dismissible via "Continue anyway") is
-    // preferable to the static Transfer Request's amount=0 pre-fill issue
-    // (confirmed on real device across SOL/MRDT/USDC — see v1.4 clipboard
-    // mitigation, which is no longer needed here since Transaction Request
-    // bakes the exact amount into the built transaction itself, so Phantom
-    // always shows the real amount, no manual paste required).
-    // FIX v1.6: open /pay inside Phantom's in-app browser instead of a
-    // solana: deeplink — see openPhantomInAppBrowser comment for why.
-    var payUrl =
-      window.location.origin +
-      '/pay?amount=' + encodeURIComponent(payAmount) +
-      '&method=' + encodeURIComponent(verifyMethod) +
-      '&label=' + encodeURIComponent(label);
-    openPhantomInAppBrowser(payUrl);
+    // preferable to the static Transfer Request's amount=0 pre-fill issue.
+    // FIX v1.7: REVERT v1.6. Real-world test showed phantom.app/ul/browse
+    // does NOT reliably open our /pay page inside Phantom's in-app browser
+    // — it fell back to phantom.com's marketing/download page instead.
+    // Back to the PROVEN v1.5 approach (confirmed working payments via
+    // Transaction Request + /api/pay).
+    var uri = buildTransactionRequestUri(payAmount, verifyMethod, label);
+    openDeeplink(uri);
     setShowInvoiceModal(false);
     setIsSending(true);
     var tokenData = await runAuditAndSave(ca, projectName, false, logoImg);
@@ -1999,17 +1994,11 @@ export default function TntHouse() {
     var isUsdc = paymentMethod === 'USDC';
     var payAmount = isSol ? getSOLAmountForUsd(bannerUsd) : isUsdc ? bannerUsd : mrdtAmount;
     var verifyMethod = isSol ? 'SOL' : isUsdc ? 'USDC' : 'MRDT';
-    // FIX v1.5: back to Transaction Request — see handleConfirmPayment's
-    // v1.5 comment for the reasoning (user accepts the Blowfish warning
-    // over the amount=0 pre-fill issue).
-    // FIX v1.6: open /pay inside Phantom's in-app browser — see
-    // openPhantomInAppBrowser comment for why.
-    var payUrl =
-      window.location.origin +
-      '/pay?amount=' + encodeURIComponent(payAmount) +
-      '&method=' + encodeURIComponent(verifyMethod) +
-      '&label=' + encodeURIComponent(label);
-    openPhantomInAppBrowser(payUrl);
+    // FIX v1.7: REVERT v1.6 — phantom.app/ul/browse redirected to
+    // phantom.com's download page instead of opening /pay. Back to the
+    // proven Transaction Request approach.
+    var uri = buildTransactionRequestUri(payAmount, verifyMethod, label);
+    openDeeplink(uri);
     setShowBannerInvoiceModal(false);
     setIsBannerSending(true);
     setBannerFormData({ tokenName: '', bannerImg: '', desc: '', days: '1' });
@@ -3453,7 +3442,7 @@ export default function TntHouse() {
               </button>
             </div>
             <div className="mt-2 p-2 bg-purple-950/30 border border-purple-500/20 rounded-lg text-[10px] text-purple-300 text-center">
-              Tapping will open our payment page inside {selectedWallet}'s app browser. Connect your wallet there and confirm the exact amount — you may see a "domain not yet reviewed" warning on connect, this is expected; tap "Continue anyway".
+              Tapping will open {selectedWallet}. You may see a "This dApp could be malicious" or "domain not yet reviewed" warning — this is expected; tap "Continue anyway" to proceed.
             </div>
             <div className="mt-6 flex gap-3">
               <button
@@ -3767,7 +3756,7 @@ export default function TntHouse() {
               </button>
             </div>
             <div className="mt-2 p-2 bg-emerald-950/30 border border-emerald-500/20 rounded-lg text-[10px] text-emerald-300 text-center">
-              {t.bannerLive} Connect your wallet on the payment page and confirm the exact amount — you may see a "domain not yet reviewed" warning on connect, this is expected; tap "Continue anyway".
+              {t.bannerLive} You may see a "This dApp could be malicious" or "domain not yet reviewed" warning — this is expected; tap "Continue anyway" to proceed.
             </div>
             <div className="mt-6 flex gap-3">
               <button
