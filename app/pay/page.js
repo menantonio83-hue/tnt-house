@@ -1,7 +1,7 @@
 'use client';
 
 // app/pay/page.js
-// Version 1.1
+// Version 1.3
 //
 // WHY THIS PAGE EXISTS: both Solana Pay URI approaches failed in production
 // (17 days of testing across SOL/MRDT/USDC):
@@ -67,19 +67,37 @@ function PayInner() {
   const [errorMsg, setErrorMsg] = useState('');
   const [signature, setSignature] = useState('');
 
+  // FIX v1.3: log every stage transition to /api/pay-log. Vercel's free
+  // Web Analytics doesn't support custom events, so this is the only way
+  // to see WHERE a visitor drops off (no Phantom, rejected connect, RPC
+  // failure building the tx, rejected sign, etc.) instead of just seeing
+  // "2 visits, 0 orders" with no further detail.
+  const logStage = function (stage, extra) {
+    try {
+      fetch('/api/pay-log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stage, amount, method, label, ...extra }),
+      }).catch(function () {});
+    } catch (e) {}
+  };
+
   const pay = async function () {
     try {
       setStatus('connecting');
+      logStage('connecting');
       const provider = typeof window !== 'undefined' ? window.phantom?.solana : null;
 
       if (!provider || !provider.isPhantom) {
         setErrorMsg('This page needs to be opened inside the Phantom app browser.');
         setStatus('error');
+        logStage('error', { reason: 'no_phantom_provider' });
         return;
       }
 
       const resp = await provider.connect();
       const payer = resp.publicKey;
+      logStage('connected', { payer: payer.toString() });
 
       setStatus('building');
       const rpcProxyUrl = window.location.origin + '/api/rpc';
@@ -125,15 +143,19 @@ function PayInner() {
       tx.feePayer = payer;
       const { blockhash } = await connection.getLatestBlockhash();
       tx.recentBlockhash = blockhash;
+      logStage('built');
 
       setStatus('signing');
+      logStage('signing');
       const result = await provider.signAndSendTransaction(tx);
       setSignature(result.signature);
       setStatus('sent');
+      logStage('sent', { signature: result.signature });
     } catch (e) {
       console.error('Payment error:', e);
       setErrorMsg(e?.message || 'Payment failed. Please try again.');
       setStatus('error');
+      logStage('error', { reason: e?.message || 'unknown' });
     }
   };
 
