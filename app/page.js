@@ -30,6 +30,48 @@ const SITE_URL = 'https://tnt-house.vercel.app';
 const SUPABASE_URL = 'https://pjtvjslcffuulsqxerpx.supabase.co';
 const SUPABASE_KEY = 'sb_publishable__gmhE8SE_blCu-v90fV2OQ_YmFCkfFU';
 
+// Max raw upload size before we even try to process the file (bytes).
+// Anything bigger is rejected outright instead of being read into memory.
+const MAX_UPLOAD_BYTES = 8 * 1024 * 1024; // 8MB
+
+// Reads an image file, validates it, and downsizes it to a small JPEG
+// data URL before it ever touches Supabase. This is the fix for the bug
+// where a huge/corrupted file got stored raw as banner_img and broke
+// the banner slot (multi-MB garbage base64 string instead of a real image).
+function processImageFile(file, maxDimension, onSuccess, onError) {
+  if (!file.type || !file.type.startsWith('image/')) {
+    onError('File must be an image (PNG, JPG, WEBP...).');
+    return;
+  }
+  if (file.size > MAX_UPLOAD_BYTES) {
+    onError('Image is too large (max 8MB). Please pick a smaller file.');
+    return;
+  }
+
+  var reader = new FileReader();
+  reader.onerror = function () {
+    onError('Could not read the file. Try a different image.');
+  };
+  reader.onload = function (ev) {
+    var img = new Image();
+    img.onerror = function () {
+      onError('File is not a valid image.');
+    };
+    img.onload = function () {
+      var scale = Math.min(1, maxDimension / Math.max(img.width, img.height));
+      var canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      var ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      // JPEG at 0.8 quality keeps the resulting data URL small (usually <150KB)
+      onSuccess(canvas.toDataURL('image/jpeg', 0.8));
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
 const GLOW_PURPLE = {
   position: 'absolute',
   top: '-10%',
@@ -2869,13 +2911,19 @@ export default function TntHouse() {
                       onChange={function (e) {
                         var f = e.target.files && e.target.files[0];
                         if (f) {
-                          var r = new FileReader();
-                          r.onload = function (ev) {
-                            setFormData(
-                              Object.assign({}, formData, { logoImg: ev.target.result }),
-                            );
-                          };
-                          r.readAsDataURL(f);
+                          processImageFile(
+                            f,
+                            400, // logos are small squares/icons
+                            function (dataUrl) {
+                              setFormData(
+                                Object.assign({}, formData, { logoImg: dataUrl }),
+                              );
+                            },
+                            function (errorMsg) {
+                              alert(errorMsg);
+                              e.target.value = '';
+                            },
+                          );
                         }
                       }}
                       className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-bold file:bg-gradient-to-r file:from-purple-500 file:to-emerald-400 file:text-slate-950 hover:file:from-purple-400 hover:file:to-emerald-300"
@@ -2995,13 +3043,19 @@ export default function TntHouse() {
                         onChange={function (e) {
                           var f = e.target.files && e.target.files[0];
                           if (f) {
-                            var r = new FileReader();
-                            r.onload = function (ev) {
-                              setBannerFormData(
-                                Object.assign({}, bannerFormData, { bannerImg: ev.target.result }),
-                              );
-                            };
-                            r.readAsDataURL(f);
+                            processImageFile(
+                              f,
+                              1200, // banners are wide, allow a larger max dimension
+                              function (dataUrl) {
+                                setBannerFormData(
+                                  Object.assign({}, bannerFormData, { bannerImg: dataUrl }),
+                                );
+                              },
+                              function (errorMsg) {
+                                alert(errorMsg);
+                                e.target.value = '';
+                              },
+                            );
                           }
                         }}
                         className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-bold file:bg-gradient-to-r file:from-purple-500 file:to-emerald-400 file:text-slate-950 hover:file:from-purple-400 hover:file:to-emerald-300"
