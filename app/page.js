@@ -2621,7 +2621,9 @@ export default function TntHouse() {
                 <h3 className="text-base font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-400 flex items-center gap-1.5">
                   <Shield className="w-3.5 h-3.5 text-cyan-400" /> {t.tableTitle}
                 </h3>
-                <p className="text-slate-400 text-[10px] mt-0.5">{t.tableClick}</p>
+                <p className="text-cyan-300 text-[11px] font-bold mt-0.5 animate-pulse flex items-center gap-1">
+                  👆 {t.tableClick}
+                </p>
               </div>
               <div className="hidden md:flex items-center gap-1 text-[9px] text-cyan-400">
                 <RefreshCw className="w-2.5 h-2.5 animate-spin" /> Live
@@ -2720,15 +2722,19 @@ export default function TntHouse() {
                       </div>
                     </td>
                     <td className="p-1 text-right">
-                      <button
-                        onClick={function (e) {
-                          e.stopPropagation();
-                          handleLaunchJupiter();
-                        }}
-                        className="text-[8px] text-emerald-400 hover:text-emerald-300 font-bold hover:underline inline-flex items-center gap-0.5"
-                      >
-                        Buy <ExternalLink className="w-2 h-2" />
-                      </button>
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={function (e) {
+                            e.stopPropagation();
+                            handleLaunchJupiter();
+                          }}
+                          className="text-[8px] text-emerald-400 hover:text-emerald-300 font-bold hover:underline inline-flex items-center gap-0.5"
+                        >
+                          Buy <ExternalLink className="w-2 h-2" />
+                        </button>
+                        {/* Tap indicator: signals the whole row is clickable for the Blueprint modal */}
+                        <span className="text-emerald-400/60 text-[10px] font-bold">›</span>
+                      </div>
                     </td>
                   </tr>
 
@@ -2799,17 +2805,21 @@ export default function TntHouse() {
                           </div>
                         </td>
                         <td className="p-1 text-right">
-                          <a
-                            href={token.dexUrl}
-                            onClick={function (e) {
-                              e.stopPropagation();
-                            }}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-[8px] text-cyan-300 hover:text-cyan-200 inline-flex items-center gap-0.5 border border-cyan-400/40 rounded-full px-1.5 py-0.5"
-                          >
-                            DEX <ExternalLink className="w-2 h-2" />
-                          </a>
+                          <div className="flex items-center justify-end gap-1">
+                            <a
+                              href={token.dexUrl}
+                              onClick={function (e) {
+                                e.stopPropagation();
+                              }}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[8px] text-cyan-300 hover:text-cyan-200 inline-flex items-center gap-0.5 border border-cyan-400/40 rounded-full px-1.5 py-0.5"
+                            >
+                              DEX <ExternalLink className="w-2 h-2" />
+                            </a>
+                            {/* Tap indicator: signals the whole row is clickable for the Blueprint modal */}
+                            <span className="text-cyan-400/60 text-[10px] font-bold">›</span>
+                          </div>
                         </td>
                       </tr>
                     );
