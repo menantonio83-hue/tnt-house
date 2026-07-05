@@ -501,7 +501,7 @@ const TRANSLATIONS = {
     pillar3: 'DAO Лицензия',
     pillar3sub: 'Через $MRDT',
     tableTitle: 'ТАБЛИЦА БЕЗОПАСНЫХ ТОКЕНОВ',
-    tableClick: 'Нажмите на токен для TNT Security Blueprint',
+    tableClick: 'Нажми на токен, чтобы узнать информацию',
     scanning: 'Сканирование...',
     formTitle: 'ЗАКАЗАТЬ ИИ-ИНСПЕКЦИЮ',
     formFreeLeft: 'бесплатных мест! Заполни форму — аудит запустится сразу.',
