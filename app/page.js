@@ -2455,6 +2455,328 @@ export default function TntHouse() {
           </div>
         </section>
 
+        {/* ═══ ORDER FORMS + PRICING ═══ */}
+        <section id="orderFormsSection" className="max-w-7xl mx-auto px-6 py-8">
+          <div className="grid md:grid-cols-2 gap-12 items-start">
+            <div className="space-y-8">
+              {/* Audit form */}
+              <div id="auditFormSection" className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 p-6 backdrop-blur-md">
+                <div className="flex items-start justify-between mb-2">
+                  <h3 className="text-lg font-black text-purple-400">{t.formTitle}</h3>
+                  {freeSlots > 0 ? (
+                    <div className="bg-emerald-500/20 border border-emerald-500/40 rounded-lg px-2 py-1 text-center">
+                      <div className="text-emerald-400 font-black text-sm">
+                        {freeSlots}/{FREE_TOTAL}
+                      </div>
+                      <div className="text-[9px] text-emerald-500">free</div>
+                    </div>
+                  ) : (
+                    <div className="bg-slate-800 border border-slate-600 rounded-lg px-2 py-1 text-center">
+                      <div className="text-slate-400 font-black text-sm">0/{FREE_TOTAL}</div>
+                      <div className="text-[9px] text-slate-500">no slots</div>
+                    </div>
+                  )}
+                </div>
+                <p className="text-slate-400 text-xs mb-4">
+                  {freeSlots > 0 ? '🎁 ' + freeSlots + ' ' + t.formFreeLeft : t.formPaid}
+                </p>
+                <form onSubmit={handleFormSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-purple-400 text-xs font-bold mb-1">
+                      {t.fieldProject}
+                    </label>
+                    <input
+                      type="text"
+                      placeholder={t.fieldProjectPH}
+                      value={formData.projectName}
+                      onChange={function (e) {
+                        setFormData(Object.assign({}, formData, { projectName: e.target.value }));
+                      }}
+                      className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-purple-400 text-xs font-bold mb-1">
+                      {t.fieldCA}
+                    </label>
+                    <input
+                      type="text"
+                      placeholder={t.fieldCAPH}
+                      value={formData.contractAddress}
+                      onChange={function (e) {
+                        setFormData(
+                          Object.assign({}, formData, { contractAddress: e.target.value }),
+                        );
+                      }}
+                      className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-purple-400 text-xs font-bold mb-1">
+                      Token Logo (optional)
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={function (e) {
+                        var f = e.target.files && e.target.files[0];
+                        if (f) {
+                          processImageFile(
+                            f,
+                            400, // logos are small squares/icons
+                            function (dataUrl) {
+                              setFormData(
+                                Object.assign({}, formData, { logoImg: dataUrl }),
+                              );
+                            },
+                            function (errorMsg) {
+                              alert(errorMsg);
+                              e.target.value = '';
+                            },
+                          );
+                        }
+                      }}
+                      className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-bold file:bg-gradient-to-r file:from-purple-500 file:to-emerald-400 file:text-slate-950 hover:file:from-purple-400 hover:file:to-emerald-300"
+                    />
+                    {!formData.logoImg && (
+                      <p className="text-slate-500 text-[9px] mt-1">
+                        No logo? We'll auto-generate one from the token name.
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-purple-400 text-xs font-bold mb-1">
+                      {t.fieldTier}
+                    </label>
+                    <select
+                      value={selectedTier}
+                      onChange={function (e) {
+                        setSelectedTier(e.target.value);
+                      }}
+                      className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white focus:border-purple-500 focus:outline-none font-mono"
+                    >
+                      <option value="basic">
+                        {t.tierBasic} — ~$10 $MRDT/SOL/USDC
+                      </option>
+                      <option value="fast">
+                        {t.tierFast} — ~$25 $MRDT/SOL/USDC
+                      </option>
+                      <option value="vip">
+                        {t.tierVIP} — ~$75 $MRDT/SOL/USDC
+                      </option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-purple-400 text-xs font-bold mb-1">
+                      {t.fieldTelegram}
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-purple-400 text-xs font-bold">
+                        @
+                      </span>
+                      <input
+                        type="text"
+                        placeholder="your_telegram"
+                        value={formData.telegram}
+                        onChange={function (e) {
+                          setFormData(Object.assign({}, formData, { telegram: e.target.value }));
+                        }}
+                        className="w-full bg-slate-950 border border-purple-500/20 rounded pl-7 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={isSending}
+                    className={
+                      'w-full font-black py-2.5 rounded text-xs transition flex items-center justify-center gap-1.5 disabled:opacity-50 ' +
+                      (freeSlots > 0
+                        ? 'bg-gradient-to-r from-emerald-400 to-purple-500 hover:from-emerald-300 hover:to-purple-400 text-slate-950'
+                        : 'bg-gradient-to-r from-purple-500 to-emerald-400 hover:from-purple-400 hover:to-emerald-300 text-slate-950')
+                    }
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    {isSending ? t.btnLaunching : freeSlots > 0 ? t.btnFreeAudit : t.btnAudit}
+                  </button>
+                  {submitted && (
+                    <div className="p-3 bg-emerald-950/40 border border-emerald-500/30 rounded text-emerald-300 text-xs text-center font-bold">
+                      Payment sent! Token added to table.
+                    </div>
+                  )}
+                </form>
+              </div>
+
+              {/* Banner form */}
+              <div id="bannerFormSection" className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 p-6 backdrop-blur-md">
+                <div className="flex items-start justify-between mb-2">
+                  <h3 className="text-lg font-black text-purple-400">{t.bannerTitle}</h3>
+                  {BANNER_SLOTS - activeBanners.length > 0 ? (
+                    <div className="bg-emerald-500/20 border border-emerald-500/40 rounded-lg px-2 py-1 text-center">
+                      <div className="text-emerald-400 font-black text-sm">
+                        {BANNER_SLOTS - activeBanners.length}/{BANNER_SLOTS}
+                      </div>
+                      <div className="text-[9px] text-emerald-500">open</div>
+                    </div>
+                  ) : (
+                    <div className="bg-slate-800 border border-slate-600 rounded-lg px-2 py-1 text-center">
+                      <div className="text-slate-400 font-black text-sm">0/{BANNER_SLOTS}</div>
+                      <div className="text-[9px] text-slate-500">full</div>
+                    </div>
+                  )}
+                </div>
+                <p className="text-slate-400 text-xs mb-4">{t.bannerSub}</p>
+                <form onSubmit={handleBannerSubmit} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-purple-400 text-[11px] font-bold mb-1">
+                        {t.fieldTokenName}
+                      </label>
+                      <input
+                        type="text"
+                        value={bannerFormData.tokenName}
+                        onChange={function (e) {
+                          setBannerFormData(
+                            Object.assign({}, bannerFormData, { tokenName: e.target.value }),
+                          );
+                        }}
+                        placeholder="SOLANA"
+                        className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-purple-400 text-[11px] font-bold mb-1">
+                        {t.fieldUpload}
+                      </label>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={function (e) {
+                          var f = e.target.files && e.target.files[0];
+                          if (f) {
+                            processImageFile(
+                              f,
+                              1200, // banners are wide, allow a larger max dimension
+                              function (dataUrl) {
+                                setBannerFormData(
+                                  Object.assign({}, bannerFormData, { bannerImg: dataUrl }),
+                                );
+                              },
+                              function (errorMsg) {
+                                alert(errorMsg);
+                                e.target.value = '';
+                              },
+                            );
+                          }
+                        }}
+                        className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-bold file:bg-gradient-to-r file:from-purple-500 file:to-emerald-400 file:text-slate-950 hover:file:from-purple-400 hover:file:to-emerald-300"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-purple-400 text-[11px] font-bold mb-1">
+                      {t.fieldSlogan}
+                    </label>
+                    <input
+                      type="text"
+                      value={bannerFormData.desc}
+                      onChange={function (e) {
+                        setBannerFormData(
+                          Object.assign({}, bannerFormData, { desc: e.target.value }),
+                        );
+                      }}
+                      placeholder={t.fieldSloganPH}
+                      className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-purple-400 text-[11px] font-bold mb-1">
+                      {t.fieldDuration}
+                    </label>
+                    <select
+                      value={bannerFormData.days}
+                      onChange={function (e) {
+                        setBannerFormData(
+                          Object.assign({}, bannerFormData, { days: e.target.value }),
+                        );
+                      }}
+                      className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white focus:border-purple-500 focus:outline-none font-mono"
+                    >
+                      <option value="1">{t.dur1} - ~$20 $MRDT/SOL/USDC</option>
+                      <option value="2">{t.dur2} - ~$35 $MRDT/SOL/USDC</option>
+                      <option value="6">{t.dur6} - ~$100 $MRDT/SOL/USDC</option>
+                    </select>
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={isBannerSending || activeBanners.length >= BANNER_SLOTS}
+                    className="w-full bg-gradient-to-r from-emerald-400 to-purple-500 hover:from-emerald-300 hover:to-purple-400 text-slate-950 font-black py-2.5 rounded text-xs transition flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Zap className="w-3.5 h-3.5" />
+                    {isBannerSending
+                      ? t.btnSending
+                      : activeBanners.length >= BANNER_SLOTS
+                        ? t.btnSlotTaken
+                        : t.btnBanner}
+                  </button>
+                  {activeBanners.length >= BANNER_SLOTS && bannerCountdown && (
+                    <div className="p-2.5 bg-slate-900 border border-purple-500/20 rounded text-center">
+                      <p className="text-slate-400 text-[11px]">{t.slotAvailIn}</p>
+                      <p className="text-purple-400 font-black text-sm mt-0.5">{bannerCountdown}</p>
+                    </div>
+                  )}
+                  {bannerSubmitted && (
+                    <div className="p-3 bg-emerald-950/40 border border-emerald-500/30 rounded text-emerald-300 text-xs text-center font-bold">
+                      Banner activated!
+                    </div>
+                  )}
+                  {bannerError && (
+                    <div className="p-3 bg-red-950/40 border border-red-500/30 rounded text-red-300 text-xs">
+                      {bannerError}
+                    </div>
+                  )}
+                </form>
+              </div>
+            </div>
+
+            {/* Pricing panel */}
+            <div className="space-y-4 bg-slate-900/20 border-2 border-purple-500/20 rounded-xl p-6">
+              <h3 className="text-xl font-black text-purple-400">{t.investorTitle}</h3>
+              <p className="text-slate-300 text-xs leading-relaxed">{t.investorSub}</p>
+              <div className="mt-6 space-y-3">
+                <h4 className="text-xs font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400 flex items-center gap-1.5">
+                  <Download className="w-4 h-4 text-purple-400 animate-pulse" /> {t.pricingTitle}
+                </h4>
+                <div className="grid grid-cols-1 gap-2 text-xs font-mono">
+                  {[
+                    [t.first10, t.free],
+                    ['Basic AI Audit', '~$10 $MRDT/SOL/USDC'],
+                    ['Fast Listing', '~$25 $MRDT/SOL/USDC'],
+                    ['VIP Boost', '~$75 $MRDT/SOL/USDC'],
+                    ['Banner 1 day', '~$20 $MRDT/SOL/USDC'],
+                    ['Banner 2 days', '~$35 $MRDT/SOL/USDC'],
+                    ['Banner 6 days', '~$100 $MRDT/SOL/USDC'],
+                  ].map(function (row, i) {
+                    var rowCls =
+                      'flex justify-between p-2.5 border rounded-lg ' +
+                      (i === 0
+                        ? 'bg-emerald-500/10 border-emerald-500/30'
+                        : 'bg-slate-950 border-purple-500/10');
+                    var labelCls = i === 0 ? 'text-emerald-300 font-bold' : 'text-slate-300';
+                    var valCls =
+                      i === 0 ? 'text-emerald-400 font-black' : 'text-emerald-400 font-bold';
+                    return (
+                      <div key={i} className={rowCls}>
+                        <span className={labelCls}>{row[0]}</span>
+                        <span className={valCls}>{row[1]}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* ═══ TOKEN TABLE ═══ */}
         <section className="max-w-7xl mx-auto px-6 py-6">
           <div
@@ -2842,328 +3164,6 @@ export default function TntHouse() {
                 <AlertCircle className="w-2.5 h-2.5" /> {error}
               </div>
             )}
-          </div>
-        </section>
-
-        {/* ═══ ORDER FORMS + PRICING ═══ */}
-        <section id="orderFormsSection" className="max-w-7xl mx-auto px-6 py-8">
-          <div className="grid md:grid-cols-2 gap-12 items-start">
-            <div className="space-y-8">
-              {/* Audit form */}
-              <div id="auditFormSection" className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 p-6 backdrop-blur-md">
-                <div className="flex items-start justify-between mb-2">
-                  <h3 className="text-lg font-black text-purple-400">{t.formTitle}</h3>
-                  {freeSlots > 0 ? (
-                    <div className="bg-emerald-500/20 border border-emerald-500/40 rounded-lg px-2 py-1 text-center">
-                      <div className="text-emerald-400 font-black text-sm">
-                        {freeSlots}/{FREE_TOTAL}
-                      </div>
-                      <div className="text-[9px] text-emerald-500">free</div>
-                    </div>
-                  ) : (
-                    <div className="bg-slate-800 border border-slate-600 rounded-lg px-2 py-1 text-center">
-                      <div className="text-slate-400 font-black text-sm">0/{FREE_TOTAL}</div>
-                      <div className="text-[9px] text-slate-500">no slots</div>
-                    </div>
-                  )}
-                </div>
-                <p className="text-slate-400 text-xs mb-4">
-                  {freeSlots > 0 ? '🎁 ' + freeSlots + ' ' + t.formFreeLeft : t.formPaid}
-                </p>
-                <form onSubmit={handleFormSubmit} className="space-y-4">
-                  <div>
-                    <label className="block text-purple-400 text-xs font-bold mb-1">
-                      {t.fieldProject}
-                    </label>
-                    <input
-                      type="text"
-                      placeholder={t.fieldProjectPH}
-                      value={formData.projectName}
-                      onChange={function (e) {
-                        setFormData(Object.assign({}, formData, { projectName: e.target.value }));
-                      }}
-                      className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-purple-400 text-xs font-bold mb-1">
-                      {t.fieldCA}
-                    </label>
-                    <input
-                      type="text"
-                      placeholder={t.fieldCAPH}
-                      value={formData.contractAddress}
-                      onChange={function (e) {
-                        setFormData(
-                          Object.assign({}, formData, { contractAddress: e.target.value }),
-                        );
-                      }}
-                      className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none font-mono"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-purple-400 text-xs font-bold mb-1">
-                      Token Logo (optional)
-                    </label>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={function (e) {
-                        var f = e.target.files && e.target.files[0];
-                        if (f) {
-                          processImageFile(
-                            f,
-                            400, // logos are small squares/icons
-                            function (dataUrl) {
-                              setFormData(
-                                Object.assign({}, formData, { logoImg: dataUrl }),
-                              );
-                            },
-                            function (errorMsg) {
-                              alert(errorMsg);
-                              e.target.value = '';
-                            },
-                          );
-                        }
-                      }}
-                      className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-bold file:bg-gradient-to-r file:from-purple-500 file:to-emerald-400 file:text-slate-950 hover:file:from-purple-400 hover:file:to-emerald-300"
-                    />
-                    {!formData.logoImg && (
-                      <p className="text-slate-500 text-[9px] mt-1">
-                        No logo? We'll auto-generate one from the token name.
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-purple-400 text-xs font-bold mb-1">
-                      {t.fieldTier}
-                    </label>
-                    <select
-                      value={selectedTier}
-                      onChange={function (e) {
-                        setSelectedTier(e.target.value);
-                      }}
-                      className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white focus:border-purple-500 focus:outline-none font-mono"
-                    >
-                      <option value="basic">
-                        {t.tierBasic} — ~$10 $MRDT/SOL/USDC
-                      </option>
-                      <option value="fast">
-                        {t.tierFast} — ~$25 $MRDT/SOL/USDC
-                      </option>
-                      <option value="vip">
-                        {t.tierVIP} — ~$75 $MRDT/SOL/USDC
-                      </option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-purple-400 text-xs font-bold mb-1">
-                      {t.fieldTelegram}
-                    </label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-purple-400 text-xs font-bold">
-                        @
-                      </span>
-                      <input
-                        type="text"
-                        placeholder="your_telegram"
-                        value={formData.telegram}
-                        onChange={function (e) {
-                          setFormData(Object.assign({}, formData, { telegram: e.target.value }));
-                        }}
-                        className="w-full bg-slate-950 border border-purple-500/20 rounded pl-7 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none"
-                      />
-                    </div>
-                  </div>
-                  <button
-                    type="submit"
-                    disabled={isSending}
-                    className={
-                      'w-full font-black py-2.5 rounded text-xs transition flex items-center justify-center gap-1.5 disabled:opacity-50 ' +
-                      (freeSlots > 0
-                        ? 'bg-gradient-to-r from-emerald-400 to-purple-500 hover:from-emerald-300 hover:to-purple-400 text-slate-950'
-                        : 'bg-gradient-to-r from-purple-500 to-emerald-400 hover:from-purple-400 hover:to-emerald-300 text-slate-950')
-                    }
-                  >
-                    <Send className="w-3.5 h-3.5" />
-                    {isSending ? t.btnLaunching : freeSlots > 0 ? t.btnFreeAudit : t.btnAudit}
-                  </button>
-                  {submitted && (
-                    <div className="p-3 bg-emerald-950/40 border border-emerald-500/30 rounded text-emerald-300 text-xs text-center font-bold">
-                      Payment sent! Token added to table.
-                    </div>
-                  )}
-                </form>
-              </div>
-
-              {/* Banner form */}
-              <div id="bannerFormSection" className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 p-6 backdrop-blur-md">
-                <div className="flex items-start justify-between mb-2">
-                  <h3 className="text-lg font-black text-purple-400">{t.bannerTitle}</h3>
-                  {BANNER_SLOTS - activeBanners.length > 0 ? (
-                    <div className="bg-emerald-500/20 border border-emerald-500/40 rounded-lg px-2 py-1 text-center">
-                      <div className="text-emerald-400 font-black text-sm">
-                        {BANNER_SLOTS - activeBanners.length}/{BANNER_SLOTS}
-                      </div>
-                      <div className="text-[9px] text-emerald-500">open</div>
-                    </div>
-                  ) : (
-                    <div className="bg-slate-800 border border-slate-600 rounded-lg px-2 py-1 text-center">
-                      <div className="text-slate-400 font-black text-sm">0/{BANNER_SLOTS}</div>
-                      <div className="text-[9px] text-slate-500">full</div>
-                    </div>
-                  )}
-                </div>
-                <p className="text-slate-400 text-xs mb-4">{t.bannerSub}</p>
-                <form onSubmit={handleBannerSubmit} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-purple-400 text-[11px] font-bold mb-1">
-                        {t.fieldTokenName}
-                      </label>
-                      <input
-                        type="text"
-                        value={bannerFormData.tokenName}
-                        onChange={function (e) {
-                          setBannerFormData(
-                            Object.assign({}, bannerFormData, { tokenName: e.target.value }),
-                          );
-                        }}
-                        placeholder="SOLANA"
-                        className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-purple-400 text-[11px] font-bold mb-1">
-                        {t.fieldUpload}
-                      </label>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={function (e) {
-                          var f = e.target.files && e.target.files[0];
-                          if (f) {
-                            processImageFile(
-                              f,
-                              1200, // banners are wide, allow a larger max dimension
-                              function (dataUrl) {
-                                setBannerFormData(
-                                  Object.assign({}, bannerFormData, { bannerImg: dataUrl }),
-                                );
-                              },
-                              function (errorMsg) {
-                                alert(errorMsg);
-                                e.target.value = '';
-                              },
-                            );
-                          }
-                        }}
-                        className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-bold file:bg-gradient-to-r file:from-purple-500 file:to-emerald-400 file:text-slate-950 hover:file:from-purple-400 hover:file:to-emerald-300"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-purple-400 text-[11px] font-bold mb-1">
-                      {t.fieldSlogan}
-                    </label>
-                    <input
-                      type="text"
-                      value={bannerFormData.desc}
-                      onChange={function (e) {
-                        setBannerFormData(
-                          Object.assign({}, bannerFormData, { desc: e.target.value }),
-                        );
-                      }}
-                      placeholder={t.fieldSloganPH}
-                      className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-purple-400 text-[11px] font-bold mb-1">
-                      {t.fieldDuration}
-                    </label>
-                    <select
-                      value={bannerFormData.days}
-                      onChange={function (e) {
-                        setBannerFormData(
-                          Object.assign({}, bannerFormData, { days: e.target.value }),
-                        );
-                      }}
-                      className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white focus:border-purple-500 focus:outline-none font-mono"
-                    >
-                      <option value="1">{t.dur1} - ~$20 $MRDT/SOL/USDC</option>
-                      <option value="2">{t.dur2} - ~$35 $MRDT/SOL/USDC</option>
-                      <option value="6">{t.dur6} - ~$100 $MRDT/SOL/USDC</option>
-                    </select>
-                  </div>
-                  <button
-                    type="submit"
-                    disabled={isBannerSending || activeBanners.length >= BANNER_SLOTS}
-                    className="w-full bg-gradient-to-r from-emerald-400 to-purple-500 hover:from-emerald-300 hover:to-purple-400 text-slate-950 font-black py-2.5 rounded text-xs transition flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Zap className="w-3.5 h-3.5" />
-                    {isBannerSending
-                      ? t.btnSending
-                      : activeBanners.length >= BANNER_SLOTS
-                        ? t.btnSlotTaken
-                        : t.btnBanner}
-                  </button>
-                  {activeBanners.length >= BANNER_SLOTS && bannerCountdown && (
-                    <div className="p-2.5 bg-slate-900 border border-purple-500/20 rounded text-center">
-                      <p className="text-slate-400 text-[11px]">{t.slotAvailIn}</p>
-                      <p className="text-purple-400 font-black text-sm mt-0.5">{bannerCountdown}</p>
-                    </div>
-                  )}
-                  {bannerSubmitted && (
-                    <div className="p-3 bg-emerald-950/40 border border-emerald-500/30 rounded text-emerald-300 text-xs text-center font-bold">
-                      Banner activated!
-                    </div>
-                  )}
-                  {bannerError && (
-                    <div className="p-3 bg-red-950/40 border border-red-500/30 rounded text-red-300 text-xs">
-                      {bannerError}
-                    </div>
-                  )}
-                </form>
-              </div>
-            </div>
-
-            {/* Pricing panel */}
-            <div className="space-y-4 bg-slate-900/20 border-2 border-purple-500/20 rounded-xl p-6">
-              <h3 className="text-xl font-black text-purple-400">{t.investorTitle}</h3>
-              <p className="text-slate-300 text-xs leading-relaxed">{t.investorSub}</p>
-              <div className="mt-6 space-y-3">
-                <h4 className="text-xs font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400 flex items-center gap-1.5">
-                  <Download className="w-4 h-4 text-purple-400 animate-pulse" /> {t.pricingTitle}
-                </h4>
-                <div className="grid grid-cols-1 gap-2 text-xs font-mono">
-                  {[
-                    [t.first10, t.free],
-                    ['Basic AI Audit', '~$10 $MRDT/SOL/USDC'],
-                    ['Fast Listing', '~$25 $MRDT/SOL/USDC'],
-                    ['VIP Boost', '~$75 $MRDT/SOL/USDC'],
-                    ['Banner 1 day', '~$20 $MRDT/SOL/USDC'],
-                    ['Banner 2 days', '~$35 $MRDT/SOL/USDC'],
-                    ['Banner 6 days', '~$100 $MRDT/SOL/USDC'],
-                  ].map(function (row, i) {
-                    var rowCls =
-                      'flex justify-between p-2.5 border rounded-lg ' +
-                      (i === 0
-                        ? 'bg-emerald-500/10 border-emerald-500/30'
-                        : 'bg-slate-950 border-purple-500/10');
-                    var labelCls = i === 0 ? 'text-emerald-300 font-bold' : 'text-slate-300';
-                    var valCls =
-                      i === 0 ? 'text-emerald-400 font-black' : 'text-emerald-400 font-bold';
-                    return (
-                      <div key={i} className={rowCls}>
-                        <span className={labelCls}>{row[0]}</span>
-                        <span className={valCls}>{row[1]}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
           </div>
         </section>
 
