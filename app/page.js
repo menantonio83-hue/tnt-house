@@ -122,7 +122,7 @@ const TRANSLATIONS = {
     tierBasic: 'Basic Audit',
     tierFast: 'Fast Listing',
     tierVIP: 'VIP Boost',
-    fieldTelegram: 'Telegram handle',
+    fieldTelegram: 'Telegram handle (optional)',
     btnFreeAudit: '🎁 LAUNCH FREE AUDIT',
     btnAudit: 'LAUNCH AI INSPECTION',
     btnLaunching: 'LAUNCHING...',
@@ -223,7 +223,7 @@ const TRANSLATIONS = {
     tierBasic: 'Auditoría Básica',
     tierFast: 'Listado Rápido',
     tierVIP: 'VIP Boost',
-    fieldTelegram: 'Usuario de Telegram',
+    fieldTelegram: 'Usuario de Telegram (opcional)',
     btnFreeAudit: '🎁 AUDITORÍA GRATIS',
     btnAudit: 'INICIAR INSPECCIÓN IA',
     btnLaunching: 'ENVIANDO...',
@@ -320,7 +320,7 @@ const TRANSLATIONS = {
     tierBasic: 'Audit Basique',
     tierFast: 'Listing Rapide',
     tierVIP: 'VIP Boost',
-    fieldTelegram: 'Pseudo Telegram',
+    fieldTelegram: 'Pseudo Telegram (optionnel)',
     btnFreeAudit: '🎁 AUDIT GRATUIT',
     btnAudit: 'LANCER INSPECTION IA',
     btnLaunching: 'ENVOI...',
@@ -417,7 +417,7 @@ const TRANSLATIONS = {
     tierBasic: 'Βασικός Έλεγχος',
     tierFast: 'Γρήγορη Καταχώρηση',
     tierVIP: 'VIP Boost',
-    fieldTelegram: 'Χρήστης Telegram',
+    fieldTelegram: 'Χρήστης Telegram (προαιρετικό)',
     btnFreeAudit: '🎁 ΔΩΡΕΑΝ ΕΛΕΓΧΟΣ',
     btnAudit: 'ΕΚΚΙΝΗΣΗ AI ΕΠΙΘΕΩΡΗΣΗΣ',
     btnLaunching: 'ΑΠΟΣΤΟΛΗ...',
@@ -514,7 +514,7 @@ const TRANSLATIONS = {
     tierBasic: 'Базовый Аудит',
     tierFast: 'Быстрый Листинг',
     tierVIP: 'VIP-Буст',
-    fieldTelegram: 'Telegram для связи',
+    fieldTelegram: 'Telegram для связи (необязательно)',
     btnFreeAudit: '🎁 БЕСПЛАТНЫЙ АУДИТ',
     btnAudit: 'ЗАПУСТИТЬ ИИ-ИНСПЕКЦИЮ',
     btnLaunching: 'ОТПРАВЛЯЕМ...',
@@ -612,7 +612,7 @@ const TRANSLATIONS = {
     tierBasic: 'Audit Base',
     tierFast: 'Listing Veloce',
     tierVIP: 'VIP Boost',
-    fieldTelegram: 'Telegram di contatto',
+    fieldTelegram: 'Telegram di contatto (opzionale)',
     btnFreeAudit: '🎁 AUDIT GRATUITO',
     btnAudit: 'AVVIA ISPEZIONE IA',
     btnLaunching: 'INVIO IN CORSO...',
@@ -710,7 +710,7 @@ const TRANSLATIONS = {
     tierBasic: '基础审计',
     tierFast: '快速上线',
     tierVIP: 'VIP加速',
-    fieldTelegram: '联系Telegram',
+    fieldTelegram: '联系Telegram（选填）',
     btnFreeAudit: '🎁 免费审计',
     btnAudit: '开始AI检测',
     btnLaunching: '发送中...',
@@ -1626,7 +1626,7 @@ export default function TntHouse() {
 
   var handleFormSubmit = function (e) {
     e.preventDefault();
-    if (!formData.projectName || !formData.contractAddress || !formData.telegram) {
+    if (!formData.projectName || !formData.contractAddress) {
       showToast(t.fillFields, 'error');
       return;
     }
