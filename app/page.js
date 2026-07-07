@@ -147,6 +147,10 @@ const TRANSLATIONS = {
     first10: '🎁 First 10 tokens',
     free: 'FREE',
     slotsLeft: 'slots left',
+    caChecking: 'Checking token...',
+    caFoundPrefix: 'Found:',
+    caFreshWarning: 'Token is brand new! Enter the name manually to run the audit.',
+    caEditManually: 'Wrong name or logo? Edit manually',
     bannersLeft: 'banners left',
     btnFreeBanner: '🎁 CLAIM FREE BANNER',
     bannerFreeLeft: 'free banners left! Fill the form — banner goes live immediately.',
@@ -251,6 +255,10 @@ const TRANSLATIONS = {
     first10: '🎁 Primeros 10 tokens',
     free: 'GRATIS',
     slotsLeft: 'cupos restantes',
+    caChecking: 'Verificando token...',
+    caFoundPrefix: 'Encontrado:',
+    caFreshWarning: 'El token es muy nuevo. Escribe el nombre manualmente para iniciar el audit.',
+    caEditManually: '¿Nombre o logo incorrecto? Editar manualmente',
     bannersLeft: 'banners restantes',
     btnFreeBanner: '🎁 RECLAMAR BANNER GRATIS',
     bannerFreeLeft: 'banners gratis restantes. Completa el formulario — el banner se activa de inmediato.',
@@ -352,6 +360,10 @@ const TRANSLATIONS = {
     first10: '🎁 10 premiers tokens',
     free: 'GRATUIT',
     slotsLeft: 'places restantes',
+    caChecking: 'Vérification du token...',
+    caFoundPrefix: 'Trouvé :',
+    caFreshWarning: "Le token est tout neuf ! Saisis le nom manuellement pour lancer l'audit.",
+    caEditManually: 'Nom ou logo incorrect ? Modifier manuellement',
     bannersLeft: 'bannières restantes',
     btnFreeBanner: '🎁 OBTENIR UNE BANNIÈRE GRATUITE',
     bannerFreeLeft: 'bannières gratuites restantes ! Remplissez le formulaire — la bannière est mise en ligne immédiatement.',
@@ -453,6 +465,10 @@ const TRANSLATIONS = {
     first10: '🎁 Πρώτα 10 tokens',
     free: 'ΔΩΡΕΑΝ',
     slotsLeft: 'θέσεις απομένουν',
+    caChecking: 'Έλεγχος token...',
+    caFoundPrefix: 'Βρέθηκε:',
+    caFreshWarning: 'Το token είναι πολύ νέο! Γράψε το όνομα χειροκίνητα για να ξεκινήσει ο έλεγχος.',
+    caEditManually: 'Λάθος όνομα ή λογότυπο; Επεξεργασία χειροκίνητα',
     bannersLeft: 'banner απομένουν',
     btnFreeBanner: '🎁 ΔΩΡΕΑΝ BANNER',
     bannerFreeLeft: 'δωρεάν banner απομένουν! Συμπλήρωσε τη φόρμα — το banner ενεργοποιείται αμέσως.',
@@ -555,6 +571,10 @@ const TRANSLATIONS = {
     first10: '🎁 Первые 10 токенов',
     free: 'БЕСПЛАТНО',
     slotsLeft: 'слотов осталось',
+    caChecking: 'Проверяем токен...',
+    caFoundPrefix: 'Найдено:',
+    caFreshWarning: 'Упс, токен совсем свежий! Введи название вручную, чтобы запустить аудит.',
+    caEditManually: 'Не то имя или лого? Изменить вручную',
     bannersLeft: 'баннеров осталось',
     btnFreeBanner: '🎁 ПОЛУЧИТЬ БЕСПЛАТНЫЙ БАННЕР',
     bannerFreeLeft: 'бесплатных баннеров осталось! Заполни форму — баннер появится сразу.',
@@ -657,6 +677,10 @@ const TRANSLATIONS = {
     first10: '🎁 Primi 10 token',
     free: 'GRATIS',
     slotsLeft: 'posti rimasti',
+    caChecking: 'Controllo token...',
+    caFoundPrefix: 'Trovato:',
+    caFreshWarning: "Il token è appena nato! Inserisci il nome manualmente per avviare l'audit.",
+    caEditManually: 'Nome o logo sbagliato? Modifica manualmente',
     bannersLeft: 'banner rimasti',
     btnFreeBanner: '🎁 RICHIEDI BANNER GRATIS',
     bannerFreeLeft: 'banner gratuiti rimasti! Compila il modulo — il banner va subito online.',
@@ -759,6 +783,10 @@ const TRANSLATIONS = {
     first10: '🎁 前10个代币',
     free: '免费',
     slotsLeft: '个名额剩余',
+    caChecking: '正在检测代币...',
+    caFoundPrefix: '已找到:',
+    caFreshWarning: '这个代币太新了！请手动输入名称以开始审计。',
+    caEditManually: '名称或图标不对？手动编辑',
     bannersLeft: '个横幅剩余',
     btnFreeBanner: '🎁 领取免费横幅',
     bannerFreeLeft: '个免费横幅名额剩余！填写表单 — 横幅立即上线。',
@@ -1245,6 +1273,13 @@ export default function TntHouse() {
     telegram: '',
     logoImg: '',
   });
+  // FEAT v1.95: CA-first progressive form. 'idle' = nothing typed yet (only
+  // the CA field shows), 'loading' = debounced DexScreener lookup in
+  // flight, 'found' = name+logo auto-filled, 'notfound' = no pair / no
+  // metadata yet, reveals manual name+logo fields.
+  var [caLookupStatus, setCaLookupStatus] = useState('idle');
+  var [caLookupPreview, setCaLookupPreview] = useState(null);
+  var [caManualOverride, setCaManualOverride] = useState(false);
   var [selectedTier, setSelectedTier] = useState('basic');
   var [isSending, setIsSending] = useState(false);
   var [submitted, setSubmitted] = useState(false);
@@ -1548,6 +1583,75 @@ export default function TntHouse() {
       setFreeBanners(Math.max(0, FREE_BANNER_TOTAL - usedCount));
     });
   }, []);
+
+  // FEAT v1.95: debounced auto-lookup as the user types/pastes a CA. Reuses
+  // the exact same DexScreener endpoint runAuditAndSave already calls for
+  // price/liquidity — baseToken.name/symbol and info.imageUrl come back in
+  // the same response, just weren't being read before. Only auto-fills
+  // projectName/logoImg; never overwrites a value the user typed manually
+  // (caManualOverride freezes it).
+  useEffect(function () {
+    var ca = formData.contractAddress.trim();
+    var looksValid = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(ca);
+    if (!looksValid) {
+      setCaLookupStatus('idle');
+      setCaLookupPreview(null);
+      return;
+    }
+    setCaLookupStatus('loading');
+    var cancelled = false;
+    var timer = setTimeout(function () {
+      fetch('https://api.dexscreener.com/latest/dex/tokens/' + ca)
+        .then(function (res) {
+          return res.json();
+        })
+        .then(function (json) {
+          if (cancelled) return;
+          var solPairs = (json.pairs || []).filter(function (p) {
+            return p.chainId === 'solana';
+          });
+          if (solPairs.length === 0) {
+            setCaLookupStatus('notfound');
+            setCaLookupPreview(null);
+            return;
+          }
+          var pair = solPairs.reduce(function (best, p) {
+            var bestLiq = best.liquidity && best.liquidity.usd ? best.liquidity.usd : 0;
+            var pLiq = p.liquidity && p.liquidity.usd ? p.liquidity.usd : 0;
+            return pLiq > bestLiq ? p : best;
+          }, solPairs[0]);
+          var name = (pair.baseToken && (pair.baseToken.name || pair.baseToken.symbol)) || '';
+          var symbol = (pair.baseToken && pair.baseToken.symbol) || name;
+          var imageUrl = (pair.info && pair.info.imageUrl) || '';
+          if (!name) {
+            setCaLookupStatus('notfound');
+            setCaLookupPreview(null);
+            return;
+          }
+          if (!caManualOverride) {
+            setFormData(function (prev) {
+              return Object.assign({}, prev, {
+                projectName: name,
+                logoImg: imageUrl || prev.logoImg,
+              });
+            });
+          }
+          setCaLookupPreview({ name: name, symbol: symbol, imageUrl: imageUrl });
+          setCaLookupStatus('found');
+        })
+        .catch(function () {
+          if (!cancelled) {
+            setCaLookupStatus('notfound');
+            setCaLookupPreview(null);
+          }
+        });
+    }, 700);
+    return function () {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData.contractAddress]);
 
   // Load token votes + this browser's own past votes (localStorage) on mount
   useEffect(function () {
@@ -2897,20 +3001,10 @@ export default function TntHouse() {
                   {freeSlots > 0 ? '🎁 ' + freeSlots + ' ' + t.formFreeLeft : t.formPaid}
                 </p>
                 <form onSubmit={handleFormSubmit} className="space-y-4">
-                  <div>
-                    <label className="block text-purple-400 text-xs font-bold mb-1">
-                      {t.fieldProject}
-                    </label>
-                    <input
-                      type="text"
-                      placeholder={t.fieldProjectPH}
-                      value={formData.projectName}
-                      onChange={function (e) {
-                        setFormData(Object.assign({}, formData, { projectName: e.target.value }));
-                      }}
-                      className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none"
-                    />
-                  </div>
+                  {/* FEAT v1.95: CA-first flow — this is the ONLY field
+                      visible until a lookup completes. Nothing else exists
+                      yet in the DOM to distract/scare off a lazy mobile
+                      user. */}
                   <div>
                     <label className="block text-purple-400 text-xs font-bold mb-1">
                       {t.fieldCA}
@@ -2924,107 +3018,168 @@ export default function TntHouse() {
                           Object.assign({}, formData, { contractAddress: e.target.value }),
                         );
                       }}
-                      className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none font-mono"
+                      className="w-full bg-slate-950 border-2 border-purple-500/40 rounded px-3 py-3 text-sm text-white placeholder-slate-500 focus:border-emerald-400 focus:outline-none font-mono shadow-[0_0_15px_rgba(153,69,255,0.15)] transition-colors"
                     />
-                  </div>
-                  <div>
-                    <label className="block text-purple-400 text-xs font-bold mb-1">
-                      Token Logo (optional)
-                    </label>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={function (e) {
-                        var f = e.target.files && e.target.files[0];
-                        if (f) {
-                          processImageFile(
-                            f,
-                            400, // logos are small squares/icons
-                            function (dataUrl) {
-                              setFormData(
-                                Object.assign({}, formData, { logoImg: dataUrl }),
-                              );
-                            },
-                            function (errorMsg) {
-                              alert(errorMsg);
-                              e.target.value = '';
-                            },
-                          );
-                        }
-                      }}
-                      className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-bold file:bg-gradient-to-r file:from-purple-500 file:to-emerald-400 file:text-slate-950 hover:file:from-purple-400 hover:file:to-emerald-300"
-                    />
-                    {!formData.logoImg && (
-                      <p className="text-slate-500 text-[9px] mt-1">
-                        No logo? We'll auto-generate one from the token name.
+                    {caLookupStatus === 'loading' && (
+                      <p className="text-purple-300 text-[10px] mt-1.5 flex items-center gap-1.5">
+                        <RefreshCw className="w-2.5 h-2.5 animate-spin" /> {t.caChecking}
+                      </p>
+                    )}
+                    {caLookupStatus === 'found' && caLookupPreview && !caManualOverride && (
+                      <p className="text-emerald-400 text-[10px] mt-1.5 flex items-center gap-1.5">
+                        {caLookupPreview.imageUrl && (
+                          <img
+                            src={caLookupPreview.imageUrl}
+                            alt=""
+                            className="w-4 h-4 rounded-full object-cover"
+                          />
+                        )}
+                        ✓ {t.caFoundPrefix} {caLookupPreview.symbol}
+                        <button
+                          type="button"
+                          onClick={function () {
+                            setCaManualOverride(true);
+                          }}
+                          className="text-slate-500 underline ml-1"
+                        >
+                          {t.caEditManually}
+                        </button>
                       </p>
                     )}
                   </div>
-                  <div>
-                    <label className="block text-purple-400 text-xs font-bold mb-1">
-                      {t.fieldTier}
-                    </label>
-                    <select
-                      value={selectedTier}
-                      onChange={function (e) {
-                        setSelectedTier(e.target.value);
-                      }}
-                      className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white focus:border-purple-500 focus:outline-none font-mono"
-                    >
-                      <option value="basic">
-                        {t.tierBasic} — {freeSlots > 0
-                          ? t.free + ' — ' + freeSlots + ' ' + t.slotsLeft
-                          : '~$10 $MRDT/SOL/USDC'}
-                      </option>
-                      <option value="fast">
-                        {t.tierFast} — {freeSlots > 0
-                          ? t.free + ' — ' + freeSlots + ' ' + t.slotsLeft
-                          : '~$25 $MRDT/SOL/USDC'}
-                      </option>
-                      <option value="vip">
-                        {t.tierVIP} — {freeSlots > 0
-                          ? t.free + ' — ' + freeSlots + ' ' + t.slotsLeft
-                          : '~$75 $MRDT/SOL/USDC'}
-                      </option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-purple-400 text-xs font-bold mb-1">
-                      {t.fieldTelegram}
-                    </label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-purple-400 text-xs font-bold">
-                        @
-                      </span>
-                      <input
-                        type="text"
-                        placeholder="your_telegram"
-                        value={formData.telegram}
-                        onChange={function (e) {
-                          setFormData(Object.assign({}, formData, { telegram: e.target.value }));
-                        }}
-                        className="w-full bg-slate-950 border border-purple-500/20 rounded pl-7 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none"
-                      />
-                    </div>
-                  </div>
-                  <button
-                    type="submit"
-                    disabled={isSending}
+
+                  {/* FEAT v1.95: everything below animates open only once a
+                      lookup has actually completed — success or fail. */}
+                  <div
                     className={
-                      'w-full font-black py-2.5 rounded text-xs transition flex items-center justify-center gap-1.5 disabled:opacity-50 ' +
-                      (freeSlots > 0
-                        ? 'bg-gradient-to-r from-emerald-400 to-purple-500 hover:from-emerald-300 hover:to-purple-400 text-slate-950'
-                        : 'bg-gradient-to-r from-purple-500 to-emerald-400 hover:from-purple-400 hover:to-emerald-300 text-slate-950')
+                      'space-y-4 overflow-hidden transition-all duration-500 ease-out ' +
+                      (caLookupStatus === 'idle' || caLookupStatus === 'loading'
+                        ? 'max-h-0 opacity-0'
+                        : 'max-h-[1200px] opacity-100')
                     }
                   >
-                    <Send className="w-3.5 h-3.5" />
-                    {isSending ? t.btnLaunching : freeSlots > 0 ? t.btnFreeAudit : t.btnAudit}
-                  </button>
-                  {submitted && (
-                    <div className="p-3 bg-emerald-950/40 border border-emerald-500/30 rounded text-emerald-300 text-xs text-center font-bold">
-                      Payment sent! Token added to table.
+                    {(caLookupStatus === 'notfound' || caManualOverride) && (
+                      <>
+                        <p className="text-yellow-400 text-[11px] bg-yellow-500/10 border border-yellow-500/30 rounded px-3 py-2">
+                          {t.caFreshWarning}
+                        </p>
+                        <div>
+                          <label className="block text-purple-400 text-xs font-bold mb-1">
+                            {t.fieldProject}
+                          </label>
+                          <input
+                            type="text"
+                            placeholder={t.fieldProjectPH}
+                            value={formData.projectName}
+                            onChange={function (e) {
+                              setFormData(
+                                Object.assign({}, formData, { projectName: e.target.value }),
+                              );
+                            }}
+                            className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-purple-400 text-xs font-bold mb-1">
+                            Token Logo (optional)
+                          </label>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={function (e) {
+                              var f = e.target.files && e.target.files[0];
+                              if (f) {
+                                processImageFile(
+                                  f,
+                                  400, // logos are small squares/icons
+                                  function (dataUrl) {
+                                    setFormData(
+                                      Object.assign({}, formData, { logoImg: dataUrl }),
+                                    );
+                                  },
+                                  function (errorMsg) {
+                                    alert(errorMsg);
+                                    e.target.value = '';
+                                  },
+                                );
+                              }
+                            }}
+                            className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-bold file:bg-gradient-to-r file:from-purple-500 file:to-emerald-400 file:text-slate-950 hover:file:from-purple-400 hover:file:to-emerald-300"
+                          />
+                          {!formData.logoImg && (
+                            <p className="text-slate-500 text-[9px] mt-1">
+                              No logo? We'll auto-generate one from the token name.
+                            </p>
+                          )}
+                        </div>
+                      </>
+                    )}
+                    <div>
+                      <label className="block text-purple-400 text-xs font-bold mb-1">
+                        {t.fieldTier}
+                      </label>
+                      <select
+                        value={selectedTier}
+                        onChange={function (e) {
+                          setSelectedTier(e.target.value);
+                        }}
+                        className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white focus:border-purple-500 focus:outline-none font-mono"
+                      >
+                        <option value="basic">
+                          {t.tierBasic} — {freeSlots > 0
+                            ? t.free + ' — ' + freeSlots + ' ' + t.slotsLeft
+                            : '~$10 $MRDT/SOL/USDC'}
+                        </option>
+                        <option value="fast">
+                          {t.tierFast} — {freeSlots > 0
+                            ? t.free + ' — ' + freeSlots + ' ' + t.slotsLeft
+                            : '~$25 $MRDT/SOL/USDC'}
+                        </option>
+                        <option value="vip">
+                          {t.tierVIP} — {freeSlots > 0
+                            ? t.free + ' — ' + freeSlots + ' ' + t.slotsLeft
+                            : '~$75 $MRDT/SOL/USDC'}
+                        </option>
+                      </select>
                     </div>
-                  )}
+                    <div>
+                      <label className="block text-purple-400 text-xs font-bold mb-1">
+                        {t.fieldTelegram}
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-purple-400 text-xs font-bold">
+                          @
+                        </span>
+                        <input
+                          type="text"
+                          placeholder="your_telegram"
+                          value={formData.telegram}
+                          onChange={function (e) {
+                            setFormData(Object.assign({}, formData, { telegram: e.target.value }));
+                          }}
+                          className="w-full bg-slate-950 border border-purple-500/20 rounded pl-7 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={isSending}
+                      className={
+                        'w-full font-black py-2.5 rounded text-xs transition flex items-center justify-center gap-1.5 disabled:opacity-50 ' +
+                        (freeSlots > 0
+                          ? 'bg-gradient-to-r from-emerald-400 to-purple-500 hover:from-emerald-300 hover:to-purple-400 text-slate-950'
+                          : 'bg-gradient-to-r from-purple-500 to-emerald-400 hover:from-purple-400 hover:to-emerald-300 text-slate-950')
+                      }
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      {isSending ? t.btnLaunching : freeSlots > 0 ? t.btnFreeAudit : t.btnAudit}
+                    </button>
+                    {submitted && (
+                      <div className="p-3 bg-emerald-950/40 border border-emerald-500/30 rounded text-emerald-300 text-xs text-center font-bold">
+                        Payment sent! Token added to table.
+                      </div>
+                    )}
+                  </div>
                 </form>
               </div>
           </div>
