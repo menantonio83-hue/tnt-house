@@ -146,6 +146,10 @@ const TRANSLATIONS = {
     pricingTitle: 'CURRENT PRICING:',
     first10: '🎁 First 10 tokens',
     free: 'FREE',
+    slotsLeft: 'slots left',
+    bannersLeft: 'banners left',
+    btnFreeBanner: '🎁 CLAIM FREE BANNER',
+    bannerFreeLeft: 'free banners left! Fill the form — banner goes live immediately.',
     daoTitle: 'TNT WHALE CLUB (DAO)',
     daoText:
       'Questions about audits, listings or $MRDT? Write to our admin in Telegram — we reply fast. 🚀',
@@ -246,6 +250,10 @@ const TRANSLATIONS = {
     pricingTitle: 'PRECIOS ACTUALES:',
     first10: '🎁 Primeros 10 tokens',
     free: 'GRATIS',
+    slotsLeft: 'cupos restantes',
+    bannersLeft: 'banners restantes',
+    btnFreeBanner: '🎁 RECLAMAR BANNER GRATIS',
+    bannerFreeLeft: 'banners gratis restantes. Completa el formulario — el banner se activa de inmediato.',
     daoTitle: 'TNT WHALE CLUB (DAO)',
     daoText: '¿Preguntas sobre auditorías o $MRDT? Escríbenos en Telegram. 🚀',
     daoBtn: '💬 Contactar Admin',
@@ -343,6 +351,10 @@ const TRANSLATIONS = {
     pricingTitle: 'TARIFS ACTUELS:',
     first10: '🎁 10 premiers tokens',
     free: 'GRATUIT',
+    slotsLeft: 'places restantes',
+    bannersLeft: 'bannières restantes',
+    btnFreeBanner: '🎁 OBTENIR UNE BANNIÈRE GRATUITE',
+    bannerFreeLeft: 'bannières gratuites restantes ! Remplissez le formulaire — la bannière est mise en ligne immédiatement.',
     daoTitle: 'TNT WHALE CLUB (DAO)',
     daoText: 'Questions sur les audits ou $MRDT ? Écrivez à notre admin sur Telegram. 🚀',
     daoBtn: '💬 Contacter Admin',
@@ -440,6 +452,10 @@ const TRANSLATIONS = {
     pricingTitle: 'ΤΡΕΧΟΥΣΕΣ ΤΙΜΕΣ:',
     first10: '🎁 Πρώτα 10 tokens',
     free: 'ΔΩΡΕΑΝ',
+    slotsLeft: 'θέσεις απομένουν',
+    bannersLeft: 'banner απομένουν',
+    btnFreeBanner: '🎁 ΔΩΡΕΑΝ BANNER',
+    bannerFreeLeft: 'δωρεάν banner απομένουν! Συμπλήρωσε τη φόρμα — το banner ενεργοποιείται αμέσως.',
     daoTitle: 'TNT WHALE CLUB (DAO)',
     daoText: 'Ερωτήσεις για ελέγχους ή $MRDT; Γράψτε μας στο Telegram. 🚀',
     daoBtn: '💬 Επικοινωνία Admin',
@@ -538,6 +554,10 @@ const TRANSLATIONS = {
     pricingTitle: 'ТЕКУЩИЕ ТАРИФЫ:',
     first10: '🎁 Первые 10 токенов',
     free: 'БЕСПЛАТНО',
+    slotsLeft: 'слотов осталось',
+    bannersLeft: 'баннеров осталось',
+    btnFreeBanner: '🎁 ПОЛУЧИТЬ БЕСПЛАТНЫЙ БАННЕР',
+    bannerFreeLeft: 'бесплатных баннеров осталось! Заполни форму — баннер появится сразу.',
     daoTitle: 'TNT WHALE CLUB (DAO)',
     daoText: 'Вопросы об аудитах, листинге или $MRDT? Пишите нашему админу в Telegram. 🚀',
     daoBtn: '💬 Написать Админу',
@@ -636,6 +656,10 @@ const TRANSLATIONS = {
     pricingTitle: 'TARIFFE ATTUALI:',
     first10: '🎁 Primi 10 token',
     free: 'GRATIS',
+    slotsLeft: 'posti rimasti',
+    bannersLeft: 'banner rimasti',
+    btnFreeBanner: '🎁 RICHIEDI BANNER GRATIS',
+    bannerFreeLeft: 'banner gratuiti rimasti! Compila il modulo — il banner va subito online.',
     daoTitle: 'TNT WHALE CLUB (DAO)',
     daoText: 'Domande su audit, listing o $MRDT? Scrivi al nostro admin su Telegram. 🚀',
     daoBtn: "💬 Scrivi all'Admin",
@@ -734,6 +758,10 @@ const TRANSLATIONS = {
     pricingTitle: '当前价格：',
     first10: '🎁 前10个代币',
     free: '免费',
+    slotsLeft: '个名额剩余',
+    bannersLeft: '个横幅剩余',
+    btnFreeBanner: '🎁 领取免费横幅',
+    bannerFreeLeft: '个免费横幅名额剩余！填写表单 — 横幅立即上线。',
     daoTitle: 'TNT 鲸鱼俱乐部 (DAO)',
     daoText: '关于审计、上线或 $MRDT 的问题？请在Telegram联系我们的管理员。🚀',
     daoBtn: '💬 联系管理员',
@@ -941,6 +969,8 @@ async function saveTokenToSupabase(token) {
       age_days: token.ageDays != null ? token.ageDays : null,
       standard_program: token.standardProgram != null ? token.standardProgram : null,
       permanent_delegate: token.permanentDelegate || null,
+      // FIX v1.90: this is what getFreeAuditsUsedCount() actually counts.
+      is_free: token.isFree || false,
     };
 
     if (existingRows.length > 0) {
@@ -1023,6 +1053,77 @@ async function loadTokensFromSupabase() {
 // FEAT v1.76: Multiple VIP banner slots instead of a single one.
 // Each slot is a separate row in active_banner (id 1..BANNER_SLOTS).
 const BANNER_SLOTS = 3;
+
+// FIX v1.90: previously freeSlots was computed as FREE_TOTAL - (total rows
+// in listed_tokens), which counted PAID audits against the free giveaway
+// too — 7 real listings (mix of free + paid) made the counter show "3
+// left" even though only genuinely-free audits should ever decrement it.
+// Now counts only rows where is_free = true (see migration
+// add_is_free_to_listed_tokens), via an exact count from PostgREST's
+// Content-Range header so it stays accurate even past the 20-row limit
+// used elsewhere for the visible token list.
+async function getFreeAuditsUsedCount() {
+  try {
+    var res = await fetch(SUPABASE_URL + '/rest/v1/listed_tokens?select=id&is_free=eq.true', {
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: 'Bearer ' + SUPABASE_KEY,
+        Prefer: 'count=exact',
+      },
+    });
+    var contentRange = res.headers.get('content-range');
+    if (contentRange) {
+      var total = parseInt(contentRange.split('/')[1], 10);
+      if (!isNaN(total)) return total;
+    }
+    var data = res.ok ? await res.json() : [];
+    return data.length;
+  } catch (e) {
+    return 0;
+  }
+}
+
+// FEAT v1.90: active_banner can't tell us how many free banners have ever
+// been claimed — it upserts onto fixed slot rows (id 1..BANNER_SLOTS), so
+// each new banner overwrites the previous one instead of accumulating.
+// free_banner_claims is an append-only log just for this count.
+async function getFreeBannersUsedCount() {
+  try {
+    var res = await fetch(SUPABASE_URL + '/rest/v1/free_banner_claims?select=id', {
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: 'Bearer ' + SUPABASE_KEY,
+        Prefer: 'count=exact',
+      },
+    });
+    var contentRange = res.headers.get('content-range');
+    if (contentRange) {
+      var total = parseInt(contentRange.split('/')[1], 10);
+      if (!isNaN(total)) return total;
+    }
+    var data = res.ok ? await res.json() : [];
+    return data.length;
+  } catch (e) {
+    return 0;
+  }
+}
+
+async function claimFreeBanner() {
+  try {
+    await fetch(SUPABASE_URL + '/rest/v1/free_banner_claims', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: SUPABASE_KEY,
+        Authorization: 'Bearer ' + SUPABASE_KEY,
+        Prefer: 'return=minimal',
+      },
+      body: JSON.stringify({}),
+    });
+  } catch (e) {
+    console.error('Free banner claim log failed:', e);
+  }
+}
 
 async function saveBannerToSupabase(banner, slot) {
   try {
@@ -1119,6 +1220,10 @@ export default function TntHouse() {
   var [submitted, setSubmitted] = useState(false);
   var [freeSlots, setFreeSlots] = useState(10);
   var FREE_TOTAL = 10;
+  // FEAT v1.90: separate free-banner giveaway counter, independent from
+  // BANNER_SLOTS (which is concurrent display capacity, not a giveaway).
+  var [freeBanners, setFreeBanners] = useState(5);
+  var FREE_BANNER_TOTAL = 5;
   var [showPaymentModal, setShowPaymentModal] = useState(false);
   var [showWalletModal, setShowWalletModal] = useState(false);
   var [showInvoiceModal, setShowInvoiceModal] = useState(false);
@@ -1396,7 +1501,17 @@ export default function TntHouse() {
   useEffect(function () {
     loadTokensFromSupabase().then(function (data) {
       if (data.length > 0) setListedTokens(data);
-      setFreeSlots(Math.max(0, FREE_TOTAL - data.length));
+    });
+    // FIX v1.90: freeSlots now comes from an accurate is_free=true count
+    // (see getFreeAuditsUsedCount), not from the total listed_tokens row
+    // count — see that function's comment for why the old approach was
+    // wrong (it let paid audits eat into the free giveaway).
+    getFreeAuditsUsedCount().then(function (usedCount) {
+      setFreeSlots(Math.max(0, FREE_TOTAL - usedCount));
+    });
+    // FEAT v1.90: same idea for the new free-banner giveaway.
+    getFreeBannersUsedCount().then(function (usedCount) {
+      setFreeBanners(Math.max(0, FREE_BANNER_TOTAL - usedCount));
     });
   }, []);
 
@@ -1883,6 +1998,8 @@ export default function TntHouse() {
       ageDays: dexData.ageDays,
       standardProgram: auditResult.standardProgram,
       permanentDelegate: auditResult.permanentDelegate,
+      // FIX v1.90: this is the field saveTokenToSupabase reads into is_free.
+      isFree: !!isFree,
     };
 
     if (isFree) {
@@ -2111,6 +2228,18 @@ export default function TntHouse() {
     startPaymentVerification('audit', payAmount, null, tokenData, verifyMethod);
   };
 
+  // Pick the first free slot (1..BANNER_SLOTS) not currently occupied.
+  // Shared by both the free-banner bypass and the paid-payment flow below.
+  var pickFreeBannerSlot = function () {
+    var takenSlots = activeBanners.map(function (b) {
+      return b.slot;
+    });
+    for (var s = 1; s <= BANNER_SLOTS; s++) {
+      if (takenSlots.indexOf(s) === -1) return s;
+    }
+    return 1;
+  };
+
   var handleBannerSubmit = function (e) {
     e.preventDefault();
     if (!bannerFormData.tokenName || !bannerFormData.desc) {
@@ -2119,6 +2248,40 @@ export default function TntHouse() {
     }
     if (activeBanners.length >= BANNER_SLOTS) {
       setBannerError(t.btnSlotTaken + ' ' + bannerCountdown);
+      return;
+    }
+    // FEAT v1.90: free-banner giveaway bypass — same pattern as
+    // handleFormSubmit's freeSlots>0 branch for audits. Skips payment
+    // entirely and activates the banner immediately.
+    if (freeBanners > 0) {
+      setIsBannerSending(true);
+      var assignedSlot = pickFreeBannerSlot();
+      var freeBanner = {
+        slot: assignedSlot,
+        tokenName: bannerFormData.tokenName.toUpperCase(),
+        bannerImg: bannerFormData.bannerImg || '',
+        desc: bannerFormData.desc,
+        expiresAt: Date.now() + parseInt(bannerFormData.days) * 86400000,
+      };
+      saveBannerToSupabase(freeBanner, assignedSlot);
+      claimFreeBanner();
+      setActiveBanners(function (prev) {
+        return prev
+          .filter(function (b) {
+            return b.slot !== assignedSlot;
+          })
+          .concat([freeBanner]);
+      });
+      setFreeBanners(function (prev) {
+        return Math.max(0, prev - 1);
+      });
+      setBannerSubmitted(true);
+      setBannerFormData({ tokenName: '', bannerImg: '', desc: '', days: '1' });
+      showToast('🎁 Free banner is live!', 'success');
+      setIsBannerSending(false);
+      setTimeout(function () {
+        setBannerSubmitted(false);
+      }, 5000);
       return;
     }
     var mrdtAmount = getAmountForBanner(bannerFormData.days);
@@ -2245,16 +2408,7 @@ export default function TntHouse() {
     var mrdtAmount = bannerInvoiceAmount;
     var bannerUsd = bannerInvoiceUsd;
     // Pick the first free slot (1..BANNER_SLOTS) not currently occupied.
-    var takenSlots = activeBanners.map(function (b) {
-      return b.slot;
-    });
-    var assignedSlot = 1;
-    for (var s = 1; s <= BANNER_SLOTS; s++) {
-      if (takenSlots.indexOf(s) === -1) {
-        assignedSlot = s;
-        break;
-      }
-    }
+    var assignedSlot = pickFreeBannerSlot();
     var banner = {
       slot: assignedSlot,
       tokenName: bannerFormData.tokenName.toUpperCase(),
@@ -2784,13 +2938,19 @@ export default function TntHouse() {
                       className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white focus:border-purple-500 focus:outline-none font-mono"
                     >
                       <option value="basic">
-                        {t.tierBasic} — ~$10 $MRDT/SOL/USDC
+                        {t.tierBasic} — {freeSlots > 0
+                          ? t.free + ' — ' + freeSlots + ' ' + t.slotsLeft
+                          : '~$10 $MRDT/SOL/USDC'}
                       </option>
                       <option value="fast">
-                        {t.tierFast} — ~$25 $MRDT/SOL/USDC
+                        {t.tierFast} — {freeSlots > 0
+                          ? t.free + ' — ' + freeSlots + ' ' + t.slotsLeft
+                          : '~$25 $MRDT/SOL/USDC'}
                       </option>
                       <option value="vip">
-                        {t.tierVIP} — ~$75 $MRDT/SOL/USDC
+                        {t.tierVIP} — {freeSlots > 0
+                          ? t.free + ' — ' + freeSlots + ' ' + t.slotsLeft
+                          : '~$75 $MRDT/SOL/USDC'}
                       </option>
                     </select>
                   </div>
@@ -3256,7 +3416,9 @@ export default function TntHouse() {
                     </div>
                   )}
                 </div>
-                <p className="text-slate-400 text-xs mb-4">{t.bannerSub}</p>
+                <p className="text-slate-400 text-xs mb-4">
+                  {freeBanners > 0 ? '🎁 ' + freeBanners + ' ' + t.bannerFreeLeft : t.bannerSub}
+                </p>
                 <form onSubmit={handleBannerSubmit} className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
@@ -3333,9 +3495,21 @@ export default function TntHouse() {
                       }}
                       className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white focus:border-purple-500 focus:outline-none font-mono"
                     >
-                      <option value="1">{t.dur1} - ~$20 $MRDT/SOL/USDC</option>
-                      <option value="2">{t.dur2} - ~$35 $MRDT/SOL/USDC</option>
-                      <option value="6">{t.dur6} - ~$100 $MRDT/SOL/USDC</option>
+                      <option value="1">
+                        {t.dur1} - {freeBanners > 0
+                          ? t.free + ' — ' + freeBanners + ' ' + t.bannersLeft
+                          : '~$20 $MRDT/SOL/USDC'}
+                      </option>
+                      <option value="2">
+                        {t.dur2} - {freeBanners > 0
+                          ? t.free + ' — ' + freeBanners + ' ' + t.bannersLeft
+                          : '~$35 $MRDT/SOL/USDC'}
+                      </option>
+                      <option value="6">
+                        {t.dur6} - {freeBanners > 0
+                          ? t.free + ' — ' + freeBanners + ' ' + t.bannersLeft
+                          : '~$100 $MRDT/SOL/USDC'}
+                      </option>
                     </select>
                   </div>
                   <button
@@ -3348,7 +3522,9 @@ export default function TntHouse() {
                       ? t.btnSending
                       : activeBanners.length >= BANNER_SLOTS
                         ? t.btnSlotTaken
-                        : t.btnBanner}
+                        : freeBanners > 0
+                          ? t.btnFreeBanner
+                          : t.btnBanner}
                   </button>
                   {activeBanners.length >= BANNER_SLOTS && bannerCountdown && (
                     <div className="p-2.5 bg-slate-900 border border-purple-500/20 rounded text-center">
