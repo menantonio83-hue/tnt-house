@@ -130,6 +130,9 @@ const TRANSLATIONS = {
     bannerSub: 'Your token replaces the ad slot automatically.',
     fieldTokenName: 'Token name / Ticker',
     fieldUpload: 'Upload image',
+    fieldTargetLink: 'Target Link (required)',
+    btnReplaceImage: 'Replace image',
+    errInvalidLink: 'Enter a valid link (https://...)',
     fieldSlogan: 'Short ad slogan',
     fieldSloganPH: 'The fastest memecoin...',
     fieldDuration: 'Duration',
@@ -239,6 +242,9 @@ const TRANSLATIONS = {
     bannerSub: 'Tu token reemplaza el espacio publicitario automáticamente.',
     fieldTokenName: 'Nombre del token / Ticker',
     fieldUpload: 'Subir imagen',
+    fieldTargetLink: 'Enlace de destino (obligatorio)',
+    btnReplaceImage: 'Reemplazar imagen',
+    errInvalidLink: 'Introduce un enlace valido (https://...)',
     fieldSlogan: 'Eslogan publicitario',
     fieldSloganPH: 'El memecoin más rápido...',
     fieldDuration: 'Duración',
@@ -344,6 +350,9 @@ const TRANSLATIONS = {
     bannerSub: 'Votre token remplace automatiquement espace publicitaire.',
     fieldTokenName: 'Nom du token / Ticker',
     fieldUpload: 'Télécharger image',
+    fieldTargetLink: 'Lien de destination (obligatoire)',
+    btnReplaceImage: "Remplacer l'image",
+    errInvalidLink: 'Entrez un lien valide (https://...)',
     fieldSlogan: 'Slogan publicitaire',
     fieldSloganPH: 'Le memecoin le plus rapide...',
     fieldDuration: 'Durée',
@@ -449,6 +458,9 @@ const TRANSLATIONS = {
     bannerSub: 'Το token σου αντικαθιστά αυτόματα τη διαφήμιση.',
     fieldTokenName: 'Όνομα token / Ticker',
     fieldUpload: 'Ανέβασμα εικόνας',
+    fieldTargetLink: 'Σύνδεσμος προορισμού (υποχρεωτικό)',
+    btnReplaceImage: 'Αντικατάσταση εικόνας',
+    errInvalidLink: 'Εισάγετε έγκυρο σύνδεσμο (https://...)',
     fieldSlogan: 'Σύντομο σλόγκαν',
     fieldSloganPH: 'Το γρηγορότερο memecoin...',
     fieldDuration: 'Διάρκεια',
@@ -554,6 +566,9 @@ const TRANSLATIONS = {
     bannerSub: 'Твой токен автоматически заменит рекламное место.',
     fieldTokenName: 'Название / Тикер токена',
     fieldUpload: 'Загрузить изображение',
+    fieldTargetLink: 'Ссылка для перехода (обязательно)',
+    btnReplaceImage: 'Заменить фото',
+    errInvalidLink: 'Введите корректную ссылку (https://...)',
     fieldSlogan: 'Краткий рекламный слоган',
     fieldSloganPH: 'Самый быстрый мемкоин...',
     fieldDuration: 'Срок размещения',
@@ -660,6 +675,9 @@ const TRANSLATIONS = {
     bannerSub: 'Il tuo token sostituirà automaticamente lo spazio pubblicitario.',
     fieldTokenName: 'Nome / Ticker del token',
     fieldUpload: 'Carica immagine',
+    fieldTargetLink: 'Link di destinazione (obbligatorio)',
+    btnReplaceImage: 'Sostituisci immagine',
+    errInvalidLink: 'Inserisci un link valido (https://...)',
     fieldSlogan: 'Slogan pubblicitario breve',
     fieldSloganPH: 'La memecoin più veloce...',
     fieldDuration: 'Durata',
@@ -766,6 +784,9 @@ const TRANSLATIONS = {
     bannerSub: '你的代币将自动替换广告位。',
     fieldTokenName: '代币名称/代码',
     fieldUpload: '上传图片',
+    fieldTargetLink: '跳转链接（必填）',
+    btnReplaceImage: '更换图片',
+    errInvalidLink: '请输入有效链接 (https://...)',
     fieldSlogan: '简短广告语',
     fieldSloganPH: '最快的模因币...',
     fieldDuration: '时长',
@@ -1168,6 +1189,10 @@ async function saveBannerToSupabase(banner, slot) {
         token_name: banner.tokenName,
         banner_img: banner.bannerImg || '',
         description: banner.desc,
+        // FEAT v1.96: required at the form level, but default to '' here
+        // too so a stray call somewhere never violates the NOT NULL
+        // constraint.
+        target_link: banner.targetLink || '',
         expires_at: new Date(banner.expiresAt).toISOString(),
       }),
     });
@@ -1195,6 +1220,10 @@ async function loadBannersFromSupabase() {
           tokenName: row.token_name,
           bannerImg: row.banner_img || '',
           desc: row.description,
+          // FEAT v1.96: empty for banners bought before this feature
+          // existed — the click-through wrapper treats '' as "not
+          // clickable" instead of navigating to a blank URL.
+          targetLink: row.target_link || '',
           expiresAt: new Date(row.expires_at).getTime(),
         };
       })
@@ -1207,6 +1236,45 @@ async function loadBannersFromSupabase() {
 }
 
 const FALLBACK_TOKENS = [];
+
+// FEAT v1.96: shared by both the audit form's and the banner form's CA
+// lookup effects — same DexScreener call, same "pick highest-liquidity
+// Solana pair" logic, same name/symbol/imageUrl extraction. Returns null
+// if no pair exists yet (brand-new token) or DexScreener hasn't indexed a
+// name for it, so both callers can fall back to manual entry identically.
+async function lookupTokenMetadata(ca) {
+  var res = await fetch('https://api.dexscreener.com/latest/dex/tokens/' + ca);
+  var json = await res.json();
+  var solPairs = (json.pairs || []).filter(function (p) {
+    return p.chainId === 'solana';
+  });
+  if (solPairs.length === 0) return null;
+  var pair = solPairs.reduce(function (best, p) {
+    var bestLiq = best.liquidity && best.liquidity.usd ? best.liquidity.usd : 0;
+    var pLiq = p.liquidity && p.liquidity.usd ? p.liquidity.usd : 0;
+    return pLiq > bestLiq ? p : best;
+  }, solPairs[0]);
+  var name = (pair.baseToken && (pair.baseToken.name || pair.baseToken.symbol)) || '';
+  var symbol = (pair.baseToken && pair.baseToken.symbol) || name;
+  var imageUrl = (pair.info && pair.info.imageUrl) || '';
+  if (!name) return null;
+  return { name: name, symbol: symbol, imageUrl: imageUrl };
+}
+
+// FEAT v1.96: validates the VIP banner's required Target Link. Uses the
+// native URL constructor instead of a regex — it actually parses the
+// string as a URL rather than pattern-matching it, so it correctly
+// rejects plain text while accepting any real http(s) URL (Telegram, X,
+// a bare website, DexScreener/Pump.fun — anything), which is exactly what
+// type="url" alone can't reliably do inside wallet in-app browsers.
+function isValidHttpUrl(str) {
+  try {
+    var u = new URL((str || '').trim());
+    return u.protocol === 'http:' || u.protocol === 'https:';
+  } catch (e) {
+    return false;
+  }
+}
 
 export default function TntHouse() {
   var [tokens, setTokens] = useState([]);
@@ -1314,11 +1382,20 @@ export default function TntHouse() {
   var verifyIntervalRef = useRef(null);
   var [deeplinkFallbackUri, setDeeplinkFallbackUri] = useState('');
   var [bannerFormData, setBannerFormData] = useState({
+    contractAddress: '',
     tokenName: '',
     bannerImg: '',
     desc: '',
+    targetLink: '',
     days: '1',
   });
+  // FEAT v1.96: banner form's own CA-lookup state, parallel to the audit
+  // form's caLookupStatus/caLookupPreview. No manual-override flag needed
+  // here — the "Replace image" button is always visible per the chosen
+  // UX (advertisers get full control over their paid creative), and
+  // auto-fill only ever writes into an EMPTY tokenName/bannerImg (see the
+  // effect below), so a manual edit or upload is never clobbered anyway.
+  var [bannerCaLookupStatus, setBannerCaLookupStatus] = useState('idle');
   var [bannerSubmitted, setBannerSubmitted] = useState(false);
   var [bannerError, setBannerError] = useState('');
   var [isBannerSending, setIsBannerSending] = useState(false);
@@ -1601,29 +1678,10 @@ export default function TntHouse() {
     setCaLookupStatus('loading');
     var cancelled = false;
     var timer = setTimeout(function () {
-      fetch('https://api.dexscreener.com/latest/dex/tokens/' + ca)
-        .then(function (res) {
-          return res.json();
-        })
-        .then(function (json) {
+      lookupTokenMetadata(ca)
+        .then(function (result) {
           if (cancelled) return;
-          var solPairs = (json.pairs || []).filter(function (p) {
-            return p.chainId === 'solana';
-          });
-          if (solPairs.length === 0) {
-            setCaLookupStatus('notfound');
-            setCaLookupPreview(null);
-            return;
-          }
-          var pair = solPairs.reduce(function (best, p) {
-            var bestLiq = best.liquidity && best.liquidity.usd ? best.liquidity.usd : 0;
-            var pLiq = p.liquidity && p.liquidity.usd ? p.liquidity.usd : 0;
-            return pLiq > bestLiq ? p : best;
-          }, solPairs[0]);
-          var name = (pair.baseToken && (pair.baseToken.name || pair.baseToken.symbol)) || '';
-          var symbol = (pair.baseToken && pair.baseToken.symbol) || name;
-          var imageUrl = (pair.info && pair.info.imageUrl) || '';
-          if (!name) {
+          if (!result) {
             setCaLookupStatus('notfound');
             setCaLookupPreview(null);
             return;
@@ -1631,12 +1689,12 @@ export default function TntHouse() {
           if (!caManualOverride) {
             setFormData(function (prev) {
               return Object.assign({}, prev, {
-                projectName: name,
-                logoImg: imageUrl || prev.logoImg,
+                projectName: result.name,
+                logoImg: result.imageUrl || prev.logoImg,
               });
             });
           }
-          setCaLookupPreview({ name: name, symbol: symbol, imageUrl: imageUrl });
+          setCaLookupPreview(result);
           setCaLookupStatus('found');
         })
         .catch(function () {
@@ -1652,6 +1710,45 @@ export default function TntHouse() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.contractAddress]);
+
+  // FEAT v1.96: same CA-first auto-lookup, for the VIP banner form. Only
+  // fills tokenName/bannerImg when they're currently empty, so it never
+  // overwrites a name the advertiser typed or an image they uploaded.
+  useEffect(function () {
+    var ca = bannerFormData.contractAddress.trim();
+    var looksValid = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(ca);
+    if (!looksValid) {
+      setBannerCaLookupStatus('idle');
+      return;
+    }
+    setBannerCaLookupStatus('loading');
+    var cancelled = false;
+    var timer = setTimeout(function () {
+      lookupTokenMetadata(ca)
+        .then(function (result) {
+          if (cancelled) return;
+          if (!result) {
+            setBannerCaLookupStatus('notfound');
+            return;
+          }
+          setBannerFormData(function (prev) {
+            return Object.assign({}, prev, {
+              tokenName: prev.tokenName || result.name,
+              bannerImg: prev.bannerImg || result.imageUrl,
+            });
+          });
+          setBannerCaLookupStatus('found');
+        })
+        .catch(function () {
+          if (!cancelled) setBannerCaLookupStatus('notfound');
+        });
+    }, 700);
+    return function () {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bannerFormData.contractAddress]);
 
   // Load token votes + this browser's own past votes (localStorage) on mount
   useEffect(function () {
@@ -2384,6 +2481,13 @@ export default function TntHouse() {
       setBannerError('Enter token name and description.');
       return;
     }
+    // FEAT v1.96: Target Link is required — a banner with nowhere to send
+    // clicks is pointless. Validated with the real URL constructor, not a
+    // regex (see isValidHttpUrl's comment).
+    if (!isValidHttpUrl(bannerFormData.targetLink)) {
+      setBannerError(t.errInvalidLink);
+      return;
+    }
     if (activeBanners.length >= BANNER_SLOTS) {
       setBannerError(t.btnSlotTaken + ' ' + bannerCountdown);
       return;
@@ -2399,6 +2503,7 @@ export default function TntHouse() {
         tokenName: bannerFormData.tokenName.toUpperCase(),
         bannerImg: bannerFormData.bannerImg || '',
         desc: bannerFormData.desc,
+        targetLink: bannerFormData.targetLink,
         expiresAt: Date.now() + parseInt(bannerFormData.days) * 86400000,
       };
       saveBannerToSupabase(freeBanner, assignedSlot);
@@ -2414,7 +2519,14 @@ export default function TntHouse() {
         return Math.max(0, prev - 1);
       });
       setBannerSubmitted(true);
-      setBannerFormData({ tokenName: '', bannerImg: '', desc: '', days: '1' });
+      setBannerFormData({
+        contractAddress: '',
+        tokenName: '',
+        bannerImg: '',
+        desc: '',
+        targetLink: '',
+        days: '1',
+      });
       showToast('🎁 Free banner is live!', 'success');
       setIsBannerSending(false);
       setTimeout(function () {
@@ -2552,6 +2664,7 @@ export default function TntHouse() {
       tokenName: bannerFormData.tokenName.toUpperCase(),
       bannerImg: bannerFormData.bannerImg || '',
       desc: bannerFormData.desc,
+      targetLink: bannerFormData.targetLink,
       expiresAt: Date.now() + parseInt(bannerFormData.days) * 86400000,
     };
     var label = 'TNT House VIP Banner ' + bannerFormData.days + 'd';
@@ -2571,7 +2684,14 @@ export default function TntHouse() {
     openWalletInAppBrowser(payUrl, selectedBannerWallet);
     setShowBannerInvoiceModal(false);
     setIsBannerSending(true);
-    setBannerFormData({ tokenName: '', bannerImg: '', desc: '', days: '1' });
+    setBannerFormData({
+      contractAddress: '',
+      tokenName: '',
+      bannerImg: '',
+      desc: '',
+      targetLink: '',
+      days: '1',
+    });
     setSelectedBannerPaymentMethod(null);
     setSelectedBannerWallet(null);
     setBannerInvoiceAmount(0);
@@ -2810,9 +2930,28 @@ export default function TntHouse() {
             <>
               {(function () {
                 var displayedBanner = activeBanners[bannerDisplayIndex % activeBanners.length];
+                // FEAT v1.96: whole card is the click target — highest CTR
+                // on mobile per the decided UX (no small "Visit" button to
+                // miss-tap). Falls back to a plain div (not clickable) for
+                // banners bought before targetLink existed.
+                var CardTag = displayedBanner.targetLink ? 'a' : 'div';
+                var cardProps = displayedBanner.targetLink
+                  ? {
+                      href: displayedBanner.targetLink,
+                      target: '_blank',
+                      rel: 'noopener noreferrer sponsored',
+                    }
+                  : {};
                 return (
-                  <div className="relative border border-purple-500/40 rounded-2xl overflow-hidden shadow-[0_0_30px_rgba(168,85,247,0.25)] min-h-[160px]">
-                    {displayedBanner.bannerImg && displayedBanner.bannerImg.startsWith('data:') ? (
+                  <CardTag
+                    {...cardProps}
+                    className="relative border border-purple-500/40 rounded-2xl overflow-hidden shadow-[0_0_30px_rgba(168,85,247,0.25)] min-h-[160px] block"
+                  >
+                    {/* FIX v1.96: this used to only show images that were
+                        base64 data: URIs (manual uploads) — DexScreener-
+                        fetched logos are plain https:// URLs and were
+                        silently skipped. Now shows any non-empty image. */}
+                    {displayedBanner.bannerImg ? (
                       <div className="absolute inset-0">
                         <img
                           src={displayedBanner.bannerImg}
@@ -2858,7 +2997,7 @@ export default function TntHouse() {
                         </p>
                       )}
                     </div>
-                  </div>
+                  </CardTag>
                 );
               })()}
               <div className="grid grid-cols-3 gap-2 mt-2">
@@ -3616,128 +3755,219 @@ export default function TntHouse() {
                   {freeBanners > 0 ? '🎁 ' + freeBanners + ' ' + t.bannerFreeLeft : t.bannerSub}
                 </p>
                 <form onSubmit={handleBannerSubmit} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  {/* FEAT v1.96: CA-first, same principle as the audit
+                      form — only this field shows until a lookup
+                      completes. */}
+                  <div>
+                    <label className="block text-purple-400 text-[11px] font-bold mb-1">
+                      {t.fieldCA}
+                    </label>
+                    <input
+                      type="text"
+                      placeholder={t.fieldCAPH}
+                      value={bannerFormData.contractAddress}
+                      onChange={function (e) {
+                        setBannerFormData(
+                          Object.assign({}, bannerFormData, {
+                            contractAddress: e.target.value,
+                          }),
+                        );
+                      }}
+                      className="w-full bg-slate-950 border-2 border-purple-500/40 rounded px-3 py-3 text-sm text-white placeholder-slate-500 focus:border-emerald-400 focus:outline-none font-mono shadow-[0_0_15px_rgba(153,69,255,0.15)] transition-colors"
+                    />
+                    {bannerCaLookupStatus === 'loading' && (
+                      <p className="text-purple-300 text-[10px] mt-1.5 flex items-center gap-1.5">
+                        <RefreshCw className="w-2.5 h-2.5 animate-spin" /> {t.caChecking}
+                      </p>
+                    )}
+                    {bannerCaLookupStatus === 'found' && (
+                      <p className="text-emerald-400 text-[10px] mt-1.5 flex items-center gap-1.5">
+                        {bannerFormData.bannerImg && (
+                          <img
+                            src={bannerFormData.bannerImg}
+                            alt=""
+                            className="w-4 h-4 rounded-full object-cover"
+                          />
+                        )}
+                        ✓ {t.caFoundPrefix} {bannerFormData.tokenName}
+                      </p>
+                    )}
+                  </div>
+
+                  <div
+                    className={
+                      'space-y-4 overflow-hidden transition-all duration-500 ease-out ' +
+                      (bannerCaLookupStatus === 'idle' || bannerCaLookupStatus === 'loading'
+                        ? 'max-h-0 opacity-0'
+                        : 'max-h-[1200px] opacity-100')
+                    }
+                  >
+                    {bannerCaLookupStatus === 'notfound' && (
+                      <p className="text-yellow-400 text-[11px] bg-yellow-500/10 border border-yellow-500/30 rounded px-3 py-2">
+                        {t.caFreshWarning}
+                      </p>
+                    )}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-purple-400 text-[11px] font-bold mb-1">
+                          {t.fieldTokenName}
+                        </label>
+                        <input
+                          type="text"
+                          value={bannerFormData.tokenName}
+                          onChange={function (e) {
+                            setBannerFormData(
+                              Object.assign({}, bannerFormData, { tokenName: e.target.value }),
+                            );
+                          }}
+                          placeholder="SOLANA"
+                          className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-purple-400 text-[11px] font-bold mb-1">
+                          {t.fieldUpload}
+                        </label>
+                        {/* FEAT v1.96: preview + "Replace image" always
+                            visible (chosen UX: full creative control for
+                            a paid placement) — a hidden real file input
+                            behind a styled label, so the button reads
+                            "Replace image" instead of the browser's
+                            default file-picker text. */}
+                        <div className="flex items-center gap-2">
+                          {bannerFormData.bannerImg && (
+                            <img
+                              src={bannerFormData.bannerImg}
+                              alt=""
+                              className="w-9 h-9 rounded-full object-cover border border-purple-500/30 flex-shrink-0"
+                            />
+                          )}
+                          <label
+                            htmlFor="bannerImgUpload"
+                            className="flex-1 text-center cursor-pointer bg-gradient-to-r from-purple-500 to-emerald-400 hover:from-purple-400 hover:to-emerald-300 text-slate-950 font-bold text-[11px] py-2 rounded transition"
+                          >
+                            {bannerFormData.bannerImg ? t.btnReplaceImage : t.fieldUpload}
+                          </label>
+                          <input
+                            id="bannerImgUpload"
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={function (e) {
+                              var f = e.target.files && e.target.files[0];
+                              if (f) {
+                                processImageFile(
+                                  f,
+                                  1200, // banners are wide, allow a larger max dimension
+                                  function (dataUrl) {
+                                    setBannerFormData(
+                                      Object.assign({}, bannerFormData, { bannerImg: dataUrl }),
+                                    );
+                                  },
+                                  function (errorMsg) {
+                                    alert(errorMsg);
+                                    e.target.value = '';
+                                  },
+                                );
+                              }
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
                     <div>
                       <label className="block text-purple-400 text-[11px] font-bold mb-1">
-                        {t.fieldTokenName}
+                        {t.fieldSlogan}
                       </label>
                       <input
                         type="text"
-                        value={bannerFormData.tokenName}
+                        value={bannerFormData.desc}
                         onChange={function (e) {
                           setBannerFormData(
-                            Object.assign({}, bannerFormData, { tokenName: e.target.value }),
+                            Object.assign({}, bannerFormData, { desc: e.target.value }),
                           );
                         }}
-                        placeholder="SOLANA"
+                        placeholder={t.fieldSloganPH}
                         className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none"
                       />
                     </div>
                     <div>
                       <label className="block text-purple-400 text-[11px] font-bold mb-1">
-                        {t.fieldUpload}
+                        {t.fieldTargetLink}
                       </label>
                       <input
-                        type="file"
-                        accept="image/*"
+                        type="url"
+                        value={bannerFormData.targetLink}
                         onChange={function (e) {
-                          var f = e.target.files && e.target.files[0];
-                          if (f) {
-                            processImageFile(
-                              f,
-                              1200, // banners are wide, allow a larger max dimension
-                              function (dataUrl) {
-                                setBannerFormData(
-                                  Object.assign({}, bannerFormData, { bannerImg: dataUrl }),
-                                );
-                              },
-                              function (errorMsg) {
-                                alert(errorMsg);
-                                e.target.value = '';
-                              },
-                            );
-                          }
+                          setBannerFormData(
+                            Object.assign({}, bannerFormData, { targetLink: e.target.value }),
+                          );
                         }}
-                        className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-bold file:bg-gradient-to-r file:from-purple-500 file:to-emerald-400 file:text-slate-950 hover:file:from-purple-400 hover:file:to-emerald-300"
+                        placeholder="https://t.me/yourproject"
+                        className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none font-mono"
                       />
                     </div>
-                  </div>
-                  <div>
-                    <label className="block text-purple-400 text-[11px] font-bold mb-1">
-                      {t.fieldSlogan}
-                    </label>
-                    <input
-                      type="text"
-                      value={bannerFormData.desc}
-                      onChange={function (e) {
-                        setBannerFormData(
-                          Object.assign({}, bannerFormData, { desc: e.target.value }),
-                        );
-                      }}
-                      placeholder={t.fieldSloganPH}
-                      className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-purple-400 text-[11px] font-bold mb-1">
-                      {t.fieldDuration}
-                    </label>
-                    <select
-                      value={bannerFormData.days}
-                      onChange={function (e) {
-                        setBannerFormData(
-                          Object.assign({}, bannerFormData, { days: e.target.value }),
-                        );
-                      }}
-                      className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white focus:border-purple-500 focus:outline-none font-mono"
+                    <div>
+                      <label className="block text-purple-400 text-[11px] font-bold mb-1">
+                        {t.fieldDuration}
+                      </label>
+                      <select
+                        value={bannerFormData.days}
+                        onChange={function (e) {
+                          setBannerFormData(
+                            Object.assign({}, bannerFormData, { days: e.target.value }),
+                          );
+                        }}
+                        className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white focus:border-purple-500 focus:outline-none font-mono"
+                      >
+                        <option value="1">
+                          {t.dur1} - {freeBanners > 0
+                            ? t.free + ' — ' + freeBanners + ' ' + t.bannersLeft
+                            : '~$20 $MRDT/SOL/USDC'}
+                        </option>
+                        <option value="2">
+                          {t.dur2} - {freeBanners > 0
+                            ? t.free + ' — ' + freeBanners + ' ' + t.bannersLeft
+                            : '~$35 $MRDT/SOL/USDC'}
+                        </option>
+                        <option value="6">
+                          {t.dur6} - {freeBanners > 0
+                            ? t.free + ' — ' + freeBanners + ' ' + t.bannersLeft
+                            : '~$100 $MRDT/SOL/USDC'}
+                        </option>
+                      </select>
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={isBannerSending || activeBanners.length >= BANNER_SLOTS}
+                      className="w-full bg-gradient-to-r from-emerald-400 to-purple-500 hover:from-emerald-300 hover:to-purple-400 text-slate-950 font-black py-2.5 rounded text-xs transition flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <option value="1">
-                        {t.dur1} - {freeBanners > 0
-                          ? t.free + ' — ' + freeBanners + ' ' + t.bannersLeft
-                          : '~$20 $MRDT/SOL/USDC'}
-                      </option>
-                      <option value="2">
-                        {t.dur2} - {freeBanners > 0
-                          ? t.free + ' — ' + freeBanners + ' ' + t.bannersLeft
-                          : '~$35 $MRDT/SOL/USDC'}
-                      </option>
-                      <option value="6">
-                        {t.dur6} - {freeBanners > 0
-                          ? t.free + ' — ' + freeBanners + ' ' + t.bannersLeft
-                          : '~$100 $MRDT/SOL/USDC'}
-                      </option>
-                    </select>
+                      <Zap className="w-3.5 h-3.5" />
+                      {isBannerSending
+                        ? t.btnSending
+                        : activeBanners.length >= BANNER_SLOTS
+                          ? t.btnSlotTaken
+                          : freeBanners > 0
+                            ? t.btnFreeBanner
+                            : t.btnBanner}
+                    </button>
+                    {activeBanners.length >= BANNER_SLOTS && bannerCountdown && (
+                      <div className="p-2.5 bg-slate-900 border border-purple-500/20 rounded text-center">
+                        <p className="text-slate-400 text-[11px]">{t.slotAvailIn}</p>
+                        <p className="text-purple-400 font-black text-sm mt-0.5">{bannerCountdown}</p>
+                      </div>
+                    )}
+                    {bannerSubmitted && (
+                      <div className="p-3 bg-emerald-950/40 border border-emerald-500/30 rounded text-emerald-300 text-xs text-center font-bold">
+                        Banner activated!
+                      </div>
+                    )}
+                    {bannerError && (
+                      <div className="p-3 bg-red-950/40 border border-red-500/30 rounded text-red-300 text-xs">
+                        {bannerError}
+                      </div>
+                    )}
                   </div>
-                  <button
-                    type="submit"
-                    disabled={isBannerSending || activeBanners.length >= BANNER_SLOTS}
-                    className="w-full bg-gradient-to-r from-emerald-400 to-purple-500 hover:from-emerald-300 hover:to-purple-400 text-slate-950 font-black py-2.5 rounded text-xs transition flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Zap className="w-3.5 h-3.5" />
-                    {isBannerSending
-                      ? t.btnSending
-                      : activeBanners.length >= BANNER_SLOTS
-                        ? t.btnSlotTaken
-                        : freeBanners > 0
-                          ? t.btnFreeBanner
-                          : t.btnBanner}
-                  </button>
-                  {activeBanners.length >= BANNER_SLOTS && bannerCountdown && (
-                    <div className="p-2.5 bg-slate-900 border border-purple-500/20 rounded text-center">
-                      <p className="text-slate-400 text-[11px]">{t.slotAvailIn}</p>
-                      <p className="text-purple-400 font-black text-sm mt-0.5">{bannerCountdown}</p>
-                    </div>
-                  )}
-                  {bannerSubmitted && (
-                    <div className="p-3 bg-emerald-950/40 border border-emerald-500/30 rounded text-emerald-300 text-xs text-center font-bold">
-                      Banner activated!
-                    </div>
-                  )}
-                  {bannerError && (
-                    <div className="p-3 bg-red-950/40 border border-red-500/30 rounded text-red-300 text-xs">
-                      {bannerError}
-                    </div>
-                  )}
                 </form>
               </div>
             {/* Pricing panel */}
