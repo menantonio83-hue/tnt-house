@@ -1,7 +1,14 @@
 'use client';
 
 // app/pay/page.js
-// Version 1.3
+// Version 1.4
+//
+// FIX v1.4: previously this page ONLY ever looked at window.phantom?.solana,
+// so no matter which wallet the user picked on the main page (Phantom or
+// Solflare), landing here after the Solflare redirect still failed/fell
+// back to Phantom's flow. Now reads a `wallet` query param (set by
+// app/page.js's handleConfirmPayment / handleBannerConfirmPayment) and
+// picks window.solflare vs window.phantom.solana accordingly.
 //
 // WHY THIS PAGE EXISTS: both Solana Pay URI approaches failed in production
 // (17 days of testing across SOL/MRDT/USDC):
@@ -61,6 +68,9 @@ function PayInner() {
   const amount = parseFloat(searchParams.get('amount') || '0');
   const method = (searchParams.get('method') || 'SOL').toUpperCase(); // SOL | MRDT | USDC
   const label = searchParams.get('label') || 'TNT House Payment';
+  // FIX v1.4: which wallet the user picked on the main page — defaults to
+  // Phantom for old links that don't have this param yet.
+  const wallet = searchParams.get('wallet') || 'Phantom';
 
   // idle -> connecting -> building -> signing -> sent | error
   const [status, setStatus] = useState('idle');
@@ -86,12 +96,25 @@ function PayInner() {
     try {
       setStatus('connecting');
       logStage('connecting');
-      const provider = typeof window !== 'undefined' ? window.phantom?.solana : null;
+      // FIX v1.4: pick the provider based on which wallet the user chose,
+      // instead of always requiring window.phantom.solana.
+      const isSolflare = wallet === 'Solflare';
+      const provider = typeof window === 'undefined'
+        ? null
+        : isSolflare
+          ? window.solflare
+          : window.phantom?.solana;
 
-      if (!provider || !provider.isPhantom) {
-        setErrorMsg('This page needs to be opened inside the Phantom app browser.');
+      const providerOk = isSolflare
+        ? provider && provider.isSolflare
+        : provider && provider.isPhantom;
+
+      if (!providerOk) {
+        setErrorMsg(
+          'This page needs to be opened inside the ' + wallet + ' app browser.',
+        );
         setStatus('error');
-        logStage('error', { reason: 'no_phantom_provider' });
+        logStage('error', { reason: 'no_' + wallet.toLowerCase() + '_provider' });
         return;
       }
 

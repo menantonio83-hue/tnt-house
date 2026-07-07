@@ -1930,9 +1930,18 @@ export default function TntHouse() {
   // blocked). The original tab's startPaymentVerification() polling loop
   // keeps running unchanged and will pick up the payment once it confirms
   // on-chain, regardless of which browser tab actually sent it.
-  var openPhantomInAppBrowser = function (payUrl) {
-    var universalLink = 'https://phantom.app/ul/browse/' + encodeURIComponent(payUrl);
-    window.location.href = universalLink;
+  // FIX v1.18: this was hardcoded to Phantom's universal link regardless of
+  // which wallet the user actually picked in handleWalletSelect /
+  // handleBannerWalletSelect — selectedWallet/selectedBannerWallet were set
+  // in state but never read here, so choosing "Solflare" still opened
+  // Phantom. Now takes the wallet name and branches the universal link.
+  var openWalletInAppBrowser = function (payUrl, wallet) {
+    var encoded = encodeURIComponent(payUrl);
+    if (wallet === 'Solflare') {
+      window.location.href = 'https://solflare.com/ul/v1/browse/' + encoded;
+    } else {
+      window.location.href = 'https://phantom.app/ul/browse/' + encoded;
+    }
   };
 
   var openDeeplink = function (uri, amountStr) {
@@ -2056,12 +2065,16 @@ export default function TntHouse() {
     // going back to this approach since it's strictly better UX than
     // v1.5/v1.7's Transaction Request (which always shows the Blowfish
     // "malicious dApp" warning).
+    // FIX v1.18: pass the chosen wallet through to /pay so it can pick the
+    // right injected provider (window.phantom.solana vs window.solflare)
+    // instead of always assuming Phantom.
     var payUrl =
       window.location.origin +
       '/pay?amount=' + encodeURIComponent(payAmount) +
       '&method=' + encodeURIComponent(verifyMethod) +
-      '&label=' + encodeURIComponent(label);
-    openPhantomInAppBrowser(payUrl);
+      '&label=' + encodeURIComponent(label) +
+      '&wallet=' + encodeURIComponent(selectedWallet || 'Phantom');
+    openWalletInAppBrowser(payUrl, selectedWallet);
     setShowInvoiceModal(false);
     setIsSending(true);
     var tokenData = await runAuditAndSave(ca, projectName, false, logoImg);
@@ -2237,12 +2250,15 @@ export default function TntHouse() {
     var payAmount = isSol ? getSOLAmountForUsd(bannerUsd) : isUsdc ? bannerUsd : mrdtAmount;
     var verifyMethod = isSol ? 'SOL' : isUsdc ? 'USDC' : 'MRDT';
     // FIX v1.8: RESTORE v1.6 — see handleConfirmPayment's v1.8 comment.
+    // FIX v1.18: pass selectedBannerWallet through so /pay uses the right
+    // provider — same fix as handleConfirmPayment above.
     var payUrl =
       window.location.origin +
       '/pay?amount=' + encodeURIComponent(payAmount) +
       '&method=' + encodeURIComponent(verifyMethod) +
-      '&label=' + encodeURIComponent(label);
-    openPhantomInAppBrowser(payUrl);
+      '&label=' + encodeURIComponent(label) +
+      '&wallet=' + encodeURIComponent(selectedBannerWallet || 'Phantom');
+    openWalletInAppBrowser(payUrl, selectedBannerWallet);
     setShowBannerInvoiceModal(false);
     setIsBannerSending(true);
     setBannerFormData({ tokenName: '', bannerImg: '', desc: '', days: '1' });
@@ -2401,7 +2417,7 @@ export default function TntHouse() {
                     TOKENS
                   </span>
                   <span className="text-[6px] sm:text-[7px] text-cyan-400 font-bold tracking-widest mt-0.5 leading-tight">
-                    v0.1.2
+                    v1.18
                   </span>
                 </div>
               </a>
@@ -3425,7 +3441,7 @@ export default function TntHouse() {
             </div>
             <div className="text-center space-y-1">
               <div className="text-purple-400 font-bold text-sm tracking-widest">
-                TNT HOUSE v0.1.2
+                TNT HOUSE v1.18
               </div>
               <div className="text-slate-400 text-xs">Powered by $MRDT · AI Audits · Supabase</div>
               <div className="text-slate-500 text-[10px]">
