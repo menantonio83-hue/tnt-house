@@ -1209,6 +1209,36 @@ export default function TntHouse() {
   var [toast, setToast] = useState({ show: false, message: '', type: 'success' });
   var [lang, setLang] = useState('en');
   var t = TRANSLATIONS[lang] || TRANSLATIONS.en;
+
+  // FEAT v1.94: auto-detect the visitor's browser language on first visit
+  // instead of always defaulting to English. A manual pick (via the flag
+  // switcher below) is remembered in localStorage and always wins on
+  // future visits — this only runs the guess when nothing is stored yet.
+  useEffect(function () {
+    try {
+      var saved = localStorage.getItem('tnt_lang');
+      if (saved && TRANSLATIONS[saved]) {
+        setLang(saved);
+        return;
+      }
+      var browserLang = (navigator.language || navigator.userLanguage || 'en')
+        .toLowerCase()
+        .split('-')[0]; // 'ru-RU' -> 'ru', 'zh-CN' -> 'zh'
+      if (TRANSLATIONS[browserLang]) {
+        setLang(browserLang);
+      }
+    } catch (e) {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Persist manual language picks so they stick on the next visit and
+  // override the auto-detect above.
+  var handleSetLang = function (l) {
+    setLang(l);
+    try {
+      localStorage.setItem('tnt_lang', l);
+    } catch (e) {}
+  };
   var [formData, setFormData] = useState({
     projectName: '',
     contractAddress: '',
@@ -2616,7 +2646,7 @@ export default function TntHouse() {
                       <button
                         key={l}
                         onClick={function () {
-                          setLang(l);
+                          handleSetLang(l);
                         }}
                         title={TRANSLATIONS[l].name}
                         className={
