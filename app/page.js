@@ -3402,7 +3402,14 @@ export default function TntHouse() {
               <div id="bannerFormSection" className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 p-6 backdrop-blur-md">
                 <div className="flex items-start justify-between mb-2">
                   <h3 className="text-lg font-black text-purple-400">{t.bannerTitle}</h3>
-                  {BANNER_SLOTS - activeBanners.length > 0 ? (
+                  {freeBanners > 0 ? (
+                    <div className="bg-emerald-500/20 border border-emerald-500/40 rounded-lg px-2 py-1 text-center">
+                      <div className="text-emerald-400 font-black text-sm">
+                        {freeBanners}/{FREE_BANNER_TOTAL}
+                      </div>
+                      <div className="text-[9px] text-emerald-500">free</div>
+                    </div>
+                  ) : BANNER_SLOTS - activeBanners.length > 0 ? (
                     <div className="bg-emerald-500/20 border border-emerald-500/40 rounded-lg px-2 py-1 text-center">
                       <div className="text-emerald-400 font-black text-sm">
                         {BANNER_SLOTS - activeBanners.length}/{BANNER_SLOTS}
