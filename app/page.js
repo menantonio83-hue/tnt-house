@@ -1935,10 +1935,28 @@ export default function TntHouse() {
   // handleBannerWalletSelect — selectedWallet/selectedBannerWallet were set
   // in state but never read here, so choosing "Solflare" still opened
   // Phantom. Now takes the wallet name and branches the universal link.
+  //
+  // FIX v1.19: the Solflare branch above only used the bare
+  // https://solflare.com/ul/v1/browse/ link with no `ref` param and no
+  // native `solflare://` scheme attempt first — real-device testing showed
+  // this just opens the Solflare app to its normal wallet/portfolio screen
+  // instead of navigating into its in-app browser at all (confirmed via
+  // screenshot: Phantom shows the real transaction confirmation sheet,
+  // Solflare shows $0.00 home screen). Solflare needs BOTH the native
+  // `solflare://v1/browse/` scheme (tried first, works if the app is
+  // already running / handles the intent) AND the `?ref=` query param on
+  // the https fallback — this matches the pattern already proven to work
+  // elsewhere in this codebase for the initial (pre-payment) wallet
+  // redirect. Phantom's simpler bare-https link is left untouched since
+  // that one is already confirmed working (see screenshot).
   var openWalletInAppBrowser = function (payUrl, wallet) {
     var encoded = encodeURIComponent(payUrl);
+    var ref = encodeURIComponent(SITE_URL);
     if (wallet === 'Solflare') {
-      window.location.href = 'https://solflare.com/ul/v1/browse/' + encoded;
+      window.location.href = 'solflare://v1/browse/' + encoded;
+      setTimeout(function () {
+        window.location.href = 'https://solflare.com/ul/v1/browse/' + encoded + '?ref=' + ref;
+      }, 500);
     } else {
       window.location.href = 'https://phantom.app/ul/browse/' + encoded;
     }
