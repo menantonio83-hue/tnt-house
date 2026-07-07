@@ -179,7 +179,7 @@ const TRANSLATIONS = {
     close: 'Close',
     slotAvailable: 'SLOT AVAILABLE',
     slotAvailClick: 'Click to buy VIP banner!',
-    vipBoostFrom: 'VIP Boost from $20/day',
+    vipBoostFrom: 'First 5 orders free',
     payInMrdt: 'Payment in $MRDT / SOL / USDC',
     buyOnJupiter: 'BUY ON JUPITER',
     safetyScore: 'Safety Score',
@@ -280,7 +280,7 @@ const TRANSLATIONS = {
     close: 'Cerrar',
     slotAvailable: 'LUGAR DISPONIBLE',
     slotAvailClick: '¡Haz clic para comprar banner VIP!',
-    vipBoostFrom: 'VIP Boost desde $20/día',
+    vipBoostFrom: 'Los primeros 5 pedidos son gratis',
     payInMrdt: 'Pago en $MRDT / SOL / USDC',
     buyOnJupiter: 'COMPRAR EN JUPITER',
     safetyScore: 'Puntuación de Seguridad',
@@ -381,7 +381,7 @@ const TRANSLATIONS = {
     close: 'Fermer',
     slotAvailable: 'EMPLACEMENT DISPONIBLE',
     slotAvailClick: 'Cliquez pour acheter la bannière VIP!',
-    vipBoostFrom: 'VIP Boost à partir de $20/jour',
+    vipBoostFrom: 'Les 5 premières commandes sont gratuites',
     payInMrdt: 'Paiement en $MRDT / SOL / USDC',
     buyOnJupiter: 'ACHETER SUR JUPITER',
     safetyScore: 'Score de Sécurité',
@@ -482,7 +482,7 @@ const TRANSLATIONS = {
     close: 'Κλείσιμο',
     slotAvailable: 'ΘΕΣΗ ΔΙΑΘΕΣΙΜΗ',
     slotAvailClick: 'Κλικ για αγορά VIP banner!',
-    vipBoostFrom: 'VIP Boost από $20/ημέρα',
+    vipBoostFrom: 'Οι πρώτες 5 παραγγελίες δωρεάν',
     payInMrdt: 'Πληρωμή σε $MRDT / SOL / USDC',
     buyOnJupiter: 'ΑΓΟΡΑ ΣΤΟ JUPITER',
     safetyScore: 'Βαθμολογία Ασφαλείας',
@@ -584,7 +584,7 @@ const TRANSLATIONS = {
     close: 'Закрыть',
     slotAvailable: 'МЕСТО СВОБОДНО',
     slotAvailClick: 'Нажмите, чтобы купить VIP-баннер!',
-    vipBoostFrom: 'VIP-Буст от $20/день',
+    vipBoostFrom: 'Первые 5 заказов бесплатные',
     payInMrdt: 'Оплата в $MRDT / SOL / USDC',
     buyOnJupiter: 'КУПИТЬ НА JUPITER',
     safetyScore: 'Оценка безопасности',
@@ -686,7 +686,7 @@ const TRANSLATIONS = {
     close: 'Chiudi',
     slotAvailable: 'POSTO LIBERO',
     slotAvailClick: 'Clicca per acquistare il banner VIP!',
-    vipBoostFrom: 'VIP Boost da $20/giorno',
+    vipBoostFrom: 'I primi 5 ordini sono gratuiti',
     payInMrdt: 'Pagamento in $MRDT / SOL / USDC',
     buyOnJupiter: 'COMPRA SU JUPITER',
     safetyScore: 'Punteggio di sicurezza',
@@ -788,7 +788,7 @@ const TRANSLATIONS = {
     close: '关闭',
     slotAvailable: '名额空闲',
     slotAvailClick: '点击购买VIP横幅！',
-    vipBoostFrom: 'VIP加速起价 $20/天',
+    vipBoostFrom: '前5个订单免费',
     payInMrdt: '支付方式 $MRDT / SOL / USDC',
     buyOnJupiter: '在JUPITER购买',
     safetyScore: '安全评分',
@@ -1419,9 +1419,13 @@ export default function TntHouse() {
     return '$' + (typeof num === 'number' ? num.toFixed(0) : '0');
   };
 
+  // FIX v1.93: this pointed at 'orderFormsSection', an id that doesn't
+  // exist anywhere in the page anymore — the homepage promo banner's
+  // onClick silently found nothing and did nothing. Point it at the real
+  // audit form (same target scrollToAuditForm already uses correctly).
   var scrollToForm = function () {
-    var el = document.getElementById('orderFormsSection');
-    if (el) el.scrollIntoView({ behavior: 'smooth' });
+    var el = document.getElementById('auditFormSection');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
 
   // NEW: scroll straight to the audit form specifically (used by the
