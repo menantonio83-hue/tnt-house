@@ -1,7 +1,21 @@
 'use client';
 
 // app/pay/page.js
-// Version 1.4
+// Version 1.5
+//
+// FIX v1.5: two Solflare-specific bugs found via real-device testing:
+// 1. CRASH: after provider.connect(), code read resp.publicKey directly.
+//    Phantom always returns { publicKey } from connect(), but Solflare's
+//    connect() can resolve without publicKey on the response — the real
+//    connected key lives on provider.publicKey instead. Reading
+//    resp.publicKey.toString() then threw "Cannot read properties of
+//    undefined (reading 'toString')" before the wallet even got a chance
+//    to show its approval prompt. Now falls back to provider.publicKey
+//    and throws a clear error only if BOTH are missing.
+// 2. TEXT: status messages ("Connecting to Phantom...", "Confirm the
+//    payment in Phantom...") were hardcoded regardless of which wallet
+//    was actually in use — Solflare users saw "Phantom" the whole time.
+//    Now interpolates the `wallet` param into both messages.
 //
 // FIX v1.4: previously this page ONLY ever looked at window.phantom?.solana,
 // so no matter which wallet the user picked on the main page (Phantom or
@@ -21,17 +35,16 @@
 //   integration hard-blocks it as a "potentially malicious dApp" — the
 //   domain-review appeal (#11857) was rejected.
 //
-// THIS APPROACH: open this page INSIDE Phantom's own in-app browser via the
-// `https://phantom.app/ul/browse/{url}` universal link. Once loaded there,
-// `window.phantom.solana` is injected directly (no deeplink query-string
-// parsing involved at all). We build the transaction on the client with
-// @solana/web3.js / @solana/spl-token — same exact amount, decimals read
-// live from the mint — and call `signAndSendTransaction`. Phantom shows its
-// real, standard confirm screen with the correct amount, because the amount
-// lives inside the transaction itself, not a URL param. This is the same
-// pattern used by Jupiter, Magic Eden, etc., so it does not trigger the
-// "fetches and blind-signs a server-built tx" pattern that got Approach B
-// blocked.
+// THIS APPROACH: open this page INSIDE the wallet's own in-app browser via
+// its universal link. Once loaded there, the provider is injected directly
+// (no deeplink query-string parsing involved at all). We build the
+// transaction on the client with @solana/web3.js / @solana/spl-token — same
+// exact amount, decimals read live from the mint — and call
+// `signAndSendTransaction`. The wallet shows its real, standard confirm
+// screen with the correct amount, because the amount lives inside the
+// transaction itself, not a URL param. This is the same pattern used by
+// Jupiter, Magic Eden, etc., so it does not trigger the "fetches and
+// blind-signs a server-built tx" pattern that got Approach B blocked.
 //
 // The original tab that opened this page keeps running its own
 // startPaymentVerification() polling loop (unchanged) — that loop checks
@@ -79,7 +92,7 @@ function PayInner() {
 
   // FIX v1.3: log every stage transition to /api/pay-log. Vercel's free
   // Web Analytics doesn't support custom events, so this is the only way
-  // to see WHERE a visitor drops off (no Phantom, rejected connect, RPC
+  // to see WHERE a visitor drops off (no wallet, rejected connect, RPC
   // failure building the tx, rejected sign, etc.) instead of just seeing
   // "2 visits, 0 orders" with no further detail.
   const logStage = function (stage, extra) {
@@ -87,7 +100,7 @@ function PayInner() {
       fetch('/api/pay-log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ stage, amount, method, label, ...extra }),
+        body: JSON.stringify({ stage, amount, method, label, wallet, ...extra }),
       }).catch(function () {});
     } catch (e) {}
   };
@@ -119,7 +132,20 @@ function PayInner() {
       }
 
       const resp = await provider.connect();
-      const payer = resp.publicKey;
+
+      // FIX v1.5: Phantom always returns { publicKey } from connect(), but
+      // Solflare can resolve connect() without publicKey on the response —
+      // the actual connected key lives on provider.publicKey instead.
+      // Fall back to that, and normalize through `new PublicKey(...)` so
+      // both wallets hand us the same shape regardless of what they
+      // returned (string, PublicKey instance, etc.).
+      const rawPubkey = resp?.publicKey || provider.publicKey;
+      if (!rawPubkey) {
+        throw new Error(
+          wallet + ' connected but did not return a public key. Try again.',
+        );
+      }
+      const payer = new PublicKey(rawPubkey.toString());
       logStage('connected', { payer: payer.toString() });
 
       setStatus('building');
@@ -203,10 +229,12 @@ function PayInner() {
         </div>
 
         {status === 'idle' && <div className="text-slate-400">Preparing...</div>}
-        {status === 'connecting' && <div className="text-purple-300">🔗 Connecting to Phantom...</div>}
+        {status === 'connecting' && (
+          <div className="text-purple-300">🔗 Connecting to {wallet}...</div>
+        )}
         {status === 'building' && <div className="text-purple-300">⚙️ Building transaction...</div>}
         {status === 'signing' && (
-          <div className="text-purple-300">✍️ Confirm the payment in Phantom...</div>
+          <div className="text-purple-300">✍️ Confirm the payment in {wallet}...</div>
         )}
         {status === 'sent' && (
           <div>
