@@ -3507,8 +3507,15 @@ export default function TntHouse() {
                               ✓ AUDITED
                             </span>
                           </div>
-                          <span className="text-[7px] text-slate-500 block truncate max-w-[80px]">
+                          <span className="text-[8.5px] text-slate-300 font-semibold block truncate max-w-[110px]">
                             {token.name}
+                          </span>
+                          {/* FEAT v1.101: show the CA (truncated) — with two
+                              different tokens sharing the same $TICKER and a
+                              heavily-truncated name at this font size, the CA
+                              was the only real way to tell them apart. */}
+                          <span className="text-[6.5px] text-slate-600 font-mono block truncate max-w-[110px]">
+                            {token.ca ? token.ca.slice(0, 4) + '...' + token.ca.slice(-4) : ''}
                           </span>
                         </td>
                         <td className="p-1 font-mono text-slate-300 text-[9px]">${token.price}</td>
