@@ -2256,8 +2256,44 @@ export default function TntHouse() {
     };
 
     if (isFree) {
-      saveTokenToSupabase(tokenData);
+      // FIX v1.100: await this so the row definitely exists in Supabase
+      // before the cluster-check call below queries it by ca (that
+      // endpoint SELECTs the existing row and does nothing if it can't
+      // find one).
+      await saveTokenToSupabase(tokenData);
       postAuditToTelegram(tokenData);
+
+      // FEAT v1.102: this used to require a second, separate manual
+      // button press ("Check Insider Clusters") inside the Blueprint
+      // modal after the fact. Folding it into the main audit flow means
+      // one CA submission produces one complete, final result — no
+      // second click needed. This check is genuinely slow (walks each
+      // top holder's signature history over RPC), so the wait is real,
+      // but that's the trade-off Бро asked for: one longer wait instead
+      // of two separate steps.
+      setLogs(function (prev) {
+        return prev
+          .slice(-12)
+          .concat(['[AUDIT] Checking insider clusters (top holders)...']);
+      });
+      try {
+        var inlineClusterRes = await fetch('/api/cluster-check?ca=' + ca);
+        var inlineClusterData = await inlineClusterRes.json();
+        if (
+          !inlineClusterData.error &&
+          inlineClusterData.clusterCount > 0 &&
+          tokenData.score > 39
+        ) {
+          // The API route already persisted this same cap to Supabase —
+          // mirror it into the in-memory object so the success modal and
+          // the table's local state show the final, post-cluster score
+          // instead of the pre-check one.
+          tokenData.score = 39;
+        }
+      } catch (e) {
+        console.error('Inline cluster-check failed:', e);
+      }
+
       setListedTokens(function (prev) {
         return [tokenData].concat(prev);
       });
@@ -2267,7 +2303,7 @@ export default function TntHouse() {
       setSubmitted(true);
       setAuditSuccessToken(tokenData);
       setFormData({ projectName: '', contractAddress: '', telegram: '', logoImg: '' });
-      showToast('🎁 Free audit complete! Score: ' + auditResult.score, 'success');
+      showToast('🎁 Free audit complete! Score: ' + tokenData.score, 'success');
       setIsSending(false);
       setTimeout(function () {
         setSubmitted(false);
@@ -2626,8 +2662,27 @@ export default function TntHouse() {
             });
             showToast('✅ Payment confirmed! Banner is live for everyone.', 'success');
           } else if (type === 'audit' && auditData) {
-            saveTokenToSupabase(auditData);
+            // FIX v1.100: await so the row exists before the cluster-check
+            // call below queries it by ca.
+            await saveTokenToSupabase(auditData);
             postAuditToTelegram(auditData);
+
+            // FEAT v1.102: same one-click merge as the free-audit path —
+            // no separate manual "Check Insider Clusters" press needed.
+            try {
+              var paidClusterRes = await fetch('/api/cluster-check?ca=' + auditData.ca);
+              var paidClusterData = await paidClusterRes.json();
+              if (
+                !paidClusterData.error &&
+                paidClusterData.clusterCount > 0 &&
+                auditData.score > 39
+              ) {
+                auditData.score = 39;
+              }
+            } catch (e) {
+              console.error('Inline cluster-check failed:', e);
+            }
+
             setListedTokens(function (prev) {
               return [auditData].concat(prev);
             });
