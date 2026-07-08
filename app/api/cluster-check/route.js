@@ -1,5 +1,15 @@
 // app/api/cluster-check/route.js
-// Version 1.5
+// Version 1.6
+
+// FIX v1.6: this endpoint walks up to 10 holders' signature history over
+// RPC (up to 3 pages of 1000 sigs each, plus a getParsedTransaction per
+// holder) — genuinely slow, and now runs automatically on EVERY audit
+// submission (v1.102 merged it into the main flow instead of only
+// on-demand). Confirmed via Vercel runtime logs: a 502 on this exact
+// route, right after that change shipped — almost certainly the default
+// serverless function timeout (10s) being too short now that this runs
+// far more often. maxDuration explicitly raised to give it real headroom.
+export const maxDuration = 60;
 
 // First Funder Trace: for a token's top holders, find each wallet's very
 // first incoming SOL transfer (its "funder"). If multiple top holders
