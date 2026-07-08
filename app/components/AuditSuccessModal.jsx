@@ -1,7 +1,7 @@
 'use client';
 
 // app/components/AuditSuccessModal.jsx
-// Version 1.0
+// Version 1.1
 //
 // Shown after ANY completed audit (free or paid, any score — no 90+
 // threshold) instead of just a toast. Gives the token creator two viral
@@ -11,6 +11,22 @@
 // 2. A copy-pasteable HTML snippet for their own site: their logo with a
 //    small clickable shield badge in the corner that links back to their
 //    public /audit/{ca} report page on tnt-audit.com.
+//
+// FIX v1.1: a flat-out green "trust shield" for every score (including a
+// 0/100 scam) would let bad projects borrow our credibility — this now
+// picks one of three shield colors/messages based on the score, so the
+// badge itself is honest about risk level:
+//   - green (score >= 75): "Safe" — original neon-green shield
+//   - yellow (40-74): "Warning" — yellow/orange shield, softer messaging
+//   - red (< 40): "High Risk" — red shield, explicit risk warning
+// This is a THREE-SEPARATE-PNG-FILES design, not a canvas color filter
+// (ctx.filter = hue-rotate(...)). Filters were considered and rejected:
+// this project has repeatedly hit wallet in-app browsers (Phantom/
+// Solflare WebViews) behaving inconsistently with otherwise-standard web
+// APIs, and Canvas 2D's `filter` property is exactly the kind of newer,
+// less-uniformly-supported feature that risks the same problem. Three
+// static PNGs (tnt-shield-green.png / -yellow.png / -red.png) have zero
+// dependency on filter support and render identically everywhere.
 //
 // WHY THE LOGO GOES THROUGH /api/proxy-image: canvas.toDataURL() throws a
 // SecurityError if any image drawn onto the canvas was loaded
@@ -24,18 +40,58 @@ import { useState } from 'react';
 import { X, Download, Copy, Check } from 'lucide-react';
 
 const SITE_URL = 'https://tnt-audit.com';
-const SHIELD_PATH = '/tnt-shield.png';
 
-function getScoreStyle(score) {
-  if (score >= 90) return { text: 'text-emerald-400', label: 'Safe' };
-  if (score >= 50) return { text: 'text-yellow-400', label: 'Caution' };
-  return { text: 'text-red-400', label: 'High Risk' };
+// FIX v1.1: generic placeholder used in the embeddable widget when a
+// token has no logo at all — a plain inline SVG data URI, so it never
+// depends on an extra file existing in /public and never needs a network
+// request on the visitor's site.
+const DEFAULT_LOGO_DATA_URI =
+  'data:image/svg+xml;utf8,' +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">' +
+      '<circle cx="60" cy="60" r="58" fill="#1e1b2e" stroke="#8b5cf6" stroke-width="4"/>' +
+      '<text x="60" y="76" font-size="48" text-anchor="middle" fill="#8b5cf6" font-family="monospace">?</text>' +
+      '</svg>',
+  );
+
+// FEAT v1.1: single source of truth for the three risk tiers — score
+// thresholds, shield filename, chip label/color, and modal body copy all
+// key off this so they can never drift out of sync with each other.
+function getRiskTier(score) {
+  if (score >= 75) {
+    return {
+      tier: 'green',
+      shieldFile: 'tnt-shield-green.png',
+      chipText: 'text-emerald-400',
+      chipLabel: 'Safe',
+      message:
+        'Покажите инвесторам, что вашему проекту можно доверять. Скачайте брендированное лого для профиля в X или заберите виджет!',
+    };
+  }
+  if (score >= 40) {
+    return {
+      tier: 'yellow',
+      shieldFile: 'tnt-shield-yellow.png',
+      chipText: 'text-yellow-400',
+      chipLabel: 'Warning',
+      message:
+        'Аудит завершен с замечаниями. Вы можете скачать желтый маркер аудита для X или забрать виджет, но рекомендуем исправить уязвимости для получения зеленого статуса.',
+    };
+  }
+  return {
+    tier: 'red',
+    shieldFile: 'tnt-shield-red.png',
+    chipText: 'text-red-400',
+    chipLabel: 'High Risk',
+    message:
+      'Внимание! Обнаружены критические уязвимости. Проект имеет высокий уровень риска. Вы можете скачать красный маркер аудита, инвесторы смогут увидеть полный отчет по ссылке.',
+  };
 }
 
 // Draws the token logo (via our proxy, to stay same-origin) onto a 400x400
-// canvas, overlays the TNT shield in the bottom-right corner, and resolves
-// with a PNG data URL.
-function generateBrandedLogo(logoUrl) {
+// canvas, overlays the risk-appropriate TNT shield in the bottom-right
+// corner, and resolves with a PNG data URL.
+function generateBrandedLogo(logoUrl, shieldFile) {
   return new Promise(function (resolve, reject) {
     var canvas = document.createElement('canvas');
     canvas.width = 400;
@@ -68,7 +124,7 @@ function generateBrandedLogo(logoUrl) {
       shieldImg.onerror = function () {
         reject(new Error('Failed to load TNT shield image'));
       };
-      shieldImg.src = window.location.origin + SHIELD_PATH;
+      shieldImg.src = window.location.origin + '/' + shieldFile;
     };
     tokenImg.onerror = function () {
       reject(new Error('Failed to load token logo'));
@@ -86,13 +142,16 @@ export default function AuditSuccessModal({ token, onClose }) {
   if (!token) return null;
 
   const score = token.score || 0;
-  const style = getScoreStyle(score);
+  const risk = getRiskTier(score);
   const hasLogo = !!token.logoUrl;
+  // FIX v1.1: widget always needs SOME image src — fall back to the
+  // generic placeholder instead of leaving it empty.
+  const widgetLogoSrc = token.logoUrl || DEFAULT_LOGO_DATA_URI;
 
   const widgetCode =
     '<div style="position: relative; width: 120px; height: 120px; display: inline-block;">\n' +
     '  <img src="' +
-    token.logoUrl +
+    widgetLogoSrc +
     '" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;" alt="Token Logo">\n' +
     '  <a href="' +
     SITE_URL +
@@ -101,8 +160,11 @@ export default function AuditSuccessModal({ token, onClose }) {
     '" target="_blank" title="Verified by TNT House" style="position: absolute; bottom: -4px; right: -4px; width: 38px; height: 38px; cursor: pointer; transition: transform 0.2s;">\n' +
     '    <img src="' +
     SITE_URL +
-    SHIELD_PATH +
-    '" style="width: 100%; height: 100%;" alt="TNT Passed">\n' +
+    '/' +
+    risk.shieldFile +
+    '" style="width: 100%; height: 100%;" alt="TNT ' +
+    risk.chipLabel +
+    '">\n' +
     '  </a>\n' +
     '</div>';
 
@@ -110,7 +172,7 @@ export default function AuditSuccessModal({ token, onClose }) {
     setDownloading(true);
     setDownloadError('');
     try {
-      const dataUrl = await generateBrandedLogo(token.logoUrl);
+      const dataUrl = await generateBrandedLogo(token.logoUrl, risk.shieldFile);
       const link = document.createElement('a');
       link.href = dataUrl;
       link.download = (token.symbol || 'token') + '_tnt_verified.png';
@@ -165,16 +227,13 @@ export default function AuditSuccessModal({ token, onClose }) {
           )}
           <div>
             <div className="text-white font-black text-sm">${token.symbol}</div>
-            <div className={'font-black text-lg ' + style.text}>
-              {style.label} {score}/100
+            <div className={'font-black text-lg ' + risk.chipText}>
+              {risk.chipLabel} {score}/100
             </div>
           </div>
         </div>
 
-        <p className="text-slate-300 text-xs leading-relaxed mb-5">
-          Покажите инвесторам, что вашему проекту можно доверять. Скачайте брендированное лого
-          для профиля в X или заберите интерактивный виджет на ваш официальный сайт!
-        </p>
+        <p className="text-slate-300 text-xs leading-relaxed mb-5">{risk.message}</p>
 
         <button
           onClick={handleDownloadLogo}
@@ -182,7 +241,7 @@ export default function AuditSuccessModal({ token, onClose }) {
           className="w-full bg-gradient-to-r from-purple-500 to-emerald-400 hover:from-purple-400 hover:to-emerald-300 text-slate-950 font-black py-3 rounded-lg text-sm transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed mb-2"
         >
           <Download className="w-4 h-4" />
-          {downloading ? 'Генерируем...' : 'Скачать аватарку для X'}
+          {downloading ? 'Генерируем...' : 'Скачать маркер аудита для X'}
         </button>
         {!hasLogo && (
           <p className="text-slate-500 text-[10px] text-center mb-3">
