@@ -1,7 +1,7 @@
 'use client';
 
 // app/components/AuditSuccessModal.jsx
-// Version 1.1
+// Version 1.2
 //
 // Shown after ANY completed audit (free or paid, any score — no 90+
 // threshold) instead of just a toast. Gives the token creator two viral
@@ -11,6 +11,16 @@
 // 2. A copy-pasteable HTML snippet for their own site: their logo with a
 //    small clickable shield badge in the corner that links back to their
 //    public /audit/{ca} report page on tnt-audit.com.
+//
+// FIX v1.2: every string in this modal was hardcoded in Russian, ignoring
+// the site's language switcher entirely — a French or Chinese visitor's
+// audit would always pop up in Russian regardless of which of the 7
+// locales they'd selected. Now takes the same `t` translations object
+// app/page.js already builds from TRANSLATIONS[lang] and reads every
+// string from it. The three risk-tier chip labels (Safe / Warning / High
+// Risk) are deliberately left in English across all locales, matching
+// the existing site-wide convention (the Blueprint modal's own risk
+// labels are English-only regardless of site language too).
 //
 // FIX v1.1: a flat-out green "trust shield" for every score (including a
 // 0/100 scam) would let bad projects borrow our credibility — this now
@@ -54,38 +64,18 @@ const DEFAULT_LOGO_DATA_URI =
       '</svg>',
   );
 
-// FEAT v1.1: single source of truth for the three risk tiers — score
-// thresholds, shield filename, chip label/color, and modal body copy all
-// key off this so they can never drift out of sync with each other.
-function getRiskTier(score) {
+// FEAT v1.1: single source of truth for the three risk tiers. Language-
+// independent bits (thresholds, shield filename, chip color) live here;
+// the actual message text is read from `t` in the component below so it
+// follows the site's language.
+function getRiskTierMeta(score) {
   if (score >= 75) {
-    return {
-      tier: 'green',
-      shieldFile: 'tnt-shield-green.png',
-      chipText: 'text-emerald-400',
-      chipLabel: 'Safe',
-      message:
-        'Покажите инвесторам, что вашему проекту можно доверять. Скачайте брендированное лого для профиля в X или заберите виджет!',
-    };
+    return { tier: 'green', shieldFile: 'tnt-shield-green.png', chipText: 'text-emerald-400', chipLabel: 'Safe' };
   }
   if (score >= 40) {
-    return {
-      tier: 'yellow',
-      shieldFile: 'tnt-shield-yellow.png',
-      chipText: 'text-yellow-400',
-      chipLabel: 'Warning',
-      message:
-        'Аудит завершен с замечаниями. Вы можете скачать желтый маркер аудита для X или забрать виджет, но рекомендуем исправить уязвимости для получения зеленого статуса.',
-    };
+    return { tier: 'yellow', shieldFile: 'tnt-shield-yellow.png', chipText: 'text-yellow-400', chipLabel: 'Warning' };
   }
-  return {
-    tier: 'red',
-    shieldFile: 'tnt-shield-red.png',
-    chipText: 'text-red-400',
-    chipLabel: 'High Risk',
-    message:
-      'Внимание! Обнаружены критические уязвимости. Проект имеет высокий уровень риска. Вы можете скачать красный маркер аудита, инвесторы смогут увидеть полный отчет по ссылке.',
-  };
+  return { tier: 'red', shieldFile: 'tnt-shield-red.png', chipText: 'text-red-400', chipLabel: 'High Risk' };
 }
 
 // Draws the token logo (via our proxy, to stay same-origin) onto a 400x400
@@ -134,7 +124,8 @@ function generateBrandedLogo(logoUrl, shieldFile) {
 }
 
 // token: { name, symbol, score, logoUrl, ca }
-export default function AuditSuccessModal({ token, onClose }) {
+// t: the same TRANSLATIONS[lang] object app/page.js already builds
+export default function AuditSuccessModal({ token, t, onClose }) {
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState('');
   const [copied, setCopied] = useState(false);
@@ -142,7 +133,9 @@ export default function AuditSuccessModal({ token, onClose }) {
   if (!token) return null;
 
   const score = token.score || 0;
-  const risk = getRiskTier(score);
+  const meta = getRiskTierMeta(score);
+  const message =
+    meta.tier === 'green' ? t.successMsgGreen : meta.tier === 'yellow' ? t.successMsgYellow : t.successMsgRed;
   const hasLogo = !!token.logoUrl;
   // FIX v1.1: widget always needs SOME image src — fall back to the
   // generic placeholder instead of leaving it empty.
@@ -161,9 +154,9 @@ export default function AuditSuccessModal({ token, onClose }) {
     '    <img src="' +
     SITE_URL +
     '/' +
-    risk.shieldFile +
+    meta.shieldFile +
     '" style="width: 100%; height: 100%;" alt="TNT ' +
-    risk.chipLabel +
+    meta.chipLabel +
     '">\n' +
     '  </a>\n' +
     '</div>';
@@ -172,7 +165,7 @@ export default function AuditSuccessModal({ token, onClose }) {
     setDownloading(true);
     setDownloadError('');
     try {
-      const dataUrl = await generateBrandedLogo(token.logoUrl, risk.shieldFile);
+      const dataUrl = await generateBrandedLogo(token.logoUrl, meta.shieldFile);
       const link = document.createElement('a');
       link.href = dataUrl;
       link.download = (token.symbol || 'token') + '_tnt_verified.png';
@@ -181,7 +174,7 @@ export default function AuditSuccessModal({ token, onClose }) {
       document.body.removeChild(link);
     } catch (e) {
       console.error('Branded logo generation failed:', e);
-      setDownloadError('Could not generate the image. Please try again.');
+      setDownloadError(t.successGenError);
     }
     setDownloading(false);
   };
@@ -197,7 +190,7 @@ export default function AuditSuccessModal({ token, onClose }) {
           }, 2000);
         })
         .catch(function () {
-          setDownloadError('Could not copy automatically — please select and copy manually.');
+          setDownloadError(t.successCopyError);
         });
     }
   };
@@ -207,7 +200,7 @@ export default function AuditSuccessModal({ token, onClose }) {
       <div className="bg-slate-950 border-2 border-purple-500/40 rounded-2xl w-full max-w-md p-6 shadow-[0_0_40px_rgba(153,69,255,0.3)] max-h-[90vh] overflow-y-auto">
         <div className="flex items-start justify-between mb-4">
           <h2 className="text-lg font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400 pr-4">
-            🎉 Проект успешно верифицирован TNT House!
+            {t.successModalTitle}
           </h2>
           <button
             onClick={onClose}
@@ -227,13 +220,13 @@ export default function AuditSuccessModal({ token, onClose }) {
           )}
           <div>
             <div className="text-white font-black text-sm">${token.symbol}</div>
-            <div className={'font-black text-lg ' + risk.chipText}>
-              {risk.chipLabel} {score}/100
+            <div className={'font-black text-lg ' + meta.chipText}>
+              {meta.chipLabel} {score}/100
             </div>
           </div>
         </div>
 
-        <p className="text-slate-300 text-xs leading-relaxed mb-5">{risk.message}</p>
+        <p className="text-slate-300 text-xs leading-relaxed mb-5">{message}</p>
 
         <button
           onClick={handleDownloadLogo}
@@ -241,21 +234,17 @@ export default function AuditSuccessModal({ token, onClose }) {
           className="w-full bg-gradient-to-r from-purple-500 to-emerald-400 hover:from-purple-400 hover:to-emerald-300 text-slate-950 font-black py-3 rounded-lg text-sm transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed mb-2"
         >
           <Download className="w-4 h-4" />
-          {downloading ? 'Генерируем...' : 'Скачать маркер аудита для X'}
+          {downloading ? t.successBtnGenerating : t.successBtnDownload}
         </button>
         {!hasLogo && (
-          <p className="text-slate-500 text-[10px] text-center mb-3">
-            Нет логотипа у этого токена — скачивание недоступно.
-          </p>
+          <p className="text-slate-500 text-[10px] text-center mb-3">{t.successNoLogo}</p>
         )}
         {downloadError && (
           <p className="text-red-400 text-[10px] text-center mb-3">{downloadError}</p>
         )}
 
         <div className="mt-4">
-          <p className="text-purple-400 text-[11px] font-bold mb-1.5">
-            Виджет для вашего сайта:
-          </p>
+          <p className="text-purple-400 text-[11px] font-bold mb-1.5">{t.successWidgetLabel}</p>
           <textarea
             readOnly
             value={widgetCode}
@@ -271,11 +260,11 @@ export default function AuditSuccessModal({ token, onClose }) {
           >
             {copied ? (
               <>
-                <Check className="w-3.5 h-3.5 text-emerald-400" /> Скопировано!
+                <Check className="w-3.5 h-3.5 text-emerald-400" /> {t.successCopied}
               </>
             ) : (
               <>
-                <Copy className="w-3.5 h-3.5" /> Скопировать код
+                <Copy className="w-3.5 h-3.5" /> {t.successBtnCopy}
               </>
             )}
           </button>
@@ -285,7 +274,7 @@ export default function AuditSuccessModal({ token, onClose }) {
           onClick={onClose}
           className="w-full mt-4 text-slate-400 hover:text-white transition text-sm"
         >
-          Закрыть
+          {t.successClose}
         </button>
       </div>
     </div>
