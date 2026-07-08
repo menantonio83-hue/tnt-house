@@ -19,6 +19,7 @@ import {
   ArrowUp,
   ArrowDown,
 } from 'lucide-react';
+import AuditSuccessModal from './components/AuditSuccessModal';
 
 export const dynamic = 'force-dynamic';
 
@@ -1351,6 +1352,10 @@ export default function TntHouse() {
   var [selectedTier, setSelectedTier] = useState('basic');
   var [isSending, setIsSending] = useState(false);
   var [submitted, setSubmitted] = useState(false);
+  // FEAT v1.97: holds the just-audited token's { name, symbol, score,
+  // logoUrl, ca } to feed the viral success modal — shown for ANY score,
+  // no 90+ threshold. null = modal hidden.
+  var [auditSuccessToken, setAuditSuccessToken] = useState(null);
   var [freeSlots, setFreeSlots] = useState(10);
   var FREE_TOTAL = 10;
   // FEAT v1.90: separate free-banner giveaway counter, independent from
@@ -2247,6 +2252,7 @@ export default function TntHouse() {
         return Math.max(0, prev - 1);
       });
       setSubmitted(true);
+      setAuditSuccessToken(tokenData);
       setFormData({ projectName: '', contractAddress: '', telegram: '', logoImg: '' });
       showToast('🎁 Free audit complete! Score: ' + auditResult.score, 'success');
       setIsSending(false);
@@ -2612,6 +2618,7 @@ export default function TntHouse() {
             setListedTokens(function (prev) {
               return [auditData].concat(prev);
             });
+            setAuditSuccessToken(auditData);
             showToast('✅ Payment confirmed! Token added. Score: ' + auditData.score, 'success');
           }
           setTimeout(function () {
@@ -4795,6 +4802,16 @@ export default function TntHouse() {
             Works on mobile with Phantom/Solflare. On desktop, install a Solana wallet extension.
           </p>
         </div>
+      )}
+
+      {/* ═══ Audit Success Modal (viral share assets) ═══ */}
+      {auditSuccessToken && (
+        <AuditSuccessModal
+          token={auditSuccessToken}
+          onClose={function () {
+            setAuditSuccessToken(null);
+          }}
+        />
       )}
 
       {/* ═══ TNT Security Blueprint Modal ═══ */}
