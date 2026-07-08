@@ -1437,6 +1437,9 @@ export default function TntHouse() {
     contractAddress: '',
     telegram: '',
     logoImg: '',
+    // FIX v1.104: the real ticker fetched by the CA lookup below — see
+    // runAuditAndSave's symbol bug comment for why this is needed.
+    tokenSymbol: '',
   });
   // FEAT v1.95: CA-first progressive form. 'idle' = nothing typed yet (only
   // the CA field shows), 'loading' = debounced DexScreener lookup in
@@ -1799,6 +1802,7 @@ export default function TntHouse() {
             setFormData(function (prev) {
               return Object.assign({}, prev, {
                 projectName: result.name,
+                tokenSymbol: result.symbol || prev.tokenSymbol,
                 logoImg: result.imageUrl || prev.logoImg,
               });
             });
@@ -2091,7 +2095,13 @@ export default function TntHouse() {
     }
     if (freeSlots > 0) {
       setIsSending(true);
-      runAuditAndSave(formData.contractAddress, formData.projectName, true, formData.logoImg);
+      runAuditAndSave(
+        formData.contractAddress,
+        formData.projectName,
+        true,
+        formData.logoImg,
+        formData.tokenSymbol,
+      );
       return;
     }
     var mrdtAmount = getAmountForTier(selectedTier);
@@ -2120,7 +2130,7 @@ export default function TntHouse() {
   };
 
   // Run RugCheck + DexScreener audit
-  var runAuditAndSave = async function (ca, projectName, isFree, logoImg) {
+  var runAuditAndSave = async function (ca, projectName, isFree, logoImg, tokenSymbol) {
     var auditResult = {
       score: 75,
       mintAuthority: 'Unknown',
@@ -2317,7 +2327,16 @@ export default function TntHouse() {
 
     var tokenData = {
       name: projectName.toUpperCase(),
-      symbol: projectName.slice(0, 4).toUpperCase() || 'NEW',
+      // FIX v1.104: this used to ALWAYS derive the symbol by truncating
+      // the project NAME to 4 letters, even when the CA-first lookup had
+      // already fetched the token's real ticker — e.g. a token literally
+      // named "The African Bull" with ticker $SUNUSI was being saved and
+      // displayed as $THE, because "The African Bull".slice(0,4) = "THE ".
+      // Now uses the real fetched symbol when we have one, only falling
+      // back to the name-slice for the rare case where a brand-new token
+      // had no DexScreener metadata at all yet (see the CA-lookup
+      // 'notfound' path, which never populates tokenSymbol).
+      symbol: (tokenSymbol && tokenSymbol.trim()) || projectName.slice(0, 4).toUpperCase() || 'NEW',
       ca: ca,
       price: dexData.price,
       liquidity: dexData.liquidity,
@@ -2393,7 +2412,7 @@ export default function TntHouse() {
       });
       setSubmitted(true);
       setAuditSuccessToken(tokenData);
-      setFormData({ projectName: '', contractAddress: '', telegram: '', logoImg: '' });
+      setFormData({ projectName: '', contractAddress: '', telegram: '', logoImg: '', tokenSymbol: '' });
       showToast('🎁 Free audit complete! Score: ' + tokenData.score, 'success');
       setIsSending(false);
       setTimeout(function () {
@@ -2573,6 +2592,7 @@ export default function TntHouse() {
     var ca = formData.contractAddress;
     var projectName = formData.projectName;
     var logoImg = formData.logoImg;
+    var tokenSymbol = formData.tokenSymbol;
     // FIX v1.8: RESTORE v1.6. User confirmed the Phantom in-app-browser
     // flow (/pay page, no Blowfish warning) had already worked in a prior
     // test (Payment Confirmed screen, no red block). The phantom.com
@@ -2593,8 +2613,8 @@ export default function TntHouse() {
     openWalletInAppBrowser(payUrl, selectedWallet);
     setShowInvoiceModal(false);
     setIsSending(true);
-    var tokenData = await runAuditAndSave(ca, projectName, false, logoImg);
-    setFormData({ projectName: '', contractAddress: '', telegram: '', logoImg: '' });
+    var tokenData = await runAuditAndSave(ca, projectName, false, logoImg, tokenSymbol);
+    setFormData({ projectName: '', contractAddress: '', telegram: '', logoImg: '', tokenSymbol: '' });
     setSelectedPaymentMethod(null);
     setSelectedWallet(null);
     setInvoiceAmount(0);
