@@ -1000,7 +1000,12 @@ async function saveTokenToSupabase(token) {
       liquidity: token.liquidity,
       volume24h: token.volume24h,
       price_change_24h: token.priceChange24h,
-      score: token.score || 95,
+      // FIX v1.100: `token.score || 95` saved a FAKE 95 to the database
+      // for any token that genuinely scored 0 — the worst possible score
+      // was being persisted as if it were nearly perfect. This is the
+      // actual value written to listed_tokens.score, so this one mattered
+      // more than the display-only bugs fixed alongside it.
+      score: typeof token.score === 'number' ? token.score : 95,
       dex_url: token.dexUrl,
       chain: token.chain || 'solana',
       mint_authority: token.mintAuthority || '-',
@@ -1473,7 +1478,15 @@ export default function TntHouse() {
   var getSafetyScore = function (token) {
     if (!token) return 75;
     if (token.symbol === 'MRDT') return 98;
-    if (token.score) return token.score;
+    // FIX v1.100: `if (token.score)` treated a genuine 0 score as falsy —
+    // a token that legitimately scored 0/100 fell through to the random
+    // hash-based fallback (85-97) instead of showing its real score. That
+    // fallback then got capped to 39 by getDisplaySafetyScore's cluster
+    // penalty below, which is why the Blueprint modal showed "39" for a
+    // token whose real, correctly-computed audit score was actually 0 —
+    // coincidence between the fallback range and the cap, not a real
+    // score. `typeof === 'number'` respects an honest 0.
+    if (typeof token.score === 'number') return token.score;
     var hash = token.symbol.split('').reduce(function (a, b) {
       return a + b.charCodeAt(0);
     }, 0);
