@@ -1456,7 +1456,10 @@ export default function TntHouse() {
   // no 90+ threshold. null = modal hidden.
   var [auditSuccessToken, setAuditSuccessToken] = useState(null);
   var [freeSlots, setFreeSlots] = useState(10);
-  var FREE_TOTAL = 10;
+  // FEAT v1.105: bumped 10 -> 20. First 10 free slots are fully used up
+  // (10/10 in listed_tokens with is_free=true) — this refreshes the
+  // counter to show 10 fresh free slots again for continued outreach.
+  var FREE_TOTAL = 20;
   // FEAT v1.90: separate free-banner giveaway counter, independent from
   // BANNER_SLOTS (which is concurrent display capacity, not a giveaway).
   var [freeBanners, setFreeBanners] = useState(5);
