@@ -3577,13 +3577,13 @@ export default function TntHouse() {
               <table className="w-full text-left border-collapse text-[9px]">
                 <thead>
                   <tr className="border-b border-cyan-400/25 bg-cyan-500/10 text-cyan-300 font-bold sticky top-0 z-20 backdrop-blur-md">
-                    {['Token', 'Price', 'Liq', 'Vol/Chg', 'Score', 'Action'].map(function (h, i) {
+                    {['Token', 'Price', 'Liq/Vol', 'Score'].map(function (h, i) {
                       return (
                         <th
                           key={i}
                           className={
                             'p-1.5 text-[9px] font-bold whitespace-nowrap' +
-                            (i === 4 ? ' text-center' : i === 5 ? ' text-right' : ' text-left')
+                            (i === 3 ? ' text-center' : ' text-left')
                           }
                         >
                           {h}
@@ -3621,26 +3621,13 @@ export default function TntHouse() {
                     <td className="p-1 font-mono text-emerald-400 font-bold text-[9px]">
                       ${mrdtPrice > 0 ? mrdtPrice.toFixed(8) : '...'}
                     </td>
-                    <td className="p-1 font-mono text-emerald-400 font-bold text-[9px]">$13K+</td>
-                    <td className="p-1 font-mono text-emerald-400 font-bold text-[9px]">+12.4%</td>
+                    <td className="p-1 font-mono text-emerald-400 font-bold text-[9px]">
+                      $13K+
+                      <div className="text-[8px]">+12.4%</div>
+                    </td>
                     <td className="p-1 text-center">
                       <div className="inline-flex items-center justify-center w-9 h-4 rounded-full bg-emerald-500/20 border border-emerald-500 text-emerald-400 text-[8px] font-extrabold shadow-[0_0_6px_rgba(16,185,129,0.5)]">
                         98
-                      </div>
-                    </td>
-                    <td className="p-1 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={function (e) {
-                            e.stopPropagation();
-                            handleLaunchJupiter();
-                          }}
-                          className="text-[8px] text-emerald-400 hover:text-emerald-300 font-bold hover:underline inline-flex items-center gap-0.5"
-                        >
-                          Buy <ExternalLink className="w-2 h-2" />
-                        </button>
-                        {/* Tap indicator: signals the whole row is clickable for the Blueprint modal */}
-                        <span className="text-emerald-400/60 text-[10px] font-bold">›</span>
                       </div>
                     </td>
                   </tr>
@@ -3688,19 +3675,21 @@ export default function TntHouse() {
                           </span>
                         </td>
                         <td className="p-1 font-mono text-slate-300 text-[9px]">${token.price}</td>
-                        <td className="p-1 font-mono text-slate-300 text-[9px]">
-                          {typeof token.liquidity === 'number'
-                            ? formatNumber(token.liquidity)
-                            : token.liquidity}
-                        </td>
-                        <td
-                          className={
-                            'p-1 font-mono text-[9px] ' +
-                            (token.priceChange24h > 0 ? 'text-emerald-400' : 'text-red-400')
-                          }
-                        >
-                          {formatNumber(token.volume24h)} ({token.priceChange24h > 0 ? '+' : ''}
-                          {token.priceChange24h}%)
+                        <td className="p-1 font-mono text-[9px]">
+                          <span className="text-slate-300">
+                            {typeof token.liquidity === 'number'
+                              ? formatNumber(token.liquidity)
+                              : token.liquidity}
+                          </span>
+                          <div
+                            className={
+                              token.priceChange24h > 0 ? 'text-emerald-400' : 'text-red-400'
+                            }
+                          >
+                            {formatNumber(token.volume24h)} (
+                            {token.priceChange24h > 0 ? '+' : ''}
+                            {token.priceChange24h}%)
+                          </div>
                         </td>
                         <td className="p-1 text-center">
                           <div
@@ -3718,23 +3707,6 @@ export default function TntHouse() {
                             {score}
                           </div>
                         </td>
-                        <td className="p-1 text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <a
-                              href={token.dexUrl}
-                              onClick={function (e) {
-                                e.stopPropagation();
-                              }}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-[8px] text-cyan-300 hover:text-cyan-200 inline-flex items-center gap-0.5 border border-cyan-400/40 rounded-full px-1.5 py-0.5"
-                            >
-                              DEX <ExternalLink className="w-2 h-2" />
-                            </a>
-                            {/* Tap indicator: signals the whole row is clickable for the Blueprint modal */}
-                            <span className="text-cyan-400/60 text-[10px] font-bold">›</span>
-                          </div>
-                        </td>
                       </tr>
                     );
                   })}
@@ -3742,7 +3714,7 @@ export default function TntHouse() {
                   {/* Live DexScreener tokens */}
                   {loading && tokens.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="p-6 text-center text-purple-400 font-bold">
+                      <td colSpan={4} className="p-6 text-center text-purple-400 font-bold">
                         <RefreshCw className="w-4 h-4 animate-spin mx-auto mb-1" />
                         {t.scanning}
                       </td>
@@ -3782,19 +3754,21 @@ export default function TntHouse() {
                           <td className="p-1 font-mono text-slate-300 text-[9px]">
                             ${token.price}
                           </td>
-                          <td className="p-1 font-mono text-slate-300 text-[9px]">
-                            {typeof token.liquidity === 'number'
-                              ? formatNumber(token.liquidity)
-                              : token.liquidity}
-                          </td>
-                          <td
-                            className={
-                              'p-1 font-mono text-[9px] ' +
-                              (token.priceChange24h > 0 ? 'text-emerald-400' : 'text-red-400')
-                            }
-                          >
-                            {formatNumber(token.volume24h)} ({token.priceChange24h > 0 ? '+' : ''}
-                            {token.priceChange24h}%)
+                          <td className="p-1 font-mono text-[9px]">
+                            <span className="text-slate-300">
+                              {typeof token.liquidity === 'number'
+                                ? formatNumber(token.liquidity)
+                                : token.liquidity}
+                            </span>
+                            <div
+                              className={
+                                token.priceChange24h > 0 ? 'text-emerald-400' : 'text-red-400'
+                              }
+                            >
+                              {formatNumber(token.volume24h)} (
+                              {token.priceChange24h > 0 ? '+' : ''}
+                              {token.priceChange24h}%)
+                            </div>
                           </td>
                           <td className="p-1 text-center">
                             <div
@@ -3812,19 +3786,6 @@ export default function TntHouse() {
                               {score}
                             </div>
                           </td>
-                          <td className="p-1 text-right">
-                            <a
-                              href={token.dexUrl}
-                              onClick={function (e) {
-                                e.stopPropagation();
-                              }}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-[8px] text-purple-400 hover:text-emerald-400 inline-flex items-center gap-0.5"
-                            >
-                              DEX <ExternalLink className="w-2 h-2" />
-                            </a>
-                          </td>
                         </tr>
                       );
                     })
@@ -3834,7 +3795,7 @@ export default function TntHouse() {
                   {[1, 2, 3, 4].map(function (n) {
                     return (
                       <tr key={'e' + n} className="border-b border-purple-500/5 opacity-40">
-                        {[0, 1, 2, 3, 4, 5].map(function (i) {
+                        {[0, 1, 2, 3].map(function (i) {
                           return (
                             <td key={i} className="p-1 text-slate-600 text-[8px] italic">
                               -
