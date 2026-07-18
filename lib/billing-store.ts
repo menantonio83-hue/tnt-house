@@ -1,4 +1,15 @@
-// Version 7.10 — lib/billing-store.ts
+// Version 7.12 — lib/billing-store.ts
+//
+// v7.12: fixed the Supabase linter's function_search_path_mutable
+// warning on all three RPC functions below — applied directly against
+// Supabase (ALTER FUNCTION ... SET search_path = public), no app code
+// change needed. A function without a pinned search_path is vulnerable
+// to hijacking if a caller can get objects created in a schema that
+// resolves earlier in their search_path; pinning to `public` matches
+// the schema everything here actually lives in. Re-verified all three
+// RPCs still work correctly afterward (confirm_payment,
+// decrement_credit_if_sufficient, increment_subscription_usage) via a
+// smoke test against Supabase.
 //
 // v7.10: ConfirmPaymentResult now carries an optional `reason` — the
 // confirm_payment() RPC returns one when a claim fails because the
