@@ -53,7 +53,7 @@ const RESPONSE_FIELDS: Array<{ field: string; desc: string }> = [
   { field: 'cluster_analysis', desc: '"pending" on a token\'s first-ever check (cluster trace runs in the background), "complete" after ~1–2 minutes.' },
   { field: 'mint_authority / freeze_authority', desc: 'Whether each authority is revoked, and its address if still active.' },
   { field: 'honeypot_risk / lp_locked', desc: 'On the roadmap — currently always null.' },
-  { field: 'holder_distribution', desc: 'Largest holder %, top-10 %, risk level, and holder count.' },
+  { field: 'holder_distribution', desc: 'Largest holder %, top-10 %, risk level, and holder_count — the number of accounts in Solana\u2019s top-20-largest-holders response (a real RPC limit, not a full holder count for widely-held tokens like BONK or USDC).' },
   { field: 'market', desc: 'Live price, liquidity, 24h volume, 24h change, and token age from DexScreener.' },
 ];
 
