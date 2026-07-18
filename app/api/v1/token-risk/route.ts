@@ -1,11 +1,12 @@
-// Version 1.3 — app/api/v1/token-risk/route.ts
+// Version 1.4 — app/api/v1/token-risk/route.ts
 //
-// Risk-Data API — Stage 1: route + scoring logic (no auth/rate-limit yet,
-// that's Stage 2/3 per the project plan).
+// Risk-Data API — Stage 2 adds API-key auth on top of Stage 1's route +
+// scoring logic. Rate limits / paywall are Stage 3, still not here yet.
 //
 // GET /api/v1/token-risk?mint=<mint_address>   (or ?ca=<mint_address>)
+// Header: Authorization: Bearer <api_key>
 //
-// Design decisions locked in for this stage:
+// Design decisions locked in so far:
 // - Accepts `mint` or `ca` as aliases for the same parameter.
 // - safety_score uses a NEW, stricter API-specific formula — separate
 //   from the public site's performFullAudit() score. insiderScore here
@@ -17,6 +18,9 @@
 //   a minute or two later gets cluster_analysis: "complete" with real data.
 // - honeypot_risk / lp_locked: not implemented in the engine yet, stay
 //   null with an explanatory `note` field — schema won't change later.
+// - Every request requires a valid API key (see lib/api-auth.ts). Keys
+//   are minted via app/api/v1/admin/keys (temporary, until Stage 5's
+//   public signup form).
 //
 // Requires: `npm install @vercel/functions` (provides waitUntil() so the
 // background cluster job keeps running after the response is sent).
@@ -32,6 +36,7 @@ import {
   saveClusterResult,
   markClusterFailed,
 } from '@/lib/risk-api-cache';
+import { requireApiKey } from '@/lib/api-auth';
 
 // Background job itself can take up to 60s (same budget as the existing
 // cluster-check feature) — waitUntil() keeps the function alive for it.
@@ -103,6 +108,15 @@ function computeApiSafetyScore(
 
 export async function GET(request: NextRequest) {
   try {
+    // 0. Auth first — before spending a single RPC call on an unpaid request.
+    const auth = await requireApiKey(request, CORS_HEADERS);
+    if (!auth.ok) {
+      return (
+        auth.response ??
+        NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: CORS_HEADERS })
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const mint = searchParams.get('mint') || searchParams.get('ca');
 
