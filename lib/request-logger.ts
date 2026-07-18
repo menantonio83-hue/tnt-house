@@ -1,4 +1,8 @@
-// Version 4.1 — lib/request-logger.ts
+// Version 6.5 — lib/request-logger.ts
+//
+// v6.5: switched to the service-role Supabase client (lib/supabase-admin.ts)
+// — api_request_log now has RLS enabled with no anon policies (it's a
+// per-key usage record, billing-adjacent, shouldn't be publicly readable).
 //
 // Per-request audit log for the Risk-Data API — the source of truth for
 // both billing (who called how many times) and analytics (which mints
@@ -25,12 +29,7 @@
 // never awaited on the request's critical path, and never allowed to
 // fail the actual API response if the insert fails.
 
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  'https://pjtvjslcffuulsqxerpx.supabase.co',
-  'sb_publishable__gmhE8SE_blCu-v90fV2OQ_YmFCkfFU',
-);
+import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
 
 const TABLE = 'api_request_log';
 

@@ -1,4 +1,8 @@
-// Version 2.2 — lib/api-key-store.ts
+// Version 6.3 — lib/api-key-store.ts
+//
+// v6.3: switched to the service-role Supabase client (lib/supabase-admin.ts).
+// This is the most important table to have locked down — it's what
+// decides who gets 'paid' (unlimited) access. See lib/supabase-admin.ts.
 //
 // Supabase-backed storage for Risk-Data API keys.
 //
@@ -23,12 +27,7 @@
 // (last_used_at, a running request_count) — not a substitute for the
 // Stage 4 audit log.
 
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  'https://pjtvjslcffuulsqxerpx.supabase.co',
-  'sb_publishable__gmhE8SE_blCu-v90fV2OQ_YmFCkfFU',
-);
+import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
 
 const TABLE = 'api_keys';
 

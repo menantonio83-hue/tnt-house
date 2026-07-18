@@ -1,4 +1,8 @@
-// Version 5.2 — app/api/v1/signup/route.ts
+// Version 6.7 — app/api/v1/signup/route.ts
+//
+// v6.7: switched the duplicate-email lookup to the service-role Supabase
+// client (lib/supabase-admin.ts) — api_keys now has RLS enabled with no
+// anon policies. See lib/supabase-admin.ts for why.
 //
 // Public signup endpoint for the Risk-Data API landing page — no admin
 // secret required, unlike app/api/v1/admin/keys (that one stays for
@@ -18,14 +22,9 @@
 // key-issuing flow from Stage 2).
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
 import { generateApiKey } from '@/lib/api-key';
 import { insertApiKey } from '@/lib/api-key-store';
-
-const supabase = createClient(
-  'https://pjtvjslcffuulsqxerpx.supabase.co',
-  'sb_publishable__gmhE8SE_blCu-v90fV2OQ_YmFCkfFU',
-);
 
 export const dynamic = 'force-dynamic';
 

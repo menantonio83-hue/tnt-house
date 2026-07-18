@@ -1,4 +1,10 @@
-// Version 3.1 — lib/rate-limit-store.ts
+// Version 6.4 — lib/rate-limit-store.ts
+//
+// v6.4: switched to the service-role Supabase client (lib/supabase-admin.ts)
+// — api_key_usage_daily now has RLS enabled with no anon policies. Since
+// increment_daily_usage() isn't SECURITY DEFINER, it runs with the
+// caller's privileges — calling it via the anon key would now fail
+// against RLS; the service-role client bypasses RLS and keeps working.
 //
 // Atomic daily usage counter for the Risk-Data API. Uses a Postgres
 // function via Supabase RPC instead of read-then-write from JS, so
@@ -33,12 +39,7 @@
 // Window is calendar-day UTC (not a rolling 24h window) — simpler to
 // reason about and explain to API customers than a sliding window.
 
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  'https://pjtvjslcffuulsqxerpx.supabase.co',
-  'sb_publishable__gmhE8SE_blCu-v90fV2OQ_YmFCkfFU',
-);
+import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
 
 // Increments today's (UTC) usage counter for this key and returns the
 // new total. Returns null on a database error — callers should fail

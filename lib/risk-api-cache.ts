@@ -1,4 +1,8 @@
-// Version 1.2 — lib/risk-api-cache.ts
+// Version 6.2 — lib/risk-api-cache.ts
+//
+// v6.2: switched to the service-role Supabase client (lib/supabase-admin.ts)
+// — risk_cluster_cache now has RLS enabled with no anon policies as part
+// of the Stage 6 security review. See lib/supabase-admin.ts for why.
 //
 // Supabase-backed cache for the slow insider-cluster detection step only.
 // Everything else in the Risk-Data API response (mint/freeze authority,
@@ -26,12 +30,7 @@
 //   4. Row status = 'pending' but stale (> PENDING_TTL_MS, likely crashed job)
 //      -> re-trigger background job, return fast response without clusters.
 
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  'https://pjtvjslcffuulsqxerpx.supabase.co',
-  'sb_publishable__gmhE8SE_blCu-v90fV2OQ_YmFCkfFU',
-);
+import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
 
 const TABLE = 'risk_cluster_cache';
 

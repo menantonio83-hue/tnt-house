@@ -1,4 +1,7 @@
-// Version 4.2 — lib/usage-stats.ts
+// Version 6.6 — lib/usage-stats.ts
+//
+// v6.6: switched to the service-role Supabase client (lib/supabase-admin.ts)
+// — api_request_log now has RLS enabled with no anon policies.
 //
 // Aggregates api_request_log for the admin usage/billing view.
 //
@@ -10,12 +13,7 @@
 // Fine for a solo project's current volume; revisit with a real
 // aggregate query if request volume grows enough to matter.
 
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  'https://pjtvjslcffuulsqxerpx.supabase.co',
-  'sb_publishable__gmhE8SE_blCu-v90fV2OQ_YmFCkfFU',
-);
+import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
 
 const TABLE = 'api_request_log';
 const RECENT_SAMPLE_SIZE = 500;
