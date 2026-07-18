@@ -1,4 +1,12 @@
-// Version 1.8 — app/api/v1/token-risk/route.ts
+// Version 1.9 — app/api/v1/token-risk/route.ts
+//
+// v1.9: lib/holder-distribution.ts was rewritten from scratch (v6.12) —
+// the v6.10 retry wrapper didn't actually fix the reported bug (holder_
+// count: 0 still reproduced on BONK). The new version distinguishes a
+// genuine RPC failure/rate-limit from a real empty holder list instead
+// of guessing, with real backoff and real per-attempt logging. Bumped
+// HOLDER_RISK_TIMEOUT_MS (25s -> 40s) to give the longer retry/backoff
+// schedule room within the 60s function budget.
 //
 // Risk-Data API — two more bugs reported live on real tokens (BONK,
 // USDC) after the Stage 6 timeout fix, both fixed without touching
@@ -89,11 +97,13 @@ export const dynamic = 'force-dynamic';
 
 // Generous but bounded — well under the 60s function budget, plenty of
 // headroom for a genuinely slow (not hung) public-RPC response.
-// HOLDER_RISK gets the largest budget: checkHolderDistributionRisk does
-// two sequential RPC round trips internally, and getHolderDistributionRobust
-// can now retry that up to 3 times on an ambiguous zero-holder result.
+// HOLDER_RISK gets the largest budget: getHolderDistributionRobust can
+// make up to 3 attempts (2 RPC calls each, 5s fetch timeout apiece) with
+// up to 5.5s of backoff between them — worst realistic case is well
+// under this, but the margin matters since a persistent rate limit is
+// exactly the failure mode this is meant to survive.
 const MINT_INFO_TIMEOUT_MS = 12000;
-const HOLDER_RISK_TIMEOUT_MS = 25000;
+const HOLDER_RISK_TIMEOUT_MS = 40000;
 const DEX_TIMEOUT_MS = 8000;
 
 const HOLDER_RISK_FALLBACK = {

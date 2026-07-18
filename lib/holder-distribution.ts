@@ -1,31 +1,27 @@
-// Version 6.10 — lib/holder-distribution.ts
+// Version 6.12 — lib/holder-distribution.ts
 //
-// Wraps the existing checkHolderDistributionRisk() (lib/helius-client.js,
-// NOT modified) with a retry, fixing a real bug reported live on BONK
-// and USDC: that function returns
-//   { riskLevel: 'CRITICAL', holderCount: 0, largestHolderPercent: 100 }
-// whenever the underlying getTokenLargestAccounts + getTokenSupply RPC
-// pair fails for ANY reason — including a rate-limited or errored
-// response from the free public Solana RPC. The error is caught deep
-// inside getTopHolders() and silently converted into an empty array,
-// which is indistinguishable from "this token genuinely has zero
-// holders". A massively-held token like BONK or USDC reporting 0
-// holders is a strong signal this is a transient fetch failure, not
-// reality — likely made more frequent by Stage 6's timeout fix, which
-// lets the background cluster-detection job hit the same public RPC
-// more aggressively right around the same time as the main request.
+// v6.10's retry wrapper around checkHolderDistributionRisk()
+// (lib/helius-client.js) did NOT fix the bug in practice — retried BONK
+// still came back holder_count: 0. Reasoning through why: that
+// function's internal RPC handling collapses BOTH "genuinely zero
+// holders" and "RPC call errored/rate-limited" into the identical
+// return shape ({ holderCount: 0, ... }), so a caller — even one that
+// retries — has no way to tell which happened. On top of that, the
+// previous backoff (600ms then 1200ms, ~1.8s total) is nowhere near
+// long enough to clear a real public-RPC rate-limit window.
 //
-// This does NOT edit helius-client.js. It just retries the ambiguous
-// zero-holder result a few times with a short backoff: a genuine
-// transient RPC failure usually clears on retry, while a token that
-// truly has no distributed holders yet will consistently return the
-// same result either way, so retrying never makes a real "no holders"
-// case worse — it only rescues the false ones.
+// This is a from-scratch implementation of the same on-chain query
+// (getTokenLargestAccounts + getTokenSupply) — NOT a wrapper around the
+// existing function, and does not modify lib/helius-client.js. Doing it
+// directly lets this tell a genuine empty result (valid RPC response,
+// no error, truly zero accounts) apart from an RPC-side failure, and
+// only retries the latter, with real backoff and real logging on every
+// attempt — visible in Vercel function logs — instead of guessing.
 
-import { checkHolderDistributionRisk } from '@/lib/helius-client';
-
+const RPC_URL = process.env.HELIUS_RPC_URL || 'https://api.mainnet-beta.solana.com';
 const MAX_ATTEMPTS = 3;
-const BACKOFF_MS = 600;
+const BACKOFF_SCHEDULE_MS = [1500, 4000]; // wait before attempt 2, then before attempt 3
+const FETCH_TIMEOUT_MS = 5000;
 
 export interface HolderDistributionResult {
   riskLevel: string;
@@ -34,15 +30,145 @@ export interface HolderDistributionResult {
   holderCount: number;
 }
 
-export async function getHolderDistributionRobust(mint: string): Promise<HolderDistributionResult> {
-  let result = await checkHolderDistributionRisk(mint);
-  let attempt = 1;
+interface RawHolder {
+  address: string;
+  amount: string;
+}
 
-  while (result.holderCount === 0 && attempt < MAX_ATTEMPTS) {
-    await new Promise((resolve) => setTimeout(resolve, BACKOFF_MS * attempt));
-    result = await checkHolderDistributionRisk(mint);
-    attempt++;
+// NOTE: deliberately a flat interface, not a discriminated union
+// ({ ok: true; data } | { ok: false; reason }). This repo's
+// tsconfig.json has "strict": false, and under that setting TS's
+// narrowing on boolean-literal discriminants is unreliable even for
+// this exact pattern — confirmed the same way in lib/api-auth.ts
+// (Stage 2). A flat interface with nullable fields sidesteps it.
+interface RpcOutcome<T> {
+  ok: boolean;
+  data: T | null;
+  reason: string | null;
+}
+
+async function callSolanaRpc(method: string, params: unknown[]): Promise<RpcOutcome<any>> {
+  try {
+    const res = await fetch(RPC_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+
+    if (!res.ok) {
+      return { ok: false, data: null, reason: `HTTP ${res.status}` };
+    }
+
+    const json = await res.json();
+
+    if (json.error) {
+      // An explicit Solana JSON-RPC error object — covers rate limiting
+      // and everything else the node can reject a request for. This is
+      // a confirmed RPC-side failure, never a legitimate "zero holders"
+      // answer, so it's always safe to retry.
+      return {
+        ok: false,
+        data: null,
+        reason: `RPC error: ${json.error.message || JSON.stringify(json.error)}`,
+      };
+    }
+
+    if (!json.result) {
+      return { ok: false, data: null, reason: 'RPC response missing result field' };
+    }
+
+    return { ok: true, data: json.result, reason: null };
+  } catch (e: any) {
+    return {
+      ok: false,
+      data: null,
+      reason: e.name === 'TimeoutError' ? 'fetch timed out' : e.message || 'fetch failed',
+    };
+  }
+}
+
+async function fetchHolderSnapshot(
+  mint: string,
+): Promise<RpcOutcome<{ holders: RawHolder[]; totalSupply: number }>> {
+  const largest = await callSolanaRpc('getTokenLargestAccounts', [mint]);
+  if (!largest.ok || !largest.data) {
+    return { ok: false, data: null, reason: largest.reason ?? 'unknown RPC failure' };
   }
 
-  return result;
+  const holders: RawHolder[] = largest.data.value || [];
+
+  // A genuinely empty largest-accounts list, with NO rpc error and a
+  // valid response, means the mint really has no distributed holders
+  // yet — trust it immediately, no retry needed, no need to even ask
+  // for supply.
+  if (holders.length === 0) {
+    return { ok: true, data: { holders: [], totalSupply: 0 }, reason: null };
+  }
+
+  const supply = await callSolanaRpc('getTokenSupply', [mint]);
+  if (!supply.ok || !supply.data) {
+    return { ok: false, data: null, reason: supply.reason ?? 'unknown RPC failure' };
+  }
+
+  const totalSupply = parseInt(supply.data.value.amount, 10);
+  return { ok: true, data: { holders, totalSupply }, reason: null };
+}
+
+function classifyRisk(largestHolderPercent: number, top10Percent: number): string {
+  if (largestHolderPercent > 20) return 'CRITICAL';
+  if (largestHolderPercent > 15) return 'HIGH';
+  if (top10Percent > 50) return 'MEDIUM';
+  return 'LOW';
+}
+
+export async function getHolderDistributionRobust(mint: string): Promise<HolderDistributionResult> {
+  let lastFailureReason = 'unknown';
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const snapshot = await fetchHolderSnapshot(mint);
+
+    if (snapshot.ok && snapshot.data) {
+      const { holders, totalSupply } = snapshot.data;
+      console.log(
+        `[holder-distribution] ${mint} attempt ${attempt}/${MAX_ATTEMPTS}: ok — ${holders.length} holders, supply=${totalSupply}`,
+      );
+
+      if (holders.length === 0) {
+        return { riskLevel: 'CRITICAL', largestHolderPercent: 100, top10Percent: 100, holderCount: 0 };
+      }
+
+      const withPercent = holders.map((h) => ({
+        balance: parseInt(h.amount, 10),
+        percent: totalSupply > 0 ? (parseInt(h.amount, 10) / totalSupply) * 100 : 0,
+      }));
+      const largestHolderPercent = withPercent[0].percent;
+      const top10Percent = withPercent.slice(0, 10).reduce((sum, h) => sum + h.percent, 0);
+
+      return {
+        riskLevel: classifyRisk(largestHolderPercent, top10Percent),
+        largestHolderPercent,
+        top10Percent,
+        holderCount: withPercent.length,
+      };
+    }
+
+    lastFailureReason = snapshot.reason ?? 'unknown';
+    console.warn(
+      `[holder-distribution] ${mint} attempt ${attempt}/${MAX_ATTEMPTS}: RPC failure — ${lastFailureReason}`,
+    );
+
+    if (attempt < MAX_ATTEMPTS) {
+      const wait = BACKOFF_SCHEDULE_MS[attempt - 1] ?? BACKOFF_SCHEDULE_MS[BACKOFF_SCHEDULE_MS.length - 1];
+      await new Promise((resolve) => setTimeout(resolve, wait));
+    }
+  }
+
+  // Every attempt hit a confirmed RPC-side failure — honestly report
+  // "we don't know" (ERROR) rather than the misleading "CRITICAL / 100%
+  // concentrated" a genuine zero-holder read would imply.
+  console.error(
+    `[holder-distribution] ${mint}: all ${MAX_ATTEMPTS} attempts failed, last reason: ${lastFailureReason}`,
+  );
+  return { riskLevel: 'ERROR', largestHolderPercent: 0, top10Percent: 0, holderCount: 0 };
 }
