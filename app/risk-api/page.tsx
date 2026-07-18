@@ -1,4 +1,9 @@
-// Version 5.4 — app/risk-api/page.tsx
+// Version 5.5 — app/risk-api/page.tsx
+//
+// v5.5: added the Billing section (id="billing", matches the
+// upgrade_url anchor from lib/rate-limit.ts v3.4) with the interactive
+// BillingPanel, and updated Pricing from the old free/paid placeholder
+// to the real three-tier model (free / pay-per-call / subscription).
 //
 // Public landing + docs page for the Risk-Data API at /risk-api.
 // New route, doesn't touch app/page.js or any existing page. Visual
@@ -8,9 +13,10 @@
 // product, not a separate brand.
 
 import type { Metadata } from 'next';
-import { Bot, Shield, Terminal, Database, Lock, Zap, CheckCircle2 } from 'lucide-react';
+import { Bot, Shield, Terminal, Database, Lock, Zap, CheckCircle2, CreditCard } from 'lucide-react';
 import CopyButton from './CopyButton';
 import RiskApiSignupForm from './RiskApiSignupForm';
+import BillingPanel from './BillingPanel';
 
 export const metadata: Metadata = {
   title: 'Risk-Data API — TNT House',
@@ -192,10 +198,10 @@ export default function RiskApiPage() {
           <h2 className="text-xl sm:text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400 mb-6">
             Limits &amp; pricing
           </h2>
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid sm:grid-cols-3 gap-4">
             <div className="border border-purple-500/30 rounded-lg p-5 bg-slate-900/40">
               <div className="text-[11px] font-bold text-purple-400 tracking-widest mb-1">FREE</div>
-              <div className="text-2xl font-black mb-3">100 req/day</div>
+              <div className="text-2xl font-black mb-3">15 req/day</div>
               <ul className="space-y-2 text-xs text-slate-400">
                 <li className="flex items-center gap-2">
                   <CheckCircle2 size={13} className="text-emerald-400 shrink-0" /> Full response schema
@@ -209,21 +215,50 @@ export default function RiskApiPage() {
               </ul>
             </div>
             <div className="border border-emerald-500/30 rounded-lg p-5 bg-slate-900/40">
-              <div className="text-[11px] font-bold text-emerald-400 tracking-widest mb-1">PAID</div>
-              <div className="text-2xl font-black mb-3">Unlimited</div>
-              <ul className="space-y-2 text-xs text-slate-400 mb-3">
+              <div className="text-[11px] font-bold text-emerald-400 tracking-widest mb-1">PAY-PER-CALL</div>
+              <div className="text-2xl font-black mb-3">$0.07<span className="text-sm text-slate-400">/call</span></div>
+              <ul className="space-y-2 text-xs text-slate-400">
                 <li className="flex items-center gap-2">
-                  <CheckCircle2 size={13} className="text-emerald-400 shrink-0" /> No daily cap
+                  <CheckCircle2 size={13} className="text-emerald-400 shrink-0" /> Top up any amount $5–$500
                 </li>
                 <li className="flex items-center gap-2">
-                  <CheckCircle2 size={13} className="text-emerald-400 shrink-0" /> Priority support
+                  <CheckCircle2 size={13} className="text-emerald-400 shrink-0" /> Only charged past the free 15/day
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 size={13} className="text-emerald-400 shrink-0" /> Drops to $0.03/call once subscribed
                 </li>
               </ul>
-              <p className="text-[11px] text-slate-500">
-                Self-serve billing is on the way — for now, reach out and we&apos;ll set you up manually.
-              </p>
+            </div>
+            <div className="border border-purple-500/30 rounded-lg p-5 bg-slate-900/40">
+              <div className="text-[11px] font-bold text-purple-400 tracking-widest mb-1">SUBSCRIPTION</div>
+              <div className="text-2xl font-black mb-3">$49<span className="text-sm text-slate-400">/30 days</span></div>
+              <ul className="space-y-2 text-xs text-slate-400">
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 size={13} className="text-emerald-400 shrink-0" /> 1000 calls included
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 size={13} className="text-emerald-400 shrink-0" /> $0.03/call overage after that
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 size={13} className="text-emerald-400 shrink-0" /> Manual renewal — no auto-charge
+                </li>
+              </ul>
             </div>
           </div>
+          <p className="text-[11px] text-slate-500 mt-4">
+            Paid in $MRDT / SOL / USDC via Solana Pay — same payment flow as the rest of TNT House.
+            Solana Pay can&apos;t auto-charge, so the subscription is a manual 30-day top-up, not a recurring
+            subscription in the traditional sense.
+          </p>
+        </section>
+
+        {/* Billing */}
+        <section id="billing" className="pb-14 scroll-mt-20">
+          <h2 className="text-xl sm:text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400 mb-6 flex items-center gap-2">
+            <CreditCard size={20} className="text-emerald-400" />
+            Manage billing
+          </h2>
+          <BillingPanel />
         </section>
 
         {/* Signup */}

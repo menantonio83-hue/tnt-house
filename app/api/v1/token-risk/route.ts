@@ -1,4 +1,9 @@
-// Version 1.9 — app/api/v1/token-risk/route.ts
+// Version 1.10 — app/api/v1/token-risk/route.ts
+//
+// v1.10: adds X-Credit-Balance-Usd header (pay-per-call billing, see
+// lib/rate-limit.ts v3.4 / lib/billing-pricing.ts) to successful
+// responses, so callers can see their remaining balance without a
+// separate request.
 //
 // v1.9: lib/holder-distribution.ts was rewritten from scratch (v6.12) —
 // the v6.10 retry wrapper didn't actually fix the reported bug (holder_
@@ -247,6 +252,9 @@ export async function GET(request: NextRequest) {
     if (rateLimit.limit !== null) {
       rateLimitHeaders['X-RateLimit-Limit'] = String(rateLimit.limit);
       rateLimitHeaders['X-RateLimit-Remaining'] = String(rateLimit.remaining ?? 0);
+    }
+    if (rateLimit.creditBalanceUsd !== null) {
+      rateLimitHeaders['X-Credit-Balance-Usd'] = rateLimit.creditBalanceUsd.toFixed(4);
     }
 
     const { searchParams } = new URL(request.url);
