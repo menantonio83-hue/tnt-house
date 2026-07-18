@@ -1,4 +1,11 @@
-// Version 7.5 — app/api/v1/billing/create-invoice/route.ts
+// Version 8.3 — app/api/v1/billing/create-invoice/route.ts
+//
+// v8.3: priceInvoice() can now return null (live price fetch failed AND
+// no fresh-enough cached price — see lib/billing-pricing.ts's version
+// note for the bug this fixes). When that happens this route refuses to
+// create the invoice rather than ever price it off a stale guess, and
+// tells the caller to pick a different currency (USDC never fails this
+// way — it's a 1:1 stablecoin with no external price dependency).
 //
 // POST /api/v1/billing/create-invoice
 // Body: { api_key: "tnt_sk_...", kind: "subscription" | "topup", currency: "SOL"|"MRDT"|"USDC", usd_amount?: number }
@@ -71,6 +78,17 @@ export async function POST(request: NextRequest) {
     }
 
     const priced = await priceInvoice(usdAmount, currency);
+
+    if (!priced) {
+      return NextResponse.json(
+        {
+          error: `Could not get a reliable ${currency} price right now — please try USDC instead, or try ${currency} again in a few minutes.`,
+          currency_unavailable: currency,
+        },
+        { status: 503 },
+      );
+    }
+
     const payment = await createPaymentInvoice(key.id, kind, currency, usdAmount, priced.payAmount);
 
     if (!payment) {

@@ -1,4 +1,11 @@
-// Version 7.17 — app/risk-api/BillingPanel.tsx
+// Version 8.4 — app/risk-api/BillingPanel.tsx
+//
+// v8.4: create-invoice can now return 503 with currency_unavailable
+// (see lib/billing-pricing.ts's version note — this is the fix for a
+// real MRDT overcharge bug). That specific failure sends the user back
+// to the currency picker with an inline explanation instead of the
+// generic error screen, which would otherwise force re-entering the
+// API key for a problem that has nothing to do with the key.
 //
 // v7.17: startPolling now sends `api_key` alongside `payment_id` on
 // every verify-payment poll — that route started requiring it (see its
@@ -124,6 +131,7 @@ export default function BillingPanel() {
 
   const handlePickCurrency = (c: Currency) => {
     setCurrency(c);
+    setErrorMsg('');
     setStep('pick-wallet');
   };
 
@@ -141,6 +149,14 @@ export default function BillingPanel() {
       });
       const data = await res.json();
       if (!res.ok) {
+        if (data.currency_unavailable) {
+          // Don't dead-end into the generic error screen (which resets
+          // to re-entering the API key) — send the user straight back
+          // to picking a different currency, with the reason visible.
+          setErrorMsg(data.error || `${currency} is temporarily unavailable`);
+          setStep('pick-currency');
+          return;
+        }
         setErrorMsg(data.error || 'Could not create invoice');
         setStep('error');
         return;
@@ -315,6 +331,11 @@ export default function BillingPanel() {
       {step === 'pick-currency' && (
         <div className="space-y-3">
           <h4 className="text-sm font-bold text-purple-400">Choose payment currency</h4>
+          {errorMsg && (
+            <div className="text-[11px] text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded px-3 py-2">
+              {errorMsg}
+            </div>
+          )}
           <div className="grid grid-cols-3 gap-3">
             <button
               onClick={() => handlePickCurrency('MRDT')}
