@@ -1,8 +1,11 @@
-// Version 6.3 — lib/api-key-store.ts
+// Version 7.3 — lib/api-key-store.ts
 //
-// v6.3: switched to the service-role Supabase client (lib/supabase-admin.ts).
-// This is the most important table to have locked down — it's what
-// decides who gets 'paid' (unlimited) access. See lib/supabase-admin.ts.
+// v7.3: added billing fields to ApiKeyRecord (credit_balance_usd,
+// subscription_expires_at, subscription_cycle_calls_used) and the new
+// 'subscription' tier — see lib/billing-pricing.ts / lib/rate-limit.ts.
+// 'paid' is kept as-is: a manually-issued, truly unlimited admin
+// override (app/api/v1/admin/keys), distinct from the new self-serve
+// $49/30-day 'subscription' tier.
 //
 // Supabase-backed storage for Risk-Data API keys.
 //
@@ -14,7 +17,7 @@
 //     key_prefix text not null,           -- display-only, e.g. "tnt_sk_a1b2c3d"
 //     owner_label text,                   -- free-text for now (email/project name);
 //                                          -- becomes a real user_id once Stage 5 ships auth
-//     tier text not null default 'free',  -- 'free' | 'paid' — enforced in Stage 3
+//     tier text not null default 'free',  -- 'free' | 'paid' | 'subscription'
 //     is_active boolean not null default true,
 //     created_at timestamptz not null default now(),
 //     last_used_at timestamptz,
@@ -22,16 +25,22 @@
 //   );
 //   create index api_keys_key_hash_idx on api_keys (key_hash);
 //
+//   -- added for billing:
+//   alter table api_keys add column credit_balance_usd numeric not null default 0;
+//   alter table api_keys add column subscription_expires_at timestamptz;
+//   alter table api_keys add column subscription_cycle_calls_used int not null default 0;
+//
 // Note: full per-request usage LOGGING (which mint, when, by whom) is
 // Stage 4 scope. This module only tracks enough to know a key is alive
 // (last_used_at, a running request_count) — not a substitute for the
 // Stage 4 audit log.
 
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
+import { hashApiKey, isValidKeyFormat } from '@/lib/api-key';
 
 const TABLE = 'api_keys';
 
-export type ApiKeyTier = 'free' | 'paid';
+export type ApiKeyTier = 'free' | 'paid' | 'subscription';
 
 export interface ApiKeyRecord {
   id: string;
@@ -43,6 +52,9 @@ export interface ApiKeyRecord {
   created_at: string;
   last_used_at: string | null;
   request_count: number;
+  credit_balance_usd: number;
+  subscription_expires_at: string | null;
+  subscription_cycle_calls_used: number;
 }
 
 export async function insertApiKey(
@@ -77,6 +89,15 @@ export async function findApiKeyByHash(keyHash: string): Promise<ApiKeyRecord | 
     return null;
   }
   return data as ApiKeyRecord | null;
+}
+
+// Convenience for routes that receive a raw key directly from a form
+// (e.g. the billing panel) rather than an Authorization header — same
+// hash-then-lookup as requireApiKey() in lib/api-auth.ts, just exposed
+// here so billing routes don't need to duplicate the hashing call.
+export async function findApiKeyByRawKey(rawKey: string): Promise<ApiKeyRecord | null> {
+  if (!isValidKeyFormat(rawKey)) return null;
+  return findApiKeyByHash(hashApiKey(rawKey));
 }
 
 // Fire-and-forget usage stamp — called via waitUntil() from the auth
