@@ -1,16 +1,33 @@
-// Version 1.7 — app/api/v1/token-risk/route.ts
+// Version 1.8 — app/api/v1/token-risk/route.ts
 //
-// Risk-Data API — Stage 6 bugfix: real (non-major) tokens could return a
-// raw platform 502 instead of a clean JSON response. Root cause: the
-// public Solana RPC + DexScreener have no guaranteed response time —
-// fast and reliable for a huge, well-indexed token like USDC, but can
-// hang for a less common one, and Node's fetch() has no default
-// timeout. getMintInfo / checkHolderDistributionRisk / getDexScreenerData
-// were awaited with a plain Promise.all, so a hang in any one of them
-// could run until Vercel's own function timeout killed the whole
-// request — the caller sees a bare 502 with no body, not our error
-// handling. Fixed by wrapping each call in lib/with-timeout.ts with a
-// safe fallback, so the response always comes back fast and as JSON.
+// Risk-Data API — two more bugs reported live on real tokens (BONK,
+// USDC) after the Stage 6 timeout fix, both fixed without touching
+// lib/helius-client.js:
+//
+// 1. holder_distribution came back as { holder_count: 0,
+//    largest_holder_percent: 100 } on massively-held tokens. Root cause:
+//    checkHolderDistributionRisk() returns exactly that shape whenever
+//    the underlying getTokenLargestAccounts + getTokenSupply RPC pair
+//    fails for ANY reason (including a rate-limited response from the
+//    free public RPC) — the failure is swallowed deep inside
+//    getTopHolders() and silently converted into an empty array,
+//    indistinguishable from "this token genuinely has zero holders".
+//    Fixed via lib/holder-distribution.ts, which retries that specific
+//    ambiguous result a few times before trusting it.
+//
+// 2. price_change_24h_percent came back as 456420 — not a real 24h move
+//    for a huge, liquid token. getDexScreenerData() passes DexScreener's
+//    number straight through with no validation. Fixed via
+//    lib/sanitize-market-data.ts, a defensive layer on our own output
+//    that nulls out implausible values instead of relaying them.
+//
+// Also carries the Stage 6 502 fix: real (non-major) tokens could
+// return a raw platform 502 instead of a clean JSON response, because
+// the public Solana RPC + DexScreener have no guaranteed response time
+// and Node's fetch() has no default timeout — getMintInfo /
+// checkHolderDistributionRisk / getDexScreenerData are each capped with
+// their own timeout + safe fallback (lib/with-timeout.ts), so a slow
+// upstream degrades the response instead of hanging it.
 //
 // GET /api/v1/token-risk?mint=<mint_address>   (or ?ca=<mint_address>)
 // Header: Authorization: Bearer <api_key>
@@ -36,10 +53,6 @@
 //   validation afterward (bad mint, upstream error).
 // - Every response (2xx/4xx/5xx) is logged via lib/request-logger.ts —
 //   fire-and-forget, never blocks or fails the actual API response.
-// - getMintInfo / checkHolderDistributionRisk / getDexScreenerData are
-//   each capped with their own timeout (see lib/with-timeout.ts) and a
-//   safe fallback — a slow upstream degrades the response, it never
-//   hangs it.
 //
 // Requires: `npm install @vercel/functions` (provides waitUntil() so the
 // background cluster job and the request log write both keep running
@@ -48,7 +61,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PublicKey } from '@solana/web3.js';
 import { waitUntil } from '@vercel/functions';
-import { getMintInfo, checkHolderDistributionRisk, getDexScreenerData } from '@/lib/helius-client';
+import { getMintInfo, getDexScreenerData } from '@/lib/helius-client';
+import { getHolderDistributionRobust } from '@/lib/holder-distribution';
+import { sanitizeDexMarketData } from '@/lib/sanitize-market-data';
 import { detectInsiderClusters, type InsiderCluster } from '@/lib/insider-cluster-detector';
 import {
   getClusterCache,
@@ -74,10 +89,11 @@ export const dynamic = 'force-dynamic';
 
 // Generous but bounded — well under the 60s function budget, plenty of
 // headroom for a genuinely slow (not hung) public-RPC response.
-// checkHolderDistributionRisk does TWO sequential RPC round trips
-// internally (largest accounts, then supply), hence the larger budget.
+// HOLDER_RISK gets the largest budget: checkHolderDistributionRisk does
+// two sequential RPC round trips internally, and getHolderDistributionRobust
+// can now retry that up to 3 times on an ambiguous zero-holder result.
 const MINT_INFO_TIMEOUT_MS = 12000;
-const HOLDER_RISK_TIMEOUT_MS = 18000;
+const HOLDER_RISK_TIMEOUT_MS = 25000;
 const DEX_TIMEOUT_MS = 8000;
 
 const HOLDER_RISK_FALLBACK = {
@@ -250,11 +266,18 @@ export async function GET(request: NextRequest) {
     // individually timeout-capped so a slow upstream (common for a
     // less-popular real token on the free public RPC) degrades this
     // response instead of hanging it — see lib/with-timeout.ts.
-    const [mintInfo, holderRisk, dexData] = await Promise.all([
+    // Holder distribution goes through a retry wrapper (see
+    // lib/holder-distribution.ts) so a transient RPC failure doesn't
+    // masquerade as "this token has zero holders".
+    const [mintInfo, holderRisk, rawDexData] = await Promise.all([
       withTimeout(getMintInfo(mint), MINT_INFO_TIMEOUT_MS, null),
-      withTimeout(checkHolderDistributionRisk(mint), HOLDER_RISK_TIMEOUT_MS, HOLDER_RISK_FALLBACK),
+      withTimeout(getHolderDistributionRobust(mint), HOLDER_RISK_TIMEOUT_MS, HOLDER_RISK_FALLBACK),
       withTimeout(getDexScreenerData(mint), DEX_TIMEOUT_MS, DEX_DATA_FALLBACK),
     ]);
+
+    // Defensive layer on our own output — nulls out implausible values
+    // (e.g. a 456420% 24h price change) instead of relaying them as-is.
+    const dexData = sanitizeDexMarketData(rawDexData);
 
     if (!mintInfo) {
       return respond(
