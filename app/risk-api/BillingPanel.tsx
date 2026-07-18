@@ -1,4 +1,9 @@
-// Version 7.8 — app/risk-api/BillingPanel.tsx
+// Version 7.17 — app/risk-api/BillingPanel.tsx
+//
+// v7.17: startPolling now sends `api_key` alongside `payment_id` on
+// every verify-payment poll — that route started requiring it (see its
+// own version note) so only the invoice's owner can trigger/observe its
+// confirmation status.
 //
 // Reuses the SAME payment execution page (app/pay/page.js, unmodified)
 // and the SAME visual language for currency/wallet selection as the
@@ -173,13 +178,20 @@ export default function BillingPanel() {
         const res = await fetch('/api/v1/billing/verify-payment', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ payment_id: paymentId }),
+          body: JSON.stringify({ payment_id: paymentId, api_key: apiKey.trim() }),
         });
         const data = await res.json();
         if (data.verified) {
           if (pollRef.current) clearInterval(pollRef.current);
           setSuccessResult(data);
           setStep('success');
+          return;
+        }
+        if (data.expired) {
+          if (pollRef.current) clearInterval(pollRef.current);
+          setErrorMsg(data.reason || 'This invoice expired before payment was detected. Please create a new one.');
+          setStep('error');
+          return;
         }
       } catch {
         // transient network error during polling — next tick retries

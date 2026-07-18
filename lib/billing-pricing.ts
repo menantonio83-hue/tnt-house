@@ -1,4 +1,13 @@
-// Version 7.9 — lib/billing-pricing.ts
+// Version 7.14 — lib/billing-pricing.ts
+//
+// v7.14: added PENDING_INVOICE_TTL_MINUTES — how long a 'pending'
+// invoice is given before app/api/v1/billing/verify-payment lazily
+// flips it to 'expired' (see lib/billing-store.ts's
+// expireStalePendingPayment). Deliberately generous and deliberately
+// NOT the same thing as a transaction's blockhash validity window
+// (~60-90s, a Solana-level concern handled inside app/pay/page.js when
+// it builds the tx) — this is how long a *person* gets to open their
+// wallet app and approve the payment.
 //
 // v7.9: widened salt ranges after collision-testing revealed the
 // original MRDT range (+1-50 whole tokens) collided ~38% of the time
@@ -48,6 +57,7 @@ export const OVERAGE_RATE_FREE_USD = 0.07; // per call, free tier over the daily
 export const OVERAGE_RATE_SUBSCRIBED_USD = 0.03; // per call, subscribed and over monthly quota
 export const MIN_TOPUP_USD = 5;
 export const MAX_TOPUP_USD = 500;
+export const PENDING_INVOICE_TTL_MINUTES = 45;
 
 // Fallback prices if DexScreener is unreachable — same fallbacks already
 // used client-side in app/page.js (getSafePrice / getSafeSolPrice), kept
