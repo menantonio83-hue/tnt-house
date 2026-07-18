@@ -54,6 +54,13 @@ import { logApiRequest } from '@/lib/request-logger';
 // cluster-check feature) — waitUntil() keeps the function alive for it.
 export const maxDuration = 60;
 
+// Reads the Authorization header and query params on every call — always
+// dynamic. Declaring it explicitly (same pattern as app/page.js) avoids
+// Next.js's build-time static-generation probe throwing its internal
+// "dynamic server usage" signal into this route's own try/catch, which
+// would otherwise get logged as if it were a real application error.
+export const dynamic = 'force-dynamic';
+
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, OPTIONS',

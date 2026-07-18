@@ -18,6 +18,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUsageStats } from '@/lib/usage-stats';
 
+// Reads the X-Admin-Secret header and query params on every call — always
+// dynamic. See the matching comment in token-risk/route.ts for why this
+// is declared explicitly rather than left implicit.
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     const adminSecret = request.headers.get('x-admin-secret');

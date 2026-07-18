@@ -22,6 +22,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateApiKey } from '@/lib/api-key';
 import { insertApiKey, type ApiKeyTier } from '@/lib/api-key-store';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   try {
     const adminSecret = request.headers.get('x-admin-secret');

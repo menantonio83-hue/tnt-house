@@ -1,4 +1,7 @@
-// Version 3.2 — lib/rate-limit.ts
+// Version 3.3 — lib/rate-limit.ts
+//
+// v3.3: upgrade_url now points at the real /risk-api#pricing section
+// (built in Stage 5) instead of a placeholder path.
 //
 // Rate-limit enforcement for the Risk-Data API.
 // - free tier: 100 requests / calendar day (UTC)
@@ -64,7 +67,7 @@ export async function enforceRateLimit(
           limit,
           used,
           reset_at: resetAt,
-          upgrade_url: 'https://tnt-audit.com/risk-api/pricing',
+          upgrade_url: 'https://tnt-audit.com/risk-api#pricing',
           note: 'Paid tier upgrades are handled manually for now — contact us to get an unlimited key.',
         },
         { status: 402, headers: extraHeaders },
