@@ -1,7 +1,10 @@
-// Version 1.4 — app/api/v1/token-risk/route.ts
+// Version 1.5 — app/api/v1/token-risk/route.ts
 //
-// Risk-Data API — Stage 2 adds API-key auth on top of Stage 1's route +
-// scoring logic. Rate limits / paywall are Stage 3, still not here yet.
+// Risk-Data API — Stage 3 adds daily rate limiting / paywall on top of
+// Stage 1 (route + scoring) and Stage 2 (API-key auth). No real Stripe
+// integration yet — a free-tier caller who hits the daily cap gets a
+// 402 Payment Required with an upgrade_url; billing wiring is a
+// separate task once Stripe keys/products exist.
 //
 // GET /api/v1/token-risk?mint=<mint_address>   (or ?ca=<mint_address>)
 // Header: Authorization: Bearer <api_key>
@@ -21,6 +24,11 @@
 // - Every request requires a valid API key (see lib/api-auth.ts). Keys
 //   are minted via app/api/v1/admin/keys (temporary, until Stage 5's
 //   public signup form).
+// - free tier: 100 requests / calendar day (UTC). paid tier: unlimited
+//   (tier is set by hand for now — see lib/rate-limit.ts). The counter
+//   increments on every authenticated call, even ones that fail
+//   validation afterward (bad mint, upstream error) — simplest policy
+//   to reason about and explain to API customers.
 //
 // Requires: `npm install @vercel/functions` (provides waitUntil() so the
 // background cluster job keeps running after the response is sent).
@@ -37,6 +45,7 @@ import {
   markClusterFailed,
 } from '@/lib/risk-api-cache';
 import { requireApiKey } from '@/lib/api-auth';
+import { enforceRateLimit } from '@/lib/rate-limit';
 
 // Background job itself can take up to 60s (same budget as the existing
 // cluster-check feature) — waitUntil() keeps the function alive for it.
@@ -116,6 +125,27 @@ export async function GET(request: NextRequest) {
         NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: CORS_HEADERS })
       );
     }
+    if (!auth.key) {
+      // Defensive — should be unreachable when auth.ok is true, but keeps
+      // this branch type-safe without relying on cross-field narrowing.
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: CORS_HEADERS });
+    }
+
+    // 0.5. Rate limit — counts against the key's daily quota before any
+    // RPC work happens, whether or not the request turns out valid.
+    const rateLimit = await enforceRateLimit(auth.key, CORS_HEADERS);
+    if (!rateLimit.allowed) {
+      return (
+        rateLimit.response ??
+        NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429, headers: CORS_HEADERS })
+      );
+    }
+
+    const rateLimitHeaders: Record<string, string> = { ...CORS_HEADERS, 'X-RateLimit-Reset': rateLimit.resetAt };
+    if (rateLimit.limit !== null) {
+      rateLimitHeaders['X-RateLimit-Limit'] = String(rateLimit.limit);
+      rateLimitHeaders['X-RateLimit-Remaining'] = String(rateLimit.remaining ?? 0);
+    }
 
     const { searchParams } = new URL(request.url);
     const mint = searchParams.get('mint') || searchParams.get('ca');
@@ -123,7 +153,7 @@ export async function GET(request: NextRequest) {
     if (!mint) {
       return NextResponse.json(
         { error: 'Missing required parameter: mint (or ca)' },
-        { status: 400, headers: CORS_HEADERS },
+        { status: 400, headers: rateLimitHeaders },
       );
     }
 
@@ -133,7 +163,7 @@ export async function GET(request: NextRequest) {
     } catch {
       return NextResponse.json(
         { error: `Invalid mint address: ${mint}` },
-        { status: 400, headers: CORS_HEADERS },
+        { status: 400, headers: rateLimitHeaders },
       );
     }
 
@@ -147,7 +177,7 @@ export async function GET(request: NextRequest) {
     if (!mintInfo) {
       return NextResponse.json(
         { error: 'Could not fetch mint account data — check the address or try again' },
-        { status: 502, headers: CORS_HEADERS },
+        { status: 502, headers: rateLimitHeaders },
       );
     }
 
@@ -213,7 +243,7 @@ export async function GET(request: NextRequest) {
           'honeypot_risk and lp_locked detection are on the roadmap and not yet implemented — both fields will remain null until shipped.',
         checked_at: new Date().toISOString(),
       },
-      { headers: CORS_HEADERS },
+      { headers: rateLimitHeaders },
     );
   } catch (error: any) {
     console.error('[token-risk] API error:', error);
