@@ -1,10 +1,16 @@
-// Version 1.6 — app/api/v1/token-risk/route.ts
+// Version 1.7 — app/api/v1/token-risk/route.ts
 //
-// Risk-Data API — Stage 4 adds per-request logging on top of Stage 1
-// (route + scoring), Stage 2 (API-key auth) and Stage 3 (rate limits).
-// Every response — success or error — is logged fire-and-forget via
-// lib/request-logger.ts, feeding both billing (app/api/v1/admin/usage)
-// and analytics (top mints, error rates, latency).
+// Risk-Data API — Stage 6 bugfix: real (non-major) tokens could return a
+// raw platform 502 instead of a clean JSON response. Root cause: the
+// public Solana RPC + DexScreener have no guaranteed response time —
+// fast and reliable for a huge, well-indexed token like USDC, but can
+// hang for a less common one, and Node's fetch() has no default
+// timeout. getMintInfo / checkHolderDistributionRisk / getDexScreenerData
+// were awaited with a plain Promise.all, so a hang in any one of them
+// could run until Vercel's own function timeout killed the whole
+// request — the caller sees a bare 502 with no body, not our error
+// handling. Fixed by wrapping each call in lib/with-timeout.ts with a
+// safe fallback, so the response always comes back fast and as JSON.
 //
 // GET /api/v1/token-risk?mint=<mint_address>   (or ?ca=<mint_address>)
 // Header: Authorization: Bearer <api_key>
@@ -30,6 +36,10 @@
 //   validation afterward (bad mint, upstream error).
 // - Every response (2xx/4xx/5xx) is logged via lib/request-logger.ts —
 //   fire-and-forget, never blocks or fails the actual API response.
+// - getMintInfo / checkHolderDistributionRisk / getDexScreenerData are
+//   each capped with their own timeout (see lib/with-timeout.ts) and a
+//   safe fallback — a slow upstream degrades the response, it never
+//   hangs it.
 //
 // Requires: `npm install @vercel/functions` (provides waitUntil() so the
 // background cluster job and the request log write both keep running
@@ -49,6 +59,7 @@ import {
 import { requireApiKey } from '@/lib/api-auth';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { logApiRequest } from '@/lib/request-logger';
+import { withTimeout } from '@/lib/with-timeout';
 
 // Background job itself can take up to 60s (same budget as the existing
 // cluster-check feature) — waitUntil() keeps the function alive for it.
@@ -60,6 +71,29 @@ export const maxDuration = 60;
 // "dynamic server usage" signal into this route's own try/catch, which
 // would otherwise get logged as if it were a real application error.
 export const dynamic = 'force-dynamic';
+
+// Generous but bounded — well under the 60s function budget, plenty of
+// headroom for a genuinely slow (not hung) public-RPC response.
+// checkHolderDistributionRisk does TWO sequential RPC round trips
+// internally (largest accounts, then supply), hence the larger budget.
+const MINT_INFO_TIMEOUT_MS = 12000;
+const HOLDER_RISK_TIMEOUT_MS = 18000;
+const DEX_TIMEOUT_MS = 8000;
+
+const HOLDER_RISK_FALLBACK = {
+  riskLevel: 'ERROR',
+  largestHolderPercent: 0,
+  top10Percent: 0,
+  holderCount: 0,
+};
+
+const DEX_DATA_FALLBACK = {
+  price: null as number | null,
+  liquidity: null as number | null,
+  volume24h: null as number | null,
+  priceChange24h: null as number | null,
+  ageDays: null as number | null,
+};
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -212,17 +246,24 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // 1. Cheap, live data — fetched fresh on every call.
+    // 1. Cheap, live data — fetched fresh on every call. Each call is
+    // individually timeout-capped so a slow upstream (common for a
+    // less-popular real token on the free public RPC) degrades this
+    // response instead of hanging it — see lib/with-timeout.ts.
     const [mintInfo, holderRisk, dexData] = await Promise.all([
-      getMintInfo(mint),
-      checkHolderDistributionRisk(mint),
-      getDexScreenerData(mint),
+      withTimeout(getMintInfo(mint), MINT_INFO_TIMEOUT_MS, null),
+      withTimeout(checkHolderDistributionRisk(mint), HOLDER_RISK_TIMEOUT_MS, HOLDER_RISK_FALLBACK),
+      withTimeout(getDexScreenerData(mint), DEX_TIMEOUT_MS, DEX_DATA_FALLBACK),
     ]);
 
     if (!mintInfo) {
       return respond(
         NextResponse.json(
-          { error: 'Could not fetch mint account data — check the address or try again' },
+          {
+            error: 'Could not fetch mint account data',
+            details:
+              'Either this address is not a valid Solana mint, or the Solana RPC did not respond in time. Try again in a moment.',
+          },
           { status: 502, headers: rateLimitHeaders },
         ),
         { error: 'mint_fetch_failed' },

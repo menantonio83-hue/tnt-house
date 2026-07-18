@@ -1,4 +1,12 @@
-// Version 1.1 — lib/insider-cluster-detector.ts
+// Version 6.9 — lib/insider-cluster-detector.ts
+//
+// v6.9: hardened against the same class of bug fixed in token-risk's
+// main path (see lib/with-timeout.ts) — RugCheck and the per-holder RPC
+// walk had no timeout, so a hang on any single call could stall this
+// entire background job. RugCheck's fetch now has an AbortSignal
+// timeout; each holder's signature-history walk is capped with
+// withTimeout so one slow/bad wallet is skipped (logged as an error)
+// instead of stalling the other holders behind it.
 //
 // Standalone "First Funder Trace" insider-cluster detector.
 //
@@ -19,6 +27,7 @@
 // sniper cluster signal — no paid third-party API (Nansen/Arkham) needed.
 
 import { Connection, PublicKey } from '@solana/web3.js';
+import { withTimeout } from '@/lib/with-timeout';
 
 const RPC_URL = process.env.HELIUS_RPC_URL || 'https://api.mainnet-beta.solana.com';
 const RUGCHECK_URL = 'https://api.rugcheck.xyz/v1/tokens';
@@ -27,6 +36,9 @@ const RUGCHECK_URL = 'https://api.rugcheck.xyz/v1/tokens';
 const MAX_HOLDERS_CHECKED = 10;
 const MAX_SIG_PAGES = 3; // 3 * 1000 = up to 3000 signatures back per wallet
 const SIG_PAGE_SIZE = 1000;
+
+const RUGCHECK_TIMEOUT_MS = 10000;
+const PER_HOLDER_TIMEOUT_MS = 15000;
 
 export interface InsiderCluster {
   funder: string;
@@ -108,6 +120,7 @@ export async function detectInsiderClusters(
 ): Promise<InsiderClusterDetectionResult> {
   const rugRes = await fetch(`${RUGCHECK_URL}/${mint}/report`, {
     headers: { Accept: 'application/json' },
+    signal: AbortSignal.timeout(RUGCHECK_TIMEOUT_MS),
   });
 
   if (!rugRes.ok) {
@@ -131,10 +144,15 @@ export async function detectInsiderClusters(
   for (const holder of topHolders) {
     try {
       const pubkey = new PublicKey(holder);
-      const oldestSig = await findOldestSignature(connection, pubkey);
-      if (!oldestSig) continue;
-
-      const funder = await findFunderFromTx(connection, holder, oldestSig);
+      const funder = await withTimeout(
+        (async () => {
+          const oldestSig = await findOldestSignature(connection, pubkey);
+          if (!oldestSig) return null;
+          return findFunderFromTx(connection, holder, oldestSig);
+        })(),
+        PER_HOLDER_TIMEOUT_MS,
+        null,
+      );
       if (funder) {
         if (!funderMap[funder]) funderMap[funder] = [];
         funderMap[funder].push(holder);
