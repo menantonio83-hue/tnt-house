@@ -1,3 +1,13 @@
+// Version 8.11 — app/risk-api/BillingPanel.tsx
+//
+// v8.11: added a manual-payment fallback under the Pay Now buttons —
+// exact wallet address + exact pay_amount (same invoice, same values
+// already sent to /pay) with copy buttons, for anyone without Phantom
+// or Solflare installed, or if the deep link doesn't cooperate.
+// Confirmation is still the exact same verify-payment poll loop,
+// unchanged — it only ever looks at what landed on-chain, never how the
+// person got there. No new backend logic.
+//
 // Version 8.9 — app/risk-api/BillingPanel.tsx
 //
 // v8.9: Phantom's link switched from a bare https universal link to an
@@ -89,6 +99,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Loader2, KeyRound, CreditCard, Zap, CheckCircle2, AlertTriangle } from 'lucide-react';
+import CopyButton from './CopyButton';
 
 type Step = 'enter-key' | 'pick-tier' | 'pick-currency' | 'pick-wallet' | 'invoice' | 'paying' | 'verifying' | 'success' | 'error';
 type Kind = 'subscription' | 'topup';
@@ -587,6 +598,42 @@ export default function BillingPanel() {
             >
               Pay Now
             </button>
+          </div>
+
+          {/* No new backend logic here — this is the exact same invoice
+              (same wallet_address, same pay_amount) the Pay Now button
+              above already sends to /pay. Confirmation is still just
+              verify-payment's poll loop, unchanged — it doesn't care
+              whether the on-chain transfer came from a deep-linked
+              wallet app or someone pasting these values into Revolut,
+              an exchange, or a wallet on a different device. */}
+          <div className="border-t border-purple-500/10 pt-4 space-y-3">
+            <div className="text-xs font-bold text-slate-400">Or pay manually from any wallet</div>
+
+            <div className="space-y-2">
+              <div className="text-[10px] text-slate-500">Send to</div>
+              <div className="flex items-center gap-2 bg-black border border-purple-500/30 rounded px-3 py-2">
+                <code className="text-[11px] text-purple-300 font-mono break-all flex-1">
+                  {invoice.wallet_address}
+                </code>
+                <CopyButton text={invoice.wallet_address} label="Copy" />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="text-[10px] text-slate-500">Exact amount</div>
+              <div className="flex items-center gap-2 bg-black border border-purple-500/30 rounded px-3 py-2">
+                <code className="text-sm text-emerald-400 font-mono flex-1">
+                  {invoice.pay_amount_formatted} {invoice.currency}
+                </code>
+                <CopyButton text={String(invoice.pay_amount_formatted)} label="Copy" />
+              </div>
+            </div>
+
+            <p className="text-[10px] text-slate-500 leading-relaxed">
+              Send exactly this amount from any Solana wallet or exchange. Your credit will be applied
+              automatically once the payment is detected — no need to do anything else after sending.
+            </p>
           </div>
         </div>
       )}
