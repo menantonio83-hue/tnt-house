@@ -131,6 +131,18 @@ const POLL_INTERVAL_MS = 4000;
 // against the pending navigation.
 const PRE_POLL_DELAY_MS = 2000;
 
+// Version 8.10 — app/risk-api/BillingPanel.tsx
+//
+// v8.10: Solflare's link switched from an undocumented
+// `solflare://v1/browse/` native-scheme attempt to the same intent://
+// mechanism just proven for Phantom — that native scheme was never
+// actually documented by Solflare for the Browse method (confirmed via
+// their official docs), the same mistake already found and fixed for
+// Phantom in v8.9. Reported symptom: with Phantom fully closed
+// beforehand (controlled test), tapping Solflare still opened Phantom
+// instead. Phantom's own branch is completely untouched. See
+// openWalletInAppBrowser's comment below for the full writeup.
+//
 // Version 8.9 — app/risk-api/BillingPanel.tsx (this comment block)
 //
 // v8.9: found the actual root cause of the Phantom "opens download page
@@ -182,11 +194,27 @@ function openWalletInAppBrowser(payUrl: string, wallet: Wallet) {
   const encoded = encodeURIComponent(payUrl);
   const ref = encodeURIComponent(SITE_URL);
   if (wallet === 'Solflare') {
-    window.location.href = 'solflare://v1/browse/' + encoded;
-    setTimeout(() => {
-      window.location.href = 'https://solflare.com/ul/v1/browse/' + encoded + '?ref=' + ref;
-    }, 500);
+    // The prior `solflare://v1/browse/` attempt was the same category of
+    // mistake already found and corrected for Phantom: Solflare's own
+    // official Browse docs (docs.solflare.com/solflare/technical/
+    // deeplinks/other-methods/browse) document ONLY the https universal
+    // link for this method — no native-scheme equivalent — same as
+    // Phantom's Browse docs. Reported symptom (fully-closed-Phantom
+    // controlled test, still opened Phantom instead of Solflare when
+    // Solflare was tapped) is consistent with that undocumented scheme
+    // resolving somewhere unintended rather than doing nothing safely.
+    // Switched to the same intent:// mechanism just confirmed working
+    // for Phantom via real-device testing, using Solflare's Android
+    // package (com.solflare.mobile, confirmed via Google Play's own
+    // URL). Base path + params match the documented https URL structure
+    // exactly (https://solflare.com/ul/v1/browse/<url>?ref=<ref>).
+    const httpsFallback = 'https://solflare.com/ul/v1/browse/' + encoded + '?ref=' + ref;
+    window.location.href =
+      'intent://solflare.com/ul/v1/browse/' + encoded + '?ref=' + ref +
+      '#Intent;scheme=https;package=com.solflare.mobile;S.browser_fallback_url=' +
+      encodeURIComponent(httpsFallback) + ';end;';
   } else {
+    // Phantom — untouched, confirmed working via real-device testing.
     const httpsFallback = 'https://phantom.app/ul/browse/' + encoded;
     window.location.href =
       'intent://phantom.app/ul/browse/' + encoded +
