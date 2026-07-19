@@ -1,26 +1,37 @@
-// Version 7.16 — app/api/v1/billing/verify-payment/route.ts
+// Version 7.17 — app/api/v1/billing/verify-payment/route.ts
 //
-// v7.16: two hardening fixes from external security review:
-// 1. Now requires `api_key` alongside `payment_id`, and rejects the
-//    request unless that key owns the payment. Previously `payment_id`
-//    (a UUID) was the ONLY thing checked — anyone who obtained/guessed a
-//    payment_id could poll it, which cost a Helius call + a Supabase
-//    round trip per attempt with zero proof of ownership. Enumerating
-//    UUIDs isn't practical (122 bits of entropy), but this closes the
-//    DoS/enumeration surface properly instead of relying on that alone,
-//    and matches how create-invoice already requires the key.
-// 2. Lazy TTL expiry: a 'pending' payment older than
-//    PENDING_INVOICE_TTL_MINUTES (lib/billing-pricing.ts) is flipped to
-//    'expired' on first read here instead of being polled forever — see
-//    lib/billing-store.ts's expireStalePendingPayment.
+// v7.17: two race-condition fixes from the second external-review round:
 //
-// v7.11: a failed claim (result.claimed === false) now distinguishes
-// "someone else already confirmed this exact payment_id" (fine,
-// idempotent) from "the tx_signature was already used for a DIFFERENT
-// payment" (a genuine collision the DB constraint caught — see
-// lib/billing-pricing.ts's version note) — the latter is surfaced as an
-// honest failure so the user knows to retry with a fresh invoice,
-// rather than being told their payment succeeded when it didn't.
+// 1. TTL no longer races against an in-flight payment. Previously, a
+//    'pending' invoice past PENDING_INVOICE_TTL_MINUTES was expired
+//    BEFORE ever calling findMatchingPayment on that poll — so if the
+//    real transaction had landed on-chain moments earlier, this exact
+//    poll could expire the invoice without ever giving it a chance to
+//    match. Now the order is reversed: findMatchingPayment always runs
+//    first for a 'pending' invoice; expiry is only attempted (and only
+//    takes effect, per expire_stale_pending_payment's own age check)
+//    when no match was found.
+//
+// 2. confirm_payment's ambiguous claimed:false (no `reason`) previously
+//    was assumed to always mean "a concurrent poll for this SAME
+//    payment_id already confirmed it a moment ago" and reported
+//    verified:true. That's one real cause, but NOT the only one — the
+//    payment could also have concurrently expired (e.g. TTL fix above
+//    running in another request at the same instant), or hit some other
+//    state change, and in either of those cases reporting verified:true
+//    would tell the caller their payment succeeded when it didn't. Now
+//    re-reads the payment's actual current status and answers honestly
+//    instead of assuming success.
+//
+// v7.16 (auth + ownership): requires `api_key` alongside `payment_id`,
+// and rejects the request unless that key owns the payment. Previously
+// `payment_id` alone (a UUID) was sufficient to trigger a Helius call +
+// Supabase round trip with zero proof of ownership.
+//
+// v7.11: a failed claim with a `reason` (the tx_signature was already
+// used by a DIFFERENT payment — the DB-level anti-collision guarantee,
+// see lib/billing-pricing.ts) is surfaced as an honest failure, not a
+// false success.
 //
 // POST /api/v1/billing/verify-payment
 // Body: { payment_id: "<uuid from create-invoice>", api_key: "tnt_sk_..." }
@@ -80,7 +91,25 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    if (payment.status === 'pending') {
+    if (payment.status === 'expired') {
+      return NextResponse.json({
+        verified: false,
+        expired: true,
+        reason: 'This invoice has expired. Please create a new one.',
+      });
+    }
+
+    // payment.status === 'pending' from here on. Always search for a
+    // match FIRST — only consider expiring if genuinely not found, so a
+    // payment that landed on-chain just before the TTL boundary always
+    // gets at least one real chance to be matched on this exact poll.
+    const match = await findMatchingPayment(
+      payment.pay_amount,
+      payment.currency,
+      new Date(payment.created_at).getTime(),
+    );
+
+    if (!match.found || !match.signature) {
       const justExpired = await expireStalePendingPayment(payment.id, PENDING_INVOICE_TTL_MINUTES);
       if (justExpired) {
         return NextResponse.json({
@@ -89,21 +118,6 @@ export async function POST(request: NextRequest) {
           reason: 'This invoice expired before payment was detected. Please create a new one.',
         });
       }
-    } else if (payment.status === 'expired') {
-      return NextResponse.json({
-        verified: false,
-        expired: true,
-        reason: 'This invoice has expired. Please create a new one.',
-      });
-    }
-
-    const match = await findMatchingPayment(
-      payment.pay_amount,
-      payment.currency,
-      new Date(payment.created_at).getTime(),
-    );
-
-    if (!match.found || !match.signature) {
       return NextResponse.json({ verified: false, reason: match.reason || 'Not found yet' });
     }
 
@@ -120,9 +134,32 @@ export async function POST(request: NextRequest) {
             'This payment amount matched a transaction already used for a different invoice. Please start a new top-up/subscription — you were not charged twice.',
         });
       }
-      // No reason means someone (this same payment_id) already claimed
-      // it a moment earlier — that's fine, idempotent success.
-      return NextResponse.json({ verified: true, already: true, kind: payment.kind });
+
+      // No reason: ambiguous. Could be "a concurrent poll for this same
+      // payment_id already confirmed it" (fine) OR "it expired
+      // concurrently" OR some other state change. Never assume success —
+      // re-read the real status and answer honestly.
+      const recheck = await getPaymentById(payment.id);
+
+      if (recheck?.status === 'confirmed') {
+        return NextResponse.json({
+          verified: true,
+          already: true,
+          kind: recheck.kind,
+          tx_signature: recheck.tx_signature,
+        });
+      }
+      if (recheck?.status === 'expired') {
+        return NextResponse.json({
+          verified: false,
+          expired: true,
+          reason: 'This invoice expired before payment was detected. Please create a new one.',
+        });
+      }
+      return NextResponse.json({
+        verified: false,
+        reason: 'Could not confirm payment right now — please try again in a moment.',
+      });
     }
 
     return NextResponse.json({

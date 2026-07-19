@@ -1,4 +1,8 @@
-// Version 3.4 — lib/rate-limit.ts
+// Version 3.5 — lib/rate-limit.ts
+//
+// v3.5: incrementSubscriptionUsage() now takes the quota so its RPC can
+// cap subscription_cycle_calls_used growth at quota+1 once a subscriber
+// is definitively in overage — see lib/billing-store.ts's version note.
 //
 // v3.4: full billing model implemented (see lib/billing-pricing.ts):
 // - free tier: 15 requests / calendar day (UTC) — lowered from 100 as
@@ -94,7 +98,7 @@ export async function enforceRateLimit(
     new Date(key.subscription_expires_at).getTime() > Date.now();
 
   if (subscriptionActive) {
-    const used = await incrementSubscriptionUsage(key.id);
+    const used = await incrementSubscriptionUsage(key.id, SUBSCRIPTION_MONTHLY_QUOTA);
 
     if (used === null) {
       // Fail open on an infra hiccup — never block a paying subscriber

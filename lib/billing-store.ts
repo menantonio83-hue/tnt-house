@@ -1,4 +1,18 @@
-// Version 7.13 — lib/billing-store.ts
+// Version 7.14 — lib/billing-store.ts
+//
+// v7.14: two changes for the anti-salt-flood fix (see the SQL migration
+// adding a partial unique index on risk_api_payments(currency,
+// pay_amount) WHERE status='pending', and lib/billing-pricing.ts's
+// resolveBaseAmount/applySalt split):
+// 1. createPaymentInvoice() now returns { payment, collision } instead
+//    of a bare PaymentRecord | null — callers need to distinguish "the
+//    salted amount collided with another pending invoice, retry with a
+//    fresh salt" (collision: true) from any other database error
+//    (collision: false, already logged here).
+// 2. countPendingInvoicesForKey() backs the per-key pending-invoice cap
+//    (MAX_PENDING_INVOICES_PER_KEY in lib/billing-pricing.ts) enforced
+//    in app/api/v1/billing/create-invoice — a secondary defense; the
+//    unique index above is the actual, unconditional guarantee.
 //
 // v7.13: added expireStalePendingPayment() — lazy TTL check for invoices
 // stuck in 'pending' too long (see lib/billing-pricing.ts's
@@ -7,28 +21,18 @@
 // used by lib/risk-api-cache.ts, not a cron job.
 //
 // v7.12: fixed the Supabase linter's function_search_path_mutable
-// warning on all three RPC functions below — applied directly against
-// Supabase (ALTER FUNCTION ... SET search_path = public), no app code
-// change needed. A function without a pinned search_path is vulnerable
-// to hijacking if a caller can get objects created in a schema that
-// resolves earlier in their search_path; pinning to `public` matches
-// the schema everything here actually lives in. Re-verified all three
-// RPCs still work correctly afterward (confirm_payment,
-// decrement_credit_if_sufficient, increment_subscription_usage) via a
-// smoke test against Supabase.
+// warning on all RPC functions below — applied directly against
+// Supabase (ALTER FUNCTION ... SET search_path = public).
 //
 // v7.10: ConfirmPaymentResult now carries an optional `reason` — the
 // confirm_payment() RPC returns one when a claim fails because the
 // tx_signature was already used by a different payment row (the hard
-// DB-level defense against double-crediting on a rare salt collision;
-// see lib/billing-pricing.ts's version note).
+// DB-level defense against double-crediting on a rare salt collision).
 //
-// Supabase access for risk_api_payments and the billing RPC functions
-// (increment_subscription_usage, decrement_credit_if_sufficient,
-// confirm_payment, expire_stale_pending_payment — see the migration in
-// this feature's SQL history). Uses the service-role client
-// (lib/supabase-admin.ts) — this table has RLS enabled with no anon
-// policies, same lockdown as the rest of the Risk-Data API tables.
+// Supabase access for risk_api_payments and the billing RPC functions.
+// Uses the service-role client (lib/supabase-admin.ts) — this table has
+// RLS enabled with no anon policies, same lockdown as the rest of the
+// Risk-Data API tables.
 
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
 import type { Currency, InvoiceKind } from '@/lib/billing-pricing';
@@ -50,13 +54,21 @@ export interface PaymentRecord {
   confirmed_at: string | null;
 }
 
+export interface CreateInvoiceResult {
+  payment: PaymentRecord | null;
+  // true = failed specifically because (currency, pay_amount) already
+  // has a pending row (the anti-salt-flood unique index) — caller
+  // should retry with a freshly-salted amount, NOT surface an error yet.
+  collision: boolean;
+}
+
 export async function createPaymentInvoice(
   keyId: string,
   kind: InvoiceKind,
   currency: Currency,
   usdAmount: number,
   payAmount: number,
-): Promise<PaymentRecord | null> {
+): Promise<CreateInvoiceResult> {
   const { data, error } = await supabase
     .from(TABLE)
     .insert({ key_id: keyId, kind, currency, usd_amount: usdAmount, pay_amount: payAmount })
@@ -64,10 +76,39 @@ export async function createPaymentInvoice(
     .single();
 
   if (error) {
-    console.error('[billing-store] createPaymentInvoice error:', error.message);
-    return null;
+    // Postgres unique_violation is SQLSTATE 23505, surfaced by
+    // PostgREST as error.code — checking the message text too as a
+    // defensive fallback in case that field isn't populated for some
+    // reason, since correctly detecting a collision (vs. any other DB
+    // error) is what makes the retry loop in create-invoice safe.
+    const isCollision =
+      error.code === '23505' ||
+      (typeof error.message === 'string' && error.message.includes('duplicate key value violates unique constraint'));
+    if (!isCollision) {
+      console.error('[billing-store] createPaymentInvoice error:', error.message);
+    }
+    return { payment: null, collision: isCollision };
   }
-  return data as PaymentRecord;
+  return { payment: data as PaymentRecord, collision: false };
+}
+
+// Backs the per-key pending-invoice cap in create-invoice. Fails OPEN
+// (returns 0) on a database error — this is a secondary/defense-in-
+// depth check; the unique index is what actually, unconditionally
+// prevents salt-space exhaustion regardless of whether this count is
+// available right now.
+export async function countPendingInvoicesForKey(keyId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from(TABLE)
+    .select('id', { count: 'exact', head: true })
+    .eq('key_id', keyId)
+    .eq('status', 'pending');
+
+  if (error) {
+    console.error('[billing-store] countPendingInvoicesForKey error:', error.message);
+    return 0;
+  }
+  return count || 0;
 }
 
 export async function getPaymentById(paymentId: string): Promise<PaymentRecord | null> {
@@ -106,8 +147,12 @@ export async function confirmPayment(paymentId: string, txSignature: string): Pr
 
 // Returns the new cycle-call count, or null on error (caller should fail
 // open rather than block a paying subscriber over an infra hiccup).
-export async function incrementSubscriptionUsage(keyId: string): Promise<number | null> {
-  const { data, error } = await supabase.rpc('increment_subscription_usage', { p_key_id: keyId });
+// Growth is capped at quota+1 server-side (see the RPC) — once a
+// subscriber is definitively in overage, the exact count past that
+// point is meaningless for billing (tracked via credit_balance_usd
+// instead) and shouldn't grow unbounded for a heavy overage user.
+export async function incrementSubscriptionUsage(keyId: string, quota: number): Promise<number | null> {
+  const { data, error } = await supabase.rpc('increment_subscription_usage', { p_key_id: keyId, p_quota: quota });
 
   if (error) {
     console.error('[billing-store] incrementSubscriptionUsage error:', error.message);
