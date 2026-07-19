@@ -1,4 +1,12 @@
-// Version 7.15 — lib/billing-verify.ts
+// Version 7.16 — lib/billing-verify.ts
+//
+// v7.16: defense-in-depth — findMatchInPage now independently checks
+// each transaction's own `timestamp` field against `sinceSeconds`
+// instead of relying solely on Helius's `gte-time` query param to have
+// filtered correctly. It's unclear from Helius's docs whether gte-time
+// is honored consistently across all response shapes/API versions; if
+// it were ever silently ignored, a transaction from BEFORE the invoice
+// existed could match by coincidence. Cheap to check, no reason not to.
 //
 // v7.15: two hardening fixes from external security review:
 // 1. Failed-transaction check: Helius's enhanced-transaction objects
@@ -97,9 +105,15 @@ function findMatchInPage(
   expectedAmount: number,
   currency: 'SOL' | 'MRDT' | 'USDC',
   tolerance: number,
+  sinceSeconds: number,
 ): PaymentMatch | null {
   for (const tx of transactions) {
     if (isFailedTx(tx)) continue;
+
+    // Defense-in-depth: don't rely solely on Helius's gte-time query
+    // param having filtered correctly — independently skip anything
+    // that claims to predate the invoice.
+    if (typeof tx.timestamp === 'number' && tx.timestamp < sinceSeconds) continue;
 
     if (currency === 'MRDT' && tx.tokenTransfers?.length) {
       for (const transfer of tx.tokenTransfers) {
@@ -168,7 +182,7 @@ export async function findMatchingPayment(
       break; // exhausted — no more pages to walk
     }
 
-    const match = findMatchInPage(transactions, expectedAmount, currency, tolerance);
+    const match = findMatchInPage(transactions, expectedAmount, currency, tolerance, sinceSeconds);
     if (match) return match;
 
     if (transactions.length < PAGE_LIMIT) break; // short page — this was the last one

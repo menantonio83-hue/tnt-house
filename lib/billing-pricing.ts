@@ -1,31 +1,36 @@
-// Version 8.2 — lib/billing-pricing.ts
+// Version 8.3 — lib/billing-pricing.ts
 //
-// v8.2: real production bug — an MRDT invoice was priced at
+// v8.3: two fixes from the second external-review round:
+//
+// 1. [CRITICAL] Anti-salt-flood: priceInvoice() (which resolved a price
+//    AND salted it in one shot) is replaced by resolveBaseAmount() +
+//    applySalt(), split apart specifically so app/api/v1/billing/
+//    create-invoice can retry ONLY the cheap salting step (not the
+//    expensive live-price fetch) when a salt collision is rejected by
+//    the new partial unique index on risk_api_payments(currency,
+//    pay_amount) WHERE status='pending' — see that route and the SQL
+//    migration for the full attack this closes (salt-space exhaustion
+//    letting an attacker steal a victim's real payment).
+//
+// 2. formatPayAmount for USDC changed from toFixed(4) to toFixed(6) —
+//    the salt lives in the 5th/6th decimal (saltUsdc adds
+//    $0.000001-$0.009999), so a 4-decimal display could round away part
+//    of the salt and show the user an amount that, if paid exactly as
+//    displayed, might fall outside billing-verify.ts's 0.00005
+//    tolerance. The automated /pay flow itself always used the full-
+//    precision `pay_amount` value regardless (never the formatted
+//    string), so this was a display-only gap, not a live mismatch — but
+//    a real one if anyone ever pays by reading the screen instead of
+//    letting /pay's auto-flow run.
+//
+// --- (v8.2 history) ---
+// Real production bug: an MRDT invoice was priced at
 // FALLBACK_MRDT_PRICE_USD ($0.0000130) while the true live DexScreener
 // price at that exact moment was $0.000006808, an ~1.9x overcharge.
-// getLivePriceUsd caught any failure silently and fell straight through
-// to a hardcoded constant with zero logging of WHY the live fetch
-// failed, and that constant itself had no mechanism to ever get updated
-// — inherently dangerous for a volatile memecoin like MRDT, and a real
-// (if smaller) risk for SOL too.
-//
-// Replaced the whole resolution strategy. New order, per mint:
-//   1. Live DexScreener price (via lib/helius-client.js's
-//      getDexScreenerData, NOT modified — wrapped here with an explicit
-//      timeout, since that function itself has none and a hang was
-//      exactly the class of bug that caused Stage 6's 502 issue).
-//      On success: used immediately AND cached (lib/price-cache.ts) for
-//      next time.
-//   2. If live fails: the last successfully-observed live price, IF it's
-//      not older than PRICE_CACHE_MAX_AGE_MS. Real market data, not a
-//      guess — self-updating every time a live fetch succeeds, unlike a
-//      hardcoded constant that silently rots.
-//   3. If both fail: priceInvoice() returns null. The caller
-//      (app/api/v1/billing/create-invoice) MUST refuse to create the
-//      invoice in that currency rather than ever guess a price again —
-//      see that route for the user-facing error.
-// Every branch now logs why, so a future incident is diagnosable instead
-// of silent.
+// Resolution order: live price (explicit timeout, the underlying fetch
+// has none) -> last successfully-cached live price (<=6h old) -> refuse
+// to price this currency at all. No hardcoded fallback constant exists
+// anywhere in this file anymore.
 //
 // Pricing model (per project brief, confirmed after consulting three
 // other AIs on the approach):
@@ -66,12 +71,13 @@ export const OVERAGE_RATE_SUBSCRIBED_USD = 0.03; // per call, subscribed and ove
 export const MIN_TOPUP_USD = 5;
 export const MAX_TOPUP_USD = 500;
 export const PENDING_INVOICE_TTL_MINUTES = 45;
+export const MAX_PENDING_INVOICES_PER_KEY = 3; // anti-salt-flood: caps how many pending invoices one key can hold at once
+export const MAX_SALT_ATTEMPTS = 8; // anti-salt-flood: retry budget when a salted amount collides with another pending invoice
 
 const PRICE_FETCH_TIMEOUT_MS = 8000;
 // Deliberately short — MRDT can move a lot in a few hours. A stale-but-
 // recent cached price is still real market data and far better than a
-// number someone typed in once; past this age it's no better than the
-// hardcoded constant this replaced, so it's treated as unavailable too.
+// hardcoded number; past this age it's treated as unavailable too.
 const PRICE_CACHE_MAX_AGE_MS = 6 * 60 * 60 * 1000; // 6 hours
 
 export interface PricedInvoice {
@@ -148,6 +154,30 @@ async function resolvePriceUsd(mint: string, label: string): Promise<PriceResolu
   return null;
 }
 
+export interface ResolvedBaseAmount {
+  currency: Currency;
+  usdAmount: number;
+  baseAmount: number; // unsalted amount in `currency` — salt applied separately, per attempt, via applySalt()
+}
+
+// The expensive half: resolve how much of `currency` equals `usdAmount`,
+// with no randomness involved. Call this ONCE per invoice request —
+// retries on a salt collision (see create-invoice) only need applySalt()
+// again, not another live-price round trip.
+export async function resolveBaseAmount(usdAmount: number, currency: Currency): Promise<ResolvedBaseAmount | null> {
+  if (currency === 'USDC') {
+    return { currency, usdAmount, baseAmount: usdAmount };
+  }
+  if (currency === 'SOL') {
+    const resolved = await resolvePriceUsd(WRAPPED_SOL_MINT, 'SOL');
+    if (!resolved) return null;
+    return { currency, usdAmount, baseAmount: usdAmount / resolved.price };
+  }
+  const resolved = await resolvePriceUsd(MRDT_CA, 'MRDT');
+  if (!resolved) return null;
+  return { currency, usdAmount, baseAmount: usdAmount / resolved.price };
+}
+
 // Every otherwise-identical invoice (e.g. every $49 subscription) gets a
 // small unique offset so payments can be matched by amount+time against
 // Helius without colliding — see lib/billing-verify.ts. Applied AFTER
@@ -155,11 +185,14 @@ async function resolvePriceUsd(mint: string, label: string): Promise<PriceResolu
 // tokens only (no fractional precision to salt in USD-cents terms; a
 // tiny USD salt could round away to nothing depending on MRDT's price).
 //
-// Ranges widened after collision-testing (see v7.9's history) — still
-// visually negligible next to the invoice total, but with a much larger
-// slot space. This is a probabilistic defense; the database's unique
-// tx_signature constraint is what actually guarantees no double-
-// crediting even on the rare residual collision.
+// Ranges widened after collision-testing found the original MRDT range
+// (+1-50 whole tokens) collided ~38% of the time across just 5
+// concurrent draws (birthday paradox). This randomness is now ALSO the
+// thing retried on a DB-level unique-constraint rejection (see
+// create-invoice's MAX_SALT_ATTEMPTS loop) — the constraint is the real
+// guarantee against a colliding amount ever being accepted; the wide
+// random range just keeps collisions (and therefore retries) rare in
+// ordinary use.
 function saltUsdc(usdAmount: number): number {
   const saltMicros = 1 + Math.floor(Math.random() * 9999); // $0.000001–$0.009999
   return Math.round(usdAmount * 1e6 + saltMicros) / 1e6;
@@ -175,27 +208,13 @@ function saltMrdtWholeTokens(mrdtAmount: number): number {
   return Math.round(mrdtAmount) + saltTokens;
 }
 
-// Returns null if this currency can't be safely priced right now (live
-// fetch failed AND no fresh-enough cached price) — the caller MUST
-// refuse to create the invoice rather than ever fall back to a guess.
-export async function priceInvoice(usdAmount: number, currency: Currency): Promise<PricedInvoice | null> {
-  if (currency === 'USDC') {
-    // 1:1 stablecoin — no external price dependency at all.
-    return { currency, usdAmount, payAmount: saltUsdc(usdAmount) };
-  }
-
-  if (currency === 'SOL') {
-    const resolved = await resolvePriceUsd(WRAPPED_SOL_MINT, 'SOL');
-    if (!resolved) return null;
-    const solAmount = usdAmount / resolved.price;
-    return { currency, usdAmount, payAmount: saltSol(solAmount) };
-  }
-
-  // MRDT
-  const resolved = await resolvePriceUsd(MRDT_CA, 'MRDT');
-  if (!resolved) return null;
-  const mrdtAmount = usdAmount / resolved.price;
-  return { currency, usdAmount, payAmount: saltMrdtWholeTokens(mrdtAmount) };
+// The cheap half: generates a fresh random salted amount from an
+// already-resolved base amount. Safe to call repeatedly in a retry loop
+// — pure math, no network/database access.
+export function applySalt(baseAmount: number, currency: Currency): number {
+  if (currency === 'USDC') return saltUsdc(baseAmount);
+  if (currency === 'SOL') return saltSol(baseAmount);
+  return saltMrdtWholeTokens(baseAmount);
 }
 
 // Same whole-vs-decimal formatting convention as app/page.js's
@@ -203,6 +222,6 @@ export async function priceInvoice(usdAmount: number, currency: Currency): Promi
 // in style to the rest of the site.
 export function formatPayAmount(payAmount: number, currency: Currency): string {
   if (currency === 'SOL') return payAmount.toFixed(6);
-  if (currency === 'USDC') return payAmount.toFixed(4); // salted to 4dp, unlike the site's plain .toFixed(2)
+  if (currency === 'USDC') return payAmount.toFixed(6); // was toFixed(4) — salt lives past the 4th decimal
   return String(Math.round(payAmount)); // MRDT: always a whole token amount
 }
