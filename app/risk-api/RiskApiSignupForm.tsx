@@ -1,4 +1,10 @@
-// Version 5.3 — app/risk-api/RiskApiSignupForm.tsx
+// Version 5.4 — app/risk-api/RiskApiSignupForm.tsx
+//
+// v5.4: fixed stale "100 requests/day" copy under the signup button —
+// the free tier limit was lowered to 15/day earlier the same day
+// (lib/billing-pricing.ts's FREE_DAILY_LIMIT), but this string wasn't
+// updated at the time, creating a mismatch with the correct "15 req/day"
+// already shown above in the Limits & pricing section on the same page.
 
 'use client';
 
@@ -106,7 +112,7 @@ export default function RiskApiSignupForm() {
       )}
 
       <p className="text-[11px] text-slate-500">
-        Free tier: 100 requests/day. No credit card. One key per email.
+        Free tier: 15 requests/day. No credit card. One key per email.
       </p>
     </form>
   );
