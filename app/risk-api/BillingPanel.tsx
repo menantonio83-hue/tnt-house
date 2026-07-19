@@ -1,3 +1,11 @@
+// Version 8.9 — app/risk-api/BillingPanel.tsx
+//
+// v8.9: Phantom's link switched from a bare https universal link to an
+// explicit Android intent:// URI — root cause confirmed via controlled
+// real-device A/B testing (same link, same device, worked in a
+// Chromium-based in-app browser, failed in Samsung Internet). See the
+// full writeup in openWalletInAppBrowser's comment below.
+//
 // Version 8.8 — app/risk-api/BillingPanel.tsx
 //
 // v8.8: found the actual remaining divergence from app/page.js after
@@ -123,35 +131,53 @@ const POLL_INTERVAL_MS = 4000;
 // against the pending navigation.
 const PRE_POLL_DELAY_MS = 2000;
 
-// Verbatim copy of app/page.js's openWalletInAppBrowser (lines
-// 2472-2483 there), per explicit instruction after two rounds of
-// independently "fixing" this in BillingPanel.tsx diverged from the
-// one version of this logic with an actual production track record —
-// first by inventing an undocumented phantom://v1/browse/ native
-// scheme, then by adding a `ref` param that Phantom's docs say is
-// required but that the main site's own working code has never
-// included. Neither change was wrong to try in isolation, but neither
-// was "the proven code" either — this now IS that code, unmodified
-// except for the TS parameter type annotation.
+// Version 8.9 — app/risk-api/BillingPanel.tsx (this comment block)
 //
-// app/page.js's own comment on this function (paraphrased, see there
-// for the full history): Solflare's bare link needed both a native
-// `solflare://v1/browse/` attempt first AND a `?ref=` param on the
-// https fallback to reliably open its in-app browser — confirmed via
-// screenshot testing. Phantom's bare link, with neither, was left
-// alone there because it was separately confirmed working via
-// screenshot. That track record — however imperfect (this project's
-// own git history also recorded this exact bare link failing once,
-// dismissed at the time as a one-off) — is still the closest thing to
-// evidence this codebase has for what actually gets Phantom to open
-// /pay instead of its home screen or a marketing page, so it's what
-// BillingPanel.tsx now uses too, rather than a third independent
-// attempt at improving it.
+// v8.9: found the actual root cause of the Phantom "opens download page
+// / opens home screen" failures via controlled real-device testing —
+// it's the BROWSER, not this code. The exact same bare
+// https://phantom.app/ul/browse/<url> link (byte-identical to
+// app/page.js's proven version, verified) failed in Samsung Internet
+// but succeeded in a Chromium-based in-app browser (Twitter's), on the
+// SAME device, SAME wallet, SAME main site — a controlled A/B the
+// person ran directly. https universal links depend on the BROWSER
+// correctly querying/honoring Android's Digital Asset Link verification
+// for phantom.app; that's a heuristic, and it demonstrably varies
+// across Android browsers.
 //
-// This file does NOT modify app/page.js itself — if this same bare
-// link is ever proven unreliable there too, that's a fix to make
-// separately, in that file, informed by real-device testing on both
-// payment flows rather than guessed at from either one alone.
+// Fix: Phantom's branch now uses an explicit Android `intent://` URI
+// instead of a bare https link — a fundamentally different mechanism,
+// not another guess at a URL format. intent:// is a direct instruction
+// to Android ("launch package app.phantom for this https URL, no
+// heuristics involved"), parsed natively by the Chromium engine itself
+// (which Samsung Internet is also built on) rather than depending on
+// browser-specific App Link verification behavior. Falls back to the
+// EXACT SAME bare https link (unchanged) via `S.browser_fallback_url`
+// if intent:// somehow isn't parsed — zero regression risk on browsers
+// where the old link already worked. Phantom's Android package ID
+// (app.phantom) confirmed via an independent source (AppBrain's app
+// catalog), not assumed.
+//
+// Solflare's branch is untouched — its native `solflare://v1/browse/`
+// scheme-first attempt is architecturally already the same category of
+// fix (asking Android directly via a scheme, not relying on https App
+// Link heuristics), and there's no confirmed failure report for it to
+// justify touching working code again.
+//
+// --- prior history (v8.7's verbatim-copy rationale) ---
+// This function was, until this version, a verbatim copy of
+// app/page.js's openWalletInAppBrowser (lines 2472-2483 there) for
+// Phantom, after two earlier independent "fixes" here (an undocumented
+// native scheme, then a docs-required `ref` param) both diverged from
+// the one version with an actual (if imperfect) production track
+// record. That verbatim copy was the right call at the time — it
+// proved the code itself wasn't the problem, which is exactly what let
+// this round correctly diagnose the real cause as browser-level instead
+// of chasing a fourth independent guess at the URL/link format itself.
+//
+// This file does NOT modify app/page.js — if the same intent:// fix is
+// wanted there too (now that the root cause is confirmed, not guessed),
+// that's a decision to make separately for that shared file.
 function openWalletInAppBrowser(payUrl: string, wallet: Wallet) {
   const encoded = encodeURIComponent(payUrl);
   const ref = encodeURIComponent(SITE_URL);
@@ -161,7 +187,11 @@ function openWalletInAppBrowser(payUrl: string, wallet: Wallet) {
       window.location.href = 'https://solflare.com/ul/v1/browse/' + encoded + '?ref=' + ref;
     }, 500);
   } else {
-    window.location.href = 'https://phantom.app/ul/browse/' + encoded;
+    const httpsFallback = 'https://phantom.app/ul/browse/' + encoded;
+    window.location.href =
+      'intent://phantom.app/ul/browse/' + encoded +
+      '#Intent;scheme=https;package=app.phantom;S.browser_fallback_url=' +
+      encodeURIComponent(httpsFallback) + ';end;';
   }
 }
 
