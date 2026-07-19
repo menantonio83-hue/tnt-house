@@ -1,3 +1,14 @@
+// Version 8.5 — app/risk-api/BillingPanel.tsx
+//
+// v8.5: fixed a reported bug — "Pay Now" for Phantom sometimes opened
+// phantom.com/download (Phantom's marketing page) instead of the app,
+// even with Phantom installed. Same historically-reproducible failure
+// this project's own git history already recorded for the bare
+// https://phantom.app/ul/browse/ universal link (see openWalletInAppBrowser's
+// comment below for the full history). Fixed by applying the exact
+// native-scheme-first pattern already proven for the identical Solflare
+// issue — no new/untested approach.
+//
 // Version 8.4 — app/risk-api/BillingPanel.tsx
 //
 // v8.4: create-invoice can now return 503 with currency_unavailable
@@ -61,9 +72,33 @@ const SITE_URL = 'https://tnt-audit.com';
 const VERIFY_TIMEOUT_MS = 15 * 60 * 1000;
 const POLL_INTERVAL_MS = 4000;
 
-// Same universal-link pattern as app/page.js's openWalletInAppBrowser —
-// opens our /pay page (unmodified, reused as-is) inside the chosen
-// wallet's own in-app browser, where it builds + signs the transfer.
+// Reported bug: "Pay Now" for Phantom sometimes landed on
+// phantom.com/download (Phantom's own marketing page) instead of
+// opening our /pay page inside the app — Phantom's bare
+// https://phantom.app/ul/browse/ universal link intermittently fails to
+// launch the installed app and falls through to Phantom's own web
+// fallback instead. This is not new: this project's own git history
+// (commit 89d847e) recorded the exact same failure as reproducible in
+// production once before; a later revert (e2a71f4) dismissed it as "a
+// one-off flake" and left the bare-link approach in place, which is
+// what both app/page.js and this file still had.
+//
+// The identical symptom for Solflare (its bare universal link opening
+// the wallet's normal home screen instead of the in-app browser) was
+// fixed differently and for good in app/page.js (commit e1171f9): try
+// the wallet's native URL scheme FIRST, then fall back to the https
+// universal link ~500ms later if the native scheme didn't get handled.
+// Phantom never got that same treatment because its bare link happened
+// to work in whatever test was run at the time — but the underlying
+// mechanism (an OS/app-link handoff that can silently fail) is the same
+// for both wallets, and evidently Phantom's bare link isn't reliable
+// either. Applying the same native-scheme-first pattern here, mirroring
+// the proven Solflare fix instead of a new, untested approach.
+//
+// This file does NOT modify app/page.js — that's the site's own,
+// separately-live audit/banner payment flow, out of scope for a
+// Risk-Data API billing bug report. If the same intermittent failure is
+// confirmed there too, it should get this same fix applied separately.
 function openWalletInAppBrowser(payUrl: string, wallet: Wallet) {
   const encoded = encodeURIComponent(payUrl);
   const ref = encodeURIComponent(SITE_URL);
@@ -73,7 +108,10 @@ function openWalletInAppBrowser(payUrl: string, wallet: Wallet) {
       window.location.href = 'https://solflare.com/ul/v1/browse/' + encoded + '?ref=' + ref;
     }, 500);
   } else {
-    window.location.href = 'https://phantom.app/ul/browse/' + encoded;
+    window.location.href = 'phantom://v1/browse/' + encoded;
+    setTimeout(() => {
+      window.location.href = 'https://phantom.app/ul/browse/' + encoded;
+    }, 500);
   }
 }
 
