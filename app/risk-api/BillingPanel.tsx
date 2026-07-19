@@ -1,3 +1,16 @@
+// Version 8.8 — app/risk-api/BillingPanel.tsx
+//
+// v8.8: found the actual remaining divergence from app/page.js after
+// v8.7's "verbatim copy" of openWalletInAppBrowser turned out to still
+// not fix the reported issue — traced through the ENTIRE flow (not just
+// that one function) and found handlePayNow started polling
+// verify-payment (its own fetch()) in the same tick as the wallet
+// navigation, with no gap. app/page.js's equivalent has a multi-second
+// gap here for free (it awaits a real audit computation before its own
+// polling starts). Added PRE_POLL_DELAY_MS to reproduce that same
+// breathing room instead of racing our own outgoing request against the
+// pending navigation. See the constant's comment and handlePayNow below.
+//
 // Version 8.7 — app/risk-api/BillingPanel.tsx
 //
 // v8.7: after two independent attempts at "fixing" Phantom's link here
@@ -95,6 +108,20 @@ interface StatusResponse {
 const SITE_URL = 'https://tnt-audit.com';
 const VERIFY_TIMEOUT_MS = 15 * 60 * 1000;
 const POLL_INTERVAL_MS = 4000;
+// Real, traced timing divergence from app/page.js's equivalent flow
+// (not a guess): there, openWalletInAppBrowser is immediately followed
+// by `await runAuditAndSave(...)` — a genuinely slow async operation —
+// and its own verification polling (startPaymentVerification) only
+// starts AFTER that resolves, several seconds later. That gives the
+// browser an uncontested window to hand off to the wallet app's
+// Intent/universal-link resolution before the page fires off any more
+// network activity of its own. This file had no such gap: startPolling()
+// (and its immediate fetch()) used to run in the same tick as
+// openWalletInAppBrowser(), with nothing in between. Delaying the first
+// poll (in handlePayNow, below) reproduces the same breathing room
+// app/page.js gets for free, instead of racing our own outgoing request
+// against the pending navigation.
+const PRE_POLL_DELAY_MS = 2000;
 
 // Verbatim copy of app/page.js's openWalletInAppBrowser (lines
 // 2472-2483 there), per explicit instruction after two rounds of
@@ -243,7 +270,9 @@ export default function BillingPanel() {
     setStep('verifying');
     startedAtRef.current = Date.now();
     setVerifyAttempts(0);
-    startPolling(invoice.payment_id);
+    setTimeout(() => {
+      startPolling(invoice.payment_id);
+    }, PRE_POLL_DELAY_MS);
   };
 
   const startPolling = (paymentId: string) => {
