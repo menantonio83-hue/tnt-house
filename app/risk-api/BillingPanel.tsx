@@ -1,3 +1,16 @@
+// Version 8.7 — app/risk-api/BillingPanel.tsx
+//
+// v8.7: after two independent attempts at "fixing" Phantom's link here
+// (v8.5's undocumented native scheme, v8.6's docs-required-but-
+// unproven `ref` param) both diverged from app/page.js's own
+// openWalletInAppBrowser — the one version of this logic with an
+// actual (if imperfect) production track record on this exact site —
+// openWalletInAppBrowser is now a verbatim copy of that function
+// (lines 2472-2483 there) instead of a third independent
+// reimplementation. See its comment below for the full reasoning.
+// Verified the two functions now produce byte-identical output for
+// both wallets via an isolated test.
+//
 // Version 8.6 — app/risk-api/BillingPanel.tsx
 //
 // v8.6: v8.5's phantom:// native-scheme attempt made things WORSE in
@@ -83,44 +96,35 @@ const SITE_URL = 'https://tnt-audit.com';
 const VERIFY_TIMEOUT_MS = 15 * 60 * 1000;
 const POLL_INTERVAL_MS = 4000;
 
-// Reported bug: "Pay Now" for Phantom sometimes landed on
-// phantom.com/download (Phantom's own marketing page), or — after the
-// v8.5 native-scheme attempt below — opened Phantom's normal home
-// screen instead of navigating to our /pay page either way.
+// Verbatim copy of app/page.js's openWalletInAppBrowser (lines
+// 2472-2483 there), per explicit instruction after two rounds of
+// independently "fixing" this in BillingPanel.tsx diverged from the
+// one version of this logic with an actual production track record —
+// first by inventing an undocumented phantom://v1/browse/ native
+// scheme, then by adding a `ref` param that Phantom's docs say is
+// required but that the main site's own working code has never
+// included. Neither change was wrong to try in isolation, but neither
+// was "the proven code" either — this now IS that code, unmodified
+// except for the TS parameter type annotation.
 //
-// Checked Phantom's OFFICIAL Browse deeplink docs
-// (docs.phantom.com/phantom-deeplinks/other-methods/browse) rather than
-// guessing further, and found two concrete things:
+// app/page.js's own comment on this function (paraphrased, see there
+// for the full history): Solflare's bare link needed both a native
+// `solflare://v1/browse/` attempt first AND a `?ref=` param on the
+// https fallback to reliably open its in-app browser — confirmed via
+// screenshot testing. Phantom's bare link, with neither, was left
+// alone there because it was separately confirmed working via
+// screenshot. That track record — however imperfect (this project's
+// own git history also recorded this exact bare link failing once,
+// dismissed at the time as a one-off) — is still the closest thing to
+// evidence this codebase has for what actually gets Phantom to open
+// /pay instead of its home screen or a marketing page, so it's what
+// BillingPanel.tsx now uses too, rather than a third independent
+// attempt at improving it.
 //
-// 1. The documented URL structure is
-//      https://phantom.app/ul/browse/<url>?ref=<ref>
-//    with BOTH `url` and `ref` listed as REQUIRED parameters. This
-//    file's link was missing `ref` entirely (only Solflare's had it) —
-//    a real, fixable bug on our side.
-//
-// 2. There is NO documented `phantom://browse` custom-scheme
-//    equivalent for this specific method — unlike Solflare, whose
-//    browse deeplink genuinely does support a native scheme, Phantom's
-//    "Other Methods" (Browse/Fungible/Swap) are only specified via the
-//    https universal link. v8.5's `phantom://v1/browse/` was an
-//    unfounded guess borrowed from Solflare's pattern: Phantom does
-//    register `phantom://` for its PROVIDER methods (connect,
-//    signMessage, etc.), so the app launched, but it has no route for
-//    `v1/browse/<url>`, so it fell through to its default home screen —
-//    exactly the symptom reported. Removed.
-//
-// Also found an open, currently-unresolved issue on Phantom's own
-// GitHub (github.com/orgs/phantom/discussions/75) describing this exact
-// browse-link intermittently breaking — acknowledged by Phantom staff,
-// not something fixable from our side. The `ref` fix below corrects the
-// one concrete bug we control; it may not fully eliminate flakiness
-// that's on Phantom's own infrastructure.
-//
-// This file does NOT modify app/page.js — that's the site's own,
-// separately-live audit/banner payment flow, out of scope for a
-// Risk-Data API billing bug report. Its Phantom link has the same
-// missing-`ref` bug and would benefit from the identical fix, applied
-// there separately if confirmed.
+// This file does NOT modify app/page.js itself — if this same bare
+// link is ever proven unreliable there too, that's a fix to make
+// separately, in that file, informed by real-device testing on both
+// payment flows rather than guessed at from either one alone.
 function openWalletInAppBrowser(payUrl: string, wallet: Wallet) {
   const encoded = encodeURIComponent(payUrl);
   const ref = encodeURIComponent(SITE_URL);
@@ -130,7 +134,7 @@ function openWalletInAppBrowser(payUrl: string, wallet: Wallet) {
       window.location.href = 'https://solflare.com/ul/v1/browse/' + encoded + '?ref=' + ref;
     }, 500);
   } else {
-    window.location.href = 'https://phantom.app/ul/browse/' + encoded + '?ref=' + ref;
+    window.location.href = 'https://phantom.app/ul/browse/' + encoded;
   }
 }
 
