@@ -1,4 +1,10 @@
-// Version 5.4 — app/risk-api/RiskApiSignupForm.tsx
+// Version 5.5 — app/risk-api/RiskApiSignupForm.tsx
+//
+// v5.5: wired up for the 7-language i18n system (see app/risk-api/
+// i18n.ts, LangContext.tsx) — static UI copy now comes from
+// useRiskApiLang()'s `t` object. Server-generated error messages (from
+// /api/v1/signup responses) stay in English, untranslated — same scope
+// limitation as the rest of this pass.
 //
 // v5.4: fixed stale "100 requests/day" copy under the signup button —
 // the free tier limit was lowered to 15/day earlier the same day
@@ -11,6 +17,7 @@
 import { useState } from 'react';
 import { Loader2, KeyRound, AlertTriangle } from 'lucide-react';
 import CopyButton from './CopyButton';
+import { useRiskApiLang } from './LangContext';
 
 type Status = 'idle' | 'loading' | 'success' | 'error';
 
@@ -20,6 +27,7 @@ interface IssuedKey {
 }
 
 export default function RiskApiSignupForm() {
+  const { t } = useRiskApiLang();
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<Status>('idle');
   const [errorMsg, setErrorMsg] = useState('');
@@ -57,21 +65,20 @@ export default function RiskApiSignupForm() {
       <div className="border-2 border-emerald-500/40 rounded-lg bg-slate-950 p-4 sm:p-5 shadow-[0_0_20px_rgba(16,185,129,0.15)]">
         <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm mb-3">
           <KeyRound size={16} />
-          Your API key is ready
+          {t.signupReadyTitle}
         </div>
 
         <div className="flex items-center gap-2 bg-black border border-purple-500/30 rounded px-3 py-2.5 mb-3">
           <code className="text-[11px] sm:text-xs text-purple-300 break-all flex-1 font-mono">
             {issuedKey.api_key}
           </code>
-          <CopyButton text={issuedKey.api_key} />
+          <CopyButton text={issuedKey.api_key} label={t.copyLabel} />
         </div>
 
         <div className="flex items-start gap-2 text-[11px] text-amber-300/90 bg-amber-500/5 border border-amber-500/20 rounded px-3 py-2">
           <AlertTriangle size={13} className="shrink-0 mt-0.5" />
           <span>
-            This key is shown once and can't be retrieved again. Copy it now and store it somewhere
-            safe — {issuedKey.daily_limit} requests/day, free tier.
+            {t.signupWarningPrefix} {issuedKey.daily_limit} {t.signupWarningSuffix}
           </span>
         </div>
       </div>
@@ -86,7 +93,7 @@ export default function RiskApiSignupForm() {
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          placeholder="you@yourbot.dev"
+          placeholder={t.emailPlaceholder}
           className="flex-1 bg-slate-950 border-2 border-purple-500/40 rounded px-3 py-3 text-sm text-white placeholder-slate-500 focus:border-emerald-400 focus:outline-none font-mono shadow-[0_0_15px_rgba(153,69,255,0.15)] transition-colors"
         />
         <button
@@ -97,10 +104,10 @@ export default function RiskApiSignupForm() {
           {status === 'loading' ? (
             <>
               <Loader2 size={14} className="animate-spin" />
-              Generating...
+              {t.generatingText}
             </>
           ) : (
-            'Get free API key'
+            t.getFreeKeyBtn
           )}
         </button>
       </div>
@@ -112,7 +119,7 @@ export default function RiskApiSignupForm() {
       )}
 
       <p className="text-[11px] text-slate-500">
-        Free tier: 15 requests/day. No credit card. One key per email.
+        {t.freeTierNote}
       </p>
     </form>
   );
