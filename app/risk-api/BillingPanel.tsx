@@ -1,3 +1,12 @@
+// Version 8.12 — app/risk-api/BillingPanel.tsx
+//
+// v8.12: wired up for the 7-language i18n system (see app/risk-api/
+// i18n.ts, LangContext.tsx) — all static UI copy now comes from
+// useRiskApiLang()'s `t` object instead of hardcoded English strings.
+// Server-generated content (errorMsg from API responses, invoice.label)
+// stays as returned by the server, untranslated — same scope limitation
+// as the main site's own translation coverage.
+//
 // Version 8.11 — app/risk-api/BillingPanel.tsx
 //
 // v8.11: added a manual-payment fallback under the Pay Now buttons —
@@ -100,6 +109,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Loader2, KeyRound, CreditCard, Zap, CheckCircle2, AlertTriangle } from 'lucide-react';
 import CopyButton from './CopyButton';
+import { useRiskApiLang } from './LangContext';
 
 type Step = 'enter-key' | 'pick-tier' | 'pick-currency' | 'pick-wallet' | 'invoice' | 'paying' | 'verifying' | 'success' | 'error';
 type Kind = 'subscription' | 'topup';
@@ -235,6 +245,7 @@ function openWalletInAppBrowser(payUrl: string, wallet: Wallet) {
 }
 
 export default function BillingPanel() {
+  const { t } = useRiskApiLang();
   const [apiKey, setApiKey] = useState('');
   const [step, setStep] = useState<Step>('enter-key');
   const [kind, setKind] = useState<Kind>('subscription');
@@ -398,11 +409,10 @@ export default function BillingPanel() {
     <div className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 p-5 sm:p-8 backdrop-blur-md">
       <div className="flex items-center gap-2 text-lg font-black mb-1">
         <CreditCard size={16} className="text-emerald-400" />
-        Billing
+        {t.billingTitle}
       </div>
       <p className="text-xs text-slate-400 mb-5">
-        Subscribe for 1000 calls/30 days, or top up pay-per-call credits. Paid in $MRDT / SOL / USDC via
-        Solana Pay — same flow as the rest of TNT House.
+        {t.billingSub}
       </p>
 
       {step === 'enter-key' && (
@@ -421,11 +431,11 @@ export default function BillingPanel() {
               className="flex items-center justify-center gap-1.5 bg-gradient-to-r from-purple-500 to-emerald-400 hover:from-purple-400 hover:to-emerald-300 text-slate-950 font-black px-5 py-3 rounded text-sm transition shadow-[0_0_15px_rgba(153,69,255,0.4)] shrink-0"
             >
               <KeyRound size={14} />
-              Continue
+              {t.continueBtn}
             </button>
           </div>
           <p className="text-[11px] text-slate-500">
-            Don&apos;t have a key yet? Get one free above first.
+            {t.noKeyYet}
           </p>
         </form>
       )}
@@ -433,16 +443,16 @@ export default function BillingPanel() {
       {step === 'pick-tier' && status && (
         <div className="space-y-4">
           <div className="text-[11px] text-slate-400 bg-slate-950 border border-purple-500/20 rounded p-3">
-            Current tier: <span className="text-emerald-400 font-bold">{status.tier}</span>
+            {t.currentTierLabel} <span className="text-emerald-400 font-bold">{status.tier}</span>
             {status.subscription.active && (
               <>
                 {' '}
-                · {status.subscription.calls_used_this_cycle}/{status.subscription.monthly_quota} calls used ·
-                renews {status.subscription.expires_at ? new Date(status.subscription.expires_at).toLocaleDateString() : ''}
+                · {status.subscription.calls_used_this_cycle}/{status.subscription.monthly_quota} {t.callsUsedLabel} ·
+                {' '}{t.renewsLabel} {status.subscription.expires_at ? new Date(status.subscription.expires_at).toLocaleDateString() : ''}
               </>
             )}
             {' '}
-            · Credit balance: <span className="text-emerald-400 font-bold">${status.credit_balance_usd.toFixed(4)}</span>
+            · {t.creditBalanceLabel} <span className="text-emerald-400 font-bold">${status.credit_balance_usd.toFixed(4)}</span>
           </div>
 
           <div className="grid sm:grid-cols-2 gap-3">
@@ -451,16 +461,16 @@ export default function BillingPanel() {
               className={buttonBase + ' bg-purple-500/10 border-purple-500/30 hover:border-purple-500'}
             >
               <Zap size={20} className="mx-auto mb-2 text-purple-400 group-hover:text-white transition" />
-              <div className="font-bold text-purple-400 group-hover:text-white transition text-sm">Subscribe — $49</div>
-              <div className="text-[10px] text-slate-500 mt-1">1000 calls / 30 days</div>
+              <div className="font-bold text-purple-400 group-hover:text-white transition text-sm">{t.subscribeCardTitle}</div>
+              <div className="text-[10px] text-slate-500 mt-1">{t.subscribeCardSub}</div>
             </button>
             <button
               onClick={() => handlePickTier('topup')}
               className={buttonBase + ' bg-emerald-500/10 border-emerald-500/30 hover:border-emerald-500'}
             >
               <CreditCard size={20} className="mx-auto mb-2 text-emerald-400 group-hover:text-white transition" />
-              <div className="font-bold text-emerald-400 group-hover:text-white transition text-sm">Top up credits</div>
-              <div className="text-[10px] text-slate-500 mt-1">Pay-per-call, $5–$500</div>
+              <div className="font-bold text-emerald-400 group-hover:text-white transition text-sm">{t.topupCardTitle}</div>
+              <div className="text-[10px] text-slate-500 mt-1">{t.topupCardSub}</div>
             </button>
           </div>
 
@@ -480,7 +490,7 @@ export default function BillingPanel() {
                 onClick={() => setStep('pick-currency')}
                 className="text-xs font-bold text-purple-300 hover:text-white border border-purple-500/40 rounded px-3 py-1.5 transition"
               >
-                Continue with top-up →
+                {t.continueTopup}
               </button>
             </div>
           )}
@@ -489,7 +499,7 @@ export default function BillingPanel() {
 
       {step === 'pick-currency' && (
         <div className="space-y-3">
-          <h4 className="text-sm font-bold text-purple-400">Choose payment currency</h4>
+          <h4 className="text-sm font-bold text-purple-400">{t.chooseCurrencyTitle}</h4>
           {errorMsg && (
             <div className="text-[11px] text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded px-3 py-2">
               {errorMsg}
@@ -536,14 +546,14 @@ export default function BillingPanel() {
             </button>
           </div>
           <button onClick={() => setStep('pick-tier')} className="text-xs text-slate-400 hover:text-white">
-            ← Back
+            {t.backBtn}
           </button>
         </div>
       )}
 
       {step === 'pick-wallet' && (
         <div className="space-y-3">
-          <h4 className="text-sm font-bold text-purple-400">Choose wallet</h4>
+          <h4 className="text-sm font-bold text-purple-400">{t.chooseWalletTitle}</h4>
           <div className="grid grid-cols-2 gap-3">
             <button
               onClick={() => handlePickWallet('Phantom')}
@@ -566,7 +576,7 @@ export default function BillingPanel() {
             </button>
           </div>
           <button onClick={() => setStep('pick-currency')} className="text-xs text-slate-400 hover:text-white">
-            ← Back
+            {t.backBtn}
           </button>
         </div>
       )}
@@ -585,18 +595,17 @@ export default function BillingPanel() {
             </div>
           </div>
           <div className="p-2 bg-purple-950/30 border border-purple-500/20 rounded-lg text-[10px] text-purple-300 text-center">
-            Tapping will open our payment page inside {wallet}&apos;s app browser. Pay the exact amount shown —
-            you may see a &quot;domain not yet reviewed&quot; warning, this is expected.
+            {t.invoiceTapNote.replace('{wallet}', wallet || '')}
           </div>
           <div className="flex gap-3">
             <button onClick={reset} className="flex-1 px-5 py-2.5 text-sm rounded-lg border border-purple-500/40 hover:bg-purple-500/10 transition text-slate-300">
-              Cancel
+              {t.cancelBtn}
             </button>
             <button
               onClick={handlePayNow}
               className="flex-1 px-5 py-2.5 text-sm rounded-lg bg-gradient-to-r from-purple-500 to-emerald-400 text-slate-950 font-black hover:from-purple-400 hover:to-emerald-300 transition"
             >
-              Pay Now
+              {t.payNowBtn}
             </button>
           </div>
 
@@ -608,31 +617,30 @@ export default function BillingPanel() {
               wallet app or someone pasting these values into Revolut,
               an exchange, or a wallet on a different device. */}
           <div className="border-t border-purple-500/10 pt-4 space-y-3">
-            <div className="text-xs font-bold text-slate-400">Or pay manually from any wallet</div>
+            <div className="text-xs font-bold text-slate-400">{t.manualPayTitle}</div>
 
             <div className="space-y-2">
-              <div className="text-[10px] text-slate-500">Send to</div>
+              <div className="text-[10px] text-slate-500">{t.sendToLabel}</div>
               <div className="flex items-center gap-2 bg-black border border-purple-500/30 rounded px-3 py-2">
                 <code className="text-[11px] text-purple-300 font-mono break-all flex-1">
                   {invoice.wallet_address}
                 </code>
-                <CopyButton text={invoice.wallet_address} label="Copy" />
+                <CopyButton text={invoice.wallet_address} label={t.copyLabel} />
               </div>
             </div>
 
             <div className="space-y-2">
-              <div className="text-[10px] text-slate-500">Exact amount</div>
+              <div className="text-[10px] text-slate-500">{t.exactAmountLabel}</div>
               <div className="flex items-center gap-2 bg-black border border-purple-500/30 rounded px-3 py-2">
                 <code className="text-sm text-emerald-400 font-mono flex-1">
                   {invoice.pay_amount_formatted} {invoice.currency}
                 </code>
-                <CopyButton text={String(invoice.pay_amount_formatted)} label="Copy" />
+                <CopyButton text={String(invoice.pay_amount_formatted)} label={t.copyLabel} />
               </div>
             </div>
 
             <p className="text-[10px] text-slate-500 leading-relaxed">
-              Send exactly this amount from any Solana wallet or exchange. Your credit will be applied
-              automatically once the payment is detected — no need to do anything else after sending.
+              {t.manualPayNote}
             </p>
           </div>
         </div>
@@ -641,18 +649,18 @@ export default function BillingPanel() {
       {step === 'verifying' && (
         <div className="text-center py-6 space-y-3">
           <Loader2 className="animate-spin mx-auto text-purple-400" size={28} />
-          <div className="text-sm text-purple-300">Checking blockchain for your payment...</div>
-          <div className="text-[11px] text-slate-500">Attempt {verifyAttempts} — this can take a minute or two.</div>
+          <div className="text-sm text-purple-300">{t.verifyingText}</div>
+          <div className="text-[11px] text-slate-500">{t.verifyingAttemptPrefix} {verifyAttempts} {t.verifyingAttemptSuffix}</div>
         </div>
       )}
 
       {step === 'success' && successResult && (
         <div className="text-center py-6 space-y-3">
           <CheckCircle2 className="mx-auto text-emerald-400" size={32} />
-          <div className="text-emerald-400 font-bold">Payment confirmed!</div>
+          <div className="text-emerald-400 font-bold">{t.paymentConfirmed}</div>
           {successResult.kind === 'subscription' ? (
             <div className="text-xs text-slate-300">
-              Subscription active until{' '}
+              {t.subActiveUntil}{' '}
               {successResult.subscription_expires_at
                 ? new Date(successResult.subscription_expires_at).toLocaleDateString()
                 : 'now +30 days'}
@@ -660,11 +668,11 @@ export default function BillingPanel() {
             </div>
           ) : (
             <div className="text-xs text-slate-300">
-              New credit balance: ${Number(successResult.credit_balance_usd ?? 0).toFixed(4)}
+              {t.newCreditBalance} ${Number(successResult.credit_balance_usd ?? 0).toFixed(4)}
             </div>
           )}
           <button onClick={() => { setApiKey(apiKey); fetchStatus(apiKey); }} className="text-xs text-purple-300 hover:text-white underline">
-            Refresh status
+            {t.refreshStatus}
           </button>
         </div>
       )}
@@ -677,7 +685,7 @@ export default function BillingPanel() {
             onClick={() => setStep('enter-key')}
             className="text-xs font-bold text-purple-300 hover:text-white border border-purple-500/40 rounded px-3 py-1.5 transition"
           >
-            Start over
+            {t.startOver}
           </button>
         </div>
       )}
