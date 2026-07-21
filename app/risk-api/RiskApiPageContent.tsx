@@ -26,6 +26,7 @@ import CopyButton from './CopyButton';
 import RiskApiSignupForm from './RiskApiSignupForm';
 import BillingPanel from './BillingPanel';
 import LangSwitcher from './LangSwitcher';
+import ChatWidget from './ChatWidget';
 import { useRiskApiLang } from './LangContext';
 
 const CURL_EXAMPLE = `curl "https://tnt-audit.com/api/v1/token-risk?mint=<MINT_ADDRESS>" \\
@@ -348,6 +349,8 @@ export default function RiskApiPageContent() {
           </a>
         </footer>
       </main>
+
+      <ChatWidget />
     </div>
   );
 }
