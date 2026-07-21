@@ -1,79 +1,54 @@
-// Version 6.14 — lib/holder-distribution.ts
+// Version 6.15 — lib/holder-distribution.ts
 //
-// v6.13: real-device test on a live production call (USDC, one of the
-// most commonly-queried mints on Solana) showed all 3 retry attempts
-// timing out after 5s each -- total ~22s, confirmed in Vercel runtime
-// logs as three consecutive "fetch timed out" failures, not a clean
-// RPC-side rejection. That's the signature of an overloaded/heavily
-// shared free public RPC node silently hanging under load, not a
-// genuine "no capacity" answer from a real provider.
+// v6.15: root cause fully confirmed via real-device testing today —
+// NOT a bad RPC provider (reproduced identically on the public RPC AND
+// on Helius's own mainnet RPC using a key proven working all day for
+// other calls). getTokenLargestAccounts is a genuinely expensive query
+// for high-holder-count mints (USDC has tens of thousands of active
+// token accounts) and can legitimately take longer than the previous
+// 5s-per-call budget, regardless of provider — confirmed by
+// `e.name === 'TimeoutError'` in every failure, meaning OUR OWN
+// AbortSignal was what cut every attempt off, not an upstream error.
 //
-// RPC_URL previously fell back straight to the fully public,
-// unauthenticated api.mainnet-beta.solana.com whenever HELIUS_RPC_URL
-// wasn't explicitly set -- the exact same fallback app/api/rpc/route.js
-// (existing file, not modified) already has, for the same reason (see
-// its own comment about the public RPC causing problems for wallet
-// signing). Rather than requiring a second manually-set env var, this
-// now also tries deriving a real Helius RPC URL from HELIUS_API_KEY --
-// which this project ALREADY has configured and already uses
-// successfully all day for lib/billing-verify.ts's Enhanced
-// Transactions API calls. Helius's mainnet RPC
-// (https://mainnet.helius-rpc.com/?api-key=...) is the same API key,
-// same account, same free tier -- not a new paid service, not a new
-// secret, just pointing at a resource we already have instead of the
-// shared public endpoint. HELIUS_RPC_URL, if explicitly set, still
-// takes priority; the fully public endpoint is now only the
-// last-resort fallback if neither is configured.
+// Rebalanced the timeout budget instead of chasing another provider:
+// getTokenLargestAccounts (the expensive call) now gets a dedicated,
+// longer budget; getTokenSupply (a cheap, simple call, never observed
+// to be the actual bottleneck) keeps a short one. Dropped from 3
+// attempts to 2 — worse odds of "eventually getting lucky within a too-
+// short window," but each individual attempt now has a real chance of
+// succeeding instead of hitting the same too-tight ceiling three times.
+// Worst case: 2 x (10s + 5s) + one 2s backoff = 32s, still comfortably
+// inside the outer 40s budget (HOLDER_RISK_TIMEOUT_MS in
+// app/api/v1/token-risk/route.ts) with ~8s of margin for everything
+// else (JSON parsing, promise scheduling, etc).
+//
+// Also settled RPC_URL: derive from HELIUS_API_KEY (this project's
+// already-configured, already-proven-working-all-day key for
+// lib/billing-verify.ts's calls) ahead of whatever HELIUS_RPC_URL
+// already holds — same account, same free tier, no new cost. The
+// temporary diagnostic logging that traced this down has been removed
+// now that the question it existed to answer is settled.
 //
 // v6.10's retry wrapper around checkHolderDistributionRisk()
-// (lib/helius-client.js) did NOT fix the bug in practice — retried BONK
-// still came back holder_count: 0. Reasoning through why: that
+// (lib/helius-client.js) did NOT fix the bug in practice — that
 // function's internal RPC handling collapses BOTH "genuinely zero
 // holders" and "RPC call errored/rate-limited" into the identical
-// return shape ({ holderCount: 0, ... }), so a caller — even one that
-// retries — has no way to tell which happened. On top of that, the
-// previous backoff (600ms then 1200ms, ~1.8s total) is nowhere near
-// long enough to clear a real public-RPC rate-limit window.
-//
-// This is a from-scratch implementation of the same on-chain query
+// return shape, so a caller has no way to tell which happened. This
+// remains a from-scratch implementation of the same on-chain query
 // (getTokenLargestAccounts + getTokenSupply) — NOT a wrapper around the
-// existing function, and does not modify lib/helius-client.js. Doing it
-// directly lets this tell a genuine empty result (valid RPC response,
-// no error, truly zero accounts) apart from an RPC-side failure, and
-// only retries the latter, with real backoff and real logging on every
-// attempt — visible in Vercel function logs — instead of guessing.
+// existing function, and does not modify lib/helius-client.js — so a
+// genuine empty result (valid RPC response, no error, truly zero
+// accounts) can be told apart from an RPC-side failure, with real
+// logging on every attempt visible in Vercel function logs.
 
-// v6.14: diagnostic confirmed HELIUS_RPC_URL IS explicitly set in
-// Vercel (not missing, as v6.13 assumed) — the "explicit HELIUS_RPC_URL
-// env var" branch was what actually timed out three times in a row on
-// USDC, both before and after v6.13's fix. Reversing priority as a
-// direct test: try the URL derived from HELIUS_API_KEY (proven working
-// all day for lib/billing-verify.ts's calls) FIRST, falling back to
-// whatever HELIUS_RPC_URL already holds only if that key is somehow
-// unavailable. If this resolves the timeout, HELIUS_RPC_URL's existing
-// value was simply stale/misconfigured. If it doesn't, the issue is
-// with Helius's RPC itself for this specific call, not which env var
-// points to it — a materially different, more concerning finding.
 const RPC_URL = process.env.HELIUS_API_KEY
   ? `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`
   : process.env.HELIUS_RPC_URL || 'https://api.mainnet-beta.solana.com';
 
-// Diagnostic only — logs WHICH branch of the fallback above got picked,
-// never the actual URL/key value, so we can tell from Vercel logs
-// whether v6.13's Helius fallback is actually being reached at all,
-// without exposing any secret. Remove once the RPC-timeout issue this
-// was added to debug is confirmed resolved.
-console.log(
-  '[holder-distribution] RPC source:',
-  process.env.HELIUS_API_KEY
-    ? 'derived from HELIUS_API_KEY (Helius mainnet RPC)'
-    : process.env.HELIUS_RPC_URL
-      ? 'explicit HELIUS_RPC_URL env var (HELIUS_API_KEY unavailable)'
-      : 'public api.mainnet-beta.solana.com (no Helius env var found)',
-);
-const MAX_ATTEMPTS = 3;
-const BACKOFF_SCHEDULE_MS = [1500, 4000]; // wait before attempt 2, then before attempt 3
-const FETCH_TIMEOUT_MS = 5000;
+const MAX_ATTEMPTS = 2;
+const BACKOFF_MS = 2000; // wait before the 2nd (final) attempt
+const LARGEST_ACCOUNTS_TIMEOUT_MS = 10000; // the expensive call — generous budget for high-holder-count mints like USDC
+const SUPPLY_TIMEOUT_MS = 5000; // cheap, simple call — never observed to be the actual bottleneck
 
 export interface HolderDistributionResult {
   riskLevel: string;
@@ -99,13 +74,13 @@ interface RpcOutcome<T> {
   reason: string | null;
 }
 
-async function callSolanaRpc(method: string, params: unknown[]): Promise<RpcOutcome<any>> {
+async function callSolanaRpc(method: string, params: unknown[], timeoutMs: number): Promise<RpcOutcome<any>> {
   try {
     const res = await fetch(RPC_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
     });
 
     if (!res.ok) {
@@ -135,7 +110,7 @@ async function callSolanaRpc(method: string, params: unknown[]): Promise<RpcOutc
     return {
       ok: false,
       data: null,
-      reason: e.name === 'TimeoutError' ? 'fetch timed out' : e.message || 'fetch failed',
+      reason: e.name === 'TimeoutError' ? `fetch timed out (${timeoutMs}ms budget)` : e.message || 'fetch failed',
     };
   }
 }
@@ -143,7 +118,7 @@ async function callSolanaRpc(method: string, params: unknown[]): Promise<RpcOutc
 async function fetchHolderSnapshot(
   mint: string,
 ): Promise<RpcOutcome<{ holders: RawHolder[]; totalSupply: number }>> {
-  const largest = await callSolanaRpc('getTokenLargestAccounts', [mint]);
+  const largest = await callSolanaRpc('getTokenLargestAccounts', [mint], LARGEST_ACCOUNTS_TIMEOUT_MS);
   if (!largest.ok || !largest.data) {
     return { ok: false, data: null, reason: largest.reason ?? 'unknown RPC failure' };
   }
@@ -158,7 +133,7 @@ async function fetchHolderSnapshot(
     return { ok: true, data: { holders: [], totalSupply: 0 }, reason: null };
   }
 
-  const supply = await callSolanaRpc('getTokenSupply', [mint]);
+  const supply = await callSolanaRpc('getTokenSupply', [mint], SUPPLY_TIMEOUT_MS);
   if (!supply.ok || !supply.data) {
     return { ok: false, data: null, reason: supply.reason ?? 'unknown RPC failure' };
   }
@@ -211,8 +186,7 @@ export async function getHolderDistributionRobust(mint: string): Promise<HolderD
     );
 
     if (attempt < MAX_ATTEMPTS) {
-      const wait = BACKOFF_SCHEDULE_MS[attempt - 1] ?? BACKOFF_SCHEDULE_MS[BACKOFF_SCHEDULE_MS.length - 1];
-      await new Promise((resolve) => setTimeout(resolve, wait));
+      await new Promise((resolve) => setTimeout(resolve, BACKOFF_MS));
     }
   }
 
