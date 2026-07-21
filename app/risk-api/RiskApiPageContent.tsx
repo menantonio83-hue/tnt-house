@@ -132,7 +132,10 @@ export default function RiskApiPageContent() {
                 <Terminal size={13} />
                 GET /api/v1/token-risk
               </div>
-              <span className="text-[10px] text-slate-500 hidden sm:block">application/json</span>
+              <span className="text-[10px] text-slate-500 hidden sm:flex items-center gap-2">
+                application/json
+                <a href="/openapi.json" className="underline hover:text-purple-300 transition">openapi.json</a>
+              </span>
             </div>
 
             <div className="p-4 space-y-3">
@@ -190,6 +193,7 @@ export default function RiskApiPageContent() {
               </div>
             ))}
           </div>
+          <p className="text-[11px] text-slate-500 mt-4">{t.rateLimitHeadersNote}</p>
         </section>
 
         {/* Pricing */}

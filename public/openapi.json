@@ -1,0 +1,177 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "TNT House Risk-Data API",
+    "description": "Real-time Solana token safety scores, on-chain-provable insider cluster detection, and market fundamentals — built for AI trading agents. Free tier: 15 requests/day, no card required. See https://tnt-audit.com/risk-api for pricing and to get a key.",
+    "version": "1.0.0",
+    "contact": {
+      "url": "https://tnt-audit.com/risk-api"
+    }
+  },
+  "servers": [
+    { "url": "https://tnt-audit.com" }
+  ],
+  "paths": {
+    "/api/v1/token-risk": {
+      "get": {
+        "summary": "Check a Solana token's safety score and insider clusters",
+        "description": "Returns a 0-100 safety score, insider funding clusters, holder distribution, mint/freeze authority status, and live market data for any Solana token mint address. The first-ever check on a given mint returns cluster_analysis: \"pending\" while insider detection runs in the background (usually complete within 1-2 minutes) — re-check the same mint shortly after for the full result.",
+        "operationId": "getTokenRisk",
+        "parameters": [
+          {
+            "name": "mint",
+            "in": "query",
+            "required": true,
+            "description": "The Solana token mint address to analyze. `ca` is accepted as an alias for the same parameter.",
+            "schema": { "type": "string", "example": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Token risk analysis. Successful responses also include X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset headers, and X-Credit-Balance-Usd once the key has a paid tier or credit balance.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mint": { "type": "string" },
+                    "safety_score": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 100,
+                      "description": "Weighted from mint/freeze authority status, holder concentration, liquidity, volume, and real insider-cluster penalties."
+                    },
+                    "cluster_analysis": {
+                      "type": "string",
+                      "enum": ["pending", "complete"],
+                      "description": "\"pending\" on a mint's first-ever check while the insider trace runs in the background; \"complete\" after ~1-2 minutes."
+                    },
+                    "insider_clusters": {
+                      "type": "array",
+                      "description": "Wallets that share a first-funder — an on-chain-provable insider/sniper signal.",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "funder": { "type": "string" },
+                          "wallets": { "type": "array", "items": { "type": "string" } }
+                        }
+                      }
+                    },
+                    "mint_authority": {
+                      "type": "object",
+                      "properties": {
+                        "revoked": { "type": "boolean" },
+                        "address": { "type": ["string", "null"] }
+                      }
+                    },
+                    "freeze_authority": {
+                      "type": "object",
+                      "properties": {
+                        "revoked": { "type": "boolean" },
+                        "address": { "type": ["string", "null"] }
+                      }
+                    },
+                    "honeypot_risk": {
+                      "type": ["boolean", "null"],
+                      "description": "On the roadmap, not yet implemented — currently always null. See `note`."
+                    },
+                    "lp_locked": {
+                      "type": ["boolean", "null"],
+                      "description": "On the roadmap, not yet implemented — currently always null. See `note`."
+                    },
+                    "holder_distribution": {
+                      "type": "object",
+                      "properties": {
+                        "risk_level": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL", "ERROR"] },
+                        "largest_holder_percent": { "type": "number" },
+                        "top10_percent": { "type": "number" },
+                        "holder_count": {
+                          "type": "integer",
+                          "description": "Number of accounts in Solana's top-20-largest-holders response — a real RPC limit, not a full holder count for widely-held tokens."
+                        }
+                      }
+                    },
+                    "market": {
+                      "type": "object",
+                      "properties": {
+                        "price_usd": { "type": ["number", "null"] },
+                        "liquidity_usd": { "type": ["number", "null"] },
+                        "volume_24h_usd": { "type": ["number", "null"] },
+                        "price_change_24h_percent": { "type": ["number", "null"] },
+                        "age_days": { "type": ["number", "null"] }
+                      }
+                    },
+                    "note": {
+                      "type": "string",
+                      "description": "Explains that honeypot_risk/lp_locked are roadmap items, not a bug."
+                    },
+                    "checked_at": { "type": "string", "format": "date-time" }
+                  },
+                  "required": ["mint", "safety_score", "cluster_analysis", "insider_clusters", "mint_authority", "freeze_authority", "holder_distribution", "market", "checked_at"]
+                },
+                "example": {
+                  "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+                  "safety_score": 78,
+                  "cluster_analysis": "complete",
+                  "insider_clusters": [{ "funder": "9xQe...k2Pd", "wallets": ["7uF3...aZ1", "3mN8...qR2"] }],
+                  "mint_authority": { "revoked": true, "address": null },
+                  "freeze_authority": { "revoked": true, "address": null },
+                  "honeypot_risk": null,
+                  "lp_locked": null,
+                  "holder_distribution": { "risk_level": "LOW", "largest_holder_percent": 4.2, "top10_percent": 22.7, "holder_count": 20 },
+                  "market": { "price_usd": 0.0000412, "liquidity_usd": 84210, "volume_24h_usd": 512300, "price_change_24h_percent": 12.4, "age_days": 3 },
+                  "note": "honeypot_risk and lp_locked detection are on the roadmap and not yet implemented — both fields will remain null until shipped.",
+                  "checked_at": "2026-07-18T12:00:00.000Z"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing or invalid `mint` parameter.",
+            "content": { "application/json": { "schema": { "type": "object", "properties": { "error": { "type": "string" } } } } }
+          },
+          "401": {
+            "description": "Missing, malformed, or revoked API key.",
+            "content": { "application/json": { "schema": { "type": "object", "properties": { "error": { "type": "string" } } } } }
+          },
+          "402": {
+            "description": "Daily free-tier limit or monthly subscription quota reached, with no call-credit balance to draw from. Response includes an upgrade_url.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": { "type": "string" },
+                    "limit": { "type": "integer" },
+                    "used": { "type": "integer" },
+                    "reset_at": { "type": "string", "format": "date-time" },
+                    "overage_rate_usd": { "type": "number" },
+                    "upgrade_url": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited.",
+            "content": { "application/json": { "schema": { "type": "object", "properties": { "error": { "type": "string" } } } } }
+          },
+          "502": {
+            "description": "Could not fetch on-chain mint data (invalid mint, or the Solana RPC didn't respond in time).",
+            "content": { "application/json": { "schema": { "type": "object", "properties": { "error": { "type": "string" }, "details": { "type": "string" } } } } }
+          }
+        },
+        "security": [{ "BearerAuth": [] }]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "API key from https://tnt-audit.com/risk-api, sent as: Authorization: Bearer tnt_sk_..."
+      }
+    }
+  }
+}

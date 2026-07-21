@@ -56,6 +56,7 @@ export interface RiskApiTranslations {
   fieldHoneypotLpLocked: string;
   fieldHolderDistribution: string;
   fieldMarket: string;
+  rateLimitHeadersNote: string;
 
   // Pricing
   pricingTitle: string;
@@ -151,6 +152,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     fieldHoneypotLpLocked: 'On the roadmap — currently always null.',
     fieldHolderDistribution: 'Largest holder %, top-10 %, risk level, and holder_count — the number of accounts in Solana\u2019s top-20-largest-holders response (a real RPC limit, not a full holder count for widely-held tokens like BONK or USDC).',
     fieldMarket: 'Live price, liquidity, 24h volume, 24h change, and token age from DexScreener.',
+    rateLimitHeadersNote: 'Every response also includes X-RateLimit-Limit, X-RateLimit-Remaining, and X-RateLimit-Reset headers — plus X-Credit-Balance-Usd once you have a paid tier or credit balance — so your bot can track its quota without ever hitting a 429.',
     pricingTitle: 'Limits & pricing',
     tierFree: 'FREE',
     tierFreeAmount: '15 req/day',
@@ -236,6 +238,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     fieldHoneypotLpLocked: 'En la hoja de ruta — actualmente siempre null.',
     fieldHolderDistribution: '% del mayor holder, % del top-10, nivel de riesgo, y holder_count — el número de cuentas en la respuesta de los 20 mayores holders de Solana (un límite real de la RPC, no un recuento total de holders para tokens muy distribuidos como BONK o USDC).',
     fieldMarket: 'Precio en vivo, liquidez, volumen 24h, cambio 24h y antigüedad del token desde DexScreener.',
+    rateLimitHeadersNote: 'Cada respuesta también incluye las cabeceras X-RateLimit-Limit, X-RateLimit-Remaining y X-RateLimit-Reset — además de X-Credit-Balance-Usd en cuanto tengas un nivel de pago o saldo de crédito — para que tu bot controle su cuota sin llegar nunca a un 429.',
     pricingTitle: 'Límites y precios',
     tierFree: 'GRATIS',
     tierFreeAmount: '15 pet./día',
@@ -321,6 +324,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     fieldHoneypotLpLocked: 'Sur la feuille de route — actuellement toujours null.',
     fieldHolderDistribution: '% du plus gros holder, % du top-10, niveau de risque, et holder_count — le nombre de comptes dans la réponse des 20 plus gros holders de Solana (une vraie limite de la RPC, pas un décompte complet des holders pour des tokens très détenus comme BONK ou USDC).',
     fieldMarket: 'Prix en direct, liquidité, volume 24h, variation 24h et âge du token, via DexScreener.',
+    rateLimitHeadersNote: 'Chaque réponse inclut aussi les en-têtes X-RateLimit-Limit, X-RateLimit-Remaining et X-RateLimit-Reset — plus X-Credit-Balance-Usd dès que vous avez un abonnement payant ou un solde de crédit — pour que votre bot suive son quota sans jamais tomber sur un 429.',
     pricingTitle: 'Limites et tarifs',
     tierFree: 'GRATUIT',
     tierFreeAmount: '15 req/jour',
@@ -406,6 +410,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     fieldHoneypotLpLocked: 'Στον χάρτη πορείας — προς το παρόν πάντα null.',
     fieldHolderDistribution: '% μεγαλύτερου holder, top-10 %, επίπεδο κινδύνου, και holder_count — ο αριθμός λογαριασμών στην απόκριση των 20 μεγαλύτερων holders της Solana (πραγματικό όριο του RPC, όχι πλήρης αριθμός holders για ευρέως κατεχόμενα tokens όπως το BONK ή το USDC).',
     fieldMarket: 'Τιμή σε πραγματικό χρόνο, ρευστότητα, όγκος 24ω, μεταβολή 24ω και ηλικία του token, από το DexScreener.',
+    rateLimitHeadersNote: 'Κάθε απόκριση περιλαμβάνει επίσης τα headers X-RateLimit-Limit, X-RateLimit-Remaining και X-RateLimit-Reset — συν το X-Credit-Balance-Usd μόλις έχεις πληρωμένο επίπεδο ή υπόλοιπο πίστωσης — ώστε το bot σου να παρακολουθεί το όριό του χωρίς ποτέ να πέσει σε 429.',
     pricingTitle: 'Όρια & τιμολόγηση',
     tierFree: 'ΔΩΡΕΑΝ',
     tierFreeAmount: '15 αιτ./ημέρα',
@@ -491,6 +496,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     fieldHoneypotLpLocked: 'В планах — сейчас всегда null.',
     fieldHolderDistribution: '% крупнейшего холдера, % топ-10, уровень риска и holder_count — число аккаунтов в ответе топ-20 крупнейших холдеров Solana (реальное ограничение самого RPC, а не полное число холдеров для широко распределённых токенов вроде BONK или USDC).',
     fieldMarket: 'Живая цена, ликвидность, объём за 24ч, изменение за 24ч и возраст токена — с DexScreener.',
+    rateLimitHeadersNote: 'Каждый ответ также включает заголовки X-RateLimit-Limit, X-RateLimit-Remaining и X-RateLimit-Reset — плюс X-Credit-Balance-Usd, если у тебя платный тариф или баланс кредитов — чтобы бот мог отслеживать свою квоту, не ловя 429.',
     pricingTitle: 'Лимиты и цены',
     tierFree: 'FREE',
     tierFreeAmount: '15 запр./день',
@@ -576,6 +582,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     fieldHoneypotLpLocked: 'Nella roadmap — attualmente sempre null.',
     fieldHolderDistribution: '% del maggior holder, % del top-10, livello di rischio, e holder_count — il numero di account nella risposta dei 20 maggiori holder di Solana (un vero limite dell\'RPC, non un conteggio completo degli holder per token molto distribuiti come BONK o USDC).',
     fieldMarket: 'Prezzo live, liquidità, volume 24h, variazione 24h ed età del token, da DexScreener.',
+    rateLimitHeadersNote: 'Ogni risposta include anche gli header X-RateLimit-Limit, X-RateLimit-Remaining e X-RateLimit-Reset — più X-Credit-Balance-Usd non appena hai un livello a pagamento o un saldo di credito — così il tuo bot può monitorare la sua quota senza mai incontrare un 429.',
     pricingTitle: 'Limiti e prezzi',
     tierFree: 'GRATIS',
     tierFreeAmount: '15 rich./giorno',
@@ -661,6 +668,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     fieldHoneypotLpLocked: '已列入路线图 —— 目前始终为 null。',
     fieldHolderDistribution: '最大持币者占比、前10名占比、风险等级，以及 holder_count —— 即 Solana 前20大持币者响应中的账户数量（这是 RPC 本身的真实限制，对于 BONK 或 USDC 这类持有非常分散的代币，并不代表完整持币人数）。',
     fieldMarket: '来自 DexScreener 的实时价格、流动性、24小时交易量、24小时涨跌幅及代币存在天数。',
+    rateLimitHeadersNote: '每个响应还包含 X-RateLimit-Limit、X-RateLimit-Remaining 和 X-RateLimit-Reset 请求头 —— 一旦你有付费套餐或信用余额，还会附带 X-Credit-Balance-Usd —— 这样你的机器人无需触发 429 就能追踪自己的配额。',
     pricingTitle: '限额与价格',
     tierFree: '免费',
     tierFreeAmount: '15 次/天',
