@@ -27,6 +27,7 @@ import RiskApiSignupForm from './RiskApiSignupForm';
 import BillingPanel from './BillingPanel';
 import LangSwitcher from './LangSwitcher';
 import ChatWidget from './ChatWidget';
+import InsiderClusterGraph from './InsiderClusterGraph';
 import { useRiskApiLang } from './LangContext';
 
 const CURL_EXAMPLE = `curl "https://tnt-audit.com/api/v1/token-risk?mint=<MINT_ADDRESS>" \\
@@ -171,6 +172,13 @@ export default function RiskApiPageContent() {
               {t.btnReadDocs}
             </a>
           </div>
+        </section>
+
+        {/* Illustrates insider_clusters — the actual killer feature —
+            instead of a generic banner. Pure inline SVG, see
+            InsiderClusterGraph.tsx. */}
+        <section className="pb-10">
+          <InsiderClusterGraph />
         </section>
 
         {/* Signature element: live terminal preview of a real response shape */}
