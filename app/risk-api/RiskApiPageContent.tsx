@@ -1,3 +1,12 @@
+// Version 1.1 — app/risk-api/RiskApiPageContent.tsx
+//
+// v1.1: docs terminal now has curl/Python/TypeScript tabs (Gemini
+// suggestion #1) instead of just curl. Both new snippets verified with
+// real compilers before committing — Python via ast.parse(), TypeScript
+// via an isolated tsc run — not just "looks right". Copy button label
+// switched from the curl-specific t.copyCurl to the generic t.copyLabel
+// since it now copies whichever language tab is active.
+//
 // Version 1.0 — app/risk-api/RiskApiPageContent.tsx
 //
 // The actual page body, split out from page.tsx (which stays a server
@@ -11,6 +20,7 @@
 
 'use client';
 
+import { useState } from 'react';
 import { Bot, Shield, Terminal, Database, Lock, Zap, CheckCircle2, CreditCard } from 'lucide-react';
 import CopyButton from './CopyButton';
 import RiskApiSignupForm from './RiskApiSignupForm';
@@ -20,6 +30,43 @@ import { useRiskApiLang } from './LangContext';
 
 const CURL_EXAMPLE = `curl "https://tnt-audit.com/api/v1/token-risk?mint=<MINT_ADDRESS>" \\
   -H "Authorization: Bearer tnt_sk_your_key_here"`;
+
+const PYTHON_EXAMPLE = `import requests
+
+API_KEY = "tnt_sk_your_key_here"
+MINT_ADDRESS = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+
+response = requests.get(
+    "https://tnt-audit.com/api/v1/token-risk",
+    params={"mint": MINT_ADDRESS},
+    headers={"Authorization": f"Bearer {API_KEY}"},
+)
+data = response.json()
+
+if data["safety_score"] < 50:
+    print("Risky — skipping buy")
+elif data["insider_clusters"]:
+    print(f"{len(data['insider_clusters'])} insider cluster(s) found")
+else:
+    print("Looks clean")`;
+
+const TYPESCRIPT_EXAMPLE = `async function checkTokenRisk(mint: string, apiKey: string) {
+  const res = await fetch(
+    \`https://tnt-audit.com/api/v1/token-risk?mint=\${mint}\`,
+    { headers: { Authorization: \`Bearer \${apiKey}\` } },
+  );
+
+  if (!res.ok) throw new Error(\`API error: \${res.status}\`);
+  return res.json();
+}`;
+
+type CodeTab = 'curl' | 'python' | 'typescript';
+
+const CODE_EXAMPLES: Record<CodeTab, { label: string; code: string }> = {
+  curl: { label: 'curl', code: CURL_EXAMPLE },
+  python: { label: 'Python', code: PYTHON_EXAMPLE },
+  typescript: { label: 'TypeScript', code: TYPESCRIPT_EXAMPLE },
+};
 
 const EXAMPLE_RESPONSE = {
   mint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
@@ -49,6 +96,7 @@ const EXAMPLE_RESPONSE = {
 
 export default function RiskApiPageContent() {
   const { t } = useRiskApiLang();
+  const [codeTab, setCodeTab] = useState<CodeTab>('curl');
 
   const responseFields: Array<{ field: string; desc: string }> = [
     { field: 'safety_score', desc: t.fieldSafetyScore },
@@ -139,11 +187,28 @@ export default function RiskApiPageContent() {
             </div>
 
             <div className="p-4 space-y-3">
+              <div className="flex items-center gap-1">
+                {(Object.keys(CODE_EXAMPLES) as CodeTab[]).map((key) => (
+                  <button
+                    key={key}
+                    onClick={() => setCodeTab(key)}
+                    className={
+                      'text-[11px] font-bold px-2.5 py-1 rounded transition ' +
+                      (codeTab === key
+                        ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
+                        : 'text-slate-500 hover:text-slate-300 border border-transparent')
+                    }
+                  >
+                    {CODE_EXAMPLES[key].label}
+                  </button>
+                ))}
+              </div>
+
               <div className="flex items-start justify-between gap-2">
                 <pre className="text-[11px] sm:text-xs text-emerald-400 overflow-x-auto flex-1 leading-relaxed">
-                  {CURL_EXAMPLE}
+                  {CODE_EXAMPLES[codeTab].code}
                 </pre>
-                <CopyButton text={CURL_EXAMPLE} label={t.copyCurl} />
+                <CopyButton text={CODE_EXAMPLES[codeTab].code} label={t.copyLabel} />
               </div>
 
               <div className="border-t border-purple-500/10 pt-3">
