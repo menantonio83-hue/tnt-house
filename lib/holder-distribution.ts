@@ -1,4 +1,29 @@
-// Version 6.12 — lib/holder-distribution.ts
+// Version 6.13 — lib/holder-distribution.ts
+//
+// v6.13: real-device test on a live production call (USDC, one of the
+// most commonly-queried mints on Solana) showed all 3 retry attempts
+// timing out after 5s each -- total ~22s, confirmed in Vercel runtime
+// logs as three consecutive "fetch timed out" failures, not a clean
+// RPC-side rejection. That's the signature of an overloaded/heavily
+// shared free public RPC node silently hanging under load, not a
+// genuine "no capacity" answer from a real provider.
+//
+// RPC_URL previously fell back straight to the fully public,
+// unauthenticated api.mainnet-beta.solana.com whenever HELIUS_RPC_URL
+// wasn't explicitly set -- the exact same fallback app/api/rpc/route.js
+// (existing file, not modified) already has, for the same reason (see
+// its own comment about the public RPC causing problems for wallet
+// signing). Rather than requiring a second manually-set env var, this
+// now also tries deriving a real Helius RPC URL from HELIUS_API_KEY --
+// which this project ALREADY has configured and already uses
+// successfully all day for lib/billing-verify.ts's Enhanced
+// Transactions API calls. Helius's mainnet RPC
+// (https://mainnet.helius-rpc.com/?api-key=...) is the same API key,
+// same account, same free tier -- not a new paid service, not a new
+// secret, just pointing at a resource we already have instead of the
+// shared public endpoint. HELIUS_RPC_URL, if explicitly set, still
+// takes priority; the fully public endpoint is now only the
+// last-resort fallback if neither is configured.
 //
 // v6.10's retry wrapper around checkHolderDistributionRisk()
 // (lib/helius-client.js) did NOT fix the bug in practice — retried BONK
@@ -18,7 +43,11 @@
 // only retries the latter, with real backoff and real logging on every
 // attempt — visible in Vercel function logs — instead of guessing.
 
-const RPC_URL = process.env.HELIUS_RPC_URL || 'https://api.mainnet-beta.solana.com';
+const RPC_URL =
+  process.env.HELIUS_RPC_URL ||
+  (process.env.HELIUS_API_KEY
+    ? `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`
+    : 'https://api.mainnet-beta.solana.com');
 const MAX_ATTEMPTS = 3;
 const BACKOFF_SCHEDULE_MS = [1500, 4000]; // wait before attempt 2, then before attempt 3
 const FETCH_TIMEOUT_MS = 5000;
