@@ -190,6 +190,7 @@ export default function RiskApiPageContent() {
               </div>
             ))}
           </div>
+          <p className="text-[11px] text-slate-500 mt-4">{t.rateLimitHeadersNote}</p>
         </section>
 
         {/* Pricing */}
