@@ -151,6 +151,10 @@ export default function RiskApiPageContent() {
                   {JSON.stringify(EXAMPLE_RESPONSE, null, 2)}
                 </pre>
               </div>
+
+              <p className="text-[10px] text-slate-500 leading-relaxed border-t border-purple-500/10 pt-3">
+                {t.openApiUsageNote}
+              </p>
             </div>
           </div>
         </section>
