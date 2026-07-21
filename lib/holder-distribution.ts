@@ -48,6 +48,20 @@ const RPC_URL =
   (process.env.HELIUS_API_KEY
     ? `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`
     : 'https://api.mainnet-beta.solana.com');
+
+// Diagnostic only — logs WHICH branch of the fallback above got picked,
+// never the actual URL/key value, so we can tell from Vercel logs
+// whether v6.13's Helius fallback is actually being reached at all,
+// without exposing any secret. Remove once the RPC-timeout issue this
+// was added to debug is confirmed resolved.
+console.log(
+  '[holder-distribution] RPC source:',
+  process.env.HELIUS_RPC_URL
+    ? 'explicit HELIUS_RPC_URL env var'
+    : process.env.HELIUS_API_KEY
+      ? 'derived from HELIUS_API_KEY (Helius mainnet RPC)'
+      : 'public api.mainnet-beta.solana.com (no Helius env var found)',
+);
 const MAX_ATTEMPTS = 3;
 const BACKOFF_SCHEDULE_MS = [1500, 4000]; // wait before attempt 2, then before attempt 3
 const FETCH_TIMEOUT_MS = 5000;
