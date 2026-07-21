@@ -143,8 +143,15 @@ export default function RiskApiPageContent() {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 relative">
+        {/* Illustrates insider_clusters — the actual killer feature —
+            instead of a generic banner. Pure inline SVG, see
+            InsiderClusterGraph.tsx. */}
+        <section className="pt-8 pb-2 sm:pt-12">
+          <InsiderClusterGraph />
+        </section>
+
         {/* Hero */}
-        <section className="pt-14 pb-10 sm:pt-20 sm:pb-14">
+        <section className="pt-4 pb-10 sm:pt-6 sm:pb-14">
           <div className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded-full px-3 py-1 mb-5">
             <Bot size={12} />
             {t.heroEyebrow}
@@ -172,13 +179,6 @@ export default function RiskApiPageContent() {
               {t.btnReadDocs}
             </a>
           </div>
-        </section>
-
-        {/* Illustrates insider_clusters — the actual killer feature —
-            instead of a generic banner. Pure inline SVG, see
-            InsiderClusterGraph.tsx. */}
-        <section className="pb-10">
-          <InsiderClusterGraph />
         </section>
 
         {/* Signature element: live terminal preview of a real response shape */}
