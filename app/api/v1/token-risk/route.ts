@@ -102,10 +102,12 @@ export const dynamic = 'force-dynamic';
 
 // Generous but bounded — well under the 60s function budget, plenty of
 // headroom for a genuinely slow (not hung) public-RPC response.
-// HOLDER_RISK gets the largest budget: getHolderDistributionRobust can
-// make up to 3 attempts (2 RPC calls each, 5s fetch timeout apiece) with
-// up to 5.5s of backoff between them — worst realistic case is well
-// under this, but the margin matters since a persistent rate limit is
+// HOLDER_RISK gets the largest budget: getHolderDistributionRobust
+// (lib/holder-distribution.ts v6.15) makes up to 2 attempts with a
+// dedicated 10s budget for the expensive getTokenLargestAccounts call
+// and 5s for the cheap getTokenSupply call, plus a 2s backoff between
+// attempts — worst case ~32s, still under this with margin, but the
+// margin matters since a persistent rate limit is
 // exactly the failure mode this is meant to survive.
 const MINT_INFO_TIMEOUT_MS = 12000;
 const HOLDER_RISK_TIMEOUT_MS = 40000;
