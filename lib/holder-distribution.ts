@@ -1,4 +1,4 @@
-// Version 6.13 — lib/holder-distribution.ts
+// Version 6.14 — lib/holder-distribution.ts
 //
 // v6.13: real-device test on a live production call (USDC, one of the
 // most commonly-queried mints on Solana) showed all 3 retry attempts
@@ -43,11 +43,20 @@
 // only retries the latter, with real backoff and real logging on every
 // attempt — visible in Vercel function logs — instead of guessing.
 
-const RPC_URL =
-  process.env.HELIUS_RPC_URL ||
-  (process.env.HELIUS_API_KEY
-    ? `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`
-    : 'https://api.mainnet-beta.solana.com');
+// v6.14: diagnostic confirmed HELIUS_RPC_URL IS explicitly set in
+// Vercel (not missing, as v6.13 assumed) — the "explicit HELIUS_RPC_URL
+// env var" branch was what actually timed out three times in a row on
+// USDC, both before and after v6.13's fix. Reversing priority as a
+// direct test: try the URL derived from HELIUS_API_KEY (proven working
+// all day for lib/billing-verify.ts's calls) FIRST, falling back to
+// whatever HELIUS_RPC_URL already holds only if that key is somehow
+// unavailable. If this resolves the timeout, HELIUS_RPC_URL's existing
+// value was simply stale/misconfigured. If it doesn't, the issue is
+// with Helius's RPC itself for this specific call, not which env var
+// points to it — a materially different, more concerning finding.
+const RPC_URL = process.env.HELIUS_API_KEY
+  ? `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`
+  : process.env.HELIUS_RPC_URL || 'https://api.mainnet-beta.solana.com';
 
 // Diagnostic only — logs WHICH branch of the fallback above got picked,
 // never the actual URL/key value, so we can tell from Vercel logs
@@ -56,10 +65,10 @@ const RPC_URL =
 // was added to debug is confirmed resolved.
 console.log(
   '[holder-distribution] RPC source:',
-  process.env.HELIUS_RPC_URL
-    ? 'explicit HELIUS_RPC_URL env var'
-    : process.env.HELIUS_API_KEY
-      ? 'derived from HELIUS_API_KEY (Helius mainnet RPC)'
+  process.env.HELIUS_API_KEY
+    ? 'derived from HELIUS_API_KEY (Helius mainnet RPC)'
+    : process.env.HELIUS_RPC_URL
+      ? 'explicit HELIUS_RPC_URL env var (HELIUS_API_KEY unavailable)'
       : 'public api.mainnet-beta.solana.com (no Helius env var found)',
 );
 const MAX_ATTEMPTS = 3;
