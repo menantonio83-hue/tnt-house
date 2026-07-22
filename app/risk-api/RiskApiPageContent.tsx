@@ -192,6 +192,7 @@ export default function RiskApiPageContent() {
               <span className="text-[10px] text-slate-500 hidden sm:flex items-center gap-2">
                 application/json
                 <a href="/openapi.json" className="underline hover:text-purple-300 transition">openapi.json</a>
+                <CopyButton text="https://tnt-audit.com/openapi.json" label={t.copyOpenApiUrl} />
               </span>
             </div>
 
@@ -272,6 +273,7 @@ export default function RiskApiPageContent() {
             ))}
           </div>
           <p className="text-[11px] text-slate-500 mt-4">{t.rateLimitHeadersNote}</p>
+          <p className="text-[11px] text-slate-500 mt-1.5">{t.webhooksRoadmapNote}</p>
         </section>
 
         {/* Pricing */}
