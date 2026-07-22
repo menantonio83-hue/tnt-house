@@ -1,3 +1,31 @@
+// Version 6.16 — lib/holder-distribution.ts
+//
+// v6.16: found a hard, hopeless-to-retry RPC rejection for extremely
+// high-holder-count mints (confirmed on USDC via real-device testing):
+// "Too many accounts requested (5000000 pubkeys), try adding filters to
+// narrow down results" — an EXPLICIT node-side refusal to even attempt
+// the query, not a timeout or a flaky transient failure. Retrying this
+// specific error can never succeed (the node isn't going to change its
+// mind about the mint's size between attempts), so it no longer costs
+// a full retry cycle — detected and fast-failed immediately, skipping
+// the backoff and second attempt entirely. Turns the worst case for
+// mints like USDC from ~20-30s of pointless waiting into a
+// near-instant, honest ERROR. Every other failure reason (timeouts,
+// generic RPC errors, rate limits) still gets the full retry treatment
+// from v6.15, since those genuinely can succeed on a second attempt.
+//
+// Considered switching to Helius's own getTokenAccounts (DAS API,
+// queryable by mint, not just owner) as a different data source
+// entirely, since it's specifically Helius-indexed rather than a raw
+// node scan. Did not adopt it: it paginates at 1000 accounts per call
+// with no balance-based sorting, so getting an accurate top-holder
+// read for a mint with 100k+ accounts (exactly the USDC-scale case
+// this is about) would mean paginating through all of them anyway —
+// same fundamental cost as the rejected query, just spread across many
+// calls instead of one. Not adopted for this specific top-N-by-balance
+// use case; may be worth reconsidering for a different feature that
+// genuinely needs the full holder list rather than just concentration.
+//
 // Version 6.15 — lib/holder-distribution.ts
 //
 // v6.15: root cause fully confirmed via real-device testing today —
@@ -49,6 +77,16 @@ const MAX_ATTEMPTS = 2;
 const BACKOFF_MS = 2000; // wait before the 2nd (final) attempt
 const LARGEST_ACCOUNTS_TIMEOUT_MS = 10000; // the expensive call — generous budget for high-holder-count mints like USDC
 const SUPPLY_TIMEOUT_MS = 5000; // cheap, simple call — never observed to be the actual bottleneck
+
+// Solana/Helius's exact wording for this hard, node-side refusal — seen
+// verbatim in Vercel logs on a real USDC request: "Too many accounts
+// requested (5000000 pubkeys), try adding filters to narrow down
+// results". Matching on the stable "too many accounts" substring
+// (case-insensitive) rather than the full message, since the pubkey
+// count is mint-specific and will vary.
+function isUnretriableMintSizeLimit(reason: string | null): boolean {
+  return !!reason && reason.toLowerCase().includes('too many accounts');
+}
 
 export interface HolderDistributionResult {
   riskLevel: string;
@@ -181,6 +219,17 @@ export async function getHolderDistributionRobust(mint: string): Promise<HolderD
     }
 
     lastFailureReason = snapshot.reason ?? 'unknown';
+
+    if (isUnretriableMintSizeLimit(lastFailureReason)) {
+      // Confirmed hard node-side refusal, not a flaky failure — no
+      // point spending the backoff + a second attempt on a request the
+      // node has already explicitly said it won't do. Fail fast.
+      console.warn(
+        `[holder-distribution] ${mint}: hard mint-size limit hit on attempt ${attempt}/${MAX_ATTEMPTS}, not retrying — ${lastFailureReason}`,
+      );
+      break;
+    }
+
     console.warn(
       `[holder-distribution] ${mint} attempt ${attempt}/${MAX_ATTEMPTS}: RPC failure — ${lastFailureReason}`,
     );
@@ -190,11 +239,11 @@ export async function getHolderDistributionRobust(mint: string): Promise<HolderD
     }
   }
 
-  // Every attempt hit a confirmed RPC-side failure — honestly report
-  // "we don't know" (ERROR) rather than the misleading "CRITICAL / 100%
-  // concentrated" a genuine zero-holder read would imply.
-  console.error(
-    `[holder-distribution] ${mint}: all ${MAX_ATTEMPTS} attempts failed, last reason: ${lastFailureReason}`,
-  );
+  // Either every attempt hit a confirmed RPC-side failure, or we fast-
+  // failed on a confirmed hard mint-size limit (logged separately
+  // above, distinguishable in Vercel logs) — either way, honestly
+  // report "we don't know" (ERROR) rather than the misleading
+  // "CRITICAL / 100% concentrated" a genuine zero-holder read would imply.
+  console.error(`[holder-distribution] ${mint}: giving up, last reason: ${lastFailureReason}`);
   return { riskLevel: 'ERROR', largestHolderPercent: 0, top10Percent: 0, holderCount: 0 };
 }
