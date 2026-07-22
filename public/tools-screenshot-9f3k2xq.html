@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Risk-Data API — Screenshot Tool</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { background: #020617; }
+  .glow-purple { box-shadow: 0 0 20px rgba(153,69,255,0.15); }
+  .grad-text {
+    background: linear-gradient(to right, #c084fc, #34d399);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  ::placeholder { color: #475569; }
+</style>
+</head>
+<body class="min-h-screen font-mono text-white px-4 py-8">
+  <div class="max-w-lg mx-auto">
+
+    <div class="text-center mb-6">
+      <div class="text-sm font-black grad-text mb-1">TNT HOUSE — RISK-DATA API</div>
+      <div class="text-xs text-slate-500">Личный инструмент для скриншотов. Не публичная страница — просто открой в браузере, введи данные, сделай скрин результата.</div>
+    </div>
+
+    <div class="bg-slate-950 border-2 border-purple-500/40 rounded-lg glow-purple p-4 space-y-3 mb-5">
+      <div>
+        <label class="text-[10px] text-slate-500 block mb-1">API key</label>
+        <input id="apiKey" type="text" placeholder="tnt_sk_..."
+          class="w-full bg-black border border-purple-500/30 rounded px-3 py-2 text-xs text-purple-200 focus:border-emerald-400 focus:outline-none" />
+      </div>
+      <div>
+        <label class="text-[10px] text-slate-500 block mb-1">Mint address (CA)</label>
+        <input id="mintAddress" type="text" placeholder="Вставь адрес токена с DexScreener"
+          class="w-full bg-black border border-purple-500/30 rounded px-3 py-2 text-xs text-purple-200 focus:border-emerald-400 focus:outline-none" />
+      </div>
+      <button id="testBtn" onclick="runTest()"
+        class="w-full bg-gradient-to-r from-purple-500 to-emerald-400 text-slate-950 font-black text-sm py-3 rounded transition hover:from-purple-400 hover:to-emerald-300">
+        Проверить токен
+      </button>
+    </div>
+
+    <div id="loading" class="hidden text-center text-xs text-purple-300 mb-4">
+      Запрашиваю данные...
+    </div>
+
+    <div id="errorBox" class="hidden bg-red-500/10 border border-red-500/30 rounded-lg p-4 text-xs text-red-300 mb-5"></div>
+
+    <div id="resultCard" class="hidden bg-slate-950 border-2 border-purple-500/40 rounded-lg glow-purple overflow-hidden">
+      <div class="border-b border-purple-500/20 px-4 py-2.5 flex items-center justify-between">
+        <span class="text-purple-400 font-bold text-xs">RISK-DATA API</span>
+        <span class="text-[10px] text-slate-500">tnt-audit.com</span>
+      </div>
+
+      <div class="p-5 text-center border-b border-purple-500/10">
+        <div class="text-[10px] text-slate-500 mb-1">SAFETY SCORE</div>
+        <div id="scoreValue" class="text-5xl font-black mb-1">--</div>
+        <div id="scoreBar" class="h-1.5 rounded-full bg-slate-800 overflow-hidden mx-6">
+          <div id="scoreBarFill" class="h-full rounded-full transition-all" style="width:0%"></div>
+        </div>
+      </div>
+
+      <div class="p-4 space-y-3">
+        <div class="flex justify-between items-center">
+          <span class="text-[11px] text-slate-500">Insider clusters</span>
+          <span id="clustersValue" class="text-xs font-bold">--</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-[11px] text-slate-500">Mint authority</span>
+          <span id="mintAuthValue" class="text-xs font-bold">--</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-[11px] text-slate-500">Freeze authority</span>
+          <span id="freezeAuthValue" class="text-xs font-bold">--</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-[11px] text-slate-500">Top holder</span>
+          <span id="topHolderValue" class="text-xs font-bold">--</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-[11px] text-slate-500">Top-10 holders</span>
+          <span id="top10Value" class="text-xs font-bold">--</span>
+        </div>
+        <div class="border-t border-purple-500/10 pt-3 flex justify-between items-center">
+          <span class="text-[11px] text-slate-500">Liquidity</span>
+          <span id="liqValue" class="text-xs font-bold text-emerald-400">--</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-[11px] text-slate-500">24h volume</span>
+          <span id="volValue" class="text-xs font-bold text-emerald-400">--</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-[11px] text-slate-500">24h change</span>
+          <span id="changeValue" class="text-xs font-bold">--</span>
+        </div>
+      </div>
+
+      <div class="border-t border-purple-500/20 px-4 py-2 text-center">
+        <span class="text-[10px] text-slate-600">tnt-audit.com/risk-api</span>
+      </div>
+    </div>
+
+  </div>
+
+<script>
+async function runTest() {
+  const apiKey = document.getElementById('apiKey').value.trim();
+  const mint = document.getElementById('mintAddress').value.trim();
+  const btn = document.getElementById('testBtn');
+  const loading = document.getElementById('loading');
+  const errorBox = document.getElementById('errorBox');
+  const resultCard = document.getElementById('resultCard');
+
+  errorBox.classList.add('hidden');
+  resultCard.classList.add('hidden');
+
+  if (!apiKey || !mint) {
+    errorBox.textContent = 'Заполни оба поля — API key и адрес токена.';
+    errorBox.classList.remove('hidden');
+    return;
+  }
+
+  btn.disabled = true;
+  loading.classList.remove('hidden');
+
+  try {
+    const res = await fetch(
+      'https://www.tnt-audit.com/api/v1/token-risk?mint=' + encodeURIComponent(mint),
+      { headers: { Authorization: 'Bearer ' + apiKey } }
+    );
+    const data = await res.json();
+
+    if (!res.ok) {
+      errorBox.textContent = 'Ошибка: ' + (data.error || res.status);
+      errorBox.classList.remove('hidden');
+      loading.classList.add('hidden');
+      btn.disabled = false;
+      return;
+    }
+
+    // Safety score + color
+    const score = data.safety_score;
+    document.getElementById('scoreValue').textContent = score;
+    let color = '#34d399';
+    if (score < 40) color = '#f87171';
+    else if (score < 70) color = '#facc15';
+    document.getElementById('scoreValue').style.color = color;
+    document.getElementById('scoreBarFill').style.width = score + '%';
+    document.getElementById('scoreBarFill').style.background = color;
+
+    // Clusters
+    const clusterCount = (data.insider_clusters || []).length;
+    const clustersEl = document.getElementById('clustersValue');
+    if (data.cluster_analysis === 'pending') {
+      clustersEl.textContent = 'анализ идёт...';
+      clustersEl.className = 'text-xs font-bold text-yellow-400';
+    } else if (clusterCount === 0) {
+      clustersEl.textContent = 'не найдено';
+      clustersEl.className = 'text-xs font-bold text-emerald-400';
+    } else {
+      clustersEl.textContent = clusterCount + ' найдено';
+      clustersEl.className = 'text-xs font-bold text-red-400';
+    }
+
+    // Authorities
+    const mintAuthEl = document.getElementById('mintAuthValue');
+    mintAuthEl.textContent = data.mint_authority.revoked ? 'отозван ✓' : 'активен ⚠';
+    mintAuthEl.className = 'text-xs font-bold ' + (data.mint_authority.revoked ? 'text-emerald-400' : 'text-red-400');
+
+    const freezeAuthEl = document.getElementById('freezeAuthValue');
+    freezeAuthEl.textContent = data.freeze_authority.revoked ? 'отозван ✓' : 'активен ⚠';
+    freezeAuthEl.className = 'text-xs font-bold ' + (data.freeze_authority.revoked ? 'text-emerald-400' : 'text-red-400');
+
+    // Holders
+    const hd = data.holder_distribution;
+    if (hd.risk_level === 'ERROR') {
+      document.getElementById('topHolderValue').textContent = 'н/д';
+      document.getElementById('top10Value').textContent = 'н/д';
+    } else {
+      document.getElementById('topHolderValue').textContent = hd.largest_holder_percent.toFixed(1) + '%';
+      document.getElementById('top10Value').textContent = hd.top10_percent.toFixed(1) + '%';
+    }
+
+    // Market
+    const m = data.market;
+    document.getElementById('liqValue').textContent = m.liquidity_usd ? '$' + Math.round(m.liquidity_usd).toLocaleString() : 'н/д';
+    document.getElementById('volValue').textContent = m.volume_24h_usd ? '$' + Math.round(m.volume_24h_usd).toLocaleString() : 'н/д';
+    const changeEl = document.getElementById('changeValue');
+    if (m.price_change_24h_percent != null) {
+      const change = m.price_change_24h_percent;
+      changeEl.textContent = (change >= 0 ? '+' : '') + change.toFixed(1) + '%';
+      changeEl.className = 'text-xs font-bold ' + (change >= 0 ? 'text-emerald-400' : 'text-red-400');
+    } else {
+      changeEl.textContent = 'н/д';
+    }
+
+    resultCard.classList.remove('hidden');
+  } catch (e) {
+    errorBox.textContent = 'Ошибка соединения: ' + e.message;
+    errorBox.classList.remove('hidden');
+  }
+
+  loading.classList.add('hidden');
+  btn.disabled = false;
+}
+</script>
+</body>
+</html>
