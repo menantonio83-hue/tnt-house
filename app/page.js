@@ -2457,29 +2457,47 @@ export default function TntHouse() {
   // in state but never read here, so choosing "Solflare" still opened
   // Phantom. Now takes the wallet name and branches the universal link.
   //
-  // FIX v1.19: the Solflare branch above only used the bare
-  // https://solflare.com/ul/v1/browse/ link with no `ref` param and no
-  // native `solflare://` scheme attempt first — real-device testing showed
-  // this just opens the Solflare app to its normal wallet/portfolio screen
-  // instead of navigating into its in-app browser at all (confirmed via
-  // screenshot: Phantom shows the real transaction confirmation sheet,
-  // Solflare shows $0.00 home screen). Solflare needs BOTH the native
-  // `solflare://v1/browse/` scheme (tried first, works if the app is
-  // already running / handles the intent) AND the `?ref=` query param on
-  // the https fallback — this matches the pattern already proven to work
-  // elsewhere in this codebase for the initial (pre-payment) wallet
-  // redirect. Phantom's simpler bare-https link is left untouched since
-  // that one is already confirmed working (see screenshot).
+  // FIX v1.20: applied the same intent:// fix already proven via
+  // real-device testing on the Risk-Data API's billing flow (separate
+  // feature, same underlying openWalletInAppBrowser problem). Root
+  // cause, confirmed there via a controlled A/B test: bare https
+  // universal links (https://phantom.app/ul/browse/...,
+  // https://solflare.com/ul/v1/browse/...) depend on the BROWSER
+  // correctly querying/honoring Android's Digital Asset Link
+  // verification — a heuristic that demonstrably varies across Android
+  // browser vendors (confirmed: the exact same link failed in Samsung
+  // Internet but succeeded in a Chromium-based in-app browser, same
+  // device, same wallet). v1.19's native-scheme-first approach for
+  // Solflare was a step in the right direction (asking Android directly
+  // via a scheme, not relying on https App Link heuristics) but
+  // Phantom's bare link never got equivalent treatment, and neither
+  // wallet used the more robust intent:// mechanism.
+  //
+  // intent:// is a direct instruction to Android ("launch package X for
+  // this https URL"), parsed natively by the Chromium engine itself
+  // (which Samsung Internet is also built on) rather than depending on
+  // browser-specific App Link verification behavior. Falls back to the
+  // exact same bare https links as before if intent:// somehow isn't
+  // parsed — zero regression risk on browsers where the old links
+  // already worked. Package IDs (app.phantom, com.solflare.mobile)
+  // confirmed via independent sources (AppBrain's app catalog, Google
+  // Play's own URL) before use — getting either wrong would make the
+  // intent fail outright, worse than the status quo.
   var openWalletInAppBrowser = function (payUrl, wallet) {
     var encoded = encodeURIComponent(payUrl);
     var ref = encodeURIComponent(SITE_URL);
     if (wallet === 'Solflare') {
-      window.location.href = 'solflare://v1/browse/' + encoded;
-      setTimeout(function () {
-        window.location.href = 'https://solflare.com/ul/v1/browse/' + encoded + '?ref=' + ref;
-      }, 500);
+      var solflareFallback = 'https://solflare.com/ul/v1/browse/' + encoded + '?ref=' + ref;
+      window.location.href =
+        'intent://solflare.com/ul/v1/browse/' + encoded + '?ref=' + ref +
+        '#Intent;scheme=https;package=com.solflare.mobile;S.browser_fallback_url=' +
+        encodeURIComponent(solflareFallback) + ';end;';
     } else {
-      window.location.href = 'https://phantom.app/ul/browse/' + encoded;
+      var phantomFallback = 'https://phantom.app/ul/browse/' + encoded;
+      window.location.href =
+        'intent://phantom.app/ul/browse/' + encoded +
+        '#Intent;scheme=https;package=app.phantom;S.browser_fallback_url=' +
+        encodeURIComponent(phantomFallback) + ';end;';
     }
   };
 
