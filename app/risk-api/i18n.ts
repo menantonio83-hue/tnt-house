@@ -64,6 +64,8 @@ export interface RiskApiTranslations {
   chatPlaceholder: string;
   chatLimitReached: string;
   chatConnectionError: string;
+  copyOpenApiUrl: string;
+  webhooksRoadmapNote: string;
 
   // Pricing
   pricingTitle: string;
@@ -167,6 +169,8 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     chatPlaceholder: 'Ask a question...',
     chatLimitReached: 'Rate limit reached — try again in a few minutes.',
     chatConnectionError: 'Connection error. ⚡ Get your free API key below.',
+    copyOpenApiUrl: 'Copy',
+    webhooksRoadmapNote: 'Webhooks for cluster_analysis completion are on the roadmap, not yet available — for now, re-check the same mint after 1-2 minutes.',
     pricingTitle: 'Limits & pricing',
     tierFree: 'FREE',
     tierFreeAmount: '15 req/day',
@@ -260,6 +264,8 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     chatPlaceholder: 'Escribe tu pregunta...',
     chatLimitReached: 'Límite alcanzado — inténtalo de nuevo en unos minutos.',
     chatConnectionError: 'Error de conexión. ⚡ Consigue tu API key gratis más abajo.',
+    copyOpenApiUrl: 'Copiar',
+    webhooksRoadmapNote: 'Los webhooks para cluster_analysis completado están en el roadmap, aún no disponibles — por ahora, vuelve a comprobar el mismo mint tras 1-2 minutos.',
     pricingTitle: 'Límites y precios',
     tierFree: 'GRATIS',
     tierFreeAmount: '15 pet./día',
@@ -353,6 +359,8 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     chatPlaceholder: 'Pose ta question...',
     chatLimitReached: 'Limite atteinte — réessaie dans quelques minutes.',
     chatConnectionError: 'Erreur de connexion. ⚡ Obtenez votre clé API gratuite ci-dessous.',
+    copyOpenApiUrl: 'Copier',
+    webhooksRoadmapNote: 'Les webhooks pour la fin de cluster_analysis sont sur la feuille de route, pas encore disponibles — en attendant, revérifiez le même mint après 1-2 minutes.',
     pricingTitle: 'Limites et tarifs',
     tierFree: 'GRATUIT',
     tierFreeAmount: '15 req/jour',
@@ -446,6 +454,8 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     chatPlaceholder: 'Γράψε την ερώτησή σου...',
     chatLimitReached: 'Το όριο ξεπεράστηκε — δοκίμασε ξανά σε λίγα λεπτά.',
     chatConnectionError: 'Σφάλμα σύνδεσης. ⚡ Πάρε το δωρεάν API key σου παρακάτω.',
+    copyOpenApiUrl: 'Αντιγραφή',
+    webhooksRoadmapNote: 'Τα webhooks για την ολοκλήρωση του cluster_analysis είναι στον χάρτη πορείας, όχι ακόμα διαθέσιμα — προς το παρόν, ξαναέλεγξε το ίδιο mint μετά από 1-2 λεπτά.',
     pricingTitle: 'Όρια & τιμολόγηση',
     tierFree: 'ΔΩΡΕΑΝ',
     tierFreeAmount: '15 αιτ./ημέρα',
@@ -539,6 +549,8 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     chatPlaceholder: 'Напиши вопрос...',
     chatLimitReached: 'Достигнут лимит — попробуй через несколько минут.',
     chatConnectionError: 'Ошибка соединения. ⚡ Получи бесплатный API-ключ ниже.',
+    copyOpenApiUrl: 'Копировать',
+    webhooksRoadmapNote: 'Вебхуки на завершение cluster_analysis — в планах, пока не реализованы. Сейчас просто перепроверь тот же минт через 1-2 минуты.',
     pricingTitle: 'Лимиты и цены',
     tierFree: 'FREE',
     tierFreeAmount: '15 запр./день',
@@ -632,6 +644,8 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     chatPlaceholder: 'Scrivi la tua domanda...',
     chatLimitReached: 'Limite raggiunto — riprova tra qualche minuto.',
     chatConnectionError: 'Errore di connessione. ⚡ Ottieni la tua API key gratuita qui sotto.',
+    copyOpenApiUrl: 'Copia',
+    webhooksRoadmapNote: 'I webhook per il completamento di cluster_analysis sono nella roadmap, non ancora disponibili — per ora, ricontrolla lo stesso mint dopo 1-2 minuti.',
     pricingTitle: 'Limiti e prezzi',
     tierFree: 'GRATIS',
     tierFreeAmount: '15 rich./giorno',
@@ -725,6 +739,8 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     chatPlaceholder: '输入你的问题…',
     chatLimitReached: '已达到限制 —— 请几分钟后再试。',
     chatConnectionError: '连接错误。⚡ 在下方获取你的免费 API 密钥。',
+    copyOpenApiUrl: '复制',
+    webhooksRoadmapNote: 'cluster_analysis 完成后的 webhook 通知已列入路线图，目前尚未上线 —— 现在请在 1-2 分钟后重新查询同一个 mint。',
     pricingTitle: '限额与价格',
     tierFree: '免费',
     tierFreeAmount: '15 次/天',
