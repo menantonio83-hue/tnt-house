@@ -1,3 +1,12 @@
+// Version 1.2 — app/risk-api/i18n.ts
+//
+// v1.2: added Changelog & Versioning section keys (versioning*/
+// changelogTitle/changelogNote). The changelog log entries themselves
+// are NOT translated — same technical-content convention as the rest
+// of this file (dates, version numbers like v1.4, endpoint paths, and
+// field names read the same in every language, like the curl example
+// or the JSON response sample elsewhere on this page).
+//
 // Version 1.1 — app/risk-api/i18n.ts
 //
 // v1.1: added a dedicated Rate Limiting section (rateLimiting*/rateLimit*
@@ -91,6 +100,12 @@ export interface RiskApiTranslations {
   rateLimitExceededTitle: string;
   rateLimitExceededDesc: string;
   rateLimitBestPractice: string;
+
+  // Changelog & versioning
+  versioningTitle: string;
+  versioningIntro: string;
+  changelogTitle: string;
+  changelogNote: string;
 
   // Pricing
   pricingTitle: string;
@@ -209,6 +224,10 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     rateLimitExceededTitle: 'What happens over the limit',
     rateLimitExceededDesc: 'You get an HTTP 402 with a JSON body — limit, used, reset_at, overage_rate_usd, and an upgrade_url. No retries needed: as soon as you top up credit or subscribe, the same key starts working again on the very next call.',
     rateLimitBestPractice: 'Check X-RateLimit-Remaining before firing off a batch of calls — reading a header costs nothing, a wasted 402 does not.',
+    versioningTitle: 'Versioning & Changelog',
+    versioningIntro: "The API is versioned in the URL (/api/v1/...). Within v1, existing fields are never removed, renamed, or repurposed — only added. Integrations should ignore fields they don't recognize rather than fail on them. A genuinely breaking change ships as /api/v2/..., with v1 kept running for a reasonable overlap period — never a silent in-place break.",
+    changelogTitle: 'Changelog',
+    changelogNote: 'No mailing list or webhooks yet for update announcements — this page and the X / Telegram links in the footer are the way to stay current.',
     pricingTitle: 'Limits & pricing',
     tierFree: 'FREE',
     tierFreeAmount: '15 req/day',
@@ -317,6 +336,10 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     rateLimitExceededTitle: 'Qué pasa al superar el límite',
     rateLimitExceededDesc: 'Recibes un HTTP 402 con un cuerpo JSON — limit, used, reset_at, overage_rate_usd y un upgrade_url. No hace falta reintentar: en cuanto recargues saldo o te suscribas, la misma key vuelve a funcionar en la siguiente llamada.',
     rateLimitBestPractice: 'Revisa X-RateLimit-Remaining antes de lanzar un lote de llamadas — leer una cabecera no cuesta nada, un 402 desperdiciado sí.',
+    versioningTitle: 'Versionado y registro de cambios',
+    versioningIntro: 'La API se versiona en la URL (/api/v1/...). Dentro de v1, los campos existentes nunca se eliminan, renombran ni cambian de propósito — solo se añaden. Las integraciones deberían ignorar los campos que no reconozcan en lugar de fallar por ellos. Un cambio realmente disruptivo se publica como /api/v2/..., manteniendo v1 en funcionamiento durante un periodo de solapamiento razonable — nunca una ruptura silenciosa en el mismo endpoint.',
+    changelogTitle: 'Registro de cambios',
+    changelogNote: 'Todavía no hay lista de correo ni webhooks para anunciar novedades — esta página y los enlaces de X / Telegram del pie son la forma de mantenerte al día.',
     pricingTitle: 'Límites y precios',
     tierFree: 'GRATIS',
     tierFreeAmount: '15 pet./día',
@@ -425,6 +448,10 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     rateLimitExceededTitle: 'Que se passe-t-il au-delà de la limite',
     rateLimitExceededDesc: "Vous recevez un HTTP 402 avec un corps JSON — limit, used, reset_at, overage_rate_usd et un upgrade_url. Pas besoin de réessayer : dès que vous rechargez du crédit ou vous abonnez, la même clé refonctionne dès le prochain appel.",
     rateLimitBestPractice: "Vérifiez X-RateLimit-Remaining avant de lancer un lot d'appels — lire un en-tête ne coûte rien, un 402 gâché si.",
+    versioningTitle: 'Versions et journal des modifications',
+    versioningIntro: "L'API est versionnée dans l'URL (/api/v1/...). Au sein de v1, les champs existants ne sont jamais supprimés, renommés ni détournés de leur usage — seulement ajoutés. Les intégrations doivent ignorer les champs qu'elles ne reconnaissent pas plutôt que d'échouer à cause d'eux. Un changement véritablement cassant est publié sous /api/v2/..., avec v1 maintenue en fonctionnement pendant une période de recouvrement raisonnable — jamais une rupture silencieuse sur place.",
+    changelogTitle: 'Journal des modifications',
+    changelogNote: 'Pas encore de liste de diffusion ni de webhooks pour les annonces — cette page et les liens X / Telegram en pied de page sont le moyen de rester à jour.',
     pricingTitle: 'Limites et tarifs',
     tierFree: 'GRATUIT',
     tierFreeAmount: '15 req/jour',
@@ -533,6 +560,10 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     rateLimitExceededTitle: 'Τι συμβαίνει πέρα από το όριο',
     rateLimitExceededDesc: 'Λαμβάνεις HTTP 402 με JSON σώμα — limit, used, reset_at, overage_rate_usd και ένα upgrade_url. Δεν χρειάζονται επαναλήψεις: μόλις φορτώσεις πίστωση ή κάνεις συνδρομή, το ίδιο key ξαναδουλεύει από την επόμενη κλήση.',
     rateLimitBestPractice: 'Έλεγξε το X-RateLimit-Remaining πριν στείλεις μια δέσμη κλήσεων — η ανάγνωση ενός header δεν κοστίζει τίποτα, ένα χαμένο 402 όμως ναι.',
+    versioningTitle: 'Εκδόσεις & Ιστορικό αλλαγών',
+    versioningIntro: 'Το API έχει έκδοση στο URL (/api/v1/...). Μέσα στο v1, τα υπάρχοντα πεδία δεν αφαιρούνται, δεν μετονομάζονται ούτε αλλάζουν σκοπό ποτέ — μόνο προστίθενται. Οι ενσωματώσεις θα πρέπει να αγνοούν πεδία που δεν αναγνωρίζουν αντί να αποτυγχάνουν εξαιτίας τους. Μια πραγματικά ασύμβατη αλλαγή δημοσιεύεται ως /api/v2/..., με το v1 να συνεχίζει να λειτουργεί για ένα λογικό διάστημα επικάλυψης — ποτέ μια σιωπηλή αλλαγή επί τόπου.',
+    changelogTitle: 'Ιστορικό αλλαγών',
+    changelogNote: 'Δεν υπάρχει ακόμα mailing list ή webhooks για ανακοινώσεις ενημερώσεων — αυτή η σελίδα και οι σύνδεσμοι X / Telegram στο footer είναι ο τρόπος να μένεις ενήμερος.',
     pricingTitle: 'Όρια & τιμολόγηση',
     tierFree: 'ΔΩΡΕΑΝ',
     tierFreeAmount: '15 αιτ./ημέρα',
@@ -641,6 +672,10 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     rateLimitExceededTitle: 'Что происходит при превышении лимита',
     rateLimitExceededDesc: 'Приходит HTTP 402 с JSON-телом — limit, used, reset_at, overage_rate_usd и upgrade_url. Повторные попытки не нужны: как только пополнишь баланс или оформишь подписку, тот же ключ снова заработает уже на следующем вызове.',
     rateLimitBestPractice: 'Проверяй X-RateLimit-Remaining перед отправкой пачки запросов — прочитать заголовок бесплатно, а вот впустую словленный 402 — нет.',
+    versioningTitle: 'Версионирование и история изменений',
+    versioningIntro: 'API версионируется через URL (/api/v1/...). Внутри v1 существующие поля никогда не удаляются, не переименовываются и не меняют смысл — только добавляются. Интеграциям стоит игнорировать незнакомые поля, а не падать из-за них. По-настоящему ломающее изменение выйдет как /api/v2/..., а v1 продолжит работать разумный переходный период — никогда никаких тихих изменений на месте.',
+    changelogTitle: 'История изменений',
+    changelogNote: 'Пока нет рассылки или вебхуков для анонсов обновлений — следить за актуальным состоянием можно по этой странице и ссылкам на X / Telegram в подвале.',
     pricingTitle: 'Лимиты и цены',
     tierFree: 'FREE',
     tierFreeAmount: '15 запр./день',
@@ -749,6 +784,10 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     rateLimitExceededTitle: 'Cosa succede oltre il limite',
     rateLimitExceededDesc: 'Ricevi un HTTP 402 con un corpo JSON — limit, used, reset_at, overage_rate_usd e un upgrade_url. Nessun retry necessario: appena ricarichi credito o ti abboni, la stessa key torna a funzionare dalla chiamata successiva.',
     rateLimitBestPractice: 'Controlla X-RateLimit-Remaining prima di lanciare un batch di chiamate — leggere un header non costa nulla, un 402 sprecato sì.',
+    versioningTitle: 'Versionamento e changelog',
+    versioningIntro: "L'API è versionata nell'URL (/api/v1/...). All'interno della v1, i campi esistenti non vengono mai rimossi, rinominati o riutilizzati con altro significato — solo aggiunti. Le integrazioni dovrebbero ignorare i campi che non riconoscono anziché fallire per colpa loro. Una modifica realmente incompatibile viene pubblicata come /api/v2/..., mantenendo la v1 attiva per un ragionevole periodo di sovrapposizione — mai una rottura silenziosa sullo stesso endpoint.",
+    changelogTitle: 'Changelog',
+    changelogNote: "Non c'è ancora una mailing list o webhook per gli annunci di aggiornamento — questa pagina e i link X / Telegram nel footer sono il modo per restare aggiornati.",
     pricingTitle: 'Limiti e prezzi',
     tierFree: 'GRATIS',
     tierFreeAmount: '15 rich./giorno',
@@ -857,6 +896,10 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     rateLimitExceededTitle: '超出限制后会发生什么',
     rateLimitExceededDesc: '你会收到一个带 JSON 内容的 HTTP 402 —— limit、used、reset_at、overage_rate_usd 以及 upgrade_url。无需重试：一旦充值或订阅，同一个密钥在下一次调用时就会立即恢复正常。',
     rateLimitBestPractice: '在发起一批调用之前先检查 X-RateLimit-Remaining —— 读取一个响应头不花钱，白白触发一次 402 却会。',
+    versioningTitle: '版本管理与更新日志',
+    versioningIntro: 'API 通过 URL 进行版本管理（/api/v1/...）。在 v1 内部，现有字段永远不会被删除、重命名或改变用途——只会新增字段。集成方应该忽略无法识别的字段，而不是因此报错。真正的不兼容变更会以 /api/v2/... 的形式发布，v1 会继续运行一段合理的过渡期——绝不会在原地进行静默的破坏性改动。',
+    changelogTitle: '更新日志',
+    changelogNote: '目前还没有邮件列表或 webhook 用于更新通知——请通过本页面以及页脚的 X / Telegram 链接来获取最新动态。',
     pricingTitle: '限额与价格',
     tierFree: '免费',
     tierFreeAmount: '15 次/天',
