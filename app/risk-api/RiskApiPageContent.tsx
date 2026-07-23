@@ -1,3 +1,13 @@
+// Version 1.2 — app/risk-api/RiskApiPageContent.tsx
+//
+// v1.2: new standalone "Rate Limiting" section (between Response Fields
+// and Pricing) — dedicated header reference table (X-RateLimit-Limit/
+// Remaining/Reset, X-Credit-Balance-Usd), a real 402 example matching
+// lib/rate-limit.ts's actual buildLimitReachedResponse() body, and a
+// one-line best-practice tip. The existing one-liner rate-limit note
+// further up (t.rateLimitHeadersNote, in the Response Fields section)
+// is unchanged — this is a fuller, separate section, not a replacement.
+//
 // Version 1.1 — app/risk-api/RiskApiPageContent.tsx
 //
 // v1.1: docs terminal now has curl/Python/TypeScript tabs (Gemini
@@ -274,6 +284,55 @@ export default function RiskApiPageContent() {
           </div>
           <p className="text-[11px] text-slate-500 mt-4">{t.rateLimitHeadersNote}</p>
           <p className="text-[11px] text-slate-500 mt-1.5">{t.webhooksRoadmapNote}</p>
+        </section>
+
+        {/* Rate limiting */}
+        <section className="pb-14">
+          <h2 className="text-xl sm:text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400 mb-4">
+            {t.rateLimitingTitle}
+          </h2>
+          <p className="text-xs sm:text-sm text-slate-400 leading-relaxed mb-6">
+            {t.rateLimitingIntro}
+          </p>
+
+          <div className="border border-purple-500/20 rounded-lg overflow-hidden divide-y divide-purple-500/10 mb-6">
+            {[
+              { label: t.rateLimitHeaderLimitLabel, desc: t.rateLimitHeaderLimitDesc },
+              { label: t.rateLimitHeaderRemainingLabel, desc: t.rateLimitHeaderRemainingDesc },
+              { label: t.rateLimitHeaderResetLabel, desc: t.rateLimitHeaderResetDesc },
+              { label: t.rateLimitHeaderCreditLabel, desc: t.rateLimitHeaderCreditDesc },
+            ].map((row) => (
+              <div key={row.label} className="p-3.5 sm:flex sm:gap-4 bg-slate-900/40">
+                <code className="text-[11px] sm:text-xs text-emerald-400 font-bold sm:w-56 shrink-0 block mb-1 sm:mb-0">
+                  {row.label}
+                </code>
+                <p className="text-xs text-slate-400 leading-relaxed">{row.desc}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="border border-red-500/20 rounded-lg bg-slate-900/40 p-4 sm:p-5">
+            <div className="text-xs sm:text-sm font-bold text-red-400 mb-2">{t.rateLimitExceededTitle}</div>
+            <p className="text-xs text-slate-400 leading-relaxed mb-3">{t.rateLimitExceededDesc}</p>
+            <pre className="text-[10px] sm:text-[11px] text-slate-300 overflow-x-auto leading-relaxed bg-black/30 rounded p-3">
+{`HTTP/1.1 402 Payment Required
+X-RateLimit-Limit: 15
+X-RateLimit-Remaining: 0
+X-RateLimit-Reset: 2026-07-24T00:00:00.000Z
+
+{
+  "error": "Daily free-tier limit reached and call-credit balance is empty",
+  "limit": 15,
+  "used": 16,
+  "reset_at": "2026-07-24T00:00:00.000Z",
+  "overage_rate_usd": 0.07,
+  "upgrade_url": "https://tnt-audit.com/risk-api#billing",
+  "note": "Top up call credits or subscribe on the upgrade_url page — overage is billed at $0.07/call once you have a balance."
+}`}
+            </pre>
+          </div>
+
+          <p className="text-[11px] text-slate-500 mt-4">{t.rateLimitBestPractice}</p>
         </section>
 
         {/* Pricing */}
