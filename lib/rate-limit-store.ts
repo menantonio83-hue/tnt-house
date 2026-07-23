@@ -1,3 +1,37 @@
+// Version 6.5 — lib/rate-limit-store.ts
+//
+// v6.5: added incrementDailyUsageBy() for the batch endpoint
+// (app/api/v1/token-risk/batch/route.ts) — N mints in one HTTP call
+// need to increment the daily counter by N, atomically, not N separate
+// round trips. New SQL function increment_daily_usage_by(), NOT a
+// change to the existing increment_daily_usage() used by the single-mint
+// route — zero risk of touching that already-proven-in-production path.
+//
+// REQUIRED: run this in the Supabase SQL editor before deploying the
+// batch endpoint (not yet applied — holding for explicit sign-off since
+// this is billing-adjacent, per the standing payment-code rule).
+// Confirmed the exact live definition of increment_daily_usage() via
+// pg_get_functiondef() before writing this — no SECURITY DEFINER, no
+// explicit search_path on that function either (called via the
+// service-role client, which bypasses RLS regardless — see v6.4's
+// note), so this new function matches that same plain style:
+//
+//   create or replace function increment_daily_usage_by(p_key_id uuid, p_usage_date date, p_amount int)
+//   returns int
+//   language plpgsql
+//   as $$
+//   declare
+//     new_count int;
+//   begin
+//     insert into api_key_usage_daily (key_id, usage_date, request_count)
+//     values (p_key_id, p_usage_date, p_amount)
+//     on conflict (key_id, usage_date)
+//     do update set request_count = api_key_usage_daily.request_count + p_amount
+//     returning request_count into new_count;
+//     return new_count;
+//   end;
+//   $$;
+//
 // Version 6.4 — lib/rate-limit-store.ts
 //
 // v6.4: switched to the service-role Supabase client (lib/supabase-admin.ts)
@@ -52,6 +86,28 @@ export async function incrementDailyUsage(keyId: string, usageDateUtc: string): 
 
   if (error) {
     console.error('[rate-limit-store] increment_daily_usage error:', error.message);
+    return null;
+  }
+  return data as number;
+}
+
+// Same as incrementDailyUsage() but by an arbitrary amount — used by the
+// batch endpoint (N mints in one call = N counted, per the decided
+// billing model, not a discounted "1 call per batch"). Returns null on
+// a database error, same fail-open contract as the single-increment path.
+export async function incrementDailyUsageBy(
+  keyId: string,
+  usageDateUtc: string,
+  amount: number,
+): Promise<number | null> {
+  const { data, error } = await supabase.rpc('increment_daily_usage_by', {
+    p_key_id: keyId,
+    p_usage_date: usageDateUtc,
+    p_amount: amount,
+  });
+
+  if (error) {
+    console.error('[rate-limit-store] increment_daily_usage_by error:', error.message);
     return null;
   }
   return data as number;

@@ -1,3 +1,17 @@
+// Version 3.6 — lib/rate-limit.ts
+//
+// v3.6: added enforceRateLimitBatch() for the batch endpoint — same
+// free/subscription/paid logic as enforceRateLimit(), generalized to
+// charge N calls (one per mint in the batch) instead of 1, per the
+// explicitly-decided batch billing model (N mints = N calls, no bulk
+// discount). All-or-nothing: the whole batch is blocked with one 402
+// if it can't be fully covered, never partially processed/billed. See
+// that function's own comment for the subscription-tier approximation
+// note. Uses new incrementDailyUsageBy() / incrementSubscriptionUsageBy()
+// (lib/rate-limit-store.ts v6.5 / lib/billing-store.ts v7.15) — NOT the
+// existing single-increment functions, which enforceRateLimit() (used by
+// the single-mint route) keeps using unchanged.
+//
 // Version 3.5 — lib/rate-limit.ts
 //
 // v3.5: incrementSubscriptionUsage() now takes the quota so its RPC can
@@ -32,8 +46,8 @@
 
 import { NextResponse } from 'next/server';
 import type { ApiKeyRecord } from '@/lib/api-key-store';
-import { incrementDailyUsage, todayUtcDateString, nextUtcMidnightIso } from '@/lib/rate-limit-store';
-import { incrementSubscriptionUsage, decrementCreditIfSufficient } from '@/lib/billing-store';
+import { incrementDailyUsage, incrementDailyUsageBy, todayUtcDateString, nextUtcMidnightIso } from '@/lib/rate-limit-store';
+import { incrementSubscriptionUsage, incrementSubscriptionUsageBy, decrementCreditIfSufficient } from '@/lib/billing-store';
 import {
   FREE_DAILY_LIMIT,
   SUBSCRIPTION_MONTHLY_QUOTA,
@@ -220,6 +234,189 @@ export async function enforceRateLimit(
       'Daily free-tier limit reached and call-credit balance is empty',
       FREE_DAILY_LIMIT,
       used,
+      resetAt,
+      OVERAGE_RATE_FREE_USD,
+      extraHeaders,
+    ),
+  };
+}
+
+// Batch variant of enforceRateLimit() — used by the batch endpoint
+// (app/api/v1/token-risk/batch/route.ts) for N mints in one HTTP call.
+// Billing model (explicitly decided, not a technical default): N mints
+// = N calls counted, no bulk discount. All-or-nothing — if the batch
+// can't be fully covered by remaining free quota + credit balance, the
+// WHOLE batch is blocked with a single 402 rather than partially
+// processed, so a caller never gets billed for some mints and silently
+// dropped others.
+//
+// Known approximation for the subscription-tier "how many of these N
+// calls are already-covered vs overage" split: uses key.
+// subscription_cycle_calls_used as the "before" count, which was read
+// at the start of this request (via requireApiKey) — under high
+// concurrency from the SAME key, a parallel request could shift that
+// baseline before this one's increment lands, causing at most a minor
+// misattribution of which calls counted as free vs overage. The TOTAL
+// counted usage (and therefore the cap itself) stays exactly correct
+// regardless, since the underlying increment RPC is atomic — only the
+// free/overage split for THIS response's credit charge could be
+// slightly off in that race window. Acceptable for a first version;
+// revisit if batch traffic at meaningful concurrency from a single key
+// becomes real.
+export async function enforceRateLimitBatch(
+  key: ApiKeyRecord,
+  count: number,
+  extraHeaders: HeadersInit = {},
+): Promise<RateLimitResult> {
+  if (key.tier === 'paid') {
+    return {
+      allowed: true,
+      limit: null,
+      used: 0,
+      remaining: null,
+      resetAt: nextUtcMidnightIso(),
+      creditBalanceUsd: key.credit_balance_usd,
+      usedOverageCredit: false,
+      response: null,
+    };
+  }
+
+  const subscriptionActive =
+    key.tier === 'subscription' &&
+    !!key.subscription_expires_at &&
+    new Date(key.subscription_expires_at).getTime() > Date.now();
+
+  if (subscriptionActive) {
+    const usedBefore = key.subscription_cycle_calls_used;
+    const usedAfter = await incrementSubscriptionUsageBy(key.id, SUBSCRIPTION_MONTHLY_QUOTA, count);
+
+    if (usedAfter === null) {
+      // Fail open on an infra hiccup — never block a paying subscriber's
+      // whole batch over a counter error.
+      return {
+        allowed: true,
+        limit: SUBSCRIPTION_MONTHLY_QUOTA,
+        used: 0,
+        remaining: null,
+        resetAt: key.subscription_expires_at as string,
+        creditBalanceUsd: key.credit_balance_usd,
+        usedOverageCredit: false,
+        response: null,
+      };
+    }
+
+    const withinQuotaCount = Math.max(0, Math.min(count, SUBSCRIPTION_MONTHLY_QUOTA - usedBefore));
+    const overCount = count - withinQuotaCount;
+
+    if (overCount === 0) {
+      return {
+        allowed: true,
+        limit: SUBSCRIPTION_MONTHLY_QUOTA,
+        used: usedAfter,
+        remaining: Math.max(0, SUBSCRIPTION_MONTHLY_QUOTA - usedAfter),
+        resetAt: key.subscription_expires_at as string,
+        creditBalanceUsd: key.credit_balance_usd,
+        usedOverageCredit: false,
+        response: null,
+      };
+    }
+
+    const newBalance = await decrementCreditIfSufficient(key.id, overCount * OVERAGE_RATE_SUBSCRIBED_USD);
+    if (newBalance !== null) {
+      return {
+        allowed: true,
+        limit: SUBSCRIPTION_MONTHLY_QUOTA,
+        used: usedAfter,
+        remaining: 0,
+        resetAt: key.subscription_expires_at as string,
+        creditBalanceUsd: newBalance,
+        usedOverageCredit: true,
+        response: null,
+      };
+    }
+
+    return {
+      allowed: false,
+      limit: SUBSCRIPTION_MONTHLY_QUOTA,
+      used: usedAfter,
+      remaining: 0,
+      resetAt: key.subscription_expires_at as string,
+      creditBalanceUsd: key.credit_balance_usd,
+      usedOverageCredit: false,
+      response: buildLimitReachedResponse(
+        `Batch of ${count} needs ${overCount} overage call(s) past the monthly subscription quota, and the call-credit balance is insufficient to cover them`,
+        SUBSCRIPTION_MONTHLY_QUOTA,
+        usedAfter,
+        key.subscription_expires_at as string,
+        OVERAGE_RATE_SUBSCRIBED_USD,
+        extraHeaders,
+      ),
+    };
+  }
+
+  // Free tier (including an expired subscription, which falls back here).
+  const usageDate = todayUtcDateString();
+  const resetAt = nextUtcMidnightIso();
+  const usedAfter = await incrementDailyUsageBy(key.id, usageDate, count);
+
+  if (usedAfter === null) {
+    return {
+      allowed: true,
+      limit: null,
+      used: 0,
+      remaining: null,
+      resetAt,
+      creditBalanceUsd: key.credit_balance_usd,
+      usedOverageCredit: false,
+      response: null,
+    };
+  }
+
+  // Exact, not an approximation — increment_daily_usage_by() is an
+  // uncapped +N, so usedBefore = usedAfter - count always holds.
+  const usedBefore = usedAfter - count;
+  const withinFreeCount = Math.max(0, Math.min(count, FREE_DAILY_LIMIT - usedBefore));
+  const overCount = count - withinFreeCount;
+
+  if (overCount === 0) {
+    return {
+      allowed: true,
+      limit: FREE_DAILY_LIMIT,
+      used: usedAfter,
+      remaining: Math.max(0, FREE_DAILY_LIMIT - usedAfter),
+      resetAt,
+      creditBalanceUsd: key.credit_balance_usd,
+      usedOverageCredit: false,
+      response: null,
+    };
+  }
+
+  const newBalance = await decrementCreditIfSufficient(key.id, overCount * OVERAGE_RATE_FREE_USD);
+  if (newBalance !== null) {
+    return {
+      allowed: true,
+      limit: FREE_DAILY_LIMIT,
+      used: usedAfter,
+      remaining: 0,
+      resetAt,
+      creditBalanceUsd: newBalance,
+      usedOverageCredit: true,
+      response: null,
+    };
+  }
+
+  return {
+    allowed: false,
+    limit: FREE_DAILY_LIMIT,
+    used: usedAfter,
+    remaining: 0,
+    resetAt,
+    creditBalanceUsd: key.credit_balance_usd,
+    usedOverageCredit: false,
+    response: buildLimitReachedResponse(
+      `Batch of ${count} needs ${overCount} overage call(s) past the daily free-tier limit, and the call-credit balance is insufficient to cover them`,
+      FREE_DAILY_LIMIT,
+      usedAfter,
       resetAt,
       OVERAGE_RATE_FREE_USD,
       extraHeaders,

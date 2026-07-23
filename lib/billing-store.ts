@@ -1,3 +1,38 @@
+// Version 7.15 — lib/billing-store.ts
+//
+// v7.15: added incrementSubscriptionUsageBy() for the batch endpoint —
+// N mints in one call need the subscription cycle counter incremented
+// by N, atomically. New SQL function increment_subscription_usage_by(),
+// separate from the existing increment_subscription_usage() (still used
+// by the single-mint route, untouched). decrementCreditIfSufficient()
+// already takes an arbitrary `amount` — no change needed there, the
+// batch route just passes overageCount * rate.
+//
+// REQUIRED: run this in the Supabase SQL editor before deploying the
+// batch endpoint (not yet applied — billing-adjacent, holding for
+// explicit sign-off per the standing payment-code rule). Confirmed the
+// exact live definition of increment_subscription_usage() via
+// pg_get_functiondef() before writing this — same
+// least(current + N, quota + 1) cap logic, just generalized from a
+// hardcoded +1 to an arbitrary +p_amount, same style (no SECURITY
+// DEFINER, same explicit search_path):
+//
+//   create or replace function increment_subscription_usage_by(p_key_id uuid, p_quota int, p_amount int)
+//   returns int
+//   language plpgsql
+//   set search_path to 'public'
+//   as $$
+//   declare
+//     new_count int;
+//   begin
+//     update api_keys
+//     set subscription_cycle_calls_used = least(subscription_cycle_calls_used + p_amount, p_quota + 1)
+//     where id = p_key_id
+//     returning subscription_cycle_calls_used into new_count;
+//     return new_count;
+//   end;
+//   $$;
+//
 // Version 7.14 — lib/billing-store.ts
 //
 // v7.14: two changes for the anti-salt-flood fix (see the SQL migration
@@ -156,6 +191,27 @@ export async function incrementSubscriptionUsage(keyId: string, quota: number): 
 
   if (error) {
     console.error('[billing-store] incrementSubscriptionUsage error:', error.message);
+    return null;
+  }
+  return data as number;
+}
+
+// Same as incrementSubscriptionUsage() but by an arbitrary amount — used
+// by the batch endpoint (N mints in one call = N counted against the
+// subscription's monthly quota). Same fail-open-null contract.
+export async function incrementSubscriptionUsageBy(
+  keyId: string,
+  quota: number,
+  amount: number,
+): Promise<number | null> {
+  const { data, error } = await supabase.rpc('increment_subscription_usage_by', {
+    p_key_id: keyId,
+    p_quota: quota,
+    p_amount: amount,
+  });
+
+  if (error) {
+    console.error('[billing-store] incrementSubscriptionUsageBy error:', error.message);
     return null;
   }
   return data as number;
