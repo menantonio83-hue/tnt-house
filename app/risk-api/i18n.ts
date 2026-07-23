@@ -1,3 +1,13 @@
+// Version 1.1 — app/risk-api/i18n.ts
+//
+// v1.1: added a dedicated Rate Limiting section (rateLimiting*/rateLimit*
+// keys) — previously only a single one-line note about rate-limit headers
+// existed (rateLimitHeadersNote, kept as-is). Translated across all 7
+// languages, following the same technical-content rule as everywhere else
+// in this file: header names (X-RateLimit-Limit etc.) and JSON field names
+// (limit, used, reset_at, overage_rate_usd, upgrade_url) stay in English
+// in every locale.
+//
 // Version 1.0 — app/risk-api/i18n.ts
 //
 // Same architecture as app/page.js's TRANSLATIONS object (existing file,
@@ -66,6 +76,21 @@ export interface RiskApiTranslations {
   chatConnectionError: string;
   copyOpenApiUrl: string;
   webhooksRoadmapNote: string;
+
+  // Rate limiting section
+  rateLimitingTitle: string;
+  rateLimitingIntro: string;
+  rateLimitHeaderLimitLabel: string;
+  rateLimitHeaderLimitDesc: string;
+  rateLimitHeaderRemainingLabel: string;
+  rateLimitHeaderRemainingDesc: string;
+  rateLimitHeaderResetLabel: string;
+  rateLimitHeaderResetDesc: string;
+  rateLimitHeaderCreditLabel: string;
+  rateLimitHeaderCreditDesc: string;
+  rateLimitExceededTitle: string;
+  rateLimitExceededDesc: string;
+  rateLimitBestPractice: string;
 
   // Pricing
   pricingTitle: string;
@@ -171,6 +196,19 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     chatConnectionError: 'Connection error. ⚡ Get your free API key below.',
     copyOpenApiUrl: 'Copy',
     webhooksRoadmapNote: 'Webhooks for cluster_analysis completion are on the roadmap, not yet available — for now, re-check the same mint after 1-2 minutes.',
+    rateLimitingTitle: 'Rate Limiting',
+    rateLimitingIntro: 'Every key gets 15 free requests per calendar day (UTC). Go over that with no call-credit balance and you get a 402, not a silent block — top up or subscribe and the same key keeps working immediately.',
+    rateLimitHeaderLimitLabel: 'X-RateLimit-Limit',
+    rateLimitHeaderLimitDesc: 'Your daily quota. Empty on unlimited/admin-issued keys.',
+    rateLimitHeaderRemainingLabel: 'X-RateLimit-Remaining',
+    rateLimitHeaderRemainingDesc: 'Requests left before the free quota runs out today.',
+    rateLimitHeaderResetLabel: 'X-RateLimit-Reset',
+    rateLimitHeaderResetDesc: 'ISO timestamp of the next quota reset (next UTC midnight, or your subscription renewal date).',
+    rateLimitHeaderCreditLabel: 'X-Credit-Balance-Usd',
+    rateLimitHeaderCreditDesc: 'Your current call-credit balance, once you have one.',
+    rateLimitExceededTitle: 'What happens over the limit',
+    rateLimitExceededDesc: 'You get an HTTP 402 with a JSON body — limit, used, reset_at, overage_rate_usd, and an upgrade_url. No retries needed: as soon as you top up credit or subscribe, the same key starts working again on the very next call.',
+    rateLimitBestPractice: 'Check X-RateLimit-Remaining before firing off a batch of calls — reading a header costs nothing, a wasted 402 does not.',
     pricingTitle: 'Limits & pricing',
     tierFree: 'FREE',
     tierFreeAmount: '15 req/day',
@@ -266,6 +304,19 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     chatConnectionError: 'Error de conexión. ⚡ Consigue tu API key gratis más abajo.',
     copyOpenApiUrl: 'Copiar',
     webhooksRoadmapNote: 'Los webhooks para cluster_analysis completado están en el roadmap, aún no disponibles — por ahora, vuelve a comprobar el mismo mint tras 1-2 minutos.',
+    rateLimitingTitle: 'Límite de solicitudes',
+    rateLimitingIntro: 'Cada key tiene 15 solicitudes gratuitas por día natural (UTC). Si superas ese límite sin saldo de crédito, recibes un 402, no un bloqueo silencioso — recarga saldo o suscríbete y la misma key vuelve a funcionar de inmediato.',
+    rateLimitHeaderLimitLabel: 'X-RateLimit-Limit',
+    rateLimitHeaderLimitDesc: 'Tu cuota diaria. Vacío en keys ilimitadas o emitidas por un admin.',
+    rateLimitHeaderRemainingLabel: 'X-RateLimit-Remaining',
+    rateLimitHeaderRemainingDesc: 'Solicitudes restantes antes de que se agote la cuota gratuita de hoy.',
+    rateLimitHeaderResetLabel: 'X-RateLimit-Reset',
+    rateLimitHeaderResetDesc: 'Marca de tiempo ISO del próximo reinicio de cuota (medianoche UTC, o la fecha de renovación de tu suscripción).',
+    rateLimitHeaderCreditLabel: 'X-Credit-Balance-Usd',
+    rateLimitHeaderCreditDesc: 'Tu saldo de crédito actual, en cuanto tengas uno.',
+    rateLimitExceededTitle: 'Qué pasa al superar el límite',
+    rateLimitExceededDesc: 'Recibes un HTTP 402 con un cuerpo JSON — limit, used, reset_at, overage_rate_usd y un upgrade_url. No hace falta reintentar: en cuanto recargues saldo o te suscribas, la misma key vuelve a funcionar en la siguiente llamada.',
+    rateLimitBestPractice: 'Revisa X-RateLimit-Remaining antes de lanzar un lote de llamadas — leer una cabecera no cuesta nada, un 402 desperdiciado sí.',
     pricingTitle: 'Límites y precios',
     tierFree: 'GRATIS',
     tierFreeAmount: '15 pet./día',
@@ -361,6 +412,19 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     chatConnectionError: 'Erreur de connexion. ⚡ Obtenez votre clé API gratuite ci-dessous.',
     copyOpenApiUrl: 'Copier',
     webhooksRoadmapNote: 'Les webhooks pour la fin de cluster_analysis sont sur la feuille de route, pas encore disponibles — en attendant, revérifiez le même mint après 1-2 minutes.',
+    rateLimitingTitle: 'Limitation de débit',
+    rateLimitingIntro: 'Chaque clé dispose de 15 requêtes gratuites par jour calendaire (UTC). Au-delà, sans solde de crédit, vous recevez un 402, pas un blocage silencieux — rechargez ou abonnez-vous et la même clé refonctionne immédiatement.',
+    rateLimitHeaderLimitLabel: 'X-RateLimit-Limit',
+    rateLimitHeaderLimitDesc: 'Votre quota quotidien. Vide pour les clés illimitées/émises par un admin.',
+    rateLimitHeaderRemainingLabel: 'X-RateLimit-Remaining',
+    rateLimitHeaderRemainingDesc: 'Requêtes restantes avant épuisement du quota gratuit du jour.',
+    rateLimitHeaderResetLabel: 'X-RateLimit-Reset',
+    rateLimitHeaderResetDesc: 'Horodatage ISO de la prochaine réinitialisation du quota (minuit UTC, ou la date de renouvellement de votre abonnement).',
+    rateLimitHeaderCreditLabel: 'X-Credit-Balance-Usd',
+    rateLimitHeaderCreditDesc: 'Votre solde de crédit actuel, dès que vous en avez un.',
+    rateLimitExceededTitle: 'Que se passe-t-il au-delà de la limite',
+    rateLimitExceededDesc: "Vous recevez un HTTP 402 avec un corps JSON — limit, used, reset_at, overage_rate_usd et un upgrade_url. Pas besoin de réessayer : dès que vous rechargez du crédit ou vous abonnez, la même clé refonctionne dès le prochain appel.",
+    rateLimitBestPractice: "Vérifiez X-RateLimit-Remaining avant de lancer un lot d'appels — lire un en-tête ne coûte rien, un 402 gâché si.",
     pricingTitle: 'Limites et tarifs',
     tierFree: 'GRATUIT',
     tierFreeAmount: '15 req/jour',
@@ -456,6 +520,19 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     chatConnectionError: 'Σφάλμα σύνδεσης. ⚡ Πάρε το δωρεάν API key σου παρακάτω.',
     copyOpenApiUrl: 'Αντιγραφή',
     webhooksRoadmapNote: 'Τα webhooks για την ολοκλήρωση του cluster_analysis είναι στον χάρτη πορείας, όχι ακόμα διαθέσιμα — προς το παρόν, ξαναέλεγξε το ίδιο mint μετά από 1-2 λεπτά.',
+    rateLimitingTitle: 'Όριο αιτημάτων',
+    rateLimitingIntro: 'Κάθε key έχει 15 δωρεάν αιτήματα ανά ημερολογιακή ημέρα (UTC). Αν το ξεπεράσεις χωρίς υπόλοιπο πίστωσης, παίρνεις 402, όχι σιωπηλό μπλοκάρισμα — φόρτωσε υπόλοιπο ή κάνε συνδρομή και το ίδιο key ξαναδουλεύει αμέσως.',
+    rateLimitHeaderLimitLabel: 'X-RateLimit-Limit',
+    rateLimitHeaderLimitDesc: 'Η ημερήσια ποσόστωσή σου. Κενό σε απεριόριστα ή διαχειριστικά keys.',
+    rateLimitHeaderRemainingLabel: 'X-RateLimit-Remaining',
+    rateLimitHeaderRemainingDesc: 'Αιτήματα που απομένουν πριν εξαντληθεί η σημερινή δωρεάν ποσόστωση.',
+    rateLimitHeaderResetLabel: 'X-RateLimit-Reset',
+    rateLimitHeaderResetDesc: 'Χρονοσφραγίδα ISO της επόμενης επαναφοράς ποσόστωσης (επόμενα μεσάνυχτα UTC, ή η ημερομηνία ανανέωσης της συνδρομής σου).',
+    rateLimitHeaderCreditLabel: 'X-Credit-Balance-Usd',
+    rateLimitHeaderCreditDesc: 'Το τρέχον υπόλοιπο πίστωσής σου, μόλις αποκτήσεις ένα.',
+    rateLimitExceededTitle: 'Τι συμβαίνει πέρα από το όριο',
+    rateLimitExceededDesc: 'Λαμβάνεις HTTP 402 με JSON σώμα — limit, used, reset_at, overage_rate_usd και ένα upgrade_url. Δεν χρειάζονται επαναλήψεις: μόλις φορτώσεις πίστωση ή κάνεις συνδρομή, το ίδιο key ξαναδουλεύει από την επόμενη κλήση.',
+    rateLimitBestPractice: 'Έλεγξε το X-RateLimit-Remaining πριν στείλεις μια δέσμη κλήσεων — η ανάγνωση ενός header δεν κοστίζει τίποτα, ένα χαμένο 402 όμως ναι.',
     pricingTitle: 'Όρια & τιμολόγηση',
     tierFree: 'ΔΩΡΕΑΝ',
     tierFreeAmount: '15 αιτ./ημέρα',
@@ -551,6 +628,19 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     chatConnectionError: 'Ошибка соединения. ⚡ Получи бесплатный API-ключ ниже.',
     copyOpenApiUrl: 'Копировать',
     webhooksRoadmapNote: 'Вебхуки на завершение cluster_analysis — в планах, пока не реализованы. Сейчас просто перепроверь тот же минт через 1-2 минуты.',
+    rateLimitingTitle: 'Лимиты запросов',
+    rateLimitingIntro: 'У каждого ключа 15 бесплатных запросов в календарные сутки (UTC). Превысил лимит без баланса кредитов — получишь 402, а не тихую блокировку: пополни баланс или оформи подписку — и тот же ключ сразу снова работает.',
+    rateLimitHeaderLimitLabel: 'X-RateLimit-Limit',
+    rateLimitHeaderLimitDesc: 'Твоя дневная квота. Пусто у безлимитных/выданных админом ключей.',
+    rateLimitHeaderRemainingLabel: 'X-RateLimit-Remaining',
+    rateLimitHeaderRemainingDesc: 'Сколько запросов осталось до конца бесплатной квоты на сегодня.',
+    rateLimitHeaderResetLabel: 'X-RateLimit-Reset',
+    rateLimitHeaderResetDesc: 'ISO-таймстамп следующего сброса квоты (следующая полночь по UTC или дата продления подписки).',
+    rateLimitHeaderCreditLabel: 'X-Credit-Balance-Usd',
+    rateLimitHeaderCreditDesc: 'Текущий баланс кредитов на звонки, как только он появится.',
+    rateLimitExceededTitle: 'Что происходит при превышении лимита',
+    rateLimitExceededDesc: 'Приходит HTTP 402 с JSON-телом — limit, used, reset_at, overage_rate_usd и upgrade_url. Повторные попытки не нужны: как только пополнишь баланс или оформишь подписку, тот же ключ снова заработает уже на следующем вызове.',
+    rateLimitBestPractice: 'Проверяй X-RateLimit-Remaining перед отправкой пачки запросов — прочитать заголовок бесплатно, а вот впустую словленный 402 — нет.',
     pricingTitle: 'Лимиты и цены',
     tierFree: 'FREE',
     tierFreeAmount: '15 запр./день',
@@ -646,6 +736,19 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     chatConnectionError: 'Errore di connessione. ⚡ Ottieni la tua API key gratuita qui sotto.',
     copyOpenApiUrl: 'Copia',
     webhooksRoadmapNote: 'I webhook per il completamento di cluster_analysis sono nella roadmap, non ancora disponibili — per ora, ricontrolla lo stesso mint dopo 1-2 minuti.',
+    rateLimitingTitle: 'Limiti di richieste',
+    rateLimitingIntro: 'Ogni key ha 15 richieste gratuite al giorno solare (UTC). Se lo superi senza saldo di credito, ricevi un 402, non un blocco silenzioso — ricarica il saldo o abbonati e la stessa key torna subito a funzionare.',
+    rateLimitHeaderLimitLabel: 'X-RateLimit-Limit',
+    rateLimitHeaderLimitDesc: 'La tua quota giornaliera. Vuoto per le key illimitate/emesse da admin.',
+    rateLimitHeaderRemainingLabel: 'X-RateLimit-Remaining',
+    rateLimitHeaderRemainingDesc: 'Richieste rimaste prima che si esaurisca la quota gratuita di oggi.',
+    rateLimitHeaderResetLabel: 'X-RateLimit-Reset',
+    rateLimitHeaderResetDesc: 'Timestamp ISO del prossimo reset della quota (mezzanotte UTC, oppure la data di rinnovo del tuo abbonamento).',
+    rateLimitHeaderCreditLabel: 'X-Credit-Balance-Usd',
+    rateLimitHeaderCreditDesc: 'Il tuo saldo di credito attuale, non appena ne hai uno.',
+    rateLimitExceededTitle: 'Cosa succede oltre il limite',
+    rateLimitExceededDesc: 'Ricevi un HTTP 402 con un corpo JSON — limit, used, reset_at, overage_rate_usd e un upgrade_url. Nessun retry necessario: appena ricarichi credito o ti abboni, la stessa key torna a funzionare dalla chiamata successiva.',
+    rateLimitBestPractice: 'Controlla X-RateLimit-Remaining prima di lanciare un batch di chiamate — leggere un header non costa nulla, un 402 sprecato sì.',
     pricingTitle: 'Limiti e prezzi',
     tierFree: 'GRATIS',
     tierFreeAmount: '15 rich./giorno',
@@ -741,6 +844,19 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     chatConnectionError: '连接错误。⚡ 在下方获取你的免费 API 密钥。',
     copyOpenApiUrl: '复制',
     webhooksRoadmapNote: 'cluster_analysis 完成后的 webhook 通知已列入路线图，目前尚未上线 —— 现在请在 1-2 分钟后重新查询同一个 mint。',
+    rateLimitingTitle: '速率限制',
+    rateLimitingIntro: '每个密钥每个日历日（UTC）有 15 次免费请求。超过这个额度且没有信用余额时，你会收到 402，而不是被默默拦截——充值或订阅后，同一个密钥会立即恢复可用。',
+    rateLimitHeaderLimitLabel: 'X-RateLimit-Limit',
+    rateLimitHeaderLimitDesc: '你的每日配额。无限量/管理员发放的密钥此项为空。',
+    rateLimitHeaderRemainingLabel: 'X-RateLimit-Remaining',
+    rateLimitHeaderRemainingDesc: '今天免费配额用完前还剩多少次请求。',
+    rateLimitHeaderResetLabel: 'X-RateLimit-Reset',
+    rateLimitHeaderResetDesc: '下次配额重置的 ISO 时间戳（下一个 UTC 午夜，或你的订阅续费日期）。',
+    rateLimitHeaderCreditLabel: 'X-Credit-Balance-Usd',
+    rateLimitHeaderCreditDesc: '你当前的通话信用余额（如果有的话）。',
+    rateLimitExceededTitle: '超出限制后会发生什么',
+    rateLimitExceededDesc: '你会收到一个带 JSON 内容的 HTTP 402 —— limit、used、reset_at、overage_rate_usd 以及 upgrade_url。无需重试：一旦充值或订阅，同一个密钥在下一次调用时就会立即恢复正常。',
+    rateLimitBestPractice: '在发起一批调用之前先检查 X-RateLimit-Remaining —— 读取一个响应头不花钱，白白触发一次 402 却会。',
     pricingTitle: '限额与价格',
     tierFree: '免费',
     tierFreeAmount: '15 次/天',
