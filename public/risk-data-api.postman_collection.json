@@ -1,0 +1,80 @@
+{
+  "info": {
+    "_postman_id": "b3f1a2c4-7d5e-4f8a-9c1b-6e2a8d5f0e11",
+    "name": "TNT House Risk-Data API",
+    "description": "Solana token safety scoring + insider-cluster detection, built for AI trading agents. Free tier: 15 requests/day, no card required.\n\nGet a free API key: https://tnt-audit.com/risk-api\n\nHow to use this collection:\n1. Open the collection variables (top-right, or Collection > Variables tab).\n2. Set `api_key` to your real key (starts with `tnt_sk_`).\n3. Set `mint` to any Solana token mint address you want to check.\n4. Run \"Check Token Risk\".\n\nA fresh mint's first-ever check returns `cluster_analysis: \"pending\"` while insider detection runs in the background — re-run the request after ~1-2 minutes for the full result.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://www.tnt-audit.com",
+      "type": "string"
+    },
+    {
+      "key": "api_key",
+      "value": "tnt_sk_your_key_here",
+      "type": "string",
+      "description": "Get a free key at https://tnt-audit.com/risk-api"
+    },
+    {
+      "key": "mint",
+      "value": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "type": "string",
+      "description": "Any Solana token mint address. Defaults to USDC's mint as a known-good example."
+    }
+  ],
+  "item": [
+    {
+      "name": "Check Token Risk",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{api_key}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/token-risk?mint={{mint}}",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "token-risk"],
+          "query": [
+            {
+              "key": "mint",
+              "value": "{{mint}}"
+            }
+          ]
+        },
+        "description": "Returns a 0-100 safety score, insider wallet clusters (wallets sharing a first-funder), mint/freeze authority status, holder concentration, and live market data for the given mint.\n\nResponses also include X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset headers, and X-Credit-Balance-Usd once your key has a paid tier or credit balance.\n\nError codes: 400 (missing/invalid mint), 401 (missing/invalid key), 402 (limit reached, includes upgrade_url), 429 (rate limited), 502 (couldn't fetch on-chain data)."
+      },
+      "response": [
+        {
+          "name": "200 OK — example",
+          "originalRequest": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer tnt_sk_your_key_here", "type": "text" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/token-risk?mint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "token-risk"],
+              "query": [
+                { "key": "mint", "value": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v" }
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            { "key": "Content-Type", "value": "application/json" }
+          ],
+          "body": "{\n  \"mint\": \"EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v\",\n  \"safety_score\": 78,\n  \"cluster_analysis\": \"complete\",\n  \"insider_clusters\": [\n    { \"funder\": \"9xQe...k2Pd\", \"wallets\": [\"7uF3...aZ1\", \"3mN8...qR2\"] }\n  ],\n  \"mint_authority\": { \"revoked\": true, \"address\": null },\n  \"freeze_authority\": { \"revoked\": true, \"address\": null },\n  \"honeypot_risk\": null,\n  \"lp_locked\": null,\n  \"holder_distribution\": {\n    \"risk_level\": \"LOW\",\n    \"largest_holder_percent\": 4.2,\n    \"top10_percent\": 22.7,\n    \"holder_count\": 20\n  },\n  \"market\": {\n    \"price_usd\": 0.0000412,\n    \"liquidity_usd\": 84210,\n    \"volume_24h_usd\": 512300,\n    \"price_change_24h_percent\": 12.4,\n    \"age_days\": 3\n  },\n  \"note\": \"honeypot_risk and lp_locked detection are on the roadmap and not yet implemented.\",\n  \"checked_at\": \"2026-07-18T12:00:00.000Z\"\n}"
+        }
+      ]
+    }
+  ]
+}
