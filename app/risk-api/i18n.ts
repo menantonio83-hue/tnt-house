@@ -1,3 +1,17 @@
+// Version 1.3 — app/risk-api/i18n.ts
+//
+// v1.3: REVERSED the v1.2 decision to leave changelog entries in
+// English for every locale. Found live on the deployed page by the
+// product owner (screenshot: Russian UI, changelog text still in
+// English) and reported as a bug — the "technical/log content" framing
+// from v1.2 was my call, not something the owner had signed off on
+// specifically for this content, and once they saw it live they wanted
+// it translated like everything else on the page. Added ChangelogEntry
+// type + changelogEntries: ChangelogEntry[] per language — version
+// numbers/dates and inline technical terms (header names, field names,
+// HTTP codes) inside the translated text still stay in English, only
+// the descriptive prose is now localized.
+//
 // Version 1.2 — app/risk-api/i18n.ts
 //
 // v1.2: added Changelog & Versioning section keys (versioning*/
@@ -38,6 +52,12 @@
 // scope for this pass.
 
 export type LangCode = 'en' | 'es' | 'fr' | 'el' | 'ru' | 'it' | 'zh';
+
+export interface ChangelogEntry {
+  version: string;
+  date: string;
+  changes: string[];
+}
 
 export interface RiskApiTranslations {
   flag: string;
@@ -106,6 +126,7 @@ export interface RiskApiTranslations {
   versioningIntro: string;
   changelogTitle: string;
   changelogNote: string;
+  changelogEntries: ChangelogEntry[];
 
   // Pricing
   pricingTitle: string;
@@ -228,6 +249,44 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     versioningIntro: "The API is versioned in the URL (/api/v1/...). Within v1, existing fields are never removed, renamed, or repurposed — only added. Integrations should ignore fields they don't recognize rather than fail on them. A genuinely breaking change ships as /api/v2/..., with v1 kept running for a reasonable overlap period — never a silent in-place break.",
     changelogTitle: 'Changelog',
     changelogNote: 'No mailing list or webhooks yet for update announcements — this page and the X / Telegram links in the footer are the way to stay current.',
+    changelogEntries: [
+      { version: 'v1.5', date: '2026-07-23', changes: ['Published a ready-to-import Postman collection.'] },
+      {
+        version: 'v1.4',
+        date: '2026-07-21',
+        changes: [
+          'Published a formal OpenAPI 3.0 spec at /openapi.json.',
+          'Rebalanced upstream timeout budget for very large/liquid mints, further reducing false holder_distribution failures.',
+        ],
+      },
+      {
+        version: 'v1.3',
+        date: '2026-07-19',
+        changes: ['Billing security hardening against invoice/payment-matching abuse — no response schema change.'],
+      },
+      {
+        version: 'v1.2',
+        date: '2026-07-18',
+        changes: [
+          'Fixed timeouts on upstream calls that could occasionally return a raw 502 on slower, less-major tokens.',
+          'Fixed holder_distribution occasionally reporting holder_count: 0 on high-volume tokens due to a swallowed RPC failure.',
+          'Fixed implausible price_change_24h_percent values passed through from upstream market data.',
+        ],
+      },
+      {
+        version: 'v1.1',
+        date: '2026-07-18',
+        changes: ['Added X-RateLimit-Limit / X-RateLimit-Remaining / X-RateLimit-Reset headers, later joined by X-Credit-Balance-Usd.'],
+      },
+      {
+        version: 'v1.0',
+        date: '2026-07-18',
+        changes: [
+          'Public launch: GET /api/v1/token-risk — safety_score, insider_clusters, mint/freeze authority, holder_distribution, market data.',
+          'API-key auth, free tier + pay-per-call + subscription billing via Solana Pay.',
+        ],
+      },
+    ],
     pricingTitle: 'Limits & pricing',
     tierFree: 'FREE',
     tierFreeAmount: '15 req/day',
@@ -340,6 +399,44 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     versioningIntro: 'La API se versiona en la URL (/api/v1/...). Dentro de v1, los campos existentes nunca se eliminan, renombran ni cambian de propósito — solo se añaden. Las integraciones deberían ignorar los campos que no reconozcan en lugar de fallar por ellos. Un cambio realmente disruptivo se publica como /api/v2/..., manteniendo v1 en funcionamiento durante un periodo de solapamiento razonable — nunca una ruptura silenciosa en el mismo endpoint.',
     changelogTitle: 'Registro de cambios',
     changelogNote: 'Todavía no hay lista de correo ni webhooks para anunciar novedades — esta página y los enlaces de X / Telegram del pie son la forma de mantenerte al día.',
+    changelogEntries: [
+      { version: 'v1.5', date: '2026-07-23', changes: ['Se publicó una colección de Postman lista para importar.'] },
+      {
+        version: 'v1.4',
+        date: '2026-07-21',
+        changes: [
+          'Se publicó una especificación formal OpenAPI 3.0 en /openapi.json.',
+          'Se reequilibró el presupuesto de tiempo de espera para mints muy grandes/líquidos, reduciendo aún más los fallos falsos de holder_distribution.',
+        ],
+      },
+      {
+        version: 'v1.3',
+        date: '2026-07-19',
+        changes: ['Refuerzo de seguridad de facturación contra abusos de coincidencia de invoice/pago — sin cambios en el esquema de respuesta.'],
+      },
+      {
+        version: 'v1.2',
+        date: '2026-07-18',
+        changes: [
+          'Se corrigieron tiempos de espera en llamadas upstream que ocasionalmente devolvían un 502 sin procesar en tokens menos importantes y más lentos.',
+          'Se corrigió que holder_distribution reportara ocasionalmente holder_count: 0 en tokens de alto volumen debido a un fallo de RPC silenciado.',
+          'Se corrigieron valores implausibles de price_change_24h_percent transmitidos tal cual desde los datos de mercado upstream.',
+        ],
+      },
+      {
+        version: 'v1.1',
+        date: '2026-07-18',
+        changes: ['Se añadieron las cabeceras X-RateLimit-Limit / X-RateLimit-Remaining / X-RateLimit-Reset, a las que luego se unió X-Credit-Balance-Usd.'],
+      },
+      {
+        version: 'v1.0',
+        date: '2026-07-18',
+        changes: [
+          'Lanzamiento público: GET /api/v1/token-risk — safety_score, insider_clusters, mint/freeze authority, holder_distribution, datos de mercado.',
+          'Autenticación por API key, facturación free tier + pago por llamada + suscripción vía Solana Pay.',
+        ],
+      },
+    ],
     pricingTitle: 'Límites y precios',
     tierFree: 'GRATIS',
     tierFreeAmount: '15 pet./día',
@@ -452,6 +549,44 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     versioningIntro: "L'API est versionnée dans l'URL (/api/v1/...). Au sein de v1, les champs existants ne sont jamais supprimés, renommés ni détournés de leur usage — seulement ajoutés. Les intégrations doivent ignorer les champs qu'elles ne reconnaissent pas plutôt que d'échouer à cause d'eux. Un changement véritablement cassant est publié sous /api/v2/..., avec v1 maintenue en fonctionnement pendant une période de recouvrement raisonnable — jamais une rupture silencieuse sur place.",
     changelogTitle: 'Journal des modifications',
     changelogNote: 'Pas encore de liste de diffusion ni de webhooks pour les annonces — cette page et les liens X / Telegram en pied de page sont le moyen de rester à jour.',
+    changelogEntries: [
+      { version: 'v1.5', date: '2026-07-23', changes: ["Publication d'une collection Postman prête à importer."] },
+      {
+        version: 'v1.4',
+        date: '2026-07-21',
+        changes: [
+          "Publication d'une spécification OpenAPI 3.0 formelle à /openapi.json.",
+          'Rééquilibrage du budget de délai d\'attente pour les mints très volumineux/liquides, réduisant encore les faux échecs de holder_distribution.',
+        ],
+      },
+      {
+        version: 'v1.3',
+        date: '2026-07-19',
+        changes: ['Renforcement de la sécurité de facturation contre les abus de correspondance invoice/paiement — aucun changement du schéma de réponse.'],
+      },
+      {
+        version: 'v1.2',
+        date: '2026-07-18',
+        changes: [
+          "Correction des délais d'attente sur les appels en amont pouvant occasionnellement renvoyer un 502 brut sur des tokens plus lents et moins importants.",
+          'Correction de holder_distribution signalant parfois holder_count: 0 sur des tokens à fort volume à cause d\'un échec RPC avalé.',
+          'Correction de valeurs invraisemblables de price_change_24h_percent transmises telles quelles depuis les données de marché en amont.',
+        ],
+      },
+      {
+        version: 'v1.1',
+        date: '2026-07-18',
+        changes: ['Ajout des en-têtes X-RateLimit-Limit / X-RateLimit-Remaining / X-RateLimit-Reset, rejoints plus tard par X-Credit-Balance-Usd.'],
+      },
+      {
+        version: 'v1.0',
+        date: '2026-07-18',
+        changes: [
+          'Lancement public : GET /api/v1/token-risk — safety_score, insider_clusters, mint/freeze authority, holder_distribution, données de marché.',
+          "Authentification par clé API, facturation free tier + paiement à l'appel + abonnement via Solana Pay.",
+        ],
+      },
+    ],
     pricingTitle: 'Limites et tarifs',
     tierFree: 'GRATUIT',
     tierFreeAmount: '15 req/jour',
@@ -564,6 +699,44 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     versioningIntro: 'Το API έχει έκδοση στο URL (/api/v1/...). Μέσα στο v1, τα υπάρχοντα πεδία δεν αφαιρούνται, δεν μετονομάζονται ούτε αλλάζουν σκοπό ποτέ — μόνο προστίθενται. Οι ενσωματώσεις θα πρέπει να αγνοούν πεδία που δεν αναγνωρίζουν αντί να αποτυγχάνουν εξαιτίας τους. Μια πραγματικά ασύμβατη αλλαγή δημοσιεύεται ως /api/v2/..., με το v1 να συνεχίζει να λειτουργεί για ένα λογικό διάστημα επικάλυψης — ποτέ μια σιωπηλή αλλαγή επί τόπου.',
     changelogTitle: 'Ιστορικό αλλαγών',
     changelogNote: 'Δεν υπάρχει ακόμα mailing list ή webhooks για ανακοινώσεις ενημερώσεων — αυτή η σελίδα και οι σύνδεσμοι X / Telegram στο footer είναι ο τρόπος να μένεις ενήμερος.',
+    changelogEntries: [
+      { version: 'v1.5', date: '2026-07-23', changes: ['Δημοσιεύτηκε μια έτοιμη προς εισαγωγή συλλογή Postman.'] },
+      {
+        version: 'v1.4',
+        date: '2026-07-21',
+        changes: [
+          'Δημοσιεύτηκε επίσημη προδιαγραφή OpenAPI 3.0 στο /openapi.json.',
+          'Επαναρρύθμιση του προϋπολογισμού timeout για πολύ μεγάλα/ρευστά mints, μειώνοντας περαιτέρω τις ψευδείς αποτυχίες holder_distribution.',
+        ],
+      },
+      {
+        version: 'v1.3',
+        date: '2026-07-19',
+        changes: ['Ενίσχυση ασφάλειας χρέωσης κατά της κατάχρησης αντιστοίχισης invoice/πληρωμής — καμία αλλαγή στο σχήμα απόκρισης.'],
+      },
+      {
+        version: 'v1.2',
+        date: '2026-07-18',
+        changes: [
+          'Διορθώθηκαν timeouts σε upstream κλήσεις που περιστασιακά επέστρεφαν ακατέργαστο 502 σε πιο αργά, λιγότερο σημαντικά tokens.',
+          'Διορθώθηκε το holder_distribution που περιστασιακά ανέφερε holder_count: 0 σε tokens υψηλού όγκου λόγω καταπιεσμένης αποτυχίας RPC.',
+          'Διορθώθηκαν μη ρεαλιστικές τιμές price_change_24h_percent που περνούσαν αυτούσιες από τα upstream δεδομένα αγοράς.',
+        ],
+      },
+      {
+        version: 'v1.1',
+        date: '2026-07-18',
+        changes: ['Προστέθηκαν οι κεφαλίδες X-RateLimit-Limit / X-RateLimit-Remaining / X-RateLimit-Reset, στις οποίες αργότερα προστέθηκε η X-Credit-Balance-Usd.'],
+      },
+      {
+        version: 'v1.0',
+        date: '2026-07-18',
+        changes: [
+          'Δημόσια κυκλοφορία: GET /api/v1/token-risk — safety_score, insider_clusters, mint/freeze authority, holder_distribution, δεδομένα αγοράς.',
+          'Αυθεντικοποίηση με API key, χρέωση free tier + πληρωμή ανά κλήση + συνδρομή μέσω Solana Pay.',
+        ],
+      },
+    ],
     pricingTitle: 'Όρια & τιμολόγηση',
     tierFree: 'ΔΩΡΕΑΝ',
     tierFreeAmount: '15 αιτ./ημέρα',
@@ -676,6 +849,44 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     versioningIntro: 'API версионируется через URL (/api/v1/...). Внутри v1 существующие поля никогда не удаляются, не переименовываются и не меняют смысл — только добавляются. Интеграциям стоит игнорировать незнакомые поля, а не падать из-за них. По-настоящему ломающее изменение выйдет как /api/v2/..., а v1 продолжит работать разумный переходный период — никогда никаких тихих изменений на месте.',
     changelogTitle: 'История изменений',
     changelogNote: 'Пока нет рассылки или вебхуков для анонсов обновлений — следить за актуальным состоянием можно по этой странице и ссылкам на X / Telegram в подвале.',
+    changelogEntries: [
+      { version: 'v1.5', date: '2026-07-23', changes: ['Опубликована готовая к импорту коллекция Postman.'] },
+      {
+        version: 'v1.4',
+        date: '2026-07-21',
+        changes: [
+          'Опубликована формальная спецификация OpenAPI 3.0 по адресу /openapi.json.',
+          'Перебалансирован бюджет таймаута для очень крупных/ликвидных минтов — дополнительно снижает ложные сбои holder_distribution.',
+        ],
+      },
+      {
+        version: 'v1.3',
+        date: '2026-07-19',
+        changes: ['Усиление защиты биллинга от злоупотреблений сопоставлением invoice/платежей — схема ответа не изменилась.'],
+      },
+      {
+        version: 'v1.2',
+        date: '2026-07-18',
+        changes: [
+          'Исправлены таймауты в апстрим-вызовах, из-за которых иногда возвращался «сырой» 502 на менее популярных токенах.',
+          'Исправлено: holder_distribution иногда показывал holder_count: 0 на высокооборотных токенах из-за проглоченной ошибки RPC.',
+          'Исправлены неправдоподобные значения price_change_24h_percent, приходившие как есть из апстрим рыночных данных.',
+        ],
+      },
+      {
+        version: 'v1.1',
+        date: '2026-07-18',
+        changes: ['Добавлены заголовки X-RateLimit-Limit / X-RateLimit-Remaining / X-RateLimit-Reset, позже дополненные X-Credit-Balance-Usd.'],
+      },
+      {
+        version: 'v1.0',
+        date: '2026-07-18',
+        changes: [
+          'Публичный запуск: GET /api/v1/token-risk — safety_score, insider_clusters, mint/freeze authority, holder_distribution, рыночные данные.',
+          'Авторизация по API-ключу, биллинг free tier + pay-per-call + подписка через Solana Pay.',
+        ],
+      },
+    ],
     pricingTitle: 'Лимиты и цены',
     tierFree: 'FREE',
     tierFreeAmount: '15 запр./день',
@@ -788,6 +999,44 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     versioningIntro: "L'API è versionata nell'URL (/api/v1/...). All'interno della v1, i campi esistenti non vengono mai rimossi, rinominati o riutilizzati con altro significato — solo aggiunti. Le integrazioni dovrebbero ignorare i campi che non riconoscono anziché fallire per colpa loro. Una modifica realmente incompatibile viene pubblicata come /api/v2/..., mantenendo la v1 attiva per un ragionevole periodo di sovrapposizione — mai una rottura silenziosa sullo stesso endpoint.",
     changelogTitle: 'Changelog',
     changelogNote: "Non c'è ancora una mailing list o webhook per gli annunci di aggiornamento — questa pagina e i link X / Telegram nel footer sono il modo per restare aggiornati.",
+    changelogEntries: [
+      { version: 'v1.5', date: '2026-07-23', changes: ["Pubblicata una collezione Postman pronta all'importazione."] },
+      {
+        version: 'v1.4',
+        date: '2026-07-21',
+        changes: [
+          "Pubblicata una specifica OpenAPI 3.0 formale su /openapi.json.",
+          'Ribilanciato il budget di timeout per mint molto grandi/liquidi, riducendo ulteriormente i falsi fallimenti di holder_distribution.',
+        ],
+      },
+      {
+        version: 'v1.3',
+        date: '2026-07-19',
+        changes: ['Rafforzamento della sicurezza di fatturazione contro abusi di corrispondenza invoice/pagamento — nessuna modifica allo schema di risposta.'],
+      },
+      {
+        version: 'v1.2',
+        date: '2026-07-18',
+        changes: [
+          'Risolti timeout nelle chiamate upstream che potevano occasionalmente restituire un 502 grezzo su token più lenti e meno importanti.',
+          'Risolto il problema per cui holder_distribution segnalava occasionalmente holder_count: 0 su token ad alto volume a causa di un errore RPC soppresso.',
+          'Risolti valori implausibili di price_change_24h_percent trasmessi così come sono dai dati di mercato upstream.',
+        ],
+      },
+      {
+        version: 'v1.1',
+        date: '2026-07-18',
+        changes: ['Aggiunte le intestazioni X-RateLimit-Limit / X-RateLimit-Remaining / X-RateLimit-Reset, a cui si è unita successivamente X-Credit-Balance-Usd.'],
+      },
+      {
+        version: 'v1.0',
+        date: '2026-07-18',
+        changes: [
+          'Lancio pubblico: GET /api/v1/token-risk — safety_score, insider_clusters, mint/freeze authority, holder_distribution, dati di mercato.',
+          'Autenticazione con API key, fatturazione free tier + pagamento a chiamata + abbonamento tramite Solana Pay.',
+        ],
+      },
+    ],
     pricingTitle: 'Limiti e prezzi',
     tierFree: 'GRATIS',
     tierFreeAmount: '15 rich./giorno',
@@ -900,6 +1149,44 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     versioningIntro: 'API 通过 URL 进行版本管理（/api/v1/...）。在 v1 内部，现有字段永远不会被删除、重命名或改变用途——只会新增字段。集成方应该忽略无法识别的字段，而不是因此报错。真正的不兼容变更会以 /api/v2/... 的形式发布，v1 会继续运行一段合理的过渡期——绝不会在原地进行静默的破坏性改动。',
     changelogTitle: '更新日志',
     changelogNote: '目前还没有邮件列表或 webhook 用于更新通知——请通过本页面以及页脚的 X / Telegram 链接来获取最新动态。',
+    changelogEntries: [
+      { version: 'v1.5', date: '2026-07-23', changes: ['发布了可直接导入的 Postman 集合。'] },
+      {
+        version: 'v1.4',
+        date: '2026-07-21',
+        changes: [
+          '在 /openapi.json 发布了正式的 OpenAPI 3.0 规范。',
+          '为超大/高流动性的 mint 重新调整了上游超时预算，进一步减少了 holder_distribution 的误报失败。',
+        ],
+      },
+      {
+        version: 'v1.3',
+        date: '2026-07-19',
+        changes: ['针对 invoice/支付匹配滥用加强了计费安全性——响应结构没有变化。'],
+      },
+      {
+        version: 'v1.2',
+        date: '2026-07-18',
+        changes: [
+          '修复了上游调用超时问题，此前在较慢、非主流代币上偶尔会返回原始 502。',
+          '修复了 holder_distribution 因被吞掉的 RPC 失败而在高交易量代币上偶尔报告 holder_count: 0 的问题。',
+          '修复了从上游行情数据原样传递过来的不合理的 price_change_24h_percent 数值。',
+        ],
+      },
+      {
+        version: 'v1.1',
+        date: '2026-07-18',
+        changes: ['新增 X-RateLimit-Limit / X-RateLimit-Remaining / X-RateLimit-Reset 响应头，随后又加入了 X-Credit-Balance-Usd。'],
+      },
+      {
+        version: 'v1.0',
+        date: '2026-07-18',
+        changes: [
+          '公开发布：GET /api/v1/token-risk —— safety_score、insider_clusters、mint/freeze authority、holder_distribution、行情数据。',
+          'API 密钥鉴权，free tier + 按次付费 + 通过 Solana Pay 订阅的计费方式。',
+        ],
+      },
+    ],
     pricingTitle: '限额与价格',
     tierFree: '免费',
     tierFreeAmount: '15 次/天',
