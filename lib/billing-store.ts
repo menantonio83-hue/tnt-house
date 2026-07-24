@@ -1,3 +1,86 @@
+// Version 7.16 — lib/billing-store.ts
+//
+// v7.16: FIXES A REAL RACE CONDITION found on review of v7.15, before
+// anything touched a real database — the exact same bug class this repo
+// already hit once with salt-flood/verify-payment.
+//
+// v7.15's design read the "before" count from key.subscription_cycle_
+// calls_used, which lib/api-auth.ts's requireApiKey() had already
+// fetched EARLIER in the request — a separate, stale SELECT, not part
+// of the same atomic operation as the increment. Two concurrent batch
+// requests on the SAME key can both read that same stale "before"
+// value, both compute their own free/overage split against it, and
+// together under-charge overage credit for calls that were, in
+// reality, entirely in overage by the time the second one actually
+// landed. Confirmed with a concrete run: usedBefore=997, quota=1000,
+// two concurrent batches of 20 each — v7.15's math would charge 17+17=
+// 34 overage calls total, when the real number (997+20+20-1000) is 37.
+// A 3-call under-charge, real money, not a display glitch.
+//
+// v7.16 fixes this by moving the "read old count" INSIDE the SQL
+// function, using SELECT ... FOR UPDATE to take a row lock at read
+// time — so a concurrent call to this function on the SAME key_id
+// blocks on that same SELECT until the first call's transaction
+// commits, and correctly sees the first call's already-applied result
+// as its own "old" value. The function now returns BOTH old_count and
+// new_count from that single atomic operation. lib/rate-limit.ts's
+// enforceRateLimitBatch() (v3.7) no longer touches key.subscription_
+// cycle_calls_used for the batch math at all — it uses only this
+// RPC's own old_count.
+//
+// REQUIRED: run this in the Supabase SQL editor before deploying the
+// batch endpoint (STILL not yet applied — sending this specific fix
+// out for a second look before it touches a real database, per the
+// standing payment-code rule):
+//
+//   create or replace function increment_subscription_usage_by(p_key_id uuid, p_quota int, p_amount int)
+//   returns table(old_count int, new_count int)
+//   language plpgsql
+//   set search_path = public
+//   as $$
+//   declare
+//     v_old int;
+//     v_new int;
+//   begin
+//     if p_amount <= 0 then
+//       raise exception 'p_amount must be positive, got %', p_amount;
+//     end if;
+//
+//     -- FOR UPDATE takes an exclusive row lock at the moment of this
+//     -- read. A concurrent call to this same function on the same
+//     -- key_id blocks HERE until this transaction commits — that's
+//     -- what actually closes the race, not just doing the read and
+//     -- the write inside one function body.
+//     select subscription_cycle_calls_used into v_old
+//     from api_keys
+//     where id = p_key_id
+//     for update;
+//
+//     v_new := least(v_old + p_amount, p_quota + 1);
+//
+//     update api_keys
+//     set subscription_cycle_calls_used = v_new
+//     where id = p_key_id;
+//
+//     return query select v_old, v_new;
+//   end;
+//   $$;
+//
+// Version 7.15 — lib/billing-store.ts
+//
+// v7.15: added incrementSubscriptionUsageBy() for the batch endpoint —
+// N mints in one call need the subscription cycle counter incremented
+// by N, atomically. New SQL function increment_subscription_usage_by(),
+// separate from the existing increment_subscription_usage() (still used
+// by the single-mint route, untouched). decrementCreditIfSufficient()
+// already takes an arbitrary `amount` — no change needed there, the
+// batch route just passes overageCount * rate.
+//
+// SUPERSEDED BY v7.16 above — the function signature this version
+// describes (returns int, no row lock) has a real race condition, kept
+// here only for the historical record of what the first draft looked
+// like before review caught it.
+//
 // Version 7.14 — lib/billing-store.ts
 //
 // v7.14: two changes for the anti-salt-flood fix (see the SQL migration
@@ -159,6 +242,45 @@ export async function incrementSubscriptionUsage(keyId: string, quota: number): 
     return null;
   }
   return data as number;
+}
+
+// Result of incrementSubscriptionUsageBy() — both values come from the
+// SAME atomic SQL operation (v7.16's SELECT ... FOR UPDATE), not a
+// separate earlier read. oldCount is the count BEFORE this batch's
+// increment landed — this is what the free/overage split in
+// lib/rate-limit.ts's enforceRateLimitBatch() must use instead of any
+// pre-fetched key.subscription_cycle_calls_used, precisely to avoid the
+// race v7.16 fixes.
+export interface SubscriptionUsageIncrement {
+  oldCount: number;
+  newCount: number;
+}
+
+// Same as incrementSubscriptionUsage() but by an arbitrary amount — used
+// by the batch endpoint (N mints in one call = N counted against the
+// subscription's monthly quota). Same fail-open-null contract.
+//
+// increment_subscription_usage_by() is declared `returns table(...)` in
+// Postgres, so PostgREST/supabase-js returns `data` as an array of rows
+// (always exactly one row here, since the underlying UPDATE targets a
+// single key_id) — not a bare scalar like the single-increment RPC.
+export async function incrementSubscriptionUsageBy(
+  keyId: string,
+  quota: number,
+  amount: number,
+): Promise<SubscriptionUsageIncrement | null> {
+  const { data, error } = await supabase.rpc('increment_subscription_usage_by', {
+    p_key_id: keyId,
+    p_quota: quota,
+    p_amount: amount,
+  });
+
+  const row = Array.isArray(data) ? data[0] : null;
+  if (error || !row) {
+    console.error('[billing-store] incrementSubscriptionUsageBy error:', error?.message ?? 'no row returned');
+    return null;
+  }
+  return { oldCount: row.old_count, newCount: row.new_count };
 }
 
 // Returns the new balance on success, or null if the balance was
