@@ -1,3 +1,22 @@
+// Version 3.7 — lib/rate-limit.ts
+//
+// v3.7: FIXES A REAL RACE CONDITION in enforceRateLimitBatch()'s
+// subscription-tier branch, found on review before anything touched a
+// real database. v3.6 used key.subscription_cycle_calls_used (read
+// earlier in the request, by requireApiKey()) as the "before" baseline
+// for splitting a batch into free-quota vs overage calls. Two
+// concurrent batch requests on the same key could both read that same
+// stale baseline and together under-charge overage credit — confirmed
+// with a concrete run (usedBefore=997, quota=1000, two concurrent
+// batches of 20: old code charges 17+17=34 overage calls total when
+// the real number is 37). Fixed by using incrementSubscriptionUsageBy()'s
+// own oldCount (lib/billing-store.ts v7.16, SELECT...FOR UPDATE inside
+// the same atomic operation as the increment) instead — no more
+// separate earlier read for the batch math. The free-tier branch was
+// NOT affected: its usedBefore is derived as usedAfter - count from
+// THIS SAME call's own atomic result, not a stale pre-fetch, so it was
+// already race-free (confirmed on review, unchanged here).
+//
 // Version 3.6 — lib/rate-limit.ts
 //
 // v3.6: added enforceRateLimitBatch() for the batch endpoint — same
@@ -287,10 +306,16 @@ export async function enforceRateLimitBatch(
     new Date(key.subscription_expires_at).getTime() > Date.now();
 
   if (subscriptionActive) {
-    const usedBefore = key.subscription_cycle_calls_used;
-    const usedAfter = await incrementSubscriptionUsageBy(key.id, SUBSCRIPTION_MONTHLY_QUOTA, count);
+    // v3.7: NOT key.subscription_cycle_calls_used (that's a separate,
+    // earlier read from requireApiKey() — using it here was the exact
+    // race lib/billing-store.ts v7.16 fixes). incrementSubscriptionUsageBy
+    // now returns the pre-increment count from the SAME atomic
+    // SELECT...FOR UPDATE that performed the increment, so two
+    // concurrent batches on the same key can no longer both compute
+    // their free/overage split against the same stale baseline.
+    const increment = await incrementSubscriptionUsageBy(key.id, SUBSCRIPTION_MONTHLY_QUOTA, count);
 
-    if (usedAfter === null) {
+    if (increment === null) {
       // Fail open on an infra hiccup — never block a paying subscriber's
       // whole batch over a counter error.
       return {
@@ -305,6 +330,7 @@ export async function enforceRateLimitBatch(
       };
     }
 
+    const { oldCount: usedBefore, newCount: usedAfter } = increment;
     const withinQuotaCount = Math.max(0, Math.min(count, SUBSCRIPTION_MONTHLY_QUOTA - usedBefore));
     const overCount = count - withinQuotaCount;
 
