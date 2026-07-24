@@ -92,25 +92,35 @@ export interface MintRiskHistoryPoint {
 // fire-and-forget and must never surface as an unhandled rejection in
 // a waitUntil() background task.
 export async function upsertMintRiskHistory(point: MintRiskHistoryPoint): Promise<void> {
-  const { error } = await supabase.from(TABLE).upsert(
-    {
-      mint: point.mint,
-      hour_bucket: hourBucketUtcIso(),
-      safety_score: point.safetyScore,
-      insider_cluster_count: point.insiderClusterCount,
-      holder_count: point.holderCount,
-      top10_percent: point.top10Percent,
-      price_usd: point.priceUsd,
-      liquidity_usd: point.liquidityUsd,
-      volume_24h_usd: point.volume24hUsd,
-      price_change_24h_percent: point.priceChange24hPercent,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: 'mint,hour_bucket' },
-  );
+  try {
+    const { error } = await supabase.from(TABLE).upsert(
+      {
+        mint: point.mint,
+        hour_bucket: hourBucketUtcIso(),
+        safety_score: point.safetyScore,
+        insider_cluster_count: point.insiderClusterCount,
+        holder_count: point.holderCount,
+        top10_percent: point.top10Percent,
+        price_usd: point.priceUsd,
+        liquidity_usd: point.liquidityUsd,
+        volume_24h_usd: point.volume24hUsd,
+        price_change_24h_percent: point.priceChange24hPercent,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'mint,hour_bucket' },
+    );
 
-  if (error) {
-    console.error('[mint-risk-history-store] upsert error:', error.message);
+    if (error) {
+      console.error('[mint-risk-history-store] upsert error:', error.message);
+    }
+  } catch (e: any) {
+    // Belt-and-suspenders on top of the `error` field check above: covers
+    // the rare case of a transport-level failure (DNS, timeout before any
+    // response) where supabase-js throws instead of returning an `error`
+    // field. Since this runs inside waitUntil() with no caller awaiting
+    // it, an uncaught exception here would be an unhandled rejection in
+    // the background — this keeps it a clean, logged no-op instead.
+    console.error('[mint-risk-history-store] upsert threw:', e?.message || e);
   }
 }
 
