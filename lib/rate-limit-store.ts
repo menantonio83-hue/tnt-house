@@ -10,27 +10,41 @@
 // REQUIRED: run this in the Supabase SQL editor before deploying the
 // batch endpoint (not yet applied — holding for explicit sign-off since
 // this is billing-adjacent, per the standing payment-code rule).
-// Confirmed the exact live definition of increment_daily_usage() via
-// pg_get_functiondef() before writing this — no SECURITY DEFINER, no
-// explicit search_path on that function either (called via the
-// service-role client, which bypasses RLS regardless — see v6.4's
-// note), so this new function matches that same plain style:
+//
+// Unlike the original increment_daily_usage() (no search_path, no
+// input guard), this new function adds both: an explicit search_path
+// (this repo already hit a real Supabase-linter bug from a missing
+// search_path on other RPCs — see v7.12's note in lib/billing-store.ts
+// — no reason to risk repeating it on a brand new function) and a hard
+// guard against p_amount <= 0, since a caller passing a non-positive
+// batch size here would otherwise silently DECREMENT or no-op the
+// counter instead of erroring:
 //
 //   create or replace function increment_daily_usage_by(p_key_id uuid, p_usage_date date, p_amount int)
 //   returns int
 //   language plpgsql
+//   set search_path = public
 //   as $$
 //   declare
 //     new_count int;
 //   begin
+//     if p_amount <= 0 then
+//       raise exception 'p_amount must be positive, got %', p_amount;
+//     end if;
+//
 //     insert into api_key_usage_daily (key_id, usage_date, request_count)
 //     values (p_key_id, p_usage_date, p_amount)
 //     on conflict (key_id, usage_date)
 //     do update set request_count = api_key_usage_daily.request_count + p_amount
 //     returning request_count into new_count;
+//
 //     return new_count;
 //   end;
 //   $$;
+//
+// Still a single atomic statement (INSERT ... ON CONFLICT ... DO UPDATE
+// ... RETURNING) — no read-then-write race window, same as the
+// original function.
 //
 // Version 6.4 — lib/rate-limit-store.ts
 //

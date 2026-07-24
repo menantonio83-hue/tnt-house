@@ -13,25 +13,38 @@
 // explicit sign-off per the standing payment-code rule). Confirmed the
 // exact live definition of increment_subscription_usage() via
 // pg_get_functiondef() before writing this — same
-// least(current + N, quota + 1) cap logic, just generalized from a
-// hardcoded +1 to an arbitrary +p_amount, same style (no SECURITY
-// DEFINER, same explicit search_path):
+// least(current + N, quota + 1) cap logic, generalized from a
+// hardcoded +1 to +p_amount. Two additions the original function
+// doesn't have, both requested on review before this touches a real
+// database: an explicit search_path (this repo already hit a real
+// Supabase-linter bug from a missing search_path on other RPCs — see
+// v7.12's note above), and a hard guard against p_amount <= 0 so a
+// non-positive batch size errors instead of silently doing nothing or
+// decrementing usage:
 //
 //   create or replace function increment_subscription_usage_by(p_key_id uuid, p_quota int, p_amount int)
 //   returns int
 //   language plpgsql
-//   set search_path to 'public'
+//   set search_path = public
 //   as $$
 //   declare
 //     new_count int;
 //   begin
+//     if p_amount <= 0 then
+//       raise exception 'p_amount must be positive, got %', p_amount;
+//     end if;
+//
 //     update api_keys
 //     set subscription_cycle_calls_used = least(subscription_cycle_calls_used + p_amount, p_quota + 1)
 //     where id = p_key_id
 //     returning subscription_cycle_calls_used into new_count;
+//
 //     return new_count;
 //   end;
 //   $$;
+//
+// Still a single atomic UPDATE ... RETURNING — no read-then-write race
+// window, same as the original function.
 //
 // Version 7.14 — lib/billing-store.ts
 //
