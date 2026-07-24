@@ -1,3 +1,12 @@
+// Version 1.1 — lib/token-risk-core.ts
+//
+// v1.1: fire-and-forget write to mint_risk_history (lib/mint-risk-
+// history-store.ts) on every successful check, from both callers
+// (single-mint and batch routes both go through fetchTokenRisk()).
+// Same waitUntil() pattern already used just above for the background
+// cluster job — never awaited, never allowed to affect this function's
+// return value or either route's response.
+//
 // Version 1.0 — lib/token-risk-core.ts
 //
 // Extracted from app/api/v1/token-risk/route.ts (v1.10) so the new batch
@@ -21,6 +30,7 @@ import { sanitizeDexMarketData } from '@/lib/sanitize-market-data';
 import { detectInsiderClusters, type InsiderCluster } from '@/lib/insider-cluster-detector';
 import { getClusterCache, markClusterPending, saveClusterResult, markClusterFailed } from '@/lib/risk-api-cache';
 import { withTimeout } from '@/lib/with-timeout';
+import { upsertMintRiskHistory } from '@/lib/mint-risk-history-store';
 
 // Same budgets as the single-mint route (app/api/v1/token-risk/route.ts) —
 // see that file's header comment for the reasoning behind each value.
@@ -193,6 +203,27 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
       dexData,
       insiderClusters,
       clusterAnalysis,
+    );
+
+    // History write: fire-and-forget, never awaited, never allowed to
+    // affect this response. Runs on every successful check regardless
+    // of cluster_analysis being "pending" vs "complete" — a pending
+    // insiderClusters=[] this call would otherwise record as
+    // insider_cluster_count: 0 for this hour, which a later "complete"
+    // call in the SAME hour will simply overwrite (last-write-wins,
+    // matches the upsert's documented semantics).
+    waitUntil(
+      upsertMintRiskHistory({
+        mint,
+        safetyScore,
+        insiderClusterCount: insiderClusters.length,
+        holderCount: holderRisk.holderCount,
+        top10Percent: holderRisk.top10Percent,
+        priceUsd: dexData.price,
+        liquidityUsd: dexData.liquidity,
+        volume24hUsd: dexData.volume24h,
+        priceChange24hPercent: dexData.priceChange24h,
+      }),
     );
 
     return {
