@@ -1,3 +1,11 @@
+// Version 1.4 — app/risk-api/RiskApiPageContent.tsx
+//
+// v1.4: changelog now renders t.changelogEntries (i18n.ts v1.3) instead
+// of a hardcoded English-only CHANGELOG constant — reversed the earlier
+// "technical/log content stays English" call after the product owner
+// found it untranslated on the live Russian page and asked for a real
+// fix, not a re-justification.
+//
 // Version 1.3 — app/risk-api/RiskApiPageContent.tsx
 //
 // v1.3: new "Versioning & Changelog" section (between Rate Limiting and
@@ -80,51 +88,14 @@ const TYPESCRIPT_EXAMPLE = `async function checkTokenRisk(mint: string, apiKey: 
   return res.json();
 }`;
 
-// Real history of the API, not the marketing site — dates and version
-// numbers are technical/log content, kept in English in every locale
-// (same convention as CURL_EXAMPLE/EXAMPLE_RESPONSE below).
-const CHANGELOG: { version: string; date: string; changes: string[] }[] = [
-  {
-    version: 'v1.5',
-    date: '2026-07-23',
-    changes: ['Published a ready-to-import Postman collection.'],
-  },
-  {
-    version: 'v1.4',
-    date: '2026-07-21',
-    changes: [
-      'Published a formal OpenAPI 3.0 spec at /openapi.json.',
-      'Rebalanced upstream timeout budget for very large/liquid mints, further reducing false holder_distribution failures.',
-    ],
-  },
-  {
-    version: 'v1.3',
-    date: '2026-07-19',
-    changes: ['Billing security hardening against invoice/payment-matching abuse — no response schema change.'],
-  },
-  {
-    version: 'v1.2',
-    date: '2026-07-18',
-    changes: [
-      'Fixed timeouts on upstream calls that could occasionally return a raw 502 on slower, less-major tokens.',
-      "Fixed holder_distribution occasionally reporting holder_count: 0 on high-volume tokens due to a swallowed RPC failure.",
-      'Fixed implausible price_change_24h_percent values passed through from upstream market data.',
-    ],
-  },
-  {
-    version: 'v1.1',
-    date: '2026-07-18',
-    changes: ['Added X-RateLimit-Limit / X-RateLimit-Remaining / X-RateLimit-Reset headers, later joined by X-Credit-Balance-Usd.'],
-  },
-  {
-    version: 'v1.0',
-    date: '2026-07-18',
-    changes: [
-      'Public launch: GET /api/v1/token-risk — safety_score, insider_clusters, mint/freeze authority, holder_distribution, market data.',
-      'API-key auth, free tier + pay-per-call + subscription billing via Solana Pay.',
-    ],
-  },
-];
+// v1.1: CHANGELOG used to be a hardcoded English-only constant here
+// ("technical/log content, same convention as curl/JSON examples").
+// Reversed per explicit product-owner instruction after seeing the
+// live page: the changes[] text is now translated per-language via
+// t.changelogEntries (app/risk-api/i18n.ts) — version numbers, dates,
+// and inline field/header names inside the translated text still stay
+// in English (those genuinely are technical literals), only the
+// descriptive prose is localized.
 
 type CodeTab = 'curl' | 'python' | 'typescript';
 
@@ -398,7 +369,7 @@ X-RateLimit-Reset: 2026-07-24T00:00:00.000Z
 
           <div className="text-xs sm:text-sm font-bold text-white mb-3">{t.changelogTitle}</div>
           <div className="space-y-3 mb-4">
-            {CHANGELOG.map((entry) => (
+            {t.changelogEntries.map((entry) => (
               <div key={entry.version} className="border-l-4 border-purple-500/40 pl-4 py-0.5">
                 <div className="flex items-baseline gap-2 mb-1">
                   <code className="text-[11px] sm:text-xs text-emerald-400 font-bold">{entry.version}</code>
