@@ -16,6 +16,27 @@ A modern Next.js landing page for discovering and submitting verified micro-cap 
 - Lucide React icons
 - DexScreener public API
 
+## MCP Server — Risk-Data API
+
+This repository includes a remote **[Model Context Protocol](https://modelcontextprotocol.io) (MCP) server**, built with the official **[`@modelcontextprotocol/sdk`](https://www.npmjs.com/package/@modelcontextprotocol/sdk)** (TypeScript), exposing Solana token risk data as tools for AI agents (Claude, Cursor, and any other MCP-compatible client).
+
+- **Source:** [`app/api/mcp/route.ts`](./app/api/mcp/route.ts)
+- **Docs:** [`app/api/mcp/README.md`](./app/api/mcp/README.md)
+- **Endpoint:** `https://tnt-audit.com/api/mcp` (Streamable HTTP transport)
+- **Auth:** `Authorization: Bearer <api_key>` — free key at [tnt-audit.com/risk-api](https://www.tnt-audit.com/risk-api)
+
+### Tools
+
+Registered via `server.registerTool(...)`:
+
+| Tool | Description |
+|---|---|
+| `check_token_risk` | Safety score, insider wallet cluster detection, mint/freeze authority, holder concentration, live price/liquidity/volume for one Solana token mint |
+| `check_token_risk_batch` | Same as above for up to 25 mints in one call |
+| `get_token_risk_history` | Hourly historical risk/price data for a mint over up to 90 days |
+
+Full tool schemas and input parameters: [`app/api/mcp/README.md`](./app/api/mcp/README.md).
+
 ## Local Development
 
 ```bash
