@@ -1,0 +1,65 @@
+{
+  "serverInfo": {
+    "name": "tnt-house-risk-data-api",
+    "version": "1.0.0"
+  },
+  "authentication": {
+    "required": true,
+    "schemes": ["bearer"]
+  },
+  "tools": [
+    {
+      "name": "check_token_risk",
+      "description": "Returns a 0-100 safety score, on-chain insider wallet clusters (wallets sharing a first funder), mint/freeze authority status, holder concentration, and live price/liquidity/volume for a single Solana token mint. Use before recommending or executing a trade on any Solana token.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mint": {
+            "type": "string",
+            "description": "The Solana token mint address to check"
+          }
+        },
+        "required": ["mint"]
+      }
+    },
+    {
+      "name": "check_token_risk_batch",
+      "description": "Same as check_token_risk but for up to 25 mints in one call — N mints charged as N calls, same per-call economics as check_token_risk, no bulk discount. All-or-nothing: if the batch can't be fully covered by remaining quota/credit, the whole batch is rejected rather than partially processed.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mints": {
+            "type": "array",
+            "items": { "type": "string" },
+            "minItems": 1,
+            "maxItems": 25,
+            "description": "1-25 Solana token mint addresses"
+          }
+        },
+        "required": ["mints"]
+      }
+    },
+    {
+      "name": "get_token_risk_history",
+      "description": "Returns hourly historical data points (safety_score, insider_cluster_count, holder_count, price, liquidity, volume) for a mint over the last N days (max 90). Does not count against the free/subscription call quota — pure read from stored history, no live upstream call.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "mint": {
+            "type": "string",
+            "description": "The Solana token mint address"
+          },
+          "days": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 90,
+            "description": "How many days of history to return (default 30, max 90)"
+          }
+        },
+        "required": ["mint"]
+      }
+    }
+  ],
+  "resources": [],
+  "prompts": []
+}
