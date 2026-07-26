@@ -1,7 +1,8 @@
 {
   "serverInfo": {
     "name": "tnt-house-risk-data-api",
-    "version": "1.0.0"
+    "version": "1.0.0",
+    "description": "Solana token risk-scoring MCP server for AI trading agents — 0-100 safety score, on-chain-provable insider wallet cluster detection (shared first-funder tracing), mint/freeze authority checks, and historical risk data via 3 tools."
   },
   "authentication": {
     "required": true,
