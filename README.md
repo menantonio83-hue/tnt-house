@@ -1,5 +1,7 @@
 # TNT House
 
+> This repo hosts both the TNT House web platform *and* a Model Context Protocol (MCP) server (`app/api/mcp`) exposing the Risk-Data API — Solana token risk scoring and insider wallet cluster detection for AI agents. See the [MCP Server section](#mcp-server--risk-data-api) below.
+
 **Trench Construction Site v1.0** — Safe New Tokens Platform
 
 A modern Next.js landing page for discovering and submitting verified micro-cap gems on Solana.
