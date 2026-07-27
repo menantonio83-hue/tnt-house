@@ -1,4 +1,4 @@
-// Version 1.2 — app/api/v1/token-risk/x402/route.ts
+// Version 1.3 — app/api/v1/token-risk/x402/route.ts
 //
 // x402 pay-per-call variant of /api/v1/token-risk, for autonomous AI
 // agents that don't want to register for an API key up front. Runs
@@ -9,13 +9,21 @@
 //
 // GET /api/v1/token-risk/x402?mint=<mint_address>   (or ?ca=<mint_address>)
 //
-// v1.2: fixed a billing-fairness bug from v1.1 — settlement (the actual
-// on-chain charge) now happens AFTER a successful fetchTokenRisk result,
-// not before. v1.1 settled the payment first, so an agent could be
-// charged for a request that then failed (bad mint, upstream error).
-// Verification (checking the payment is well-formed and funded, which
-// does NOT move money) still happens first, before any scoring work —
-// that part was already correct and stays as the up-front gate.
+// v1.3: fixed a discovery-scanner bug from v1.2 — the 402 response now
+// fires BEFORE the mint/ca parameter is checked, not after. Directory
+// scanners (x402-list.com, x402scan, CDP Bazaar) probe the bare route
+// with no query params at all, expecting a 402 with a PaymentRequirements
+// body on ANY unpaid request. v1.2 checked for `mint` first and returned
+// a plain 400 for a bare probe, which loses submissions ("endpoints_found:
+// 0"). The mint/ca requirement is still enforced, just moved to after
+// payment verification, alongside the existing fetchTokenRisk error
+// handling — a request with valid payment but no mint now gets a clean
+// 400 post-payment (not settled, same as any other pre-scoring failure).
+//
+// v1.2: settlement (the actual on-chain charge) happens AFTER a
+// successful fetchTokenRisk result, not before — an agent is never
+// charged for a request that fails (bad mint, upstream error, or a
+// missing mint after payment as of v1.3).
 //
 // Price: $0.07/call, matching the existing pay-per-call overage rate
 // documented on tnt-audit.com/risk-api (Limits & pricing section) —
@@ -23,15 +31,16 @@
 // this channel.
 //
 // Flow:
-// 1. No X-PAYMENT header -> respond 402 with PaymentRequirements JSON
-//    (price, receiving wallet, USDC mint, resource path).
+// 1. ALWAYS check for X-PAYMENT header first, regardless of query
+//    params. No header -> 402 with PaymentRequirements. This is what
+//    makes the route discoverable by x402 directory scanners, which
+//    probe the bare path.
 // 2. X-PAYMENT header present -> verify with the x402 facilitator
-//    (signature + funds check, no money moved yet) -> run the real
-//    scoring logic -> only on success, settle the payment on-chain ->
-//    return the data.
-// 3. Verify failure or scoring failure both return without ever
-//    settling — the agent is not charged for a request it didn't get
-//    a usable answer for.
+//    (signature + funds check, no money moved yet).
+// 3. THEN check for mint/ca — missing param is a clean 400, no
+//    settlement, same as any other pre-scoring failure.
+// 4. Run the real scoring logic -> only on success, settle the
+//    payment on-chain -> return the data.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchTokenRisk } from '@/lib/token-risk-core';
@@ -57,16 +66,6 @@ export async function OPTIONS() {
 }
 
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const mint = searchParams.get('mint') || searchParams.get('ca');
-
-  if (!mint) {
-    return NextResponse.json(
-      { error: 'Missing required parameter: mint (or ca)' },
-      { status: 400, headers: CORS_HEADERS },
-    );
-  }
-
   const requirements = buildPaymentRequirements(
     RESOURCE_PATH,
     PRICE_USDC_ATOMIC,
@@ -75,7 +74,9 @@ export async function GET(request: NextRequest) {
 
   const paymentHeader = request.headers.get('X-PAYMENT');
 
-  // No payment attached yet -> tell the agent what it costs and where to pay.
+  // No payment attached yet -> tell the caller what it costs and where
+  // to pay. Fires on ANY unpaid request, with or without a mint param —
+  // this is what directory scanners probe for on the bare path.
   if (!paymentHeader) {
     return NextResponse.json(
       {
@@ -99,6 +100,19 @@ export async function GET(request: NextRequest) {
         accepts: [requirements],
       },
       { status: 402, headers: CORS_HEADERS },
+    );
+  }
+
+  // mint/ca is only checked now, after a verified payment — a bare
+  // probe with no payment already returned 402 above and never reaches
+  // this line.
+  const { searchParams } = new URL(request.url);
+  const mint = searchParams.get('mint') || searchParams.get('ca');
+
+  if (!mint) {
+    return NextResponse.json(
+      { error: 'Missing required parameter: mint (or ca)' },
+      { status: 400, headers: CORS_HEADERS },
     );
   }
 
