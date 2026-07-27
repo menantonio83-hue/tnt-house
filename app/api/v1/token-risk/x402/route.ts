@@ -1,4 +1,4 @@
-// Version 1.3 — app/api/v1/token-risk/x402/route.ts
+// Version 1.4 — app/api/v1/token-risk/x402/route.ts
 //
 // x402 pay-per-call variant of /api/v1/token-risk, for autonomous AI
 // agents that don't want to register for an API key up front. Runs
@@ -9,42 +9,28 @@
 //
 // GET /api/v1/token-risk/x402?mint=<mint_address>   (or ?ca=<mint_address>)
 //
-// v1.3: fixed a discovery-scanner bug from v1.2 — the 402 response now
-// fires BEFORE the mint/ca parameter is checked, not after. Directory
-// scanners (x402-list.com, x402scan, CDP Bazaar) probe the bare route
-// with no query params at all, expecting a 402 with a PaymentRequirements
-// body on ANY unpaid request. v1.2 checked for `mint` first and returned
-// a plain 400 for a bare probe, which loses submissions ("endpoints_found:
-// 0"). The mint/ca requirement is still enforced, just moved to after
-// payment verification, alongside the existing fetchTokenRisk error
-// handling — a request with valid payment but no mint now gets a clean
-// 400 post-payment (not settled, same as any other pre-scoring failure).
+// v1.4: migrated the 402 response body to the x402 v2 spec shape (see
+// lib/x402/verify.ts v1.2 for the field-level changes). Also now
+// accepts the incoming payment proof under either X-PAYMENT (v1-style,
+// still used by several existing clients) or PAYMENT-SIGNATURE (the v2
+// HTTP-transport header name) — checks both so callers on either
+// version work. x402scan and similar v2-aware scanners rejected the
+// v1.3 response outright with "x402 v1 response detected".
+//
+// v1.3: 402 response fires before the mint/ca parameter is checked, not
+// after — required for directory scanners that probe the bare path
+// with no query params.
 //
 // v1.2: settlement (the actual on-chain charge) happens AFTER a
 // successful fetchTokenRisk result, not before — an agent is never
-// charged for a request that fails (bad mint, upstream error, or a
-// missing mint after payment as of v1.3).
+// charged for a request that fails.
 //
 // Price: $0.07/call, matching the existing pay-per-call overage rate
-// documented on tnt-audit.com/risk-api (Limits & pricing section) —
-// intentionally the same number, not a separate price invented for
-// this channel.
-//
-// Flow:
-// 1. ALWAYS check for X-PAYMENT header first, regardless of query
-//    params. No header -> 402 with PaymentRequirements. This is what
-//    makes the route discoverable by x402 directory scanners, which
-//    probe the bare path.
-// 2. X-PAYMENT header present -> verify with the x402 facilitator
-//    (signature + funds check, no money moved yet).
-// 3. THEN check for mint/ca — missing param is a clean 400, no
-//    settlement, same as any other pre-scoring failure.
-// 4. Run the real scoring logic -> only on success, settle the
-//    payment on-chain -> return the data.
+// documented on tnt-audit.com/risk-api (Limits & pricing section).
 
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchTokenRisk } from '@/lib/token-risk-core';
-import { buildPaymentRequirements, verifyPayment, settlePayment } from '@/lib/x402/verify';
+import { buildPaymentRequiredBody, verifyPayment, settlePayment } from '@/lib/x402/verify';
 
 export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
@@ -52,60 +38,55 @@ export const dynamic = 'force-dynamic';
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, X-PAYMENT',
-  'Access-Control-Expose-Headers': 'X-PAYMENT-RESPONSE',
+  'Access-Control-Allow-Headers': 'Content-Type, X-PAYMENT, PAYMENT-SIGNATURE',
+  'Access-Control-Expose-Headers': 'X-PAYMENT-RESPONSE, PAYMENT-RESPONSE',
 };
 
 // $0.07 per call in USDC atomic units (USDC has 6 decimals: 0.07 * 1_000_000)
-// — matches the existing pay-per-call overage_rate_usd on the pricing page.
 const PRICE_USDC_ATOMIC = '70000';
 const RESOURCE_PATH = '/api/v1/token-risk/x402';
+const DESCRIPTION = 'TNT House Risk-Data API — single token risk score lookup';
 
 export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
 }
 
 export async function GET(request: NextRequest) {
-  const requirements = buildPaymentRequirements(
-    RESOURCE_PATH,
-    PRICE_USDC_ATOMIC,
-    'TNT House Risk-Data API — single token risk score lookup',
-  );
-
-  const paymentHeader = request.headers.get('X-PAYMENT');
+  // Accept either header name — X-PAYMENT (v1-style, still common) or
+  // PAYMENT-SIGNATURE (the v2 HTTP-transport name).
+  const paymentHeader =
+    request.headers.get('X-PAYMENT') || request.headers.get('PAYMENT-SIGNATURE');
 
   // No payment attached yet -> tell the caller what it costs and where
   // to pay. Fires on ANY unpaid request, with or without a mint param —
   // this is what directory scanners probe for on the bare path.
   if (!paymentHeader) {
-    return NextResponse.json(
-      {
-        error: 'Payment required',
-        x402Version: 1,
-        accepts: [requirements],
-      },
-      { status: 402, headers: CORS_HEADERS },
+    const body = buildPaymentRequiredBody(
+      RESOURCE_PATH,
+      PRICE_USDC_ATOMIC,
+      DESCRIPTION,
+      'Payment required',
     );
+    return NextResponse.json(body, { status: 402, headers: CORS_HEADERS });
   }
+
+  const requirement = buildPaymentRequiredBody(RESOURCE_PATH, PRICE_USDC_ATOMIC, DESCRIPTION)
+    .accepts[0];
 
   // Verify only checks the payment is well-formed and funded — no money
   // moves yet. Cheap gate before we spend any RPC/scoring work.
-  const verification = await verifyPayment(paymentHeader, requirements);
+  const verification = await verifyPayment(paymentHeader, requirement);
   if (!verification.isValid) {
-    return NextResponse.json(
-      {
-        error: 'Payment verification failed',
-        reason: verification.errorReason ?? 'unknown',
-        x402Version: 1,
-        accepts: [requirements],
-      },
-      { status: 402, headers: CORS_HEADERS },
+    const body = buildPaymentRequiredBody(
+      RESOURCE_PATH,
+      PRICE_USDC_ATOMIC,
+      DESCRIPTION,
+      verification.errorReason ?? 'Payment verification failed',
     );
+    return NextResponse.json(body, { status: 402, headers: CORS_HEADERS });
   }
 
-  // mint/ca is only checked now, after a verified payment — a bare
-  // probe with no payment already returned 402 above and never reaches
-  // this line.
+  // mint/ca is only checked now, after a verified payment.
   const { searchParams } = new URL(request.url);
   const mint = searchParams.get('mint') || searchParams.get('ca');
 
@@ -130,7 +111,6 @@ export async function GET(request: NextRequest) {
   }
 
   if (!result.ok) {
-    // Bad mint / upstream failure — no settlement, agent isn't charged.
     return NextResponse.json(
       { error: result.error ?? 'Unknown error', ...(result.details ? { details: result.details } : {}) },
       { status: result.status ?? 502, headers: CORS_HEADERS },
@@ -139,25 +119,22 @@ export async function GET(request: NextRequest) {
 
   // Only now, with a real usable result in hand, actually settle the
   // payment on-chain.
-  const settlement = await settlePayment(paymentHeader, requirements);
+  const settlement = await settlePayment(paymentHeader, requirement);
   if (!settlement.success) {
-    return NextResponse.json(
-      {
-        error: 'Payment settlement failed',
-        reason: settlement.errorReason ?? 'unknown',
-        x402Version: 1,
-        accepts: [requirements],
-      },
-      { status: 402, headers: CORS_HEADERS },
+    const body = buildPaymentRequiredBody(
+      RESOURCE_PATH,
+      PRICE_USDC_ATOMIC,
+      DESCRIPTION,
+      settlement.errorReason ?? 'Payment settlement failed',
     );
+    return NextResponse.json(body, { status: 402, headers: CORS_HEADERS });
   }
 
   const responseHeaders: Record<string, string> = { ...CORS_HEADERS };
   if (settlement.transactionHash) {
-    responseHeaders['X-PAYMENT-RESPONSE'] = JSON.stringify({
-      success: true,
-      transaction: settlement.transactionHash,
-    });
+    const receiptJson = JSON.stringify({ success: true, transaction: settlement.transactionHash });
+    responseHeaders['X-PAYMENT-RESPONSE'] = receiptJson;
+    responseHeaders['PAYMENT-RESPONSE'] = receiptJson;
   }
 
   return NextResponse.json(
