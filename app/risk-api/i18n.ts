@@ -250,6 +250,27 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'Changelog',
     changelogNote: 'No mailing list or webhooks yet for update announcements — this page and the X / Telegram links in the footer are the way to stay current.',
     changelogEntries: [
+      {
+        version: 'v1.8',
+        date: '2026-07-27',
+        changes: [
+          'Added GET /api/v1/token-risk/x402 — pay-per-call access via the x402 protocol (USDC on Solana), no API key required. Same price as the existing pay-per-call rate.',
+          'Published as an x402-discoverable resource on x402scan.com, with an OpenAPI x-payment-info schema for automated agent discovery.',
+        ],
+      },
+      {
+        version: 'v1.7',
+        date: '2026-07-26',
+        changes: [
+          'Published as an MCP server on Smithery.ai and Glama.ai, alongside the Official MCP Registry — usable directly as a tool by Claude, Cursor, and other MCP-compatible agents.',
+          'Published npm plugins for ElizaOS (eliza-plugin-tnt-risk-api) and Solana Agent Kit (solana-agent-kit-plugin-risk-api).',
+        ],
+      },
+      {
+        version: 'v1.6',
+        date: '2026-07-25',
+        changes: ['Published to the Official MCP Registry, mcp.so, RapidAPI, and the Postman Public API Network — more ways to discover and integrate the API.'],
+      },
       { version: 'v1.5', date: '2026-07-23', changes: ['Published a ready-to-import Postman collection.'] },
       {
         version: 'v1.4',
@@ -400,6 +421,27 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'Registro de cambios',
     changelogNote: 'Todavía no hay lista de correo ni webhooks para anunciar novedades — esta página y los enlaces de X / Telegram del pie son la forma de mantenerte al día.',
     changelogEntries: [
+      {
+        version: 'v1.8',
+        date: '2026-07-27',
+        changes: [
+          'Se añadió GET /api/v1/token-risk/x402 — acceso de pago por llamada mediante el protocolo x402 (USDC en Solana), sin necesidad de clave API. Mismo precio que la tarifa de pago por llamada existente.',
+          'Publicado como recurso detectable por x402 en x402scan.com, con un esquema OpenAPI x-payment-info para el descubrimiento automático por agentes.',
+        ],
+      },
+      {
+        version: 'v1.7',
+        date: '2026-07-26',
+        changes: [
+          'Publicado como servidor MCP en Smithery.ai y Glama.ai, además del Official MCP Registry — utilizable directamente como herramienta por Claude, Cursor y otros agentes compatibles con MCP.',
+          'Publicados plugins de npm para ElizaOS (eliza-plugin-tnt-risk-api) y Solana Agent Kit (solana-agent-kit-plugin-risk-api).',
+        ],
+      },
+      {
+        version: 'v1.6',
+        date: '2026-07-25',
+        changes: ['Publicado en el Official MCP Registry, mcp.so, RapidAPI y el Postman Public API Network — más formas de descubrir e integrar la API.'],
+      },
       { version: 'v1.5', date: '2026-07-23', changes: ['Se publicó una colección de Postman lista para importar.'] },
       {
         version: 'v1.4',
@@ -550,6 +592,27 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'Journal des modifications',
     changelogNote: 'Pas encore de liste de diffusion ni de webhooks pour les annonces — cette page et les liens X / Telegram en pied de page sont le moyen de rester à jour.',
     changelogEntries: [
+      {
+        version: 'v1.8',
+        date: '2026-07-27',
+        changes: [
+          "Ajout de GET /api/v1/token-risk/x402 — accès payant à l'appel via le protocole x402 (USDC sur Solana), sans clé API requise. Même tarif que le tarif payant à l'appel existant.",
+          "Publié comme ressource détectable par x402 sur x402scan.com, avec un schéma OpenAPI x-payment-info pour la découverte automatique par les agents.",
+        ],
+      },
+      {
+        version: 'v1.7',
+        date: '2026-07-26',
+        changes: [
+          "Publié comme serveur MCP sur Smithery.ai et Glama.ai, en plus de l'Official MCP Registry — utilisable directement comme outil par Claude, Cursor et d'autres agents compatibles MCP.",
+          "Plugins npm publiés pour ElizaOS (eliza-plugin-tnt-risk-api) et Solana Agent Kit (solana-agent-kit-plugin-risk-api).",
+        ],
+      },
+      {
+        version: 'v1.6',
+        date: '2026-07-25',
+        changes: ["Publié sur l'Official MCP Registry, mcp.so, RapidAPI et le Postman Public API Network — davantage de moyens de découvrir et d'intégrer l'API."],
+      },
       { version: 'v1.5', date: '2026-07-23', changes: ["Publication d'une collection Postman prête à importer."] },
       {
         version: 'v1.4',
@@ -700,6 +763,27 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'Ιστορικό αλλαγών',
     changelogNote: 'Δεν υπάρχει ακόμα mailing list ή webhooks για ανακοινώσεις ενημερώσεων — αυτή η σελίδα και οι σύνδεσμοι X / Telegram στο footer είναι ο τρόπος να μένεις ενήμερος.',
     changelogEntries: [
+      {
+        version: 'v1.8',
+        date: '2026-07-27',
+        changes: [
+          'Προστέθηκε το GET /api/v1/token-risk/x402 — πρόσβαση με πληρωμή ανά κλήση μέσω του πρωτοκόλλου x402 (USDC σε Solana), χωρίς API key. Ίδια τιμή με την υπάρχουσα χρέωση ανά κλήση.',
+          'Δημοσιεύτηκε ως πόρος ανιχνεύσιμος από x402 στο x402scan.com, με σχήμα OpenAPI x-payment-info για αυτόματη ανακάλυψη από agents.',
+        ],
+      },
+      {
+        version: 'v1.7',
+        date: '2026-07-26',
+        changes: [
+          'Δημοσιεύτηκε ως διακομιστής MCP στο Smithery.ai και στο Glama.ai, εκτός από το Official MCP Registry — χρησιμοποιήσιμο απευθείας ως εργαλείο από το Claude, το Cursor και άλλους συμβατούς με MCP agents.',
+          'Δημοσιεύτηκαν πρόσθετα npm για το ElizaOS (eliza-plugin-tnt-risk-api) και το Solana Agent Kit (solana-agent-kit-plugin-risk-api).',
+        ],
+      },
+      {
+        version: 'v1.6',
+        date: '2026-07-25',
+        changes: ['Δημοσιεύτηκε στο Official MCP Registry, στο mcp.so, στο RapidAPI και στο Postman Public API Network — περισσότεροι τρόποι ανακάλυψης και ενσωμάτωσης του API.'],
+      },
       { version: 'v1.5', date: '2026-07-23', changes: ['Δημοσιεύτηκε μια έτοιμη προς εισαγωγή συλλογή Postman.'] },
       {
         version: 'v1.4',
@@ -850,6 +934,27 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'История изменений',
     changelogNote: 'Пока нет рассылки или вебхуков для анонсов обновлений — следить за актуальным состоянием можно по этой странице и ссылкам на X / Telegram в подвале.',
     changelogEntries: [
+      {
+        version: 'v1.8',
+        date: '2026-07-27',
+        changes: [
+          'Добавлен GET /api/v1/token-risk/x402 — оплата за вызов через протокол x402 (USDC в Solana), без API-ключа. Цена совпадает с текущим тарифом pay-per-call.',
+          'Опубликован как обнаруживаемый x402-ресурс на x402scan.com, со схемой OpenAPI x-payment-info для автоматического обнаружения агентами.',
+        ],
+      },
+      {
+        version: 'v1.7',
+        date: '2026-07-26',
+        changes: [
+          'Опубликован как MCP-сервер на Smithery.ai и Glama.ai, в дополнение к Official MCP Registry — доступен как инструмент напрямую для Claude, Cursor и других MCP-совместимых агентов.',
+          'Опубликованы npm-плагины для ElizaOS (eliza-plugin-tnt-risk-api) и Solana Agent Kit (solana-agent-kit-plugin-risk-api).',
+        ],
+      },
+      {
+        version: 'v1.6',
+        date: '2026-07-25',
+        changes: ['Опубликован в Official MCP Registry, mcp.so, RapidAPI и Postman Public API Network — больше способов найти и интегрировать API.'],
+      },
       { version: 'v1.5', date: '2026-07-23', changes: ['Опубликована готовая к импорту коллекция Postman.'] },
       {
         version: 'v1.4',
@@ -1000,6 +1105,27 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'Changelog',
     changelogNote: "Non c'è ancora una mailing list o webhook per gli annunci di aggiornamento — questa pagina e i link X / Telegram nel footer sono il modo per restare aggiornati.",
     changelogEntries: [
+      {
+        version: 'v1.8',
+        date: '2026-07-27',
+        changes: [
+          "Aggiunto GET /api/v1/token-risk/x402 — accesso a pagamento per chiamata tramite il protocollo x402 (USDC su Solana), senza bisogno di una chiave API. Stesso prezzo della tariffa pay-per-call esistente.",
+          "Pubblicato come risorsa rilevabile da x402 su x402scan.com, con uno schema OpenAPI x-payment-info per la scoperta automatica da parte degli agenti.",
+        ],
+      },
+      {
+        version: 'v1.7',
+        date: '2026-07-26',
+        changes: [
+          "Pubblicato come server MCP su Smithery.ai e Glama.ai, oltre all'Official MCP Registry — utilizzabile direttamente come strumento da Claude, Cursor e altri agenti compatibili con MCP.",
+          "Pubblicati plugin npm per ElizaOS (eliza-plugin-tnt-risk-api) e Solana Agent Kit (solana-agent-kit-plugin-risk-api).",
+        ],
+      },
+      {
+        version: 'v1.6',
+        date: '2026-07-25',
+        changes: ["Pubblicato su Official MCP Registry, mcp.so, RapidAPI e Postman Public API Network — più modi per scoprire e integrare l'API."],
+      },
       { version: 'v1.5', date: '2026-07-23', changes: ["Pubblicata una collezione Postman pronta all'importazione."] },
       {
         version: 'v1.4',
@@ -1150,6 +1276,27 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: '更新日志',
     changelogNote: '目前还没有邮件列表或 webhook 用于更新通知——请通过本页面以及页脚的 X / Telegram 链接来获取最新动态。',
     changelogEntries: [
+      {
+        version: 'v1.8',
+        date: '2026-07-27',
+        changes: [
+          '新增 GET /api/v1/token-risk/x402 — 通过 x402 协议按次付费访问（Solana 上的 USDC），无需 API 密钥。价格与现有的按次计费费率相同。',
+          '已作为可被 x402 发现的资源发布在 x402scan.com 上，并附有 OpenAPI x-payment-info 架构以便代理自动发现。',
+        ],
+      },
+      {
+        version: 'v1.7',
+        date: '2026-07-26',
+        changes: [
+          '已作为 MCP 服务器发布在 Smithery.ai 和 Glama.ai 上，此外还发布在 Official MCP Registry 上 —— Claude、Cursor 及其他兼容 MCP 的智能体可直接将其作为工具使用。',
+          '已发布 ElizaOS（eliza-plugin-tnt-risk-api）和 Solana Agent Kit（solana-agent-kit-plugin-risk-api）的 npm 插件。',
+        ],
+      },
+      {
+        version: 'v1.6',
+        date: '2026-07-25',
+        changes: ['已发布至 Official MCP Registry、mcp.so、RapidAPI 和 Postman Public API Network —— 提供更多发现和集成该 API 的途径。'],
+      },
       { version: 'v1.5', date: '2026-07-23', changes: ['发布了可直接导入的 Postman 集合。'] },
       {
         version: 'v1.4',
