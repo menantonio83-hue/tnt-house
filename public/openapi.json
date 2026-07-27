@@ -163,6 +163,124 @@
         },
         "security": [{ "BearerAuth": [] }]
       }
+    },
+    "/api/v1/token-risk/x402": {
+      "get": {
+        "summary": "Check a Solana token's safety score and insider clusters — pay-per-call via x402, no API key needed",
+        "description": "Identical response payload to /api/v1/token-risk, but authenticated via the x402 protocol (HTTP 402 Payment Required) instead of a Bearer API key. Built for autonomous AI agents that pay per-request in USDC on Solana rather than registering for a key up front. First call without a payment proof returns 402 with the price and payTo address; retry with a valid X-PAYMENT or PAYMENT-SIGNATURE header to receive the data.",
+        "operationId": "getTokenRiskX402",
+        "parameters": [
+          {
+            "name": "mint",
+            "in": "query",
+            "required": true,
+            "description": "The Solana token mint address to analyze. `ca` is accepted as an alias for the same parameter. Note: this parameter is only validated AFTER a valid payment is verified — an unpaid request always receives 402 regardless of whether mint is present.",
+            "schema": { "type": "string", "example": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v" }
+          }
+        ],
+        "x-payment-info": {
+          "protocols": [
+            {
+              "scheme": "exact",
+              "network": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+              "asset": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+            }
+          ],
+          "pricing": {
+            "mode": "fixed",
+            "price": { "amount": 0.07, "currency": "USD" }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Token risk analysis. Identical schema to the 200 response of /api/v1/token-risk.",
+            "content": {
+              "application/json": {
+                "example": {
+                  "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+                  "safety_score": 78,
+                  "cluster_analysis": "complete",
+                  "insider_clusters": [{ "funder": "9xQe...k2Pd", "wallets": ["7uF3...aZ1", "3mN8...qR2"] }],
+                  "mint_authority": { "revoked": true, "address": null },
+                  "freeze_authority": { "revoked": true, "address": null },
+                  "honeypot_risk": null,
+                  "lp_locked": null,
+                  "holder_distribution": { "risk_level": "LOW", "largest_holder_percent": 4.2, "top10_percent": 22.7, "holder_count": 20 },
+                  "market": { "price_usd": 0.0000412, "liquidity_usd": 84210, "volume_24h_usd": 512300, "price_change_24h_percent": 12.4, "age_days": 3 },
+                  "note": "honeypot_risk and lp_locked detection are on the roadmap and not yet implemented — both fields will remain null until shipped.",
+                  "checked_at": "2026-07-18T12:00:00.000Z"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing or invalid `mint` parameter (only returned after a valid payment).",
+            "content": { "application/json": { "schema": { "type": "object", "properties": { "error": { "type": "string" } } } } }
+          },
+          "402": {
+            "description": "x402 payment required (no payment proof sent), or the sent payment failed verification/settlement. Body follows the x402 v2 PaymentRequired schema; the same object is also base64-encoded in the PAYMENT-REQUIRED response header per the x402 v2 HTTP transport spec.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "x402Version": { "type": "integer", "enum": [2] },
+                    "error": { "type": "string" },
+                    "resource": {
+                      "type": "object",
+                      "properties": {
+                        "url": { "type": "string" },
+                        "description": { "type": "string" },
+                        "mimeType": { "type": "string" }
+                      }
+                    },
+                    "accepts": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "scheme": { "type": "string", "enum": ["exact"] },
+                          "network": { "type": "string", "description": "CAIP-2 network identifier." },
+                          "amount": { "type": "string", "description": "Price in USDC atomic units (6 decimals)." },
+                          "asset": { "type": "string" },
+                          "payTo": { "type": "string" },
+                          "maxTimeoutSeconds": { "type": "integer" },
+                          "extra": { "type": "object" }
+                        }
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "x402Version": 2,
+                  "error": "Payment required",
+                  "resource": {
+                    "url": "https://www.tnt-audit.com/api/v1/token-risk/x402",
+                    "description": "TNT House Risk-Data API — single token risk score lookup",
+                    "mimeType": "application/json"
+                  },
+                  "accepts": [
+                    {
+                      "scheme": "exact",
+                      "network": "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
+                      "amount": "70000",
+                      "asset": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+                      "payTo": "9p5hBDTrFRzyW4VhKMaq96XCtWkRPA9ZaSTnsM9qvtEE",
+                      "maxTimeoutSeconds": 60,
+                      "extra": { "name": "USDC", "version": "2" }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Could not fetch on-chain mint data (invalid mint, or the Solana RPC didn't respond in time). No settlement occurs on this path — the agent is not charged.",
+            "content": { "application/json": { "schema": { "type": "object", "properties": { "error": { "type": "string" }, "details": { "type": "string" } } } } }
+          }
+        },
+        "security": []
+      }
     }
   },
   "components": {
