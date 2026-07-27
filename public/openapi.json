@@ -5,7 +5,8 @@
     "description": "Real-time Solana token safety scores, on-chain-provable insider cluster detection, and market fundamentals — built for AI trading agents. Free tier: 15 requests/day, no card required. See https://tnt-audit.com/risk-api for pricing and to get a key.",
     "version": "1.0.0",
     "contact": {
-      "url": "https://tnt-audit.com/risk-api"
+      "url": "https://tnt-audit.com/risk-api",
+      "email": "menantonio83@gmail.com"
     }
   },
   "servers": [
