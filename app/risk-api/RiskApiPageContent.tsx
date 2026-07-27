@@ -368,22 +368,24 @@ X-RateLimit-Reset: 2026-07-24T00:00:00.000Z
           <p className="text-xs sm:text-sm text-slate-400 leading-relaxed mb-6">{t.versioningIntro}</p>
 
           <div className="text-xs sm:text-sm font-bold text-white mb-3">{t.changelogTitle}</div>
-          <div className="space-y-3 mb-4">
-            {t.changelogEntries.map((entry) => (
-              <div key={entry.version} className="border-l-4 border-purple-500/40 pl-4 py-0.5">
-                <div className="flex items-baseline gap-2 mb-1">
-                  <code className="text-[11px] sm:text-xs text-emerald-400 font-bold">{entry.version}</code>
-                  <span className="text-[10px] text-slate-500">{entry.date}</span>
+          <div className="bg-slate-950 border border-purple-500/30 rounded-lg mb-4 max-h-80 sm:max-h-96 overflow-y-auto overflow-x-hidden p-4">
+            <div className="space-y-3">
+              {t.changelogEntries.map((entry) => (
+                <div key={entry.version} className="border-l-4 border-purple-500/40 pl-4 py-0.5">
+                  <div className="flex items-baseline gap-2 mb-1">
+                    <code className="text-[11px] sm:text-xs text-emerald-400 font-bold">{entry.version}</code>
+                    <span className="text-[10px] text-slate-500">{entry.date}</span>
+                  </div>
+                  <ul className="space-y-1">
+                    {entry.changes.map((change) => (
+                      <li key={change} className="text-xs text-slate-400 leading-relaxed">
+                        • {change}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-                <ul className="space-y-1">
-                  {entry.changes.map((change) => (
-                    <li key={change} className="text-xs text-slate-400 leading-relaxed">
-                      • {change}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
 
           <p className="text-[11px] text-slate-500">{t.changelogNote}</p>
