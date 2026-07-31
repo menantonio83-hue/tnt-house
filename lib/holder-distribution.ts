@@ -1,3 +1,33 @@
+// Version 6.17 — lib/holder-distribution.ts
+//
+// v6.17: fixed a real bug (not just a stale-audit-timing story) behind
+// top10Percent/largestHolderPercent readings that exceeded 100% —
+// mathematically impossible for real circulating supply, but observed
+// live on a token that had just gone through a large burn. Root cause:
+// getTokenLargestAccounts and getTokenSupply are two SEPARATE RPC
+// calls, and getTokenLargestAccounts is documented above (v6.15/6.16)
+// as the expensive one — served from an index that can lag behind the
+// node's live state. Right after a large burn, getTokenSupply reflects
+// the new, much smaller supply instantly, while getTokenLargestAccounts
+// can still return the OLD (larger) holder balances from before the
+// burn for a short window. Old numerator / new tiny denominator =
+// impossible percentages like 243%. This is a real synchronization gap
+// between two calls, not the mint's actual state, and re-running the
+// whole audit didn't fix it before this patch because both calls were
+// always re-issued fresh, hitting the same lagging index again.
+//
+// Fix: after computing a result, if top10Percent or
+// largestHolderPercent is over 100 (impossible), re-fetch ONLY
+// getTokenLargestAccounts (totalSupply is the cheap/fresh call and
+// already confirmed correct — no need to refetch it) after a short
+// backoff, up to STALE_RETRY_MAX times. The largest-accounts index
+// typically catches up within a few seconds of a burn. If it's still
+// inconsistent after all stale-retries, return the best (lowest,
+// least-impossible) reading observed instead of silently displaying
+// a number that cannot be true, and log a warning so this stays
+// visible in Vercel logs rather than a silent bad number reaching a
+// paying user.
+//
 // Version 6.16 — lib/holder-distribution.ts
 //
 // v6.16: found a hard, hopeless-to-retry RPC rejection for extremely
@@ -77,6 +107,19 @@ const MAX_ATTEMPTS = 2;
 const BACKOFF_MS = 2000; // wait before the 2nd (final) attempt
 const LARGEST_ACCOUNTS_TIMEOUT_MS = 10000; // the expensive call — generous budget for high-holder-count mints like USDC
 const SUPPLY_TIMEOUT_MS = 5000; // cheap, simple call — never observed to be the actual bottleneck
+
+// v6.17: when top10Percent/largestHolderPercent comes back over 100%
+// (impossible for real circulating supply), it means
+// getTokenLargestAccounts served a stale index — typically right after
+// a large burn. totalSupply is NOT re-fetched here since it's the
+// cheap/fresh call and already correct; only the holder snapshot is
+// retried until the index catches up or we run out of attempts.
+const STALE_RETRY_MAX = 3;
+const STALE_RETRY_BACKOFF_MS = 3000;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 // Solana/Helius's exact wording for this hard, node-side refusal — seen
 // verbatim in Vercel logs on a real USDC request: "Too many accounts
@@ -207,14 +250,74 @@ export async function getHolderDistributionRobust(mint: string): Promise<HolderD
         balance: parseInt(h.amount, 10),
         percent: totalSupply > 0 ? (parseInt(h.amount, 10) / totalSupply) * 100 : 0,
       }));
-      const largestHolderPercent = withPercent[0].percent;
-      const top10Percent = withPercent.slice(0, 10).reduce((sum, h) => sum + h.percent, 0);
+      let largestHolderPercent = withPercent[0].percent;
+      let top10Percent = withPercent.slice(0, 10).reduce((sum, h) => sum + h.percent, 0);
+      let holderCount = withPercent.length;
+
+      // Impossible reading (>100%) — almost always a stale
+      // getTokenLargestAccounts index right after a burn (see v6.17
+      // note above). Re-fetch just the holder snapshot; totalSupply
+      // already confirmed fresh above, no need to ask again.
+      if (largestHolderPercent > 100 || top10Percent > 100) {
+        console.warn(
+          `[holder-distribution] ${mint}: impossible reading (top10=${top10Percent.toFixed(1)}%, largest=${largestHolderPercent.toFixed(1)}%) — likely stale largest-accounts index after a burn, retrying holder snapshot only`,
+        );
+
+        for (let staleRetry = 1; staleRetry <= STALE_RETRY_MAX; staleRetry++) {
+          await sleep(STALE_RETRY_BACKOFF_MS);
+
+          const retryLargest = await callSolanaRpc('getTokenLargestAccounts', [mint], LARGEST_ACCOUNTS_TIMEOUT_MS);
+          if (!retryLargest.ok || !retryLargest.data) {
+            console.warn(
+              `[holder-distribution] ${mint}: stale-retry ${staleRetry}/${STALE_RETRY_MAX} RPC failure — ${retryLargest.reason ?? 'unknown'}`,
+            );
+            continue;
+          }
+
+          const retryHolders: RawHolder[] = retryLargest.data.value || [];
+          if (retryHolders.length === 0) continue;
+
+          const retryWithPercent = retryHolders.map((h) => ({
+            balance: parseInt(h.amount, 10),
+            percent: totalSupply > 0 ? (parseInt(h.amount, 10) / totalSupply) * 100 : 0,
+          }));
+          const retryLargestPercent = retryWithPercent[0].percent;
+          const retryTop10Percent = retryWithPercent.slice(0, 10).reduce((sum, h) => sum + h.percent, 0);
+
+          console.log(
+            `[holder-distribution] ${mint}: stale-retry ${staleRetry}/${STALE_RETRY_MAX} — top10=${retryTop10Percent.toFixed(1)}%, largest=${retryLargestPercent.toFixed(1)}%`,
+          );
+
+          // Index caught up to a sane reading — use it and stop retrying.
+          if (retryLargestPercent <= 100 && retryTop10Percent <= 100) {
+            largestHolderPercent = retryLargestPercent;
+            top10Percent = retryTop10Percent;
+            holderCount = retryWithPercent.length;
+            break;
+          }
+
+          // Still impossible, but keep the least-impossible reading seen
+          // so far in case every retry stays stale — better than
+          // silently keeping the very first (often worst) number.
+          if (retryTop10Percent < top10Percent) {
+            largestHolderPercent = retryLargestPercent;
+            top10Percent = retryTop10Percent;
+            holderCount = retryWithPercent.length;
+          }
+        }
+
+        if (largestHolderPercent > 100 || top10Percent > 100) {
+          console.warn(
+            `[holder-distribution] ${mint}: still impossible after ${STALE_RETRY_MAX} stale-retries (top10=${top10Percent.toFixed(1)}%) — returning best-effort reading, largest-accounts index has not caught up yet`,
+          );
+        }
+      }
 
       return {
         riskLevel: classifyRisk(largestHolderPercent, top10Percent),
         largestHolderPercent,
         top10Percent,
-        holderCount: withPercent.length,
+        holderCount,
       };
     }
 
