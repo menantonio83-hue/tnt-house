@@ -2539,6 +2539,28 @@ export default function TntHouse() {
       setTimeout(function () {
         setSubmitted(false);
       }, 5000);
+
+      // v1.113: the core problem — people ran a free audit, saw their
+      // token in the table, and left, never noticing the ALSO-free
+      // banner sitting further down the page. Two unrelated free
+      // giveaways with zero connection between them. Same fix pattern
+      // as the VIP-tier nudge: if free banner slots remain, prefill the
+      // form with what we already know and nudge them straight to it —
+      // don't make them discover it themselves.
+      if (freeBanners > 0) {
+        setBannerFormData(function (prev) {
+          return Object.assign({}, prev, {
+            contractAddress: tokenData.ca || '',
+            tokenName: tokenData.symbol || tokenData.name || '',
+          });
+        });
+        setTimeout(function () {
+          showToast('🎁 Your token is free-listed! Free banner ad still available — scroll down 👇', 'success');
+        }, 2500);
+        setTimeout(function () {
+          scrollToBannerForm();
+        }, 4500);
+      }
     }
 
     return tokenData;
