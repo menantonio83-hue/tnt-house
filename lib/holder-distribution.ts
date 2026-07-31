@@ -99,6 +99,43 @@
 // accounts) can be told apart from an RPC-side failure, with real
 // logging on every attempt visible in Vercel function logs.
 
+import { PublicKey } from '@solana/web3.js';
+import { getAssociatedTokenAddress } from '@solana/spl-token';
+
+// v6.17: not every project "burns" via the actual SPL Burn instruction
+// (which reduces mint.supply directly and leaves no token account
+// behind). Some send tokens to a well-known, unrecoverable wallet
+// instead — most commonly Solana's community "Incinerator" address.
+// That wallet still HOLDS the tokens in a normal token account, so it
+// can legitimately show up as the #1 "largest account" in
+// getTokenLargestAccounts, inflating largestHolderPercent/top10Percent
+// with tokens that are functionally dead, not a real risk-relevant
+// holder. Solscan and similar explorers exclude these from
+// "circulating"/concentration figures — we should too.
+const KNOWN_BURN_WALLETS = [
+  '1nc1nerator11111111111111111111111111111', // Solana community Incinerator
+];
+
+async function getKnownBurnTokenAccounts(mint: string): Promise<Set<string>> {
+  const mintKey = new PublicKey(mint);
+  const excluded = new Set<string>();
+  for (const wallet of KNOWN_BURN_WALLETS) {
+    try {
+      const ata = await getAssociatedTokenAddress(mintKey, new PublicKey(wallet), true);
+      excluded.add(ata.toBase58());
+    } catch {
+      // Malformed mint or PDA derivation failure — skip silently,
+      // this is a best-effort exclusion, not a hard requirement.
+    }
+  }
+  return excluded;
+}
+
+function excludeBurnAddresses(holders: RawHolder[], burnAccounts: Set<string>): RawHolder[] {
+  if (burnAccounts.size === 0) return holders;
+  return holders.filter((h) => !burnAccounts.has(h.address));
+}
+
 const RPC_URL = process.env.HELIUS_API_KEY
   ? `https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`
   : process.env.HELIUS_RPC_URL || 'https://api.mainnet-beta.solana.com';
@@ -204,7 +241,9 @@ async function fetchHolderSnapshot(
     return { ok: false, data: null, reason: largest.reason ?? 'unknown RPC failure' };
   }
 
-  const holders: RawHolder[] = largest.data.value || [];
+  const rawHolders: RawHolder[] = largest.data.value || [];
+  const burnAccounts = await getKnownBurnTokenAccounts(mint);
+  const holders = excludeBurnAddresses(rawHolders, burnAccounts);
 
   // A genuinely empty largest-accounts list, with NO rpc error and a
   // valid response, means the mint really has no distributed holders
@@ -274,7 +313,8 @@ export async function getHolderDistributionRobust(mint: string): Promise<HolderD
             continue;
           }
 
-          const retryHolders: RawHolder[] = retryLargest.data.value || [];
+          const rawRetryHolders: RawHolder[] = retryLargest.data.value || [];
+          const retryHolders = excludeBurnAddresses(rawRetryHolders, await getKnownBurnTokenAccounts(mint));
           if (retryHolders.length === 0) continue;
 
           const retryWithPercent = retryHolders.map((h) => ({
