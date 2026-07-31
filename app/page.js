@@ -1639,13 +1639,24 @@ export default function TntHouse() {
     return p;
   };
 
+  // v1.109: $MRDT payment discount — paying in $MRDT costs less than the
+  // listed USD price (SOL/USDC pay full price). This is a distinct
+  // "discounted usd" used ONLY to size the $MRDT token amount, separate
+  // from invoiceUsd (the official listed price shown for SOL/USDC and
+  // as the "≈ $X USD" reference line). Discount: $7->$5, $18->$15, $75->$70.
+  var getMrdtDiscountedUsd = function (tier) {
+    return tier === 'fast' ? 15 : tier === 'vip' ? 70 : 5;
+  };
+
   var getAmountForTier = function (tier) {
     // v1.108: repositioned away from "audit" (competes with free
     // RugCheck/Solsniffer scans) toward "listing + promotion" (compares
     // against paid ad placements instead). Basic/Fast lowered as a
     // near-frictionless entry point; VIP kept at $75 to preserve a
     // premium tier worth reaching for.
-    var usd = tier === 'fast' ? 18 : tier === 'vip' ? 75 : 7;
+    // v1.109: $MRDT payment now uses the discounted usd equivalent
+    // instead of the full listed price — see getMrdtDiscountedUsd above.
+    var usd = getMrdtDiscountedUsd(tier);
     var price = getSafePrice();
     return Math.round(usd / price);
   };
@@ -4195,9 +4206,9 @@ export default function TntHouse() {
                 <div className="grid grid-cols-1 gap-2 text-xs font-mono">
                   {[
                     [t.first10, t.free],
-                    ['Verified Badge + Listing', '~$7 $MRDT/SOL/USDC'],
-                    ['Priority Listing + Push', '~$18 $MRDT/SOL/USDC'],
-                    ['VIP Featured + Banner', '~$75 $MRDT/SOL/USDC'],
+                    ['Verified Badge + Listing', '~$5 $MRDT · ~$7 SOL/USDC'],
+                    ['Priority Listing + Push', '~$15 $MRDT · ~$18 SOL/USDC'],
+                    ['VIP Featured + Banner', '~$70 $MRDT · ~$75 SOL/USDC'],
                     ['Banner 1 day', '~$20 $MRDT/SOL/USDC'],
                     ['Banner 2 days', '~$35 $MRDT/SOL/USDC'],
                     ['Banner 6 days', '~$100 $MRDT/SOL/USDC'],
@@ -4325,6 +4336,9 @@ export default function TntHouse() {
                   $MRDT
                 </div>
                 <div className="text-[9px] text-slate-500 mt-1">{t.recommended}</div>
+                <div className="text-[9px] text-emerald-400 font-bold mt-0.5">
+                  Save ${invoiceUsd - getMrdtDiscountedUsd(selectedTier)}
+                </div>
               </button>
               <button
                 onClick={function () {
@@ -4535,7 +4549,12 @@ export default function TntHouse() {
                     ? invoiceUsd.toFixed(2) + ' USDC'
                     : invoiceAmount.toLocaleString() + ' $MRDT'}
               </div>
-              <div className="text-sm font-bold text-slate-300">≈ ${invoiceUsd} USD</div>
+              <div className="text-sm font-bold text-slate-300">
+                ≈ ${selectedPaymentMethod === 'MRDT' ? getMrdtDiscountedUsd(selectedTier) : invoiceUsd} USD
+                {selectedPaymentMethod === 'MRDT' ? (
+                  <span className="text-emerald-400 ml-1">🎉 -${invoiceUsd - getMrdtDiscountedUsd(selectedTier)} $MRDT discount</span>
+                ) : null}
+              </div>
               <div className="text-xs text-slate-400">{invoiceLabel}</div>
               <div className="text-xs text-slate-500 font-mono break-all">
                 Wallet: {WALLET_ADDRESS.slice(0, 8)}...{WALLET_ADDRESS.slice(-8)}
