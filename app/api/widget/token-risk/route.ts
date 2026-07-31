@@ -48,11 +48,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'invalid_holder_data' }, { status: 422 });
     }
 
-    return NextResponse.json(data, {
-      headers: {
-        'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60',
+    return NextResponse.json(
+      { ...data, source: 'helius' },
+      {
+        headers: {
+          'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60',
+        },
       },
-    });
+    );
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : 'unknown error';
     console.error(`[widget/token-risk] ${address}: upstream failure — ${message}`);
