@@ -2160,9 +2160,33 @@ export default function TntHouse() {
       // token except MRDT (which had manually hardcoded real numbers).
       // The full report includes real, computable holder concentration and
       // LP-lock data for every audited token, not just MRDT.
+      //
+      // FIX v1.107: top10Percent/holderCount no longer come from RugCheck.
+      // RugCheck was observed returning a stale post-burn snapshot for a
+      // real token (243% top-10 concentration vs Solscan's live ~46% at
+      // the same moment) — a third-party staleness issue we can't fix or
+      // even detect from the browser. We now fetch our own
+      // /api/widget/token-risk in parallel, which reuses the same
+      // Helius-backed calculation (with its own stale-index retries and
+      // known-burn-wallet exclusion) already powering the paid Risk-Data
+      // API. RugCheck is still used below for everything it uniquely
+      // provides — score, LP lock, risks, mint/freeze authority, tax.
       var rugRes = await fetch('https://api.rugcheck.xyz/v1/tokens/' + ca + '/report', {
         headers: { Accept: 'application/json' },
       });
+      var ownHolderData = null;
+      try {
+        var ownHolderRes = await fetch('/api/widget/token-risk?address=' + encodeURIComponent(ca));
+        if (ownHolderRes.ok) {
+          ownHolderData = await ownHolderRes.json();
+        } else {
+          setLogs(function (prev) {
+            return prev.slice(-12).concat(['[AUDIT] holder-concentration check unavailable, using fallback...']);
+          });
+        }
+      } catch (holderErr) {
+        // Non-fatal — RugCheck-derived numbers below remain the fallback.
+      }
       if (rugRes.ok) {
         var rugData = await rugRes.json();
         var normalizedScore = Math.min(
@@ -2171,21 +2195,30 @@ export default function TntHouse() {
         );
         var risks = rugData.risks || [];
 
-        // Real top-10 holder concentration, computed from actual holder list.
+        // FIX v1.107: prefer our own Helius-backed calculation
+        // (ownHolderData, fetched above in parallel) over RugCheck's
+        // numbers. Only fall back to RugCheck's topHolders sum if our
+        // own endpoint genuinely couldn't return usable data (network
+        // failure, invalid mint, etc.) — RugCheck-derived numbers are
+        // no longer trusted as the primary source, only as a backup.
         var top10Percent = null;
-        if (Array.isArray(rugData.topHolders) && rugData.topHolders.length > 0) {
+        var holderCount = null;
+        if (ownHolderData && typeof ownHolderData.top10Percent === 'number') {
+          top10Percent = Math.round(ownHolderData.top10Percent * 10) / 10;
+          holderCount =
+            typeof ownHolderData.holderCount === 'number' ? ownHolderData.holderCount : null;
+        } else if (Array.isArray(rugData.topHolders) && rugData.topHolders.length > 0) {
           var sumPct = rugData.topHolders.slice(0, 10).reduce(function (acc, h) {
             return acc + (typeof h.pct === 'number' ? h.pct : 0);
           }, 0);
-          top10Percent = Math.round(sumPct * 10) / 10;
-        }
-
-        // Real total holder count, if RugCheck reports it.
-        var holderCount = null;
-        if (typeof rugData.totalHolders === 'number') {
-          holderCount = rugData.totalHolders;
-        } else if (Array.isArray(rugData.topHolders)) {
-          holderCount = rugData.topHolders.length;
+          // Same impossible-value guard as the server-side route —
+          // don't display a RugCheck fallback number that can't be true.
+          top10Percent = sumPct <= 100 ? Math.round(sumPct * 10) / 10 : null;
+          if (typeof rugData.totalHolders === 'number') {
+            holderCount = rugData.totalHolders;
+          } else {
+            holderCount = rugData.topHolders.length;
+          }
         }
 
         // Real LP-locked percentage, averaged across reported markets.
