@@ -2816,7 +2816,10 @@ export default function TntHouse() {
         bannerImg: bannerFormData.bannerImg || '',
         desc: bannerFormData.desc,
         targetLink: bannerFormData.targetLink,
-        expiresAt: Date.now() + parseInt(bannerFormData.days) * 86400000,
+        // v1.111: VIP-credited banner is fixed at exactly 24h, regardless
+        // of whatever the Duration dropdown happens to show — prevents
+        // picking the $100 "6 days" tier for free off a $75 purchase.
+        expiresAt: Date.now() + 86400000,
       };
       saveBannerToSupabase(vipBanner, vipSlot);
       setActiveBanners(function (prev) {
@@ -4288,6 +4291,11 @@ export default function TntHouse() {
                       <label className="block text-purple-400 text-[11px] font-bold mb-1">
                         {t.fieldDuration}
                       </label>
+                      {vipBannerCredit > 0 ? (
+                        <div className="w-full bg-purple-500/10 border border-purple-500/30 rounded px-3 py-2 text-xs text-purple-300 font-mono">
+                          24 hours — VIP free 🎁
+                        </div>
+                      ) : (
                       <select
                         value={bannerFormData.days}
                         onChange={function (e) {
@@ -4313,6 +4321,7 @@ export default function TntHouse() {
                             : '~$100 $MRDT/SOL/USDC'}
                         </option>
                       </select>
+                      )}
                     </div>
                     <button
                       type="submit"
