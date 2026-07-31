@@ -1507,6 +1507,11 @@ export default function TntHouse() {
   // FEAT v1.90: separate free-banner giveaway counter, independent from
   // BANNER_SLOTS (which is concurrent display capacity, not a giveaway).
   var [freeBanners, setFreeBanners] = useState(5);
+  // v1.110: separate from the general free-banner giveaway counter above —
+  // this tracks banners earned specifically by paying for the VIP tier
+  // ($75 "VIP Featured + Banner"), consumed once per credit in
+  // handleBannerSubmit regardless of how many general free slots remain.
+  var [vipBannerCredit, setVipBannerCredit] = useState(0);
   var FREE_BANNER_TOTAL = 5;
   var [showPaymentModal, setShowPaymentModal] = useState(false);
   var [showWalletModal, setShowWalletModal] = useState(false);
@@ -2727,6 +2732,11 @@ export default function TntHouse() {
     var projectName = formData.projectName;
     var logoImg = formData.logoImg;
     var tokenSymbol = formData.tokenSymbol;
+    // v1.110: capture the tier BEFORE any state resets below, so the
+    // payment-success handler in startPaymentVerification can tell
+    // whether this was a VIP purchase (which includes a free banner —
+    // see handleBannerSubmit's vipBannerCredit branch).
+    var tierAtPayment = selectedTier;
     // FIX v1.8: RESTORE v1.6. User confirmed the Phantom in-app-browser
     // flow (/pay page, no Blowfish warning) had already worked in a prior
     // test (Payment Confirmed screen, no red block). The phantom.com
@@ -2748,6 +2758,7 @@ export default function TntHouse() {
     setShowInvoiceModal(false);
     setIsSending(true);
     var tokenData = await runAuditAndSave(ca, projectName, false, logoImg, tokenSymbol);
+    if (tokenData) tokenData.tier = tierAtPayment;
     setFormData({ projectName: '', contractAddress: '', telegram: '', logoImg: '', tokenSymbol: '' });
     setSelectedPaymentMethod(null);
     setSelectedWallet(null);
@@ -2790,6 +2801,48 @@ export default function TntHouse() {
     }
     if (activeBanners.length >= BANNER_SLOTS) {
       setBannerError(t.btnSlotTaken + ' ' + bannerCountdown);
+      return;
+    }
+    // v1.110: VIP-earned free banner (from paying for the "VIP Featured +
+    // Banner" tier) — checked before the general free-banner giveaway so
+    // a VIP buyer's credit isn't silently consumed by/confused with the
+    // unrelated public giveaway counter.
+    if (vipBannerCredit > 0) {
+      setIsBannerSending(true);
+      var vipSlot = pickFreeBannerSlot();
+      var vipBanner = {
+        slot: vipSlot,
+        tokenName: bannerFormData.tokenName.toUpperCase(),
+        bannerImg: bannerFormData.bannerImg || '',
+        desc: bannerFormData.desc,
+        targetLink: bannerFormData.targetLink,
+        expiresAt: Date.now() + parseInt(bannerFormData.days) * 86400000,
+      };
+      saveBannerToSupabase(vipBanner, vipSlot);
+      setActiveBanners(function (prev) {
+        return prev
+          .filter(function (b) {
+            return b.slot !== vipSlot;
+          })
+          .concat([vipBanner]);
+      });
+      setVipBannerCredit(function (prev) {
+        return Math.max(0, prev - 1);
+      });
+      setBannerSubmitted(true);
+      setBannerFormData({
+        contractAddress: '',
+        tokenName: '',
+        bannerImg: '',
+        desc: '',
+        targetLink: '',
+        days: '1',
+      });
+      showToast('🎁 VIP banner is live!', 'success');
+      setIsBannerSending(false);
+      setTimeout(function () {
+        setBannerSubmitted(false);
+      }, 5000);
       return;
     }
     // FEAT v1.90: free-banner giveaway bypass — same pattern as
@@ -2933,6 +2986,29 @@ export default function TntHouse() {
             });
             setAuditSuccessToken(auditData);
             showToast('✅ Payment confirmed! Token added. Score: ' + auditData.score, 'success');
+
+            // v1.110: "VIP Featured + Banner" ($75) includes a free
+            // banner slot — previously nothing connected the audit
+            // payment to the separate banner form, so VIP buyers had to
+            // guess they needed to scroll down and pay again. Now: grant
+            // one free banner credit, pre-fill the form with what we
+            // already know about their token, and scroll them straight
+            // to it.
+            if (auditData.tier === 'vip') {
+              setVipBannerCredit(function (prev) {
+                return prev + 1;
+              });
+              setBannerFormData(function (prev) {
+                return Object.assign({}, prev, {
+                  contractAddress: auditData.ca || '',
+                  tokenName: auditData.symbol || auditData.name || '',
+                });
+              });
+              showToast('🎁 VIP includes a free banner — scroll down to set it up!', 'success');
+              setTimeout(function () {
+                scrollToBannerForm();
+              }, 1500);
+            }
           }
           setTimeout(function () {
             setShowVerifyModal(false);
@@ -4024,7 +4100,14 @@ export default function TntHouse() {
               <div id="bannerFormSection" className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 p-6 backdrop-blur-md">
                 <div className="flex items-start justify-between mb-2">
                   <h3 className="text-lg font-black text-purple-400">{t.bannerTitle}</h3>
-                  {freeBanners > 0 ? (
+                  {vipBannerCredit > 0 ? (
+                    <div className="bg-purple-500/20 border border-purple-500/40 rounded-lg px-2 py-1 text-center">
+                      <div className="text-purple-300 font-black text-sm">
+                        {vipBannerCredit}
+                      </div>
+                      <div className="text-[9px] text-purple-400">VIP free</div>
+                    </div>
+                  ) : freeBanners > 0 ? (
                     <div className="bg-emerald-500/20 border border-emerald-500/40 rounded-lg px-2 py-1 text-center">
                       <div className="text-emerald-400 font-black text-sm">
                         {freeBanners}/{FREE_BANNER_TOTAL}
