@@ -103,8 +103,8 @@ const TRANSLATIONS = {
     tagline: 'TOP NEW TOKENS',
     heroTitle: 'Exploding scams. Launching gems.',
     heroSub: 'Welcome to the Home of New Tokens! Our AI agent scans the blockchain.',
-    pillar1: 'AI Audit',
-    pillar1sub: 'Contract security check',
+    pillar1: 'Insider Detection',
+    pillar1sub: 'See who really controls supply',
     pillar2: 'Micro-caps',
     pillar2sub: '$5K-$100K',
     pillar3: 'DAO License',
@@ -120,9 +120,9 @@ const TRANSLATIONS = {
     fieldCA: 'Token CA (Solana)',
     fieldCAPH: 'Enter contract address...',
     fieldTier: 'Select tier',
-    tierBasic: 'Basic Audit',
-    tierFast: 'Fast Listing',
-    tierVIP: 'VIP Boost',
+    tierBasic: 'Verified Badge + Listing',
+    tierFast: 'Priority Listing + Push',
+    tierVIP: 'VIP Featured + Banner',
     fieldTelegram: 'Telegram handle (optional)',
     btnFreeAudit: '🎁 LAUNCH FREE AUDIT',
     btnAudit: 'LAUNCH AI INSPECTION',
@@ -228,8 +228,8 @@ const TRANSLATIONS = {
     tagline: 'NUEVOS TOKENS',
     heroTitle: 'Destruyendo scams. Lanzando gems.',
     heroSub: '¡Bienvenido a la Casa de Nuevos Tokens! Nuestro agente IA escanea la blockchain.',
-    pillar1: 'Auditoría IA',
-    pillar1sub: 'Seguridad de contratos',
+    pillar1: 'Detección de Insiders',
+    pillar1sub: 'Descubre quién controla realmente el suministro',
     pillar2: 'Micro-caps',
     pillar2sub: '$5K-$100K',
     pillar3: 'Licencia DAO',
@@ -245,9 +245,9 @@ const TRANSLATIONS = {
     fieldCA: 'CA del Token (Solana)',
     fieldCAPH: 'Ingresa la dirección...',
     fieldTier: 'Selecciona plan',
-    tierBasic: 'Auditoría Básica',
-    tierFast: 'Listado Rápido',
-    tierVIP: 'VIP Boost',
+    tierBasic: 'Insignia + Listado',
+    tierFast: 'Listado Prioritario + Push',
+    tierVIP: 'VIP Destacado + Banner',
     fieldTelegram: 'Usuario de Telegram (opcional)',
     btnFreeAudit: '🎁 AUDITORÍA GRATIS',
     btnAudit: 'INICIAR INSPECCIÓN IA',
@@ -349,8 +349,8 @@ const TRANSLATIONS = {
     tagline: 'NOUVEAUX TOKENS',
     heroTitle: 'Détruire les arnaques. Lancer des gems.',
     heroSub: 'Bienvenue à la Maison des Nouveaux Tokens ! Notre agent IA scanne la blockchain.',
-    pillar1: 'Audit IA',
-    pillar1sub: 'Sécurité des contrats',
+    pillar1: 'Détection Insiders',
+    pillar1sub: "Découvrez qui contrôle vraiment l'offre",
     pillar2: 'Micro-caps',
     pillar2sub: '$5K-$100K',
     pillar3: 'Licence DAO',
@@ -366,9 +366,9 @@ const TRANSLATIONS = {
     fieldCA: 'CA du Token (Solana)',
     fieldCAPH: 'Entrez adresse...',
     fieldTier: 'Choisir le plan',
-    tierBasic: 'Audit Basique',
-    tierFast: 'Listing Rapide',
-    tierVIP: 'VIP Boost',
+    tierBasic: 'Badge Vérifié + Listing',
+    tierFast: 'Listing Prioritaire + Push',
+    tierVIP: 'VIP en Vedette + Bannière',
     fieldTelegram: 'Pseudo Telegram (optionnel)',
     btnFreeAudit: '🎁 AUDIT GRATUIT',
     btnAudit: 'LANCER INSPECTION IA',
@@ -470,8 +470,8 @@ const TRANSLATIONS = {
     tagline: 'ΝΕΑ TOKENS',
     heroTitle: 'Σπάζουμε scams. Λανσάρουμε gems.',
     heroSub: 'Καλώς ήρθατε στο Σπίτι Νέων Tokens! Ο AI πράκτοράς μας σαρώνει το blockchain.',
-    pillar1: 'AI Έλεγχος',
-    pillar1sub: 'Ασφάλεια συμβολαίων',
+    pillar1: 'Ανίχνευση Insider',
+    pillar1sub: 'Δείτε ποιος ελέγχει πραγματικά την προσφορά',
     pillar2: 'Micro-caps',
     pillar2sub: '$5K-$100K',
     pillar3: 'Άδεια DAO',
@@ -487,9 +487,9 @@ const TRANSLATIONS = {
     fieldCA: 'CA Token (Solana)',
     fieldCAPH: 'Εισαγωγή διεύθυνσης...',
     fieldTier: 'Επιλογή πλάνου',
-    tierBasic: 'Βασικός Έλεγχος',
-    tierFast: 'Γρήγορη Καταχώρηση',
-    tierVIP: 'VIP Boost',
+    tierBasic: 'Επαληθευμένο Badge + Καταχώρηση',
+    tierFast: 'Καταχώρηση Προτεραιότητας + Push',
+    tierVIP: 'VIP Προβολή + Banner',
     fieldTelegram: 'Χρήστης Telegram (προαιρετικό)',
     btnFreeAudit: '🎁 ΔΩΡΕΑΝ ΕΛΕΓΧΟΣ',
     btnAudit: 'ΕΚΚΙΝΗΣΗ AI ΕΠΙΘΕΩΡΗΣΗΣ',
@@ -591,8 +591,8 @@ const TRANSLATIONS = {
     tagline: 'НОВЫЕ ТОКЕНЫ',
     heroTitle: 'Взрываем скамы. Запускаем гемы.',
     heroSub: 'Добро пожаловать в Дом Новых Токенов! Наш ИИ-агент сканирует блокчейн.',
-    pillar1: 'ИИ Аудит',
-    pillar1sub: 'Безопасность контрактов',
+    pillar1: 'Детект Инсайдеров',
+    pillar1sub: 'Кто реально контролирует supply',
     pillar2: 'Микро-капы',
     pillar2sub: '$5K-$100K',
     pillar3: 'DAO Лицензия',
@@ -608,9 +608,9 @@ const TRANSLATIONS = {
     fieldCA: 'CA Токена (Solana)',
     fieldCAPH: 'Введи адрес контракта...',
     fieldTier: 'Выбери тариф',
-    tierBasic: 'Базовый Аудит',
-    tierFast: 'Быстрый Листинг',
-    tierVIP: 'VIP-Буст',
+    tierBasic: 'Бейдж + Листинг',
+    tierFast: 'Приоритетный Листинг + Push',
+    tierVIP: 'VIP Витрина + Баннер',
     fieldTelegram: 'Telegram для связи (необязательно)',
     btnFreeAudit: '🎁 БЕСПЛАТНЫЙ АУДИТ',
     btnAudit: 'ЗАПУСТИТЬ ИИ-ИНСПЕКЦИЮ',
@@ -713,8 +713,8 @@ const TRANSLATIONS = {
     tagline: 'NUOVI TOKEN',
     heroTitle: 'Scam esplosi. Gemme lanciate.',
     heroSub: "Benvenuto nella Casa dei Nuovi Token! Il nostro agente IA scansiona la blockchain.",
-    pillar1: 'Controllo IA',
-    pillar1sub: 'Sicurezza del contratto',
+    pillar1: 'Rilevamento Insider',
+    pillar1sub: "Scopri chi controlla davvero l'offerta",
     pillar2: 'Micro-cap',
     pillar2sub: '$5K-$100K',
     pillar3: 'Licenza DAO',
@@ -730,9 +730,9 @@ const TRANSLATIONS = {
     fieldCA: 'CA del Token (Solana)',
     fieldCAPH: "Inserisci l'indirizzo del contratto...",
     fieldTier: 'Scegli il piano',
-    tierBasic: 'Audit Base',
-    tierFast: 'Listing Veloce',
-    tierVIP: 'VIP Boost',
+    tierBasic: 'Badge Verificato + Listing',
+    tierFast: 'Listing Prioritario + Push',
+    tierVIP: 'VIP in Evidenza + Banner',
     fieldTelegram: 'Telegram di contatto (opzionale)',
     btnFreeAudit: '🎁 AUDIT GRATUITO',
     btnAudit: 'AVVIA ISPEZIONE IA',
@@ -835,8 +835,8 @@ const TRANSLATIONS = {
     tagline: '新代币',
     heroTitle: '引爆骗局。发射宝石。',
     heroSub: '欢迎来到新代币之家！我们的AI代理正在扫描区块链。',
-    pillar1: 'AI审计',
-    pillar1sub: '合约安全',
+    pillar1: '内幕检测',
+    pillar1sub: '看清谁真正控制供应量',
     pillar2: '微市值',
     pillar2sub: '$5K-$100K',
     pillar3: 'DAO许可',
@@ -852,9 +852,9 @@ const TRANSLATIONS = {
     fieldCA: '代币CA地址 (Solana)',
     fieldCAPH: '输入合约地址...',
     fieldTier: '选择套餐',
-    tierBasic: '基础审计',
-    tierFast: '快速上线',
-    tierVIP: 'VIP加速',
+    tierBasic: '认证徽章+上线',
+    tierFast: '优先上线+推送',
+    tierVIP: 'VIP精选+横幅',
     fieldTelegram: '联系Telegram（选填）',
     btnFreeAudit: '🎁 免费审计',
     btnAudit: '开始AI检测',
@@ -1640,7 +1640,12 @@ export default function TntHouse() {
   };
 
   var getAmountForTier = function (tier) {
-    var usd = tier === 'fast' ? 25 : tier === 'vip' ? 75 : 10;
+    // v1.108: repositioned away from "audit" (competes with free
+    // RugCheck/Solsniffer scans) toward "listing + promotion" (compares
+    // against paid ad placements instead). Basic/Fast lowered as a
+    // near-frictionless entry point; VIP kept at $75 to preserve a
+    // premium tier worth reaching for.
+    var usd = tier === 'fast' ? 18 : tier === 'vip' ? 75 : 7;
     var price = getSafePrice();
     return Math.round(usd / price);
   };
@@ -2115,7 +2120,7 @@ export default function TntHouse() {
       return;
     }
     var tierName = selectedTier === 'fast' ? 'Fast' : selectedTier === 'vip' ? 'VIP' : 'Basic';
-    var usd = selectedTier === 'fast' ? 25 : selectedTier === 'vip' ? 75 : 10;
+    var usd = selectedTier === 'fast' ? 18 : selectedTier === 'vip' ? 75 : 7;
     setInvoiceAmount(mrdtAmount);
     setInvoiceUsd(usd);
     setInvoiceLabel('TNT House ' + tierName + ' Audit - ' + formData.projectName);
@@ -4190,9 +4195,9 @@ export default function TntHouse() {
                 <div className="grid grid-cols-1 gap-2 text-xs font-mono">
                   {[
                     [t.first10, t.free],
-                    ['Basic AI Audit', '~$10 $MRDT/SOL/USDC'],
-                    ['Fast Listing', '~$25 $MRDT/SOL/USDC'],
-                    ['VIP Boost', '~$75 $MRDT/SOL/USDC'],
+                    ['Verified Badge + Listing', '~$7 $MRDT/SOL/USDC'],
+                    ['Priority Listing + Push', '~$18 $MRDT/SOL/USDC'],
+                    ['VIP Featured + Banner', '~$75 $MRDT/SOL/USDC'],
                     ['Banner 1 day', '~$20 $MRDT/SOL/USDC'],
                     ['Banner 2 days', '~$35 $MRDT/SOL/USDC'],
                     ['Banner 6 days', '~$100 $MRDT/SOL/USDC'],
