@@ -1006,6 +1006,48 @@ async function loadTokenVotes() {
   }
 }
 
+async function loadTokenViews() {
+  try {
+    var res = await fetch(SUPABASE_URL + '/rest/v1/token_views?select=*', {
+      headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY },
+    });
+    if (!res.ok) return {};
+    var data = await res.json();
+    var map = {};
+    data.forEach(function (row) {
+      map[row.ca] = row.views || 0;
+    });
+    return map;
+  } catch (e) {
+    return {};
+  }
+}
+
+// v1.109: "Proof of Eyeballs" — real view counters on token cards, so
+// devs paying for Priority/VIP listing can see actual traffic instead
+// of trusting the claim blindly. Counted on genuine card opens (tap to
+// see info), not raw page renders, via the atomic track_view RPC —
+// same SECURITY DEFINER pattern as cast_vote above, avoids races from
+// concurrent viewers.
+async function trackViewRpc(ca) {
+  try {
+    var res = await fetch(SUPABASE_URL + '/rest/v1/rpc/track_view', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: SUPABASE_KEY,
+        Authorization: 'Bearer ' + SUPABASE_KEY,
+      },
+      body: JSON.stringify({ p_ca: ca }),
+    });
+    if (!res.ok) return null;
+    var data = await res.json();
+    return data && data[0] ? data[0] : null;
+  } catch (e) {
+    return null;
+  }
+}
+
 async function castVoteRpc(ca, direction) {
   try {
     var res = await fetch(SUPABASE_URL + '/rest/v1/rpc/cast_vote', {
@@ -1377,6 +1419,7 @@ export default function TntHouse() {
   var [tokens, setTokens] = useState([]);
   var [listedTokens, setListedTokens] = useState([]);
   var [tokenVotes, setTokenVotes] = useState({}); // { [ca]: { upvotes, downvotes } }
+  var [tokenViews, setTokenViews] = useState({}); // { [ca]: views } — "Proof of Eyeballs"
   var [tableSearch, setTableSearch] = useState('');
   var [tableSort, setTableSort] = useState('default'); // default | score | volume | liquidity
   var [watchlist, setWatchlist] = useState([]); // array of CA strings, persisted to localStorage
@@ -1733,6 +1776,23 @@ export default function TntHouse() {
     setSelectedToken(token);
     setIsBlueprintOpen(true);
     setClusterResult(null);
+    // v1.109: "Proof of Eyeballs" — count this as a real view. Optimistic
+    // local bump so the counter feels instant, RPC call reconciles with
+    // the real server-side count right after (see trackViewRpc above).
+    setTokenViews(function (prev) {
+      var next = Object.assign({}, prev);
+      next[token.ca] = (prev[token.ca] || 0) + 1;
+      return next;
+    });
+    trackViewRpc(token.ca).then(function (result) {
+      if (result) {
+        setTokenViews(function (prev) {
+          var next = Object.assign({}, prev);
+          next[token.ca] = result.views;
+          return next;
+        });
+      }
+    });
   };
   var checkClusters = async function () {
     if (!selectedToken || clusterLoading) return;
@@ -1883,10 +1943,13 @@ export default function TntHouse() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bannerFormData.contractAddress]);
 
-  // Load token votes + this browser's own past votes (localStorage) on mount
+  // Load token votes + views + this browser's own past votes (localStorage) on mount
   useEffect(function () {
     loadTokenVotes().then(function (map) {
       setTokenVotes(map);
+    });
+    loadTokenViews().then(function (map) {
+      setTokenViews(map);
     });
     try {
       var stored = localStorage.getItem('tnt_voted_tokens');
@@ -3741,6 +3804,12 @@ export default function TntHouse() {
                           <span className="text-[6.5px] text-slate-600 font-mono block truncate max-w-[110px]">
                             {token.ca ? token.ca.slice(0, 4) + '...' + token.ca.slice(-4) : ''}
                           </span>
+                          {/* v1.109: "Proof of Eyeballs" — real view count,
+                              visible traffic proof for devs deciding whether
+                              a paid listing is worth it. */}
+                          <span className="text-[6.5px] text-purple-400 font-mono block">
+                            👁 {tokenViews[token.ca] || 0}
+                          </span>
                         </td>
                         <td className="p-1 font-mono text-slate-300 text-[9px]">${token.price}</td>
                         <td className="p-1 font-mono text-[9px]">
@@ -5071,6 +5140,9 @@ export default function TntHouse() {
                   </p>
                   <p className="text-slate-500 text-[10px] font-mono break-all">
                     {selectedToken.ca}
+                  </p>
+                  <p className="text-purple-400 text-[10px] font-mono mt-0.5">
+                    👁 {tokenViews[selectedToken.ca] || 0} views
                   </p>
                 </div>
               </div>
