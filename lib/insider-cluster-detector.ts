@@ -1,12 +1,28 @@
-// Version 6.9 — lib/insider-cluster-detector.ts
+// Version 7.0 — lib/insider-cluster-detector.ts
 //
-// v6.9: hardened against the same class of bug fixed in token-risk's
-// main path (see lib/with-timeout.ts) — RugCheck and the per-holder RPC
-// walk had no timeout, so a hang on any single call could stall this
-// entire background job. RugCheck's fetch now has an AbortSignal
-// timeout; each holder's signature-history walk is capped with
-// withTimeout so one slow/bad wallet is skipped (logged as an error)
-// instead of stalling the other holders behind it.
+// v7.0: PERFORMANCE REWRITE. Replaced the per-holder RPC signature walk
+// (getSignaturesForAddress pagination + getParsedTransaction balance-
+// delta scan — the ~1-2 min bottleneck) with Helius Wallet API's
+// GET /v1/wallet/{wallet}/funded-by endpoint: one HTTP call returns a
+// wallet's original funder + funding timestamp directly, no RPC paging.
+//
+// IMPORTANT: /funded-by is a Helius Wallet API endpoint (100 credits per
+// call) that requires a PAID Helius plan — Free-plan keys get 403 and
+// every call in this file will silently resolve to null (see
+// fetchFundedBy). Confirm the HELIUS_API_KEY in use is on a paid tier
+// before relying on this in production.
+//
+// v7.0: holder pipelines now run in parallel via p-limit
+// (HOLDER_CONCURRENCY = 8) instead of a sequential for-loop.
+//
+// v7.0: added a funder "hop" heuristic. A funder wallet is treated as
+// CLEAN (tracing stops there) if it is at least CLEAN_FUNDER_MIN_AGE_DAYS
+// old AND holds more than CLEAN_FUNDER_MIN_BALANCE_SOL — that profile is
+// very unlikely to be a disposable sniper/insider wallet, so it's used
+// as-is for cluster grouping. A FRESH or low-balance funder is hopped
+// past — its own funder becomes the next candidate — up to
+// MAX_HOP_DEPTH hops total, to reach past disposable intermediate
+// wallets toward the real originating source.
 //
 // Standalone "First Funder Trace" insider-cluster detector.
 //
@@ -21,24 +37,32 @@
 // This module contains only the pure on-chain detection logic, reusable
 // by both features going forward.
 //
-// Logic: for a token's top holders, find each wallet's very first
-// incoming SOL transfer (its "funder"). If the same funder wallet funded
-// 2+ of the checked top holders, that's an on-chain-provable insider/
-// sniper cluster signal — no paid third-party API (Nansen/Arkham) needed.
+// Logic: for a token's top holders, find each wallet's funding chain via
+// Helius funded-by, hop past fresh/thin intermediate wallets, and land
+// on a stable funder. If the same funder wallet funded 2+ of the checked
+// top holders, that's an on-chain-provable insider/sniper cluster signal
+// — no paid third-party API (Nansen/Arkham) needed.
 
 import { Connection, PublicKey } from '@solana/web3.js';
+import pLimit from 'p-limit';
 import { withTimeout } from '@/lib/with-timeout';
 
 const RPC_URL = process.env.HELIUS_RPC_URL || 'https://api.mainnet-beta.solana.com';
 const RUGCHECK_URL = 'https://api.rugcheck.xyz/v1/tokens';
+const HELIUS_WALLET_API_URL = 'https://api.helius.xyz/v1/wallet';
+const HELIUS_API_KEY = process.env.HELIUS_API_KEY || '';
 
-// Safety caps so one request can't hammer the RPC forever on an old/busy wallet.
+// Safety caps so one request can't hammer Helius/RPC forever.
 const MAX_HOLDERS_CHECKED = 10;
-const MAX_SIG_PAGES = 3; // 3 * 1000 = up to 3000 signatures back per wallet
-const SIG_PAGE_SIZE = 1000;
+const HOLDER_CONCURRENCY = 8; // p-limit: max holder pipelines running at once
+const MAX_HOP_DEPTH = 3; // never trace further than this even if every hop looks fresh
+const CLEAN_FUNDER_MIN_AGE_DAYS = 30;
+const CLEAN_FUNDER_MIN_BALANCE_SOL = 1;
+const LAMPORTS_PER_SOL = 1_000_000_000;
 
 const RUGCHECK_TIMEOUT_MS = 10000;
-const PER_HOLDER_TIMEOUT_MS = 15000;
+const FUNDED_BY_TIMEOUT_MS = 6000;
+const PER_HOLDER_TIMEOUT_MS = 20000; // budget for one holder's whole hop chain (up to 3 sequential calls)
 
 export interface InsiderCluster {
   funder: string;
@@ -51,67 +75,72 @@ export interface InsiderClusterDetectionResult {
   errors: Array<{ holder: string; error: string }>;
 }
 
-interface SignatureInfo {
-  signature: string;
+interface FundedByResponse {
+  funder: string;
+  timestamp: number; // unix seconds — when this address's funding tx happened
 }
 
-// Walk a wallet's signature history backwards (oldest last) to find its
-// very first transaction signature.
-async function findOldestSignature(
-  connection: Connection,
-  pubkey: PublicKey,
-): Promise<string | null> {
-  let before: string | undefined = undefined;
-  let oldest: SignatureInfo | null = null;
+// One call to Helius Wallet API — who funded `address`, and when.
+// Resolves to null on any non-2xx response (400/401/403/404/429/500) or
+// network failure — callers treat null as "tracing stops here", not as
+// a hard error, since a missing funding tx (e.g. a fresh empty wallet,
+// or a Free-plan key hitting 403) shouldn't kill the whole holder check.
+async function fetchFundedBy(address: string): Promise<FundedByResponse | null> {
+  if (!HELIUS_API_KEY) return null;
 
-  for (let page = 0; page < MAX_SIG_PAGES; page++) {
-    const sigs = await connection.getSignaturesForAddress(pubkey, {
-      limit: SIG_PAGE_SIZE,
-      before,
-    });
-    if (sigs.length === 0) break;
-    oldest = sigs[sigs.length - 1];
-    if (sigs.length < SIG_PAGE_SIZE) break; // reached the actual start of history
-    before = oldest.signature;
+  try {
+    const res = await fetch(
+      `${HELIUS_WALLET_API_URL}/${address}/funded-by?api-key=${HELIUS_API_KEY}`,
+      { signal: AbortSignal.timeout(FUNDED_BY_TIMEOUT_MS) },
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!data || typeof data.funder !== 'string') return null;
+    return { funder: data.funder, timestamp: data.timestamp };
+  } catch {
+    return null;
   }
-
-  return oldest ? oldest.signature : null;
 }
 
-// Given a wallet's first transaction, find which OTHER account's SOL
-// balance decreased while this wallet's balance increased — that's the
-// real funder, read directly from the transaction's balance deltas.
-async function findFunderFromTx(
-  connection: Connection,
-  walletAddress: string,
-  signature: string,
-): Promise<string | null> {
-  const tx = await connection.getParsedTransaction(signature, {
-    maxSupportedTransactionVersion: 0,
-  });
-  if (!tx || !tx.meta) return null;
-
-  const accountKeys = tx.transaction.message.accountKeys.map((k: any) =>
-    typeof k === 'string' ? k : k.pubkey.toString(),
-  );
-  const walletIndex = accountKeys.indexOf(walletAddress);
-  if (walletIndex === -1) return null;
-
-  const preBalances = tx.meta.preBalances;
-  const postBalances = tx.meta.postBalances;
-  const walletGained = postBalances[walletIndex] - preBalances[walletIndex];
-  if (walletGained <= 0) return null; // this tx wasn't the wallet receiving funds
-
-  // Find an account whose balance dropped by roughly the amount this
-  // wallet gained (accounting for a small fee margin).
-  for (let i = 0; i < accountKeys.length; i++) {
-    if (i === walletIndex) continue;
-    const delta = postBalances[i] - preBalances[i];
-    if (delta < 0 && Math.abs(delta) >= walletGained * 0.9) {
-      return accountKeys[i];
-    }
+// Cheap RPC call — current SOL balance only, no signature history walk.
+async function fetchBalanceSol(connection: Connection, address: string): Promise<number> {
+  try {
+    const pubkey = new PublicKey(address);
+    const lamports = await connection.getBalance(pubkey, 'confirmed');
+    return lamports / LAMPORTS_PER_SOL;
+  } catch {
+    return 0;
   }
-  return null;
+}
+
+// Traces a single holder's first-funder chain, hopping past fresh/thin
+// intermediate wallets until a clean funder is found or MAX_HOP_DEPTH is
+// reached. Returns the resolved funder address, or null if no funding
+// transaction could be found at all (hop 1 already comes back empty).
+async function traceFunder(connection: Connection, holder: string): Promise<string | null> {
+  const firstHop = await fetchFundedBy(holder);
+  if (!firstHop) return null;
+
+  let resolvedFunder = firstHop.funder;
+
+  for (let hop = 1; hop < MAX_HOP_DEPTH; hop++) {
+    const [funderOrigin, balanceSol] = await Promise.all([
+      fetchFundedBy(resolvedFunder),
+      fetchBalanceSol(connection, resolvedFunder),
+    ]);
+
+    const ageDays = funderOrigin ? (Date.now() / 1000 - funderOrigin.timestamp) / 86400 : 0;
+    const isClean = ageDays >= CLEAN_FUNDER_MIN_AGE_DAYS && balanceSol > CLEAN_FUNDER_MIN_BALANCE_SOL;
+
+    // Clean funder found, OR this wallet has no funding tx of its own
+    // (likely pre-history / genesis-funded) — either way, stop here.
+    if (isClean || !funderOrigin) break;
+
+    // Fresh / thin-balance funder — hop one level further up the chain.
+    resolvedFunder = funderOrigin.funder;
+  }
+
+  return resolvedFunder;
 }
 
 // Main entry point: detect insider clusters among a mint's top holders.
@@ -140,27 +169,27 @@ export async function detectInsiderClusters(
   const connection = new Connection(RPC_URL, 'confirmed');
   const funderMap: Record<string, string[]> = {};
   const errors: Array<{ holder: string; error: string }> = [];
+  const limit = pLimit(HOLDER_CONCURRENCY);
 
-  for (const holder of topHolders) {
-    try {
-      const pubkey = new PublicKey(holder);
-      const funder = await withTimeout(
-        (async () => {
-          const oldestSig = await findOldestSignature(connection, pubkey);
-          if (!oldestSig) return null;
-          return findFunderFromTx(connection, holder, oldestSig);
-        })(),
-        PER_HOLDER_TIMEOUT_MS,
-        null,
-      );
-      if (funder) {
-        if (!funderMap[funder]) funderMap[funder] = [];
-        funderMap[funder].push(holder);
-      }
-    } catch (e: any) {
-      errors.push({ holder, error: e.message || 'Unknown error' });
-    }
-  }
+  await Promise.all(
+    topHolders.map((holder) =>
+      limit(async () => {
+        try {
+          const funder = await withTimeout(
+            traceFunder(connection, holder),
+            PER_HOLDER_TIMEOUT_MS,
+            null,
+          );
+          if (funder) {
+            if (!funderMap[funder]) funderMap[funder] = [];
+            funderMap[funder].push(holder);
+          }
+        } catch (e: any) {
+          errors.push({ holder, error: e.message || 'Unknown error' });
+        }
+      }),
+    ),
+  );
 
   // Only surface funders that funded 2+ of the checked top holders —
   // a single shared funding source across multiple top wallets is the
