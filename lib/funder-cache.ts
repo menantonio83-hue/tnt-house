@@ -1,4 +1,9 @@
-// Version 1.0 — lib/funder-cache.ts
+// Version 1.1 — lib/funder-cache.ts
+//
+// v1.1: added a plain console.log per lookup ('[funder-cache] HIT' /
+// 'MISS' + address) so real hit/miss rates are visible in Vercel
+// function logs on live traffic — no counter table, no extra moving
+// parts, just grep-able log lines.
 //
 // Optional Upstash Redis cache for wallet funder resolution, used by
 // lib/insider-cluster-detector.ts. A wallet's first-funding source is a
@@ -44,6 +49,7 @@ export async function getCachedFunder(address: string): Promise<CachedFunder | n
   if (!redis) return null;
   try {
     const value = await redis.get<CachedFunder>(`${KEY_PREFIX}${address}`);
+    console.log(value ? `[funder-cache] HIT ${address}` : `[funder-cache] MISS ${address}`);
     return value ?? null;
   } catch (e) {
     console.error('[funder-cache] get error:', (e as Error).message);
