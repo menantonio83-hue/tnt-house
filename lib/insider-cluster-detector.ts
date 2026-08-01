@@ -1,37 +1,29 @@
-// Version 7.1 — lib/insider-cluster-detector.ts
+// Version 7.2 — lib/insider-cluster-detector.ts
 //
-// v7.1: REVERTED v7.0's use of Helius Wallet API's /funded-by endpoint —
-// that's a paid Enhanced API endpoint (100 credits/call, 403 on Free
-// plan), and this project runs on a Free Helius plan. Back to standard
-// JSON-RPC getSignaturesForAddress (free on every plan), but with a
-// single-call fast path: most wallets in this hop chain (fresh/small
-// sniper & funder wallets) have well under 1000 total transactions, so
-// requesting the RPC's max page size (limit: 1000) already returns their
-// FULL history in one call — the last entry in that page is definitively
-// the oldest signature, no further pagination needed. Only wallets whose
-// first page comes back completely full (meaning more history exists
-// past it) fall through to the old page-by-page walk, capped at
-// MAX_SIG_PAGES like before.
-// NOTE: there is no `before`/`until` combination that returns the oldest
-// signature for an arbitrarily-old wallet in a single call — the RPC
-// only lets you page BACKWARD from "now", it can't jump straight to the
-// start. This fast path just skips paying that cost for the common case
-// (short-lived wallets) instead of pretending the worst case (old,
-// high-traffic wallets like a CEX hot wallet) doesn't exist.
+// v7.2: added an optional, TTL-less Upstash Redis cache
+// (lib/funder-cache.ts) for the "who funded this wallet" resolution
+// step. A wallet's first incoming SOL transfer is a fixed historical
+// fact, so once resolved for ANY wallet address — a top holder or an
+// intermediate funder hit while tracing a DIFFERENT token entirely — it
+// never needs to be resolved via RPC again. This is why the cache is
+// keyed by raw wallet address rather than by mint: a whale/market-maker
+// wallet that shows up as a funder across many different tokens' holder
+// lists now only pays the RPC cost once, ever, across the whole API.
+// Fail-open: if the Upstash integration isn't connected, every cache
+// call is a no-op and this file behaves exactly like v7.1.
 //
-// v7.1: getSignaturesForAddress already returns blockTime per entry, so
-// the oldest signature's timestamp (used for the hop clean/fresh check)
-// is read directly off that same call — no extra getParsedTransaction
-// just to learn a wallet's age. getParsedTransaction is only called when
-// we actually need to resolve WHO funded a wallet (balance-delta scan),
-// not just how old it is.
+// v7.1 (kept): free-tier getSignaturesForAddress with a single-call
+// fast path (max page size 1000; only paginates further if that first
+// page came back completely full, capped at MAX_SIG_PAGES) instead of
+// the paid Helius funded-by endpoint. blockTime is read straight off
+// the signature-list entry, no extra getParsedTransaction just to learn
+// a wallet's age.
 //
 // v7.0 (kept): holder pipelines run in parallel via p-limit
-// (HOLDER_CONCURRENCY = 8) instead of a sequential for-loop. Funder
-// "hop" heuristic kept as-is: a funder is CLEAN (tracing stops there) if
-// it's >= CLEAN_FUNDER_MIN_AGE_DAYS old AND holds more than
-// CLEAN_FUNDER_MIN_BALANCE_SOL — otherwise hop to ITS funder, up to
-// MAX_HOP_DEPTH hops total.
+// (HOLDER_CONCURRENCY = 8). Funder "hop" heuristic: a funder is CLEAN
+// (tracing stops there) if it's >= CLEAN_FUNDER_MIN_AGE_DAYS old AND
+// holds more than CLEAN_FUNDER_MIN_BALANCE_SOL — otherwise hop to ITS
+// funder, up to MAX_HOP_DEPTH hops total.
 //
 // Standalone "First Funder Trace" insider-cluster detector.
 //
@@ -55,6 +47,7 @@
 import { Connection, PublicKey } from '@solana/web3.js';
 import pLimit from 'p-limit';
 import { withTimeout } from '@/lib/with-timeout';
+import { getCachedFunder, setCachedFunderAsync, type CachedFunder } from '@/lib/funder-cache';
 
 const RPC_URL = process.env.HELIUS_RPC_URL || 'https://api.mainnet-beta.solana.com';
 const RUGCHECK_URL = 'https://api.rugcheck.xyz/v1/tokens';
@@ -153,6 +146,8 @@ async function findFunderFromTx(
 }
 
 // Cheap RPC call — current SOL balance only, no signature history walk.
+// Never cached — a live balance, unlike a funding source, changes
+// constantly.
 async function fetchBalanceSol(connection: Connection, address: string): Promise<number> {
   try {
     const lamports = await connection.getBalance(new PublicKey(address), 'confirmed');
@@ -162,38 +157,56 @@ async function fetchBalanceSol(connection: Connection, address: string): Promise
   }
 }
 
+// Resolves "who funded this wallet, and when" — cache-first. A hit
+// skips the RPC signature walk + tx parse entirely. A miss falls back
+// to the RPC path and writes the result to cache (fire-and-forget) so
+// every OTHER wallet that shares this same funder — in this token's
+// holder list, or any future token's — gets a free hit from here on.
+async function resolveWalletFunder(
+  connection: Connection,
+  address: string,
+): Promise<CachedFunder | null> {
+  const cached = await getCachedFunder(address);
+  if (cached) return cached;
+
+  const oldest = await findOldestSignature(connection, new PublicKey(address));
+  if (!oldest) return null;
+
+  const funder = await findFunderFromTx(connection, address, oldest.signature);
+  if (!funder) return null;
+
+  const result: CachedFunder = { funder, blockTime: oldest.blockTime };
+  setCachedFunderAsync(address, result); // fire-and-forget, no TTL — this fact never changes
+  return result;
+}
+
 // Traces a single holder's first-funder chain, hopping past fresh/thin
 // intermediate wallets until a clean funder is found or MAX_HOP_DEPTH is
 // reached. Returns the resolved funder address, or null if no funding
 // transaction could be found at all.
 async function traceFunder(connection: Connection, holder: string): Promise<string | null> {
-  const holderOldest = await findOldestSignature(connection, new PublicKey(holder));
-  if (!holderOldest) return null;
+  const first = await resolveWalletFunder(connection, holder);
+  if (!first) return null;
 
-  let resolvedFunder = await findFunderFromTx(connection, holder, holderOldest.signature);
-  if (!resolvedFunder) return null;
+  let resolvedFunder = first.funder;
 
   for (let hop = 1; hop < MAX_HOP_DEPTH; hop++) {
-    const funderPubkey = new PublicKey(resolvedFunder);
-    const [funderOldest, balanceSol] = await Promise.all([
-      findOldestSignature(connection, funderPubkey),
+    const [funderInfo, balanceSol] = await Promise.all([
+      resolveWalletFunder(connection, resolvedFunder),
       fetchBalanceSol(connection, resolvedFunder),
     ]);
 
-    const ageDays = funderOldest?.blockTime
-      ? (Date.now() / 1000 - funderOldest.blockTime) / 86400
+    const ageDays = funderInfo?.blockTime
+      ? (Date.now() / 1000 - funderInfo.blockTime) / 86400
       : 0;
     const isClean = ageDays >= CLEAN_FUNDER_MIN_AGE_DAYS && balanceSol > CLEAN_FUNDER_MIN_BALANCE_SOL;
 
-    // Clean funder found, OR this wallet has no signature history of its
-    // own (shouldn't normally happen once it has funded another wallet,
-    // but guard against it) — either way, stop here and use it.
-    if (isClean || !funderOldest) break;
+    // Clean funder found, OR this wallet has no funding tx of its own
+    // (e.g. pre-history / genesis-funded) — either way, stop here.
+    if (isClean || !funderInfo) break;
 
     // Fresh / thin-balance funder — hop one level further up the chain.
-    const nextFunder = await findFunderFromTx(connection, resolvedFunder, funderOldest.signature);
-    if (!nextFunder) break; // couldn't resolve the next hop — keep current resolvedFunder
-    resolvedFunder = nextFunder;
+    resolvedFunder = funderInfo.funder;
   }
 
   return resolvedFunder;
