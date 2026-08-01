@@ -1159,6 +1159,16 @@ async function saveTokenToSupabase(token) {
       permanent_delegate: token.permanentDelegate || null,
       // FIX v1.90: this is what getFreeAuditsUsedCount() actually counts.
       is_free: token.isFree || false,
+      // FIX v1.114: bumped on EVERY save (insert and re-audit alike) —
+      // this is what loadTokensFromSupabase() now sorts "Newest" by,
+      // instead of created_at (which Supabase only sets once, at INSERT,
+      // and a PATCH never touches). Without this, a fully re-audited
+      // token with completely fresh price/score/holders data still sat
+      // frozen at its original position in the table — the monetization
+      // incentive ("pay again -> fresh data AND back on top") only half
+      // worked. created_at itself is left alone as the token's genuine
+      // first-listed date.
+      last_audit_at: new Date().toISOString(),
     };
 
     if (existingRows.length > 0) {
@@ -1196,8 +1206,12 @@ async function saveTokenToSupabase(token) {
 
 async function loadTokensFromSupabase() {
   try {
+    // FIX v1.114: sort by last_audit_at (bumped on every re-audit), not
+    // created_at (fixed at first insert forever) — see saveTokenToSupabase
+    // for why. Fall back to created_at is unnecessary: the migration
+    // backfilled last_audit_at = created_at for every pre-existing row.
     var res = await fetch(
-      SUPABASE_URL + '/rest/v1/listed_tokens?select=*&order=created_at.desc&limit=20',
+      SUPABASE_URL + '/rest/v1/listed_tokens?select=*&order=last_audit_at.desc&limit=20',
       { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } },
     );
     if (!res.ok) return [];
