@@ -1,3 +1,11 @@
+// Version 8.4 — lib/billing-pricing.ts
+//
+// v8.4: added WEBHOOK_SUBSCRIPTION_LIMITS — app/api/v1/webhooks/subscribe
+// caps how many ACTIVE subscriptions one key can hold at once. Kept
+// here alongside the other tier-based numbers rather than a new file,
+// since it's the same "what does this tier get" concern as
+// FREE_DAILY_LIMIT / SUBSCRIPTION_MONTHLY_QUOTA below.
+//
 // Version 8.3 — lib/billing-pricing.ts
 //
 // v8.3: two fixes from the second external-review round:
@@ -225,3 +233,12 @@ export function formatPayAmount(payAmount: number, currency: Currency): string {
   if (currency === 'USDC') return payAmount.toFixed(6); // was toFixed(4) — salt lives past the 4th decimal
   return String(Math.round(payAmount)); // MRDT: always a whole token amount
 }
+
+// Active-subscription cap per tier for app/api/v1/webhooks/subscribe.
+// 'paid' gets a real cap (never Infinity) — an unbounded value here is
+// a footgun if this table is ever scanned without pagination.
+export const WEBHOOK_SUBSCRIPTION_LIMITS: Record<string, number> = {
+  free: 10,
+  subscription: 50,
+  paid: 1000,
+};
