@@ -1,3 +1,19 @@
+// Version 1.1 — app/api/v1/webhooks/check/route.ts
+//
+// v1.1: HOTFIX — verifySignatureAppRouter() throws SYNCHRONOUSLY at
+// import time if QSTASH_CURRENT_SIGNING_KEY / QSTASH_NEXT_SIGNING_KEY
+// aren't set, and Next.js's build step imports every route to collect
+// its metadata — so a missing env var here took down the ENTIRE site's
+// `next build`, not just this route (confirmed: this exact deploy
+// failed with "Error: Failed to collect page data for
+// /api/v1/webhooks/check"). Same class of bug lib/supabase-admin.ts's
+// header comment already warns about for its own client. Fix: pass
+// explicit signing keys with non-empty placeholder fallbacks so the
+// wrapper can always be constructed at build time; a real request
+// still fails normally (signature won't verify) until the actual keys
+// are set in Vercel — that failure mode is fine, an unreachable build
+// is not.
+//
 // Version 1.0 — app/api/v1/webhooks/check/route.ts
 //
 // QStash scheduled target (scheduleId scd_611yNNY9v5VLG79bzzXE1R5Ucby2,
@@ -149,4 +165,7 @@ async function handler(_request: NextRequest) {
   }
 }
 
-export const POST = verifySignatureAppRouter(handler);
+export const POST = verifySignatureAppRouter(handler, {
+  currentSigningKey: process.env.QSTASH_CURRENT_SIGNING_KEY || 'missing-qstash-current-signing-key',
+  nextSigningKey: process.env.QSTASH_NEXT_SIGNING_KEY || 'missing-qstash-next-signing-key',
+});
