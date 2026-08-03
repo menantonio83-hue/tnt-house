@@ -106,6 +106,14 @@ export interface RiskApiTranslations {
   copyOpenApiUrl: string;
   webhooksRoadmapNote: string;
 
+  // Webhooks docs section (v1.9)
+  webhooksDocsTitle: string;
+  webhooksDocsIntro: string;
+  webhooksSubscribeLabel: string;
+  webhooksResponseLabel: string;
+  webhooksPayloadLabel: string;
+  webhooksUnsubscribeNote: string;
+
   // Rate limiting section
   rateLimitingTitle: string;
   rateLimitingIntro: string;
@@ -231,7 +239,13 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     chatLimitReached: 'Rate limit reached — try again in a few minutes.',
     chatConnectionError: 'Connection error. ⚡ Get your free API key below.',
     copyOpenApiUrl: 'Copy',
-    webhooksRoadmapNote: 'Webhooks for cluster_analysis completion are on the roadmap, not yet available — for now, re-check the same mint after 1-2 minutes.',
+    webhooksRoadmapNote: 'On a token\'s first-ever check, cluster_analysis returns "pending" while the trace runs in the background — re-check the same mint after 1-2 minutes, or subscribe to a safety_score webhook below to get pushed a notification instead of polling.',
+    webhooksDocsTitle: 'Webhooks',
+    webhooksDocsIntro: 'Instead of polling token-risk on a schedule, subscribe once to a mint and a safety_score threshold — get a signed HTTP callback the moment it\'s crossed, in either direction.',
+    webhooksSubscribeLabel: 'Subscribe',
+    webhooksResponseLabel: 'Subscription created',
+    webhooksPayloadLabel: 'Delivered to your callback_url',
+    webhooksUnsubscribeNote: 'Fires once per crossing, not on every check. Verify each delivery with the X-Webhook-Signature header and the webhook_secret from the subscribe response (shown only once). Call DELETE /api/v1/webhooks/{id} to unsubscribe.',
     rateLimitingTitle: 'Rate Limiting',
     rateLimitingIntro: 'Every key gets 15 free requests per calendar day (UTC). Go over that with no call-credit balance and you get a 402, not a silent block — top up or subscribe and the same key keeps working immediately.',
     rateLimitHeaderLimitLabel: 'X-RateLimit-Limit',
@@ -250,6 +264,14 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'Changelog',
     changelogNote: 'No mailing list or webhooks yet for update announcements — this page and the X / Telegram links in the footer are the way to stay current.',
     changelogEntries: [
+      {
+        version: 'v1.9',
+        date: '2026-08-03',
+        changes: [
+          "Added webhook subscriptions — POST /api/v1/webhooks/subscribe to get pushed a callback when a mint's safety_score crosses a threshold (above/below), instead of polling.",
+          "Edge-triggered delivery (fires once per crossing, not repeatedly), HMAC-signed payloads, DELETE /api/v1/webhooks/{id} to unsubscribe.",
+        ],
+      },
       {
         version: 'v1.8',
         date: '2026-07-27',
@@ -402,7 +424,13 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     chatLimitReached: 'Límite alcanzado — inténtalo de nuevo en unos minutos.',
     chatConnectionError: 'Error de conexión. ⚡ Consigue tu API key gratis más abajo.',
     copyOpenApiUrl: 'Copiar',
-    webhooksRoadmapNote: 'Los webhooks para cluster_analysis completado están en el roadmap, aún no disponibles — por ahora, vuelve a comprobar el mismo mint tras 1-2 minutos.',
+    webhooksRoadmapNote: 'En la primera verificación de un token, cluster_analysis devuelve "pending" mientras el rastreo se ejecuta en segundo plano — vuelve a comprobar el mismo mint tras 1-2 minutos, o suscríbete a un webhook de safety_score más abajo para recibir una notificación en lugar de hacer polling.',
+    webhooksDocsTitle: 'Webhooks',
+    webhooksDocsIntro: 'En lugar de hacer polling a token-risk según un horario, suscríbete una vez a un mint y un umbral de safety_score — recibe un callback HTTP firmado en el momento en que se cruza, en cualquier dirección.',
+    webhooksSubscribeLabel: 'Suscribirse',
+    webhooksResponseLabel: 'Suscripción creada',
+    webhooksPayloadLabel: 'Entregado a tu callback_url',
+    webhooksUnsubscribeNote: 'Se dispara una sola vez por cruce, no en cada verificación. Verifica cada entrega con la cabecera X-Webhook-Signature y el webhook_secret de la respuesta de suscripción (se muestra una sola vez). Llama a DELETE /api/v1/webhooks/{id} para darte de baja.',
     rateLimitingTitle: 'Límite de solicitudes',
     rateLimitingIntro: 'Cada key tiene 15 solicitudes gratuitas por día natural (UTC). Si superas ese límite sin saldo de crédito, recibes un 402, no un bloqueo silencioso — recarga saldo o suscríbete y la misma key vuelve a funcionar de inmediato.',
     rateLimitHeaderLimitLabel: 'X-RateLimit-Limit',
@@ -421,6 +449,14 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'Registro de cambios',
     changelogNote: 'Todavía no hay lista de correo ni webhooks para anunciar novedades — esta página y los enlaces de X / Telegram del pie son la forma de mantenerte al día.',
     changelogEntries: [
+      {
+        version: 'v1.9',
+        date: '2026-08-03',
+        changes: [
+          "Se añadieron suscripciones a webhooks — POST /api/v1/webhooks/subscribe para recibir un callback cuando el safety_score de un mint cruza un umbral (por encima/por debajo), en lugar de hacer polling.",
+          "Entrega basada en el cruce (se dispara una sola vez por cruce, no repetidamente), payloads firmados con HMAC, DELETE /api/v1/webhooks/{id} para darse de baja.",
+        ],
+      },
       {
         version: 'v1.8',
         date: '2026-07-27',
@@ -573,7 +609,13 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     chatLimitReached: 'Limite atteinte — réessaie dans quelques minutes.',
     chatConnectionError: 'Erreur de connexion. ⚡ Obtenez votre clé API gratuite ci-dessous.',
     copyOpenApiUrl: 'Copier',
-    webhooksRoadmapNote: 'Les webhooks pour la fin de cluster_analysis sont sur la feuille de route, pas encore disponibles — en attendant, revérifiez le même mint après 1-2 minutes.',
+    webhooksRoadmapNote: 'Lors de la toute première vérification d\'un token, cluster_analysis renvoie "pending" pendant que l\'analyse s\'exécute en arrière-plan — revérifiez le même mint après 1-2 minutes, ou abonnez-vous à un webhook de safety_score ci-dessous pour recevoir une notification au lieu de faire du polling.',
+    webhooksDocsTitle: 'Webhooks',
+    webhooksDocsIntro: 'Plutôt que de faire du polling sur token-risk selon un planning, abonnez-vous une seule fois à un mint et un seuil de safety_score — recevez un callback HTTP signé dès qu\'il est franchi, dans un sens comme dans l\'autre.',
+    webhooksSubscribeLabel: 'S\'abonner',
+    webhooksResponseLabel: 'Abonnement créé',
+    webhooksPayloadLabel: 'Livré à votre callback_url',
+    webhooksUnsubscribeNote: 'Se déclenche une seule fois par franchissement, pas à chaque vérification. Vérifiez chaque livraison avec l\'en-tête X-Webhook-Signature et le webhook_secret renvoyé lors de l\'abonnement (affiché une seule fois). Appelez DELETE /api/v1/webhooks/{id} pour vous désabonner.',
     rateLimitingTitle: 'Limitation de débit',
     rateLimitingIntro: 'Chaque clé dispose de 15 requêtes gratuites par jour calendaire (UTC). Au-delà, sans solde de crédit, vous recevez un 402, pas un blocage silencieux — rechargez ou abonnez-vous et la même clé refonctionne immédiatement.',
     rateLimitHeaderLimitLabel: 'X-RateLimit-Limit',
@@ -592,6 +634,14 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'Journal des modifications',
     changelogNote: 'Pas encore de liste de diffusion ni de webhooks pour les annonces — cette page et les liens X / Telegram en pied de page sont le moyen de rester à jour.',
     changelogEntries: [
+      {
+        version: 'v1.9',
+        date: '2026-08-03',
+        changes: [
+          "Ajout des abonnements webhook — POST /api/v1/webhooks/subscribe pour recevoir un callback quand le safety_score d'un mint franchit un seuil (au-dessus/en dessous), au lieu de faire du polling.",
+          "Livraison déclenchée par le franchissement (se déclenche une seule fois par franchissement, pas de façon répétée), payloads signés HMAC, DELETE /api/v1/webhooks/{id} pour se désabonner.",
+        ],
+      },
       {
         version: 'v1.8',
         date: '2026-07-27',
@@ -744,7 +794,13 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     chatLimitReached: 'Το όριο ξεπεράστηκε — δοκίμασε ξανά σε λίγα λεπτά.',
     chatConnectionError: 'Σφάλμα σύνδεσης. ⚡ Πάρε το δωρεάν API key σου παρακάτω.',
     copyOpenApiUrl: 'Αντιγραφή',
-    webhooksRoadmapNote: 'Τα webhooks για την ολοκλήρωση του cluster_analysis είναι στον χάρτη πορείας, όχι ακόμα διαθέσιμα — προς το παρόν, ξαναέλεγξε το ίδιο mint μετά από 1-2 λεπτά.',
+    webhooksRoadmapNote: 'Στον πρώτο έλεγχο ενός token, το cluster_analysis επιστρέφει "pending" όσο η ανάλυση εκτελείται στο παρασκήνιο — ξαναέλεγξε το ίδιο mint μετά από 1-2 λεπτά, ή κάνε εγγραφή σε ένα webhook του safety_score παρακάτω για να λαμβάνεις ειδοποίηση αντί να κάνεις polling.',
+    webhooksDocsTitle: 'Webhooks',
+    webhooksDocsIntro: 'Αντί να κάνεις polling στο token-risk σε πρόγραμμα, κάνε εγγραφή μία φορά σε ένα mint και ένα όριο safety_score — λάβε ένα υπογεγραμμένο HTTP callback τη στιγμή που το διασχίζει, προς οποιαδήποτε κατεύθυνση.',
+    webhooksSubscribeLabel: 'Εγγραφή',
+    webhooksResponseLabel: 'Η συνδρομή δημιουργήθηκε',
+    webhooksPayloadLabel: 'Παραδίδεται στο callback_url σου',
+    webhooksUnsubscribeNote: 'Ενεργοποιείται μία φορά ανά διάσχιση, όχι σε κάθε έλεγχο. Επιβεβαίωσε κάθε παράδοση με το header X-Webhook-Signature και το webhook_secret από την απόκριση εγγραφής (εμφανίζεται μία μόνο φορά). Κάλεσε DELETE /api/v1/webhooks/{id} για διαγραφή συνδρομής.',
     rateLimitingTitle: 'Όριο αιτημάτων',
     rateLimitingIntro: 'Κάθε key έχει 15 δωρεάν αιτήματα ανά ημερολογιακή ημέρα (UTC). Αν το ξεπεράσεις χωρίς υπόλοιπο πίστωσης, παίρνεις 402, όχι σιωπηλό μπλοκάρισμα — φόρτωσε υπόλοιπο ή κάνε συνδρομή και το ίδιο key ξαναδουλεύει αμέσως.',
     rateLimitHeaderLimitLabel: 'X-RateLimit-Limit',
@@ -763,6 +819,14 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'Ιστορικό αλλαγών',
     changelogNote: 'Δεν υπάρχει ακόμα mailing list ή webhooks για ανακοινώσεις ενημερώσεων — αυτή η σελίδα και οι σύνδεσμοι X / Telegram στο footer είναι ο τρόπος να μένεις ενήμερος.',
     changelogEntries: [
+      {
+        version: 'v1.9',
+        date: '2026-08-03',
+        changes: [
+          "Προστέθηκαν συνδρομές webhook — POST /api/v1/webhooks/subscribe για να λαμβάνεις ένα callback όταν το safety_score ενός mint διασχίζει ένα όριο (πάνω/κάτω), αντί να κάνεις polling.",
+          "Παράδοση με βάση τη διάσχιση (ενεργοποιείται μία φορά ανά διάσχιση, όχι επανειλημμένα), payloads υπογεγραμμένα με HMAC, DELETE /api/v1/webhooks/{id} για διαγραφή συνδρομής.",
+        ],
+      },
       {
         version: 'v1.8',
         date: '2026-07-27',
@@ -915,7 +979,13 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     chatLimitReached: 'Достигнут лимит — попробуй через несколько минут.',
     chatConnectionError: 'Ошибка соединения. ⚡ Получи бесплатный API-ключ ниже.',
     copyOpenApiUrl: 'Копировать',
-    webhooksRoadmapNote: 'Вебхуки на завершение cluster_analysis — в планах, пока не реализованы. Сейчас просто перепроверь тот же минт через 1-2 минуты.',
+    webhooksRoadmapNote: 'При первой проверке токена cluster_analysis возвращает "pending", пока анализ выполняется в фоне — перепроверь тот же mint через 1-2 минуты, либо подпишись на webhook по safety_score ниже, чтобы получать уведомление вместо постоянного опроса.',
+    webhooksDocsTitle: 'Webhooks',
+    webhooksDocsIntro: 'Вместо постоянного опроса token-risk по расписанию — подпишись один раз на mint и порог safety_score и получай подписанный HTTP callback в момент пересечения, в любую сторону.',
+    webhooksSubscribeLabel: 'Подписаться',
+    webhooksResponseLabel: 'Подписка создана',
+    webhooksPayloadLabel: 'Доставляется на твой callback_url',
+    webhooksUnsubscribeNote: 'Срабатывает один раз за пересечение, а не при каждой проверке. Проверяй каждую доставку через заголовок X-Webhook-Signature и webhook_secret из ответа на подписку (показывается только один раз). Вызови DELETE /api/v1/webhooks/{id}, чтобы отписаться.',
     rateLimitingTitle: 'Лимиты запросов',
     rateLimitingIntro: 'У каждого ключа 15 бесплатных запросов в календарные сутки (UTC). Превысил лимит без баланса кредитов — получишь 402, а не тихую блокировку: пополни баланс или оформи подписку — и тот же ключ сразу снова работает.',
     rateLimitHeaderLimitLabel: 'X-RateLimit-Limit',
@@ -934,6 +1004,14 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'История изменений',
     changelogNote: 'Пока нет рассылки или вебхуков для анонсов обновлений — следить за актуальным состоянием можно по этой странице и ссылкам на X / Telegram в подвале.',
     changelogEntries: [
+      {
+        version: 'v1.9',
+        date: '2026-08-03',
+        changes: [
+          "Добавлены подписки на webhook — POST /api/v1/webhooks/subscribe, чтобы получать callback, когда safety_score минта пересекает порог (сверху/снизу), вместо постоянного опроса.",
+          "Доставка по факту пересечения (срабатывает один раз за пересечение, не повторяется), payload подписан HMAC, DELETE /api/v1/webhooks/{id} для отписки.",
+        ],
+      },
       {
         version: 'v1.8',
         date: '2026-07-27',
@@ -1086,7 +1164,13 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     chatLimitReached: 'Limite raggiunto — riprova tra qualche minuto.',
     chatConnectionError: 'Errore di connessione. ⚡ Ottieni la tua API key gratuita qui sotto.',
     copyOpenApiUrl: 'Copia',
-    webhooksRoadmapNote: 'I webhook per il completamento di cluster_analysis sono nella roadmap, non ancora disponibili — per ora, ricontrolla lo stesso mint dopo 1-2 minuti.',
+    webhooksRoadmapNote: 'Al primo controllo di un token, cluster_analysis restituisce "pending" mentre l\'analisi viene eseguita in background — ricontrolla lo stesso mint dopo 1-2 minuti, oppure iscriviti a un webhook su safety_score qui sotto per ricevere una notifica invece di fare polling.',
+    webhooksDocsTitle: 'Webhooks',
+    webhooksDocsIntro: 'Invece di fare polling su token-risk secondo una pianificazione, iscriviti una sola volta a un mint e una soglia di safety_score — ricevi una callback HTTP firmata nel momento in cui viene superata, in entrambe le direzioni.',
+    webhooksSubscribeLabel: 'Iscriviti',
+    webhooksResponseLabel: 'Iscrizione creata',
+    webhooksPayloadLabel: 'Consegnato al tuo callback_url',
+    webhooksUnsubscribeNote: 'Si attiva una sola volta per attraversamento, non a ogni controllo. Verifica ogni consegna con l\'header X-Webhook-Signature e il webhook_secret restituito alla sottoscrizione (mostrato una sola volta). Chiama DELETE /api/v1/webhooks/{id} per annullare l\'iscrizione.',
     rateLimitingTitle: 'Limiti di richieste',
     rateLimitingIntro: 'Ogni key ha 15 richieste gratuite al giorno solare (UTC). Se lo superi senza saldo di credito, ricevi un 402, non un blocco silenzioso — ricarica il saldo o abbonati e la stessa key torna subito a funzionare.',
     rateLimitHeaderLimitLabel: 'X-RateLimit-Limit',
@@ -1105,6 +1189,14 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'Changelog',
     changelogNote: "Non c'è ancora una mailing list o webhook per gli annunci di aggiornamento — questa pagina e i link X / Telegram nel footer sono il modo per restare aggiornati.",
     changelogEntries: [
+      {
+        version: 'v1.9',
+        date: '2026-08-03',
+        changes: [
+          "Aggiunte le sottoscrizioni webhook — POST /api/v1/webhooks/subscribe per ricevere una callback quando il safety_score di un mint supera una soglia (sopra/sotto), invece di fare polling.",
+          "Consegna basata sull'attraversamento della soglia (si attiva una sola volta per attraversamento, non ripetutamente), payload firmati HMAC, DELETE /api/v1/webhooks/{id} per annullare l'iscrizione.",
+        ],
+      },
       {
         version: 'v1.8',
         date: '2026-07-27',
@@ -1257,7 +1349,13 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     chatLimitReached: '已达到限制 —— 请几分钟后再试。',
     chatConnectionError: '连接错误。⚡ 在下方获取你的免费 API 密钥。',
     copyOpenApiUrl: '复制',
-    webhooksRoadmapNote: 'cluster_analysis 完成后的 webhook 通知已列入路线图，目前尚未上线 —— 现在请在 1-2 分钟后重新查询同一个 mint。',
+    webhooksRoadmapNote: '代币首次检测时，cluster_analysis 会返回 "pending"，此时分析仍在后台运行 —— 请在 1-2 分钟后重新查询同一个 mint，或在下方订阅 safety_score webhook，以推送通知代替轮询。',
+    webhooksDocsTitle: 'Webhooks',
+    webhooksDocsIntro: '无需按计划轮询 token-risk —— 只需针对某个 mint 和 safety_score 阈值订阅一次，一旦跨越阈值（无论方向），即可收到已签名的 HTTP 回调。',
+    webhooksSubscribeLabel: '订阅',
+    webhooksResponseLabel: '订阅已创建',
+    webhooksPayloadLabel: '推送到你的 callback_url',
+    webhooksUnsubscribeNote: '每次跨越只触发一次，而非每次检测都触发。请使用 X-Webhook-Signature 请求头和订阅响应中返回的 webhook_secret（仅显示一次）验证每次推送。调用 DELETE /api/v1/webhooks/{id} 即可取消订阅。',
     rateLimitingTitle: '速率限制',
     rateLimitingIntro: '每个密钥每个日历日（UTC）有 15 次免费请求。超过这个额度且没有信用余额时，你会收到 402，而不是被默默拦截——充值或订阅后，同一个密钥会立即恢复可用。',
     rateLimitHeaderLimitLabel: 'X-RateLimit-Limit',
@@ -1276,6 +1374,14 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: '更新日志',
     changelogNote: '目前还没有邮件列表或 webhook 用于更新通知——请通过本页面以及页脚的 X / Telegram 链接来获取最新动态。',
     changelogEntries: [
+      {
+        version: 'v1.9',
+        date: '2026-08-03',
+        changes: [
+          "新增 webhook 订阅功能 —— 通过 POST /api/v1/webhooks/subscribe，当某个 mint 的 safety_score 跨越设定阈值（above/below）时推送回调，而无需轮询。",
+          "基于阈值跨越触发的推送（每次跨越只触发一次，不会重复），payload 使用 HMAC 签名，可通过 DELETE /api/v1/webhooks/{id} 取消订阅。",
+        ],
+      },
       {
         version: 'v1.8',
         date: '2026-07-27',
