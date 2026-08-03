@@ -1,3 +1,16 @@
+// Version 1.5 — app/risk-api/RiskApiPageContent.tsx
+//
+// v1.5: new "Webhooks" docs section (between Rate Limiting and
+// Versioning & Changelog) — subscribe request example, the 201
+// subscription-created response (with webhook_secret), and the actual
+// risk_score.threshold_crossed payload shape delivered to callback_url,
+// copied verbatim from the deployed app/api/v1/webhooks/subscribe and
+// app/api/v1/webhooks/check route handlers (v1.9 changelog entry).
+// Endpoint paths, JSON field names, and HTTP header names stay in
+// English in every locale, same convention as the rest of this file —
+// only the surrounding prose (t.webhooksDocsIntro/*Label/*Note) is
+// localized via i18n.ts.
+//
 // Version 1.4 — app/risk-api/RiskApiPageContent.tsx
 //
 // v1.4: changelog now renders t.changelogEntries (i18n.ts v1.3) instead
@@ -87,6 +100,47 @@ const TYPESCRIPT_EXAMPLE = `async function checkTokenRisk(mint: string, apiKey: 
   if (!res.ok) throw new Error(\`API error: \${res.status}\`);
   return res.json();
 }`;
+
+const WEBHOOK_SUBSCRIBE_EXAMPLE = `curl -X POST "https://tnt-audit.com/api/v1/webhooks/subscribe" \\
+  -H "Authorization: Bearer tnt_sk_your_key_here" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    "threshold": 50,
+    "condition": "below",
+    "callback_url": "https://yourbot.example.com/webhooks/tnt"
+  }'`;
+
+const WEBHOOK_SUBSCRIBE_RESPONSE = {
+  id: '8f2a1c3e-4b6d-4a1e-9c2f-1a2b3c4d5e6f',
+  mint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+  threshold: 50,
+  condition: 'below',
+  callback_url: 'https://yourbot.example.com/webhooks/tnt',
+  active: true,
+  created_at: '2026-08-03T12:00:00.000Z',
+  webhook_secret: 'whsec_9f8e7d6c5b4a3f2e1d0c...',
+  note: 'Save webhook_secret now — it is shown only once and is required to verify the X-Webhook-Signature header on every delivery.',
+};
+
+const WEBHOOK_PAYLOAD_EXAMPLE = {
+  id: 'evt_19a2b3c4d5e6f7',
+  object: 'webhook_event',
+  api_version: 'v1',
+  created: 1785845700,
+  type: 'risk_score.threshold_crossed',
+  data: {
+    object: {
+      subscription_id: '8f2a1c3e-4b6d-4a1e-9c2f-1a2b3c4d5e6f',
+      mint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+      previous_score: 62,
+      current_score: 48,
+      threshold: 50,
+      condition: 'below',
+      crossed_at: '2026-08-03T12:15:00.000Z',
+    },
+  },
+};
 
 // v1.1: CHANGELOG used to be a hardcoded English-only constant here
 // ("technical/log content, same convention as curl/JSON examples").
@@ -358,6 +412,61 @@ X-RateLimit-Reset: 2026-07-24T00:00:00.000Z
           </div>
 
           <p className="text-[11px] text-slate-500 mt-4">{t.rateLimitBestPractice}</p>
+        </section>
+
+        {/* Webhooks — push notifications instead of polling */}
+        <section className="pb-14">
+          <h2 className="text-xl sm:text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400 mb-4">
+            {t.webhooksDocsTitle}
+          </h2>
+          <p className="text-xs sm:text-sm text-slate-400 leading-relaxed mb-6">
+            {t.webhooksDocsIntro}
+          </p>
+
+          <div className="bg-slate-950 border-2 border-purple-500/40 rounded-lg shadow-[0_0_20px_rgba(153,69,255,0.15)] overflow-hidden mb-4">
+            <div className="flex items-center justify-between border-b border-purple-500/20 px-4 py-2.5">
+              <div className="flex items-center gap-1.5 text-purple-400 font-bold text-xs">
+                <Terminal size={13} />
+                POST /api/v1/webhooks/subscribe
+              </div>
+              <span className="text-[10px] text-slate-500">{t.webhooksSubscribeLabel}</span>
+            </div>
+            <div className="p-4 space-y-3">
+              <div className="flex items-start justify-between gap-2">
+                <pre className="text-[11px] sm:text-xs text-emerald-400 overflow-x-auto flex-1 leading-relaxed">
+                  {WEBHOOK_SUBSCRIBE_EXAMPLE}
+                </pre>
+                <CopyButton text={WEBHOOK_SUBSCRIBE_EXAMPLE} label={t.copyLabel} />
+              </div>
+
+              <div className="border-t border-purple-500/10 pt-3">
+                <div className="text-[10px] text-slate-500 mb-1.5">{t.webhooksResponseLabel} — 201</div>
+                <pre className="text-[10px] sm:text-[11px] text-slate-300 overflow-x-auto leading-relaxed">
+                  {JSON.stringify(WEBHOOK_SUBSCRIBE_RESPONSE, null, 2)}
+                </pre>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-slate-950 border-2 border-purple-500/40 rounded-lg shadow-[0_0_20px_rgba(153,69,255,0.15)] overflow-hidden mb-4">
+            <div className="flex items-center justify-between border-b border-purple-500/20 px-4 py-2.5">
+              <div className="flex items-center gap-1.5 text-purple-400 font-bold text-xs">
+                <Zap size={13} />
+                POST {'<your callback_url>'}
+              </div>
+              <span className="text-[10px] text-slate-500">{t.webhooksPayloadLabel}</span>
+            </div>
+            <div className="p-4 space-y-2">
+              <div className="text-[10px] text-slate-500">
+                X-Webhook-Signature: <span className="text-emerald-400">hmac-sha256(...)</span>
+              </div>
+              <pre className="text-[10px] sm:text-[11px] text-slate-300 overflow-x-auto leading-relaxed">
+                {JSON.stringify(WEBHOOK_PAYLOAD_EXAMPLE, null, 2)}
+              </pre>
+            </div>
+          </div>
+
+          <p className="text-[11px] text-slate-500">{t.webhooksUnsubscribeNote}</p>
         </section>
 
         {/* Changelog & versioning */}
