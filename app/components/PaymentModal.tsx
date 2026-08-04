@@ -14,8 +14,8 @@ export default function PaymentModal({ amount, onPaymentSuccess, onClose }: Paym
   const [timeLeft, setTimeLeft] = useState(0);
   const [verifyAttempt, setVerifyAttempt] = useState(0);
   const initiatedAtRef = useRef<number | null>(null);
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const VERIFY_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
   const POLL_INTERVAL_MS = 3000; // Check every 3 seconds
