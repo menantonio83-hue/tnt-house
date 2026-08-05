@@ -1,4 +1,10 @@
-// Version 1.1 — lib/token-risk-core.ts
+// Version 1.2 — lib/token-risk-core.ts
+//
+// v1.2: honeypot_risk and lp_locked are now real values from RugCheck
+// (lib/rugcheck-client.ts) instead of hardcoded null. See that file's
+// header for the "why now, and why null still means something"
+// reasoning. Response `note` only appears when RugCheck genuinely
+// couldn't be checked for this mint, not unconditionally on every call.
 //
 // v1.1: fire-and-forget write to mint_risk_history (lib/mint-risk-
 // history-store.ts) on every successful check, from both callers
