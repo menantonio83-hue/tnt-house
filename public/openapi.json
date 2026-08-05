@@ -74,11 +74,15 @@
                     },
                     "honeypot_risk": {
                       "type": ["boolean", "null"],
-                      "description": "On the roadmap, not yet implemented — currently always null. See `note`."
+                      "description": "true = RugCheck flagged a honeypot-shaped risk, false = checked and clear, null = could not be checked (RugCheck timeout/failure) — never a false-clean default."
                     },
                     "lp_locked": {
-                      "type": ["boolean", "null"],
-                      "description": "On the roadmap, not yet implemented — currently always null. See `note`."
+                      "type": ["object", "null"],
+                      "properties": {
+                        "locked": { "type": "boolean" },
+                        "percent": { "type": "number", "description": "0-100, averaged across markets RugCheck reported for this mint." }
+                      },
+                      "description": "null = could not be checked (RugCheck timeout/failure, or no market data reported for this mint at all)."
                     },
                     "holder_distribution": {
                       "type": "object",
@@ -104,7 +108,7 @@
                     },
                     "note": {
                       "type": "string",
-                      "description": "Explains that honeypot_risk/lp_locked are roadmap items, not a bug."
+                      "description": "Present only when honeypot_risk/lp_locked genuinely could not be checked for this mint."
                     },
                     "checked_at": { "type": "string", "format": "date-time" }
                   },
@@ -117,11 +121,10 @@
                   "insider_clusters": [{ "funder": "9xQe...k2Pd", "wallets": ["7uF3...aZ1", "3mN8...qR2"] }],
                   "mint_authority": { "revoked": true, "address": null },
                   "freeze_authority": { "revoked": true, "address": null },
-                  "honeypot_risk": null,
-                  "lp_locked": null,
+                  "honeypot_risk": false,
+                  "lp_locked": { "locked": true, "percent": 100 },
                   "holder_distribution": { "risk_level": "LOW", "largest_holder_percent": 4.2, "top10_percent": 22.7, "holder_count": 20 },
                   "market": { "price_usd": 0.0000412, "liquidity_usd": 84210, "volume_24h_usd": 512300, "price_change_24h_percent": 12.4, "age_days": 3 },
-                  "note": "honeypot_risk and lp_locked detection are on the roadmap and not yet implemented — both fields will remain null until shipped.",
                   "checked_at": "2026-07-18T12:00:00.000Z"
                 }
               }
@@ -204,11 +207,10 @@
                   "insider_clusters": [{ "funder": "9xQe...k2Pd", "wallets": ["7uF3...aZ1", "3mN8...qR2"] }],
                   "mint_authority": { "revoked": true, "address": null },
                   "freeze_authority": { "revoked": true, "address": null },
-                  "honeypot_risk": null,
-                  "lp_locked": null,
+                  "honeypot_risk": false,
+                  "lp_locked": { "locked": true, "percent": 100 },
                   "holder_distribution": { "risk_level": "LOW", "largest_holder_percent": 4.2, "top10_percent": 22.7, "holder_count": 20 },
                   "market": { "price_usd": 0.0000412, "liquidity_usd": 84210, "volume_24h_usd": 512300, "price_change_24h_percent": 12.4, "age_days": 3 },
-                  "note": "honeypot_risk and lp_locked detection are on the roadmap and not yet implemented — both fields will remain null until shipped.",
                   "checked_at": "2026-07-18T12:00:00.000Z"
                 }
               }
