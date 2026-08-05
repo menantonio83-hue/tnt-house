@@ -54,6 +54,4 @@ Vercel-ready. Connected to GitHub main branch for auto-deploys.
 
 **Latest: Next.js full migration done. Forced new deploy trigger.**
 
-**Part of $MRDT ecosystem** • D10S vibes
-
-**Links:** [X @Crypto_D10S](https://x.com/Crypto_D10S) | [Telegram](https://t.me/D10S_Solana_Stadium) | [Site](https://www.maradonatoken-mrdt.xyz)
+**Links:** [X @RiskDataApiSol](https://x.com/RiskDataApiSol) | [Site](https://www.tnt-audit.com/risk-api) | [Telegram](https://t.me/tnt_house2026)
