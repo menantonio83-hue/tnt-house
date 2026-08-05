@@ -228,7 +228,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     fieldInsiderClusters: 'Wallets that share a first-funder — an on-chain-provable insider/sniper signal, not a guess.',
     fieldClusterAnalysis: '"pending" on a token\'s first-ever check (cluster trace runs in the background), "complete" after ~1–2 minutes.',
     fieldAuthorities: 'Whether each authority is revoked, and its address if still active.',
-    fieldHoneypotLpLocked: 'On the roadmap — currently always null.',
+    fieldHoneypotLpLocked: 'honeypot_risk (boolean) and lp_locked ({ locked, percent }) from RugCheck. null means it could not be checked, not "safe."',
     fieldHolderDistribution: 'Largest holder %, top-10 %, risk level, and holder_count — the number of accounts in Solana\u2019s top-20-largest-holders response (a real RPC limit, not a full holder count for widely-held tokens like BONK or USDC).',
     fieldMarket: 'Live price, liquidity, 24h volume, 24h change, and token age from DexScreener.',
     rateLimitHeadersNote: 'Every response also includes X-RateLimit-Limit, X-RateLimit-Remaining, and X-RateLimit-Reset headers — plus X-Credit-Balance-Usd once you have a paid tier or credit balance — so your bot can track its quota without ever hitting a 429.',
@@ -265,6 +265,13 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'Changelog',
     changelogNote: 'No mailing list or webhooks yet for update announcements — this page and the X / Telegram links in the footer are the way to stay current.',
     changelogEntries: [
+      {
+        version: 'v1.10',
+        date: '2026-08-05',
+        changes: [
+          'honeypot_risk and lp_locked now return real values from RugCheck instead of always null — honeypot_risk is a boolean, lp_locked is { locked, percent }. null still means "could not be checked", never a false-clean default.',
+        ],
+      },
       {
         version: 'v1.9',
         date: '2026-08-03',
@@ -414,7 +421,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     fieldInsiderClusters: 'Wallets que comparten un mismo financiador inicial — una señal de insider/sniper demostrable on-chain, no una suposición.',
     fieldClusterAnalysis: '"pending" en la primera comprobación de un token (el rastreo de clústeres corre en segundo plano), "complete" tras ~1–2 minutos.',
     fieldAuthorities: 'Si cada autoridad está revocada, y su dirección si sigue activa.',
-    fieldHoneypotLpLocked: 'En la hoja de ruta — actualmente siempre null.',
+    fieldHoneypotLpLocked: 'honeypot_risk (booleano) y lp_locked ({ locked, percent }) de RugCheck. null significa que no se pudo comprobar, no "seguro".',
     fieldHolderDistribution: '% del mayor holder, % del top-10, nivel de riesgo, y holder_count — el número de cuentas en la respuesta de los 20 mayores holders de Solana (un límite real de la RPC, no un recuento total de holders para tokens muy distribuidos como BONK o USDC).',
     fieldMarket: 'Precio en vivo, liquidez, volumen 24h, cambio 24h y antigüedad del token desde DexScreener.',
     rateLimitHeadersNote: 'Cada respuesta también incluye las cabeceras X-RateLimit-Limit, X-RateLimit-Remaining y X-RateLimit-Reset — además de X-Credit-Balance-Usd en cuanto tengas un nivel de pago o saldo de crédito — para que tu bot controle su cuota sin llegar nunca a un 429.',
@@ -451,6 +458,13 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'Registro de cambios',
     changelogNote: 'Todavía no hay lista de correo ni webhooks para anunciar novedades — esta página y los enlaces de X / Telegram del pie son la forma de mantenerte al día.',
     changelogEntries: [
+      {
+        version: 'v1.10',
+        date: '2026-08-05',
+        changes: [
+          'honeypot_risk y lp_locked ahora devuelven valores reales de RugCheck en lugar de siempre null — honeypot_risk es un booleano, lp_locked es { locked, percent }. null sigue significando "no se pudo comprobar", nunca un valor "seguro" falso.',
+        ],
+      },
       {
         version: 'v1.9',
         date: '2026-08-03',
@@ -600,7 +614,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     fieldInsiderClusters: 'Wallets partageant un même premier financeur — un signal insider/sniper prouvable on-chain, pas une supposition.',
     fieldClusterAnalysis: '"pending" lors de la toute première vérification d\'un token (le traçage des clusters tourne en arrière-plan), "complete" après ~1–2 minutes.',
     fieldAuthorities: 'Si chaque autorité est révoquée, et son adresse si elle est encore active.',
-    fieldHoneypotLpLocked: 'Sur la feuille de route — actuellement toujours null.',
+    fieldHoneypotLpLocked: "honeypot_risk (booléen) et lp_locked ({ locked, percent }) issus de RugCheck. null signifie que la vérification a échoué, jamais « sûr ».",
     fieldHolderDistribution: '% du plus gros holder, % du top-10, niveau de risque, et holder_count — le nombre de comptes dans la réponse des 20 plus gros holders de Solana (une vraie limite de la RPC, pas un décompte complet des holders pour des tokens très détenus comme BONK ou USDC).',
     fieldMarket: 'Prix en direct, liquidité, volume 24h, variation 24h et âge du token, via DexScreener.',
     rateLimitHeadersNote: 'Chaque réponse inclut aussi les en-têtes X-RateLimit-Limit, X-RateLimit-Remaining et X-RateLimit-Reset — plus X-Credit-Balance-Usd dès que vous avez un abonnement payant ou un solde de crédit — pour que votre bot suive son quota sans jamais tomber sur un 429.',
@@ -637,6 +651,13 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'Journal des modifications',
     changelogNote: 'Pas encore de liste de diffusion ni de webhooks pour les annonces — cette page et les liens X / Telegram en pied de page sont le moyen de rester à jour.',
     changelogEntries: [
+      {
+        version: 'v1.10',
+        date: '2026-08-05',
+        changes: [
+          "honeypot_risk et lp_locked renvoient désormais de vraies valeurs issues de RugCheck au lieu de toujours null — honeypot_risk est un booléen, lp_locked est { locked, percent }. null signifie toujours « impossible à vérifier », jamais une fausse valeur « sûre ».",
+        ],
+      },
       {
         version: 'v1.9',
         date: '2026-08-03',
@@ -786,7 +807,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     fieldInsiderClusters: 'Wallets που μοιράζονται τον ίδιο πρώτο χρηματοδότη — ένα on-chain αποδείξιμο σήμα insider/sniper, όχι εικασία.',
     fieldClusterAnalysis: '"pending" στον πρώτο έλεγχο ενός token (η ανίχνευση clusters τρέχει στο παρασκήνιο), "complete" μετά από ~1–2 λεπτά.',
     fieldAuthorities: 'Αν κάθε authority έχει ανακληθεί, και η διεύθυνσή της αν είναι ακόμα ενεργή.',
-    fieldHoneypotLpLocked: 'Στον χάρτη πορείας — προς το παρόν πάντα null.',
+    fieldHoneypotLpLocked: 'honeypot_risk (boolean) και lp_locked ({ locked, percent }) από το RugCheck. Το null σημαίνει ότι δεν ήταν δυνατός ο έλεγχος, όχι «ασφαλές».',
     fieldHolderDistribution: '% μεγαλύτερου holder, top-10 %, επίπεδο κινδύνου, και holder_count — ο αριθμός λογαριασμών στην απόκριση των 20 μεγαλύτερων holders της Solana (πραγματικό όριο του RPC, όχι πλήρης αριθμός holders για ευρέως κατεχόμενα tokens όπως το BONK ή το USDC).',
     fieldMarket: 'Τιμή σε πραγματικό χρόνο, ρευστότητα, όγκος 24ω, μεταβολή 24ω και ηλικία του token, από το DexScreener.',
     rateLimitHeadersNote: 'Κάθε απόκριση περιλαμβάνει επίσης τα headers X-RateLimit-Limit, X-RateLimit-Remaining και X-RateLimit-Reset — συν το X-Credit-Balance-Usd μόλις έχεις πληρωμένο επίπεδο ή υπόλοιπο πίστωσης — ώστε το bot σου να παρακολουθεί το όριό του χωρίς ποτέ να πέσει σε 429.',
@@ -823,6 +844,13 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'Ιστορικό αλλαγών',
     changelogNote: 'Δεν υπάρχει ακόμα mailing list ή webhooks για ανακοινώσεις ενημερώσεων — αυτή η σελίδα και οι σύνδεσμοι X / Telegram στο footer είναι ο τρόπος να μένεις ενήμερος.',
     changelogEntries: [
+      {
+        version: 'v1.10',
+        date: '2026-08-05',
+        changes: [
+          'Τα honeypot_risk και lp_locked επιστρέφουν πλέον πραγματικές τιμές από το RugCheck αντί για πάντα null — το honeypot_risk είναι boolean, το lp_locked είναι { locked, percent }. Το null εξακολουθεί να σημαίνει «δεν ήταν δυνατός ο έλεγχος», ποτέ μια ψευδή «ασφαλή» τιμή.',
+        ],
+      },
       {
         version: 'v1.9',
         date: '2026-08-03',
@@ -972,7 +1000,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     fieldInsiderClusters: 'Кошельки с общим первым фандером — доказуемый он-чейн сигнал инсайдера/снайпера, а не догадка.',
     fieldClusterAnalysis: '"pending" при первой проверке токена (трассировка кластеров считается в фоне), "complete" через ~1–2 минуты.',
     fieldAuthorities: 'Отозвана ли каждая authority, и её адрес, если ещё активна.',
-    fieldHoneypotLpLocked: 'В планах — сейчас всегда null.',
+    fieldHoneypotLpLocked: 'honeypot_risk (булево) и lp_locked ({ locked, percent }) от RugCheck. null означает "не удалось проверить", а не "безопасно".',
     fieldHolderDistribution: '% крупнейшего холдера, % топ-10, уровень риска и holder_count — число аккаунтов в ответе топ-20 крупнейших холдеров Solana (реальное ограничение самого RPC, а не полное число холдеров для широко распределённых токенов вроде BONK или USDC).',
     fieldMarket: 'Живая цена, ликвидность, объём за 24ч, изменение за 24ч и возраст токена — с DexScreener.',
     rateLimitHeadersNote: 'Каждый ответ также включает заголовки X-RateLimit-Limit, X-RateLimit-Remaining и X-RateLimit-Reset — плюс X-Credit-Balance-Usd, если у тебя платный тариф или баланс кредитов — чтобы бот мог отслеживать свою квоту, не ловя 429.',
@@ -1009,6 +1037,13 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'История изменений',
     changelogNote: 'Пока нет рассылки или вебхуков для анонсов обновлений — следить за актуальным состоянием можно по этой странице и ссылкам на X / Telegram в подвале.',
     changelogEntries: [
+      {
+        version: 'v1.10',
+        date: '2026-08-05',
+        changes: [
+          'honeypot_risk и lp_locked теперь возвращают реальные значения от RugCheck вместо вечного null — honeypot_risk булево значение, lp_locked это { locked, percent }. null по-прежнему значит "не удалось проверить", а не ложное "чисто".',
+        ],
+      },
       {
         version: 'v1.9',
         date: '2026-08-03',
@@ -1158,7 +1193,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     fieldInsiderClusters: 'Wallet che condividono lo stesso primo finanziatore — un segnale insider/sniper dimostrabile on-chain, non un\'ipotesi.',
     fieldClusterAnalysis: '"pending" al primo controllo di un token (il tracciamento dei cluster gira in background), "complete" dopo ~1–2 minuti.',
     fieldAuthorities: 'Se ciascuna authority è revocata, e il suo indirizzo se ancora attiva.',
-    fieldHoneypotLpLocked: 'Nella roadmap — attualmente sempre null.',
+    fieldHoneypotLpLocked: 'honeypot_risk (booleano) e lp_locked ({ locked, percent }) da RugCheck. null significa che non è stato possibile verificarlo, non "sicuro".',
     fieldHolderDistribution: '% del maggior holder, % del top-10, livello di rischio, e holder_count — il numero di account nella risposta dei 20 maggiori holder di Solana (un vero limite dell\'RPC, non un conteggio completo degli holder per token molto distribuiti come BONK o USDC).',
     fieldMarket: 'Prezzo live, liquidità, volume 24h, variazione 24h ed età del token, da DexScreener.',
     rateLimitHeadersNote: 'Ogni risposta include anche gli header X-RateLimit-Limit, X-RateLimit-Remaining e X-RateLimit-Reset — più X-Credit-Balance-Usd non appena hai un livello a pagamento o un saldo di credito — così il tuo bot può monitorare la sua quota senza mai incontrare un 429.',
@@ -1195,6 +1230,13 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'Changelog',
     changelogNote: "Non c'è ancora una mailing list o webhook per gli annunci di aggiornamento — questa pagina e i link X / Telegram nel footer sono il modo per restare aggiornati.",
     changelogEntries: [
+      {
+        version: 'v1.10',
+        date: '2026-08-05',
+        changes: [
+          "honeypot_risk e lp_locked ora restituiscono valori reali da RugCheck invece di sempre null — honeypot_risk è un booleano, lp_locked è { locked, percent }. null continua a significare \"impossibile verificare\", mai un falso \"sicuro\".",
+        ],
+      },
       {
         version: 'v1.9',
         date: '2026-08-03',
@@ -1344,7 +1386,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     fieldInsiderClusters: '共享同一个首次资金来源的钱包 —— 一个链上可证明的内部人/狙击信号，而非猜测。',
     fieldClusterAnalysis: '代币首次检查时为 "pending"（集群追踪正在后台运行），约 1–2 分钟后变为 "complete"。',
     fieldAuthorities: '各权限是否已被撤销，若仍处于活跃状态则显示其地址。',
-    fieldHoneypotLpLocked: '已列入路线图 —— 目前始终为 null。',
+    fieldHoneypotLpLocked: 'honeypot_risk（布尔值）和 lp_locked（{ locked, percent }）来自 RugCheck。null 表示无法检测，而不是"安全"。',
     fieldHolderDistribution: '最大持币者占比、前10名占比、风险等级，以及 holder_count —— 即 Solana 前20大持币者响应中的账户数量（这是 RPC 本身的真实限制，对于 BONK 或 USDC 这类持有非常分散的代币，并不代表完整持币人数）。',
     fieldMarket: '来自 DexScreener 的实时价格、流动性、24小时交易量、24小时涨跌幅及代币存在天数。',
     rateLimitHeadersNote: '每个响应还包含 X-RateLimit-Limit、X-RateLimit-Remaining 和 X-RateLimit-Reset 请求头 —— 一旦你有付费套餐或信用余额，还会附带 X-Credit-Balance-Usd —— 这样你的机器人无需触发 429 就能追踪自己的配额。',
@@ -1381,6 +1423,13 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: '更新日志',
     changelogNote: '目前还没有邮件列表或 webhook 用于更新通知——请通过本页面以及页脚的 X / Telegram 链接来获取最新动态。',
     changelogEntries: [
+      {
+        version: 'v1.10',
+        date: '2026-08-05',
+        changes: [
+          'honeypot_risk 和 lp_locked 现在返回来自 RugCheck 的真实值，不再始终为 null —— honeypot_risk 是布尔值，lp_locked 是 { locked, percent }。null 仍然表示"无法检测"，而不是虚假的"安全"。',
+        ],
+      },
       {
         version: 'v1.9',
         date: '2026-08-03',
