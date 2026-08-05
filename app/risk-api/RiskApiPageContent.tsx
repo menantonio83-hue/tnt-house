@@ -166,8 +166,8 @@ const EXAMPLE_RESPONSE = {
   insider_clusters: [{ funder: '9xQe...k2Pd', wallets: ['7uF3...aZ1', '3mN8...qR2'] }],
   mint_authority: { revoked: true, address: null },
   freeze_authority: { revoked: true, address: null },
-  honeypot_risk: null,
-  lp_locked: null,
+  honeypot_risk: false,
+  lp_locked: { locked: true, percent: 100 },
   holder_distribution: {
     risk_level: 'LOW',
     largest_holder_percent: 4.2,
@@ -181,7 +181,6 @@ const EXAMPLE_RESPONSE = {
     price_change_24h_percent: 12.4,
     age_days: 3,
   },
-  note: 'honeypot_risk and lp_locked detection are on the roadmap and not yet implemented.',
   checked_at: '2026-07-18T12:00:00.000Z',
 };
 
