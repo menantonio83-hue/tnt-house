@@ -87,7 +87,12 @@ export default function RiskApiSignupForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
-      <p className="text-[10px] text-slate-500">{t.signupHint}</p>
+      <p
+        className="text-[10px] text-white font-semibold tracking-wide"
+        style={{ textShadow: '0 0 6px rgba(255,255,255,0.85), 0 0 14px rgba(255,255,255,0.5)' }}
+      >
+        {t.signupHint}
+      </p>
       <div className="flex flex-col sm:flex-row gap-2">
         <input
           type="email"
