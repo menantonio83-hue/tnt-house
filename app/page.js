@@ -5501,38 +5501,73 @@ export default function TntHouse() {
                   if (!item.value) return null;
                   var valueStr = String(item.value);
                   var isUnknown = valueStr === 'Unknown';
-                  var isNeutralInfo =
-                    item.label === 'Buy/Sell Tax' ||
-                    item.label === 'Token Age' ||
-                    item.label === 'Dev Wallet %';
-                  var isSafe =
-                    valueStr.includes('Revoked') ||
-                    valueStr.includes('No ✓') ||
-                    valueStr.includes('Yes ✓') ||
-                    valueStr.includes('Standard ✓') ||
-                    valueStr.includes('Burned') ||
-                    valueStr.includes('locked') ||
-                    valueStr.includes('wallets');
+
+                  // FIX v1.123: color used to come from a blunt, unconditional
+                  // substring match — valueStr.includes('locked') colored ANY
+                  // LP-lock percentage green, including "10% locked", and
+                  // valueStr.includes('wallets') colored ANY holder count
+                  // green, including "3 wallets". Neither checked the actual
+                  // number — same class of bug as the old 100/100 score.
+                  // These four fields now get a real threshold check instead.
+                  var colorClass;
+                  if (item.label === 'Holders') {
+                    colorClass = isUnknown
+                      ? 'text-slate-500'
+                      : selectedToken.holderCount != null && selectedToken.holderCount < 50
+                        ? 'text-yellow-400'
+                        : 'text-emerald-400';
+                  } else if (item.label === 'LP Lock') {
+                    colorClass = isUnknown
+                      ? 'text-slate-500'
+                      : selectedToken.lpLockedPercent != null && selectedToken.lpLockedPercent < 100
+                        ? 'text-yellow-400'
+                        : 'text-emerald-400';
+                  } else if (item.label === 'Token Age') {
+                    colorClass = isUnknown
+                      ? 'text-slate-500'
+                      : selectedToken.ageDays != null && selectedToken.ageDays < 1
+                        ? 'text-red-400'
+                        : selectedToken.ageDays != null && selectedToken.ageDays < 7
+                          ? 'text-yellow-400'
+                          : 'text-slate-200';
+                  } else if (item.label === 'Dev Wallet %') {
+                    // On a brand-new token an unusually low dev balance isn't
+                    // automatically reassuring the way it is on a token with
+                    // a real track record — it can mean the deployer already
+                    // exited, or their real allocation sits in other
+                    // wallets. Flag it, don't just show it as neutral info.
+                    colorClass =
+                      selectedToken.ageDays != null &&
+                      selectedToken.ageDays < 7 &&
+                      selectedToken.creatorBalancePercent != null &&
+                      selectedToken.creatorBalancePercent < 1
+                        ? 'text-yellow-400'
+                        : 'text-slate-200';
+                  } else if (item.label === 'Buy/Sell Tax') {
+                    colorClass = 'text-slate-200';
+                  } else {
+                    var isSafe =
+                      valueStr.includes('Revoked') ||
+                      valueStr.includes('No ✓') ||
+                      valueStr.includes('Yes ✓') ||
+                      valueStr.includes('Standard ✓') ||
+                      valueStr.includes('Burned');
+                    colorClass = isUnknown
+                      ? 'text-slate-500'
+                      : isSafe
+                        ? 'text-emerald-400'
+                        : 'text-red-400';
+                  }
                   return (
                     <div
                       key={i}
                       className="flex items-center justify-between px-3 py-2 bg-slate-900 rounded-lg border border-purple-500/10"
                     >
                       <span className="text-slate-400 text-xs">{item.label}</span>
-                      <span
-                        className={
-                          'text-xs font-bold ' +
-                          (isUnknown
-                            ? 'text-slate-500'
-                            : isNeutralInfo
-                              ? 'text-slate-200'
-                              : isSafe
-                              ? 'text-emerald-400'
-                              : 'text-red-400')
-                        }
-                      >
+                      <span className={'text-xs font-bold ' + colorClass}>
                         {valueStr}
                       </span>
+
                     </div>
                   );
                 })}
