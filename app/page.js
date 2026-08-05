@@ -206,6 +206,7 @@ const TRANSLATIONS = {
     safetyScore: 'Safety Score',
     ironclad: 'Ironclad Safe ★',
     newTokenWarning: 'New token — score capped, unproven track record',
+    marketHealthWarning: 'Near-zero liquidity or extreme holder concentration — score capped regardless of contract safety',
     washTradingWarning: 'Volume far exceeds liquidity — possible wash trading',
     moderate: 'Moderate Risk ⚠️',
     highRisk: 'High Risk 🚨',
@@ -329,6 +330,7 @@ const TRANSLATIONS = {
     safetyScore: 'Puntuación de Seguridad',
     ironclad: 'Totalmente Seguro ★',
     newTokenWarning: 'Token nuevo — puntuación limitada, historial no probado',
+    marketHealthWarning: 'Liquidez casi nula o concentración extrema de holders — puntuación limitada sin importar la seguridad del contrato',
     washTradingWarning: 'El volumen supera la liquidez — posible wash trading',
     moderate: 'Riesgo Moderado ⚠️',
     highRisk: 'Alto Riesgo 🚨',
@@ -452,6 +454,7 @@ const TRANSLATIONS = {
     safetyScore: 'Score de Sécurité',
     ironclad: 'Totalement Sécurisé ★',
     newTokenWarning: 'Nouveau token — score plafonné, historique non prouvé',
+    marketHealthWarning: 'Liquidité quasi nulle ou concentration extrême des holders — score plafonné quelle que soit la sécurité du contrat',
     washTradingWarning: 'Le volume dépasse largement la liquidité — wash trading possible',
     moderate: 'Risque Modéré ⚠️',
     highRisk: 'Risque Élevé 🚨',
@@ -575,6 +578,7 @@ const TRANSLATIONS = {
     safetyScore: 'Βαθμολογία Ασφαλείας',
     ironclad: 'Απολύτως Ασφαλές ★',
     newTokenWarning: 'Νέο token — περιορισμένη βαθμολογία, χωρίς αποδεδειγμένο ιστορικό',
+    marketHealthWarning: 'Σχεδόν μηδενική ρευστότητα ή ακραία συγκέντρωση κατόχων — περιορισμένη βαθμολογία ανεξαρτήτως ασφάλειας συμβολαίου',
     washTradingWarning: 'Ο όγκος υπερβαίνει κατά πολύ τη ρευστότητα — πιθανό wash trading',
     moderate: 'Μέτριος Κίνδυνος ⚠️',
     highRisk: 'Υψηλός Κίνδυνος 🚨',
@@ -699,6 +703,7 @@ const TRANSLATIONS = {
     safetyScore: 'Оценка безопасности',
     ironclad: 'Железобетонно безопасно ★',
     newTokenWarning: 'Новый токен — скор ограничен, история не проверена',
+    marketHealthWarning: 'Почти нулевая ликвидность или экстремальная концентрация холдеров — скор ограничен независимо от безопасности контракта',
     washTradingWarning: 'Объём намного больше ликвидности — возможен wash trading',
     moderate: 'Умеренный риск ⚠️',
     highRisk: 'Высокий риск 🚨',
@@ -823,6 +828,7 @@ const TRANSLATIONS = {
     safetyScore: 'Punteggio di sicurezza',
     ironclad: 'Sicurezza blindata ★',
     newTokenWarning: 'Nuovo token — punteggio limitato, storico non provato',
+    marketHealthWarning: 'Liquidità quasi nulla o concentrazione estrema degli holder — punteggio limitato indipendentemente dalla sicurezza del contratto',
     washTradingWarning: 'Il volume supera di gran lunga la liquidità — possibile wash trading',
     moderate: 'Rischio moderato ⚠️',
     highRisk: 'Rischio alto 🚨',
@@ -947,6 +953,7 @@ const TRANSLATIONS = {
     safetyScore: '安全评分',
     ironclad: '固若金汤 ★',
     newTokenWarning: '新代币 — 评分受限，尚无可验证的历史记录',
+    marketHealthWarning: '流动性接近于零或持有者集中度极高 —— 无论合约是否安全，评分都会被限制',
     washTradingWarning: '交易量远超流动性 — 可能存在刷量交易',
     moderate: '中等风险 ⚠️',
     highRisk: '高风险 🚨',
@@ -2502,6 +2509,43 @@ export default function TntHouse() {
     auditResult.score = Math.min(auditResult.score, maturityCap);
     auditResult.maturityCapped = maturityCapped;
 
+    // FIX v1.124: maturityCap above only fires for tokens under 7 days
+    // old — a proxy for "unproven", not a direct check. A token can be
+    // 40+ days old and still have near-zero liquidity and 99%+ top-10
+    // concentration (dead market, or a cabal that never sold), and the
+    // age gate simply doesn't see it — RugCheck's own score only grades
+    // CONTRACT mechanics, so all-green contract flags + old-enough-to-
+    // skip-the-age-cap could still show 100/100 on an unsellable token.
+    // Separate, age-independent cap on the two metrics that actually
+    // mean "you may not be able to exit this position": liquidity and
+    // holder concentration. Same "cap, don't subtract" reasoning as
+    // maturityCap above — this is deliberately the tighter of two caps
+    // when both would apply, not a second penalty stacked on top.
+    var marketHealthCap = 100;
+    if (dexData.liquidity !== null && dexData.liquidity < 500) {
+      marketHealthCap = 25;
+    } else if (
+      auditResult.top10Percent !== null &&
+      typeof auditResult.top10Percent === 'number' &&
+      auditResult.top10Percent > 90
+    ) {
+      marketHealthCap = Math.min(marketHealthCap, 30);
+    } else if (
+      auditResult.top10Percent !== null &&
+      typeof auditResult.top10Percent === 'number' &&
+      auditResult.top10Percent > 80
+    ) {
+      marketHealthCap = Math.min(marketHealthCap, 50);
+    } else if (
+      typeof auditResult.holderCount === 'number' &&
+      auditResult.holderCount < 20
+    ) {
+      marketHealthCap = Math.min(marketHealthCap, 60);
+    }
+    var marketHealthCapped = marketHealthCap < 100 && auditResult.score > marketHealthCap;
+    auditResult.score = Math.min(auditResult.score, marketHealthCap);
+    auditResult.marketHealthCapped = marketHealthCapped;
+
     // Wash-trading signal: 24h volume far exceeding pool liquidity (bots
     // or self-trading inflating "activity") is a real, distinct red flag
     // — kept as its own explicit boolean rather than folded into the
@@ -2547,6 +2591,7 @@ export default function TntHouse() {
       standardProgram: auditResult.standardProgram,
       permanentDelegate: auditResult.permanentDelegate,
       maturityCapped: auditResult.maturityCapped,
+      marketHealthCapped: auditResult.marketHealthCapped,
       washTradingRisk: auditResult.washTradingRisk,
       // FIX v1.90: this is the field saveTokenToSupabase reads into is_free.
       isFree: !!isFree,
@@ -5371,12 +5416,18 @@ export default function TntHouse() {
                   </p>
                 </div>
               </div>
-              {(selectedToken.maturityCapped || selectedToken.washTradingRisk) && (
+              {(selectedToken.maturityCapped || selectedToken.marketHealthCapped || selectedToken.washTradingRisk) && (
                 <div className="mb-3 space-y-1.5">
                   {selectedToken.maturityCapped && (
                     <div className="flex items-start gap-1.5 px-3 py-2 bg-yellow-500/10 border border-yellow-500/30 rounded-lg text-yellow-300 text-[11px] font-mono">
                       <span>⚠️</span>
                       <span>{t.newTokenWarning}</span>
+                    </div>
+                  )}
+                  {selectedToken.marketHealthCapped && (
+                    <div className="flex items-start gap-1.5 px-3 py-2 bg-red-500/10 border border-red-500/30 rounded-lg text-red-300 text-[11px] font-mono">
+                      <span>🚨</span>
+                      <span>{t.marketHealthWarning}</span>
                     </div>
                   )}
                   {selectedToken.washTradingRisk && (
