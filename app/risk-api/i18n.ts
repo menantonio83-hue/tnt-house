@@ -201,6 +201,7 @@ export interface RiskApiTranslations {
   getFreeKeyBtn: string;
   freeTierNote: string;
   emailPlaceholder: string;
+  signupHint: string;
 }
 
 export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
@@ -387,6 +388,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     generatingText: 'Generating...',
     getFreeKeyBtn: 'Get free API key',
     freeTierNote: 'Free tier: 15 requests/day. No credit card. One key per email.',
+    signupHint: 'Enter your email, then copy the key that appears — shown once.',
     emailPlaceholder: 'you@yourbot.dev',
   },
   es: {
@@ -572,6 +574,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     generatingText: 'Generando...',
     getFreeKeyBtn: 'Obtener API key gratis',
     freeTierNote: 'Nivel gratuito: 15 peticiones/día. Sin tarjeta de crédito. Una key por email.',
+    signupHint: 'Escribe tu email y copia la key que aparece — se muestra una sola vez.',
     emailPlaceholder: 'tu@bot.dev',
   },
   fr: {
@@ -757,6 +760,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     generatingText: 'Génération...',
     getFreeKeyBtn: 'Obtenir une clé API gratuite',
     freeTierNote: 'Niveau gratuit : 15 requêtes/jour. Pas de carte bancaire. Une clé par email.',
+    signupHint: 'Entrez votre email, puis copiez la clé affichée — elle n’apparaît qu’une fois.',
     emailPlaceholder: 'vous@votrebot.dev',
   },
   el: {
@@ -942,6 +946,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     generatingText: 'Δημιουργία...',
     getFreeKeyBtn: 'Πάρε δωρεάν API key',
     freeTierNote: 'Δωρεάν επίπεδο: 15 αιτήματα/ημέρα. Χωρίς πιστωτική κάρτα. Ένα key ανά email.',
+    signupHint: 'Γράψε το email σου και αντέγραψε το key που θα εμφανιστεί — εμφανίζεται μόνο μία φορά.',
     emailPlaceholder: 'you@yourbot.dev',
   },
   ru: {
@@ -1127,6 +1132,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     generatingText: 'Генерация...',
     getFreeKeyBtn: 'Получить бесплатный API-ключ',
     freeTierNote: 'Бесплатный тариф: 15 запросов/день. Без карты. Один ключ на email.',
+    signupHint: 'Введи email и скопируй ключ, который появится — показывается один раз.',
     emailPlaceholder: 'you@yourbot.dev',
   },
   it: {
@@ -1312,6 +1318,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     generatingText: 'Generazione...',
     getFreeKeyBtn: 'Ottieni API key gratuita',
     freeTierNote: 'Livello gratuito: 15 richieste/giorno. Nessuna carta di credito. Una key per email.',
+    signupHint: 'Inserisci la tua email, poi copia la key che appare — mostrata una sola volta.',
     emailPlaceholder: 'tu@tuobot.dev',
   },
   zh: {
@@ -1497,6 +1504,8 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     generatingText: '生成中…',
     getFreeKeyBtn: '获取免费 API 密钥',
     freeTierNote: '免费套餐：15 次请求/天。无需信用卡。每个邮箱一个密钥。',
+    signupHint: '输入邮箱，然后复制出现的密钥 —— 只显示一次。',
     emailPlaceholder: 'you@yourbot.dev',
   },
 };
+
