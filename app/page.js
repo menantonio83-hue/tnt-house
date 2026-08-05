@@ -205,6 +205,8 @@ const TRANSLATIONS = {
     buyOnJupiter: 'BUY ON JUPITER',
     safetyScore: 'Safety Score',
     ironclad: 'Ironclad Safe ★',
+    newTokenWarning: 'New token — score capped, unproven track record',
+    washTradingWarning: 'Volume far exceeds liquidity — possible wash trading',
     moderate: 'Moderate Risk ⚠️',
     highRisk: 'High Risk 🚨',
     mintAuth: 'Mint Authority',
@@ -326,6 +328,8 @@ const TRANSLATIONS = {
     buyOnJupiter: 'COMPRAR EN JUPITER',
     safetyScore: 'Puntuación de Seguridad',
     ironclad: 'Totalmente Seguro ★',
+    newTokenWarning: 'Token nuevo — puntuación limitada, historial no probado',
+    washTradingWarning: 'El volumen supera la liquidez — posible wash trading',
     moderate: 'Riesgo Moderado ⚠️',
     highRisk: 'Alto Riesgo 🚨',
     mintAuth: 'Mint Authority',
@@ -447,6 +451,8 @@ const TRANSLATIONS = {
     buyOnJupiter: 'ACHETER SUR JUPITER',
     safetyScore: 'Score de Sécurité',
     ironclad: 'Totalement Sécurisé ★',
+    newTokenWarning: 'Nouveau token — score plafonné, historique non prouvé',
+    washTradingWarning: 'Le volume dépasse largement la liquidité — wash trading possible',
     moderate: 'Risque Modéré ⚠️',
     highRisk: 'Risque Élevé 🚨',
     mintAuth: 'Mint Authority',
@@ -568,6 +574,8 @@ const TRANSLATIONS = {
     buyOnJupiter: 'ΑΓΟΡΑ ΣΤΟ JUPITER',
     safetyScore: 'Βαθμολογία Ασφαλείας',
     ironclad: 'Απολύτως Ασφαλές ★',
+    newTokenWarning: 'Νέο token — περιορισμένη βαθμολογία, χωρίς αποδεδειγμένο ιστορικό',
+    washTradingWarning: 'Ο όγκος υπερβαίνει κατά πολύ τη ρευστότητα — πιθανό wash trading',
     moderate: 'Μέτριος Κίνδυνος ⚠️',
     highRisk: 'Υψηλός Κίνδυνος 🚨',
     mintAuth: 'Mint Authority',
@@ -690,6 +698,8 @@ const TRANSLATIONS = {
     buyOnJupiter: 'КУПИТЬ НА JUPITER',
     safetyScore: 'Оценка безопасности',
     ironclad: 'Железобетонно безопасно ★',
+    newTokenWarning: 'Новый токен — скор ограничен, история не проверена',
+    washTradingWarning: 'Объём намного больше ликвидности — возможен wash trading',
     moderate: 'Умеренный риск ⚠️',
     highRisk: 'Высокий риск 🚨',
     mintAuth: 'Mint Authority',
@@ -812,6 +822,8 @@ const TRANSLATIONS = {
     buyOnJupiter: 'COMPRA SU JUPITER',
     safetyScore: 'Punteggio di sicurezza',
     ironclad: 'Sicurezza blindata ★',
+    newTokenWarning: 'Nuovo token — punteggio limitato, storico non provato',
+    washTradingWarning: 'Il volume supera di gran lunga la liquidità — possibile wash trading',
     moderate: 'Rischio moderato ⚠️',
     highRisk: 'Rischio alto 🚨',
     mintAuth: 'Mint Authority',
@@ -934,6 +946,8 @@ const TRANSLATIONS = {
     buyOnJupiter: '在JUPITER购买',
     safetyScore: '安全评分',
     ironclad: '固若金汤 ★',
+    newTokenWarning: '新代币 — 评分受限，尚无可验证的历史记录',
+    washTradingWarning: '交易量远超流动性 — 可能存在刷量交易',
     moderate: '中等风险 ⚠️',
     highRisk: '高风险 🚨',
     mintAuth: 'Mint Authority',
@@ -2460,6 +2474,42 @@ export default function TntHouse() {
       }
     } catch (e) {}
 
+    // FIX v1.121: RugCheck's own score (inverted into normalizedScore
+    // above) measures CONTRACT mechanics only — mint/freeze/honeypot/tax/
+    // lp-lock risks it can detect. It has zero concept of "this token is
+    // 40 minutes old with 20 holders" — that's a market-maturity risk, a
+    // completely different axis — so a brand-new, thin-holder token could
+    // show 100/"Ironclad Safe" even though nobody has had time to prove
+    // it isn't a rug. Applying a CAP here (not a subtracted penalty):
+    // caps don't stack unpredictably the way sequential deductions would,
+    // and a token that's both young AND thin-holder isn't double-punished
+    // — it just gets whichever single cap is lowest. Contract-safety
+    // checks above (mint/freeze/honeypot/tax) are untouched.
+    var maturityCap = 100;
+    if (dexData.ageDays !== null && dexData.ageDays < 1) {
+      maturityCap = 55;
+    } else if (
+      dexData.ageDays !== null &&
+      dexData.ageDays < 7 &&
+      typeof auditResult.holderCount === 'number' &&
+      auditResult.holderCount < 50
+    ) {
+      maturityCap = 65;
+    } else if (dexData.ageDays !== null && dexData.ageDays < 7) {
+      maturityCap = 75;
+    }
+    var maturityCapped = maturityCap < 100 && auditResult.score > maturityCap;
+    auditResult.score = Math.min(auditResult.score, maturityCap);
+    auditResult.maturityCapped = maturityCapped;
+
+    // Wash-trading signal: 24h volume far exceeding pool liquidity (bots
+    // or self-trading inflating "activity") is a real, distinct red flag
+    // — kept as its own explicit boolean rather than folded into the
+    // score, so the UI can show WHY the token looks suspicious, not just
+    // a lower number with no explanation.
+    auditResult.washTradingRisk =
+      dexData.liquidity > 0 && dexData.volume24h / dexData.liquidity > 20;
+
     var tokenData = {
       name: projectName.toUpperCase(),
       // FIX v1.104: this used to ALWAYS derive the symbol by truncating
@@ -2496,6 +2546,8 @@ export default function TntHouse() {
       ageDays: dexData.ageDays,
       standardProgram: auditResult.standardProgram,
       permanentDelegate: auditResult.permanentDelegate,
+      maturityCapped: auditResult.maturityCapped,
+      washTradingRisk: auditResult.washTradingRisk,
       // FIX v1.90: this is the field saveTokenToSupabase reads into is_free.
       isFree: !!isFree,
     };
@@ -5300,6 +5352,22 @@ export default function TntHouse() {
                   </p>
                 </div>
               </div>
+              {(selectedToken.maturityCapped || selectedToken.washTradingRisk) && (
+                <div className="mb-3 space-y-1.5">
+                  {selectedToken.maturityCapped && (
+                    <div className="flex items-start gap-1.5 px-3 py-2 bg-yellow-500/10 border border-yellow-500/30 rounded-lg text-yellow-300 text-[11px] font-mono">
+                      <span>⚠️</span>
+                      <span>{t.newTokenWarning}</span>
+                    </div>
+                  )}
+                  {selectedToken.washTradingRisk && (
+                    <div className="flex items-start gap-1.5 px-3 py-2 bg-orange-500/10 border border-orange-500/30 rounded-lg text-orange-300 text-[11px] font-mono">
+                      <span>⚠️</span>
+                      <span>{t.washTradingWarning}</span>
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="grid grid-cols-3 gap-2 mb-3">
                 {[
                   { label: t.price, value: '$' + (selectedToken.price || '0.00000000') },
@@ -5674,3 +5742,4 @@ export default function TntHouse() {
     </div>
   );
 }
+
