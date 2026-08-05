@@ -1,4 +1,4 @@
-// Version 1.0 — app/api/mcp/route.ts
+// Version 1.1 — app/api/mcp/route.ts
 //
 // POST /api/mcp — remote MCP server for the Risk-Data API, "simple path"
 // per the explicit decision: API-key auth (same Authorization: Bearer
@@ -7,6 +7,24 @@
 // NOT submitted to Anthropic's reviewed Connectors Directory, which
 // requires OAuth 2.1 + PKCE and a privacy policy page we don't have
 // yet. That's a deliberate later step, not an oversight.
+//
+// v1.1 change: auth is no longer enforced on the whole POST handler.
+// Automated MCP health-checkers/directory scanners (Glama, Smithery,
+// etc.) connect with NO Authorization header to run "initialize" and
+// discover tools via "tools/list" — that's normal MCP client behavior,
+// not a bypass attempt. Per the MCP spec, auth applies to the session
+// / tool invocation, not to capability negotiation. Blocking
+// "initialize" behind an API key meant every unauthenticated scanner
+// got a 401 before the server even responded, which Glama's connector
+// directory reported as "Unhealthy" — a false negative, not a real
+// outage. Fix: peek at the JSON-RPC "method" in the request body
+// first. "initialize" / "notifications/initialized" / "ping" /
+// "tools/list" are allowed with no key (nothing paid or private is
+// exposed — the tool schemas are already public in
+// public/.well-known/mcp/server-card.json). Every other method
+// (importantly "tools/call", where the actual paid work happens)
+// still goes through requireApiKey() exactly as before. No change to
+// rate limiting, billing, or the tool logic itself.
 //
 // Architecture: this does NOT proxy HTTP calls to our own
 // /api/v1/token-risk endpoints. It calls the same underlying library
@@ -19,7 +37,8 @@
 // Auth: exactly the existing requireApiKey() (lib/api-auth.ts) — same
 // Bearer token, same key hash lookup, same table. A person's existing
 // tnt_sk_... API key works here unchanged; no separate MCP-specific
-// credential to issue or manage.
+// credential to issue or manage. Now scoped to auth-requiring methods
+// only (see v1.1 note above), not the whole handler.
 //
 // Rate limiting / billing: exactly the existing enforceRateLimit() /
 // enforceRateLimitBatch() (lib/rate-limit.ts) — an MCP tool call is
@@ -58,11 +77,22 @@ export const maxDuration = 60;
 // update both.
 const MAX_BATCH_SIZE = 25;
 
+// JSON-RPC methods that never touch paid/private data — safe to allow
+// with no Authorization header so directory health-checkers and new
+// clients can discover this server before a person has an API key.
+const PUBLIC_METHODS = new Set(['initialize', 'notifications/initialized', 'ping', 'tools/list']);
+
 function jsonResult(data: unknown, isError = false) {
   return { content: [{ type: 'text' as const, text: JSON.stringify(data) }], isError };
 }
 
-function buildServer(apiKey: ApiKeyRecord): McpServer {
+// A server instance built with no ApiKeyRecord — used only for the
+// PUBLIC_METHODS path. Tool handlers below still individually assume
+// apiKey is set for the paid calls, so this is only ever reached for
+// initialize/tools list/ping, never for an actual tools/call — see
+// the routing in POST() below, which forces unauthenticated requests
+// down this path only when the method is in PUBLIC_METHODS.
+function buildServer(apiKey: ApiKeyRecord | null): McpServer {
   const server = new McpServer({ name: 'tnt-house-risk-data-api', version: '1.0.0' });
 
   server.registerTool(
@@ -74,6 +104,9 @@ function buildServer(apiKey: ApiKeyRecord): McpServer {
       inputSchema: { mint: z.string().describe('The Solana token mint address to check') },
     },
     async ({ mint }) => {
+      if (!apiKey) {
+        return jsonResult({ error: 'Unauthorized — provide an Authorization: Bearer <api_key> header. Get a free key at https://tnt-audit.com/risk-api' }, true);
+      }
       const startedAt = Date.now();
       const rateLimit = await enforceRateLimit(apiKey, {});
       if (!rateLimit.allowed) {
@@ -112,6 +145,9 @@ function buildServer(apiKey: ApiKeyRecord): McpServer {
       },
     },
     async ({ mints }) => {
+      if (!apiKey) {
+        return jsonResult({ error: 'Unauthorized — provide an Authorization: Bearer <api_key> header. Get a free key at https://tnt-audit.com/risk-api' }, true);
+      }
       const startedAt = Date.now();
       const rateLimit = await enforceRateLimitBatch(apiKey, mints.length, {});
       if (!rateLimit.allowed) {
@@ -160,6 +196,9 @@ function buildServer(apiKey: ApiKeyRecord): McpServer {
       },
     },
     async ({ mint, days }) => {
+      if (!apiKey) {
+        return jsonResult({ error: 'Unauthorized — provide an Authorization: Bearer <api_key> header. Get a free key at https://tnt-audit.com/risk-api' }, true);
+      }
       const startedAt = Date.now();
       const rows = await getMintRiskHistory(mint, days ?? 30);
       waitUntil(
@@ -196,12 +235,32 @@ function buildServer(apiKey: ApiKeyRecord): McpServer {
 }
 
 export async function POST(request: NextRequest) {
-  const auth = await requireApiKey(request, {});
-  if (!auth.ok || !auth.key) {
-    return auth.response ?? NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  // Peek at the JSON-RPC method without consuming the request body,
+  // so it can still be read normally by transport.handleRequest()
+  // below. NextRequest bodies are streams — clone() gives us a
+  // throwaway copy to inspect.
+  let method: string | undefined;
+  try {
+    const peek = await request.clone().json();
+    method = typeof peek?.method === 'string' ? peek.method : undefined;
+  } catch {
+    // Not valid JSON, or a batch array — fall through to requiring
+    // auth, same as before. Malformed/unrecognized bodies never get
+    // the public-method pass.
   }
 
-  const server = buildServer(auth.key);
+  const isPublic = method !== undefined && PUBLIC_METHODS.has(method);
+
+  let apiKey: ApiKeyRecord | null = null;
+  if (!isPublic) {
+    const auth = await requireApiKey(request, {});
+    if (!auth.ok || !auth.key) {
+      return auth.response ?? NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    apiKey = auth.key;
+  }
+
+  const server = buildServer(apiKey);
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined });
   await server.connect(transport);
   return transport.handleRequest(request);
