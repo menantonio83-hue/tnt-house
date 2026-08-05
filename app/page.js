@@ -2591,8 +2591,20 @@ export default function TntHouse() {
         console.error('Inline cluster-check failed:', e);
       }
 
+      // FIX v1.122: this used to prepend tokenData unconditionally, so
+      // re-auditing a CA already present in `prev` (loaded earlier from
+      // Supabase or from an earlier audit this session) showed BOTH the
+      // old and new entry side by side in the table — even though
+      // saveTokenToSupabase() above already correctly upserted a single
+      // row in the database. The DB was always right; only this local
+      // list was duplicating. Filtering out any existing row for the
+      // same ca before prepending makes the on-screen list match the DB.
       setListedTokens(function (prev) {
-        return [tokenData].concat(prev);
+        return [tokenData].concat(
+          prev.filter(function (t) {
+            return t.ca !== tokenData.ca;
+          }),
+        );
       });
       setFreeSlots(function (prev) {
         return Math.max(0, prev - 1);
@@ -3072,8 +3084,15 @@ export default function TntHouse() {
               console.error('Inline cluster-check failed:', e);
             }
 
+            // FIX v1.122: same dedup-by-ca fix as the free-audit flow
+            // above (see that comment) — a paid re-audit of an already-
+            // listed token was showing a duplicate row too.
             setListedTokens(function (prev) {
-              return [auditData].concat(prev);
+              return [auditData].concat(
+                prev.filter(function (t) {
+                  return t.ca !== auditData.ca;
+                }),
+              );
             });
             setAuditSuccessToken(auditData);
             showToast('✅ Payment confirmed! Token added. Score: ' + auditData.score, 'success');
