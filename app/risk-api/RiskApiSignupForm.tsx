@@ -124,10 +124,14 @@ export default function RiskApiSignupForm() {
         </div>
       )}
 
-      <p className="text-[11px] text-slate-500">
+      <p
+        className="text-[11px] text-white/90 font-medium"
+        style={{ textShadow: '0 0 5px rgba(255,255,255,0.7), 0 0 12px rgba(255,255,255,0.4)' }}
+      >
         {t.freeTierNote}
       </p>
     </form>
   );
 }
+
 
