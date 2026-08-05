@@ -31,12 +31,16 @@ import { detectInsiderClusters, type InsiderCluster } from '@/lib/insider-cluste
 import { getClusterCache, markClusterPending, saveClusterResult, markClusterFailed } from '@/lib/risk-api-cache';
 import { withTimeout } from '@/lib/with-timeout';
 import { upsertMintRiskHistory } from '@/lib/mint-risk-history-store';
+import { getRugCheckRiskData, type RugCheckRiskData } from '@/lib/rugcheck-client';
 
 // Same budgets as the single-mint route (app/api/v1/token-risk/route.ts) —
 // see that file's header comment for the reasoning behind each value.
 export const MINT_INFO_TIMEOUT_MS = 12000;
 export const HOLDER_RISK_TIMEOUT_MS = 40000;
 export const DEX_TIMEOUT_MS = 8000;
+export const RUGCHECK_TIMEOUT_MS = 8000;
+
+const RUGCHECK_FALLBACK: RugCheckRiskData = { honeypot_risk: null, lp_locked: null };
 
 const HOLDER_RISK_FALLBACK = {
   riskLevel: 'ERROR',
@@ -71,8 +75,12 @@ export interface TokenRiskResult {
   insider_clusters?: InsiderCluster[];
   mint_authority?: { revoked: boolean; address: string | null };
   freeze_authority?: { revoked: boolean; address: string | null };
-  honeypot_risk?: null;
-  lp_locked?: null;
+  // v1.10: real values from RugCheck (lib/rugcheck-client.ts), not the
+  // hardcoded null this API launched with. null still means "couldn't
+  // check" (RugCheck timeout/failure, or — for lp_locked only — no
+  // market data reported for this mint), never a false-clean default.
+  honeypot_risk?: boolean | null;
+  lp_locked?: { locked: boolean; percent: number } | null;
   holder_distribution?: {
     risk_level: string;
     largest_holder_percent: number;
@@ -156,10 +164,11 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
   }
 
   try {
-    const [mintInfo, holderRisk, rawDexData] = await Promise.all([
+    const [mintInfo, holderRisk, rawDexData, rugCheckData] = await Promise.all([
       withTimeout(getMintInfo(mint), MINT_INFO_TIMEOUT_MS, null),
       withTimeout(getHolderDistributionRobust(mint), HOLDER_RISK_TIMEOUT_MS, HOLDER_RISK_FALLBACK),
       withTimeout(getDexScreenerData(mint), DEX_TIMEOUT_MS, DEX_DATA_FALLBACK),
+      withTimeout(getRugCheckRiskData(mint), RUGCHECK_TIMEOUT_MS, RUGCHECK_FALLBACK),
     ]);
 
     const dexData = sanitizeDexMarketData(rawDexData);
@@ -240,8 +249,8 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
         revoked: freezeAuthorityRevoked,
         address: freezeAuthorityRevoked ? null : mintInfo.info.freezeAuthority,
       },
-      honeypot_risk: null,
-      lp_locked: null,
+      honeypot_risk: rugCheckData.honeypot_risk,
+      lp_locked: rugCheckData.lp_locked,
       holder_distribution: {
         risk_level: holderRisk.riskLevel,
         largest_holder_percent: holderRisk.largestHolderPercent,
@@ -255,7 +264,10 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
         price_change_24h_percent: dexData.priceChange24h,
         age_days: dexData.ageDays,
       },
-      note: 'honeypot_risk and lp_locked detection are on the roadmap and not yet implemented — both fields will remain null until shipped.',
+      note:
+        rugCheckData.honeypot_risk === null && rugCheckData.lp_locked === null
+          ? 'honeypot_risk and lp_locked could not be checked for this mint (RugCheck timeout, or no market data reported) — both null rather than a false-clean default.'
+          : undefined,
       checked_at: new Date().toISOString(),
     };
   } catch (error: any) {
