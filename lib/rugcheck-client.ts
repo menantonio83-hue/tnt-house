@@ -1,3 +1,30 @@
+// Version 1.2 — lib/rugcheck-client.ts
+//
+// v1.2: added four more fields extracted from the SAME RugCheck
+// /report response this file already fetches — zero extra latency,
+// zero extra RPC/HTTP calls, just parsing more of a payload that was
+// previously discarded after honeypot_risk/lp_locked. Verified the
+// exact field shapes against a real captured RugCheck response (not
+// guessed): deployer_address <- top-level `creator` (string, the
+// mint's deployer wallet); rugged <- top-level `rugged` (boolean,
+// RugCheck's OWN explicit "this token has already been confirmed
+// rugged" flag — previously not read at all); jup_verified <-
+// `verification.jup_verified` (boolean, Jupiter's own verification
+// status); insider_holder_count <- count of entries in `topHolders`
+// where that entry's own `insider` boolean is true (RugCheck runs its
+// own insider-graph analysis per top holder — this is a free
+// cross-check signal alongside this codebase's own from-scratch
+// lib/insider-cluster-detector.ts, not a replacement for it: RugCheck
+// flags insiders by its own graph-relationship heuristic, our detector
+// flags them by shared-first-funder — different methodologies, both
+// useful, deliberately exposed as separate signals rather than merged
+// into one number).
+//
+// All four follow the same "null means couldn't check, never a
+// false-clean default" rule already established for honeypot_risk/
+// lp_locked below — an absent RugCheck response means all six fields
+// come back null together, never a partial success.
+//
 // Version 1.1 — lib/rugcheck-client.ts
 //
 // Server-side RugCheck client, added to give the Risk-Data API real
@@ -30,9 +57,21 @@ export interface RugCheckRiskData {
   // null = couldn't check (RugCheck failure, or no market/LP data
   // reported for this mint at all — different from "checked, 0% locked").
   lp_locked: { locked: boolean; percent: number } | null;
+  // v1.2 — see header note above for exact provenance of each field.
+  deployer_address: string | null;
+  rugged: boolean | null;
+  jup_verified: boolean | null;
+  insider_holder_count: number | null;
 }
 
-const EMPTY_RESULT: RugCheckRiskData = { honeypot_risk: null, lp_locked: null };
+const EMPTY_RESULT: RugCheckRiskData = {
+  honeypot_risk: null,
+  lp_locked: null,
+  deployer_address: null,
+  rugged: null,
+  jup_verified: null,
+  insider_holder_count: null,
+};
 
 export async function getRugCheckRiskData(mint: string): Promise<RugCheckRiskData> {
   try {
@@ -63,7 +102,17 @@ export async function getRugCheckRiskData(mint: string): Promise<RugCheckRiskDat
       }
     }
 
-    return { honeypot_risk, lp_locked };
+    const deployer_address = typeof data.creator === 'string' && data.creator.length > 0 ? data.creator : null;
+    const rugged = typeof data.rugged === 'boolean' ? data.rugged : null;
+    const jup_verified =
+      data.verification && typeof data.verification.jup_verified === 'boolean'
+        ? data.verification.jup_verified
+        : null;
+    const insider_holder_count = Array.isArray(data.topHolders)
+      ? data.topHolders.filter((h: any) => h && h.insider === true).length
+      : null;
+
+    return { honeypot_risk, lp_locked, deployer_address, rugged, jup_verified, insider_holder_count };
   } catch {
     // Timeout (AbortSignal), network failure, or invalid JSON.
     return EMPTY_RESULT;
