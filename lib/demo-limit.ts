@@ -1,4 +1,25 @@
-// Version 1.1 — lib/demo-limit.ts
+// Version 1.2 — lib/demo-limit.ts
+//
+// v1.2: added a GLOBAL daily cap (DEMO_DAILY_LIMIT_GLOBAL = 100) on top
+// of the existing per-IP cap. Per-IP alone doesn't stop someone who
+// actually wants to burn free calls: Vercel overwrites x-forwarded-for
+// so a client can't spoof it directly (confirmed against Vercel's own
+// docs), but rotating real IPs — VPN, mobile carrier NAT, cloud
+// instances — is trivial and each one gets its own fresh 3/day. A
+// global ceiling is the real backstop: no matter how many distinct IPs
+// show up, the upstream cost (Helius/DexScreener calls via
+// fetchTokenRisk) for anonymous, unauthenticated traffic is capped for
+// the whole service, not just per visitor. 100/day is generous for
+// legitimate first-time visitors (way more than the handful of real
+// people testing the listing right now) while bounding worst-case
+// abuse cost to a fixed, small number of upstream calls per day.
+//
+// Both counters live in the same Redis database, separate keys
+// ("demo-limit:<ip>:<date>" vs "demo-limit:global:<date>"), both
+// expire at UTC midnight the same way. A request is allowed only if
+// BOTH the per-IP and the global count are still within their limits —
+// whichever is hit first blocks the call, and the response tells the
+// caller which one it was.
 //
 // v1.1: FIXED WRONG ENV VAR NAMES on first deploy — checked
 // UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN, which don't exist
@@ -54,10 +75,14 @@ const redis =
 
 // Small on purpose: enough for one person to see ONE real response and
 // believe the product works (and try a second/third mint if curious),
-// not enough to matter as a free scraping vector. Per-IP, not global,
-// so one bad actor can't burn every stranger's demo allowance for the
-// whole day.
+// not enough to matter as a free scraping vector on its own.
 const DEMO_DAILY_LIMIT_PER_IP = 3;
+
+// Backstop across ALL anonymous demo callers combined, regardless of
+// how many distinct IPs show up — see v1.2 note above.
+const DEMO_DAILY_LIMIT_GLOBAL = 100;
+
+const GLOBAL_KEY_PREFIX = 'demo-limit:global:';
 
 function secondsUntilUtcMidnight(): number {
   const now = new Date();
@@ -69,6 +94,26 @@ export interface DemoLimitResult {
   allowed: boolean;
   used: number;
   limit: number;
+  // Which counter actually blocked the call, when allowed is false —
+  // lets the tool handler give an accurate error message instead of
+  // always blaming the per-IP quota.
+  reason?: 'per_ip' | 'global';
+}
+
+// Increments a Redis counter and sets its UTC-midnight expiry on the
+// first increment of the day. Shared helper for both the per-IP and
+// the global counter — same pattern, different key.
+async function incrementDailyCounter(key: string): Promise<number | null> {
+  try {
+    const used = await redis!.incr(key);
+    if (used === 1) {
+      await redis!.expire(key, secondsUntilUtcMidnight());
+    }
+    return used;
+  } catch (e) {
+    console.error(`[demo-limit] Redis error incrementing ${key}:`, (e as Error).message);
+    return null;
+  }
 }
 
 // clientIp should already be extracted by the caller (first hop of
@@ -77,22 +122,37 @@ export interface DemoLimitResult {
 export async function checkDemoLimit(clientIp: string): Promise<DemoLimitResult> {
   if (!redis) {
     console.error('[demo-limit] Redis not configured, failing closed on anonymous demo calls.');
-    return { allowed: false, used: 0, limit: DEMO_DAILY_LIMIT_PER_IP };
+    return { allowed: false, used: 0, limit: DEMO_DAILY_LIMIT_PER_IP, reason: 'per_ip' };
   }
 
-  const key = `demo-limit:${clientIp}:${new Date().toISOString().slice(0, 10)}`;
+  const today = new Date().toISOString().slice(0, 10);
+  const perIpKey = `demo-limit:${clientIp}:${today}`;
+  const globalKey = `${GLOBAL_KEY_PREFIX}${today}`;
 
-  try {
-    const used = await redis.incr(key);
-    if (used === 1) {
-      // Only set the expiry on the FIRST increment of the day for this
-      // IP — re-setting it on every call would keep pushing the window
-      // out and the counter would never actually reset at UTC midnight.
-      await redis.expire(key, secondsUntilUtcMidnight());
-    }
-    return { allowed: used <= DEMO_DAILY_LIMIT_PER_IP, used, limit: DEMO_DAILY_LIMIT_PER_IP };
-  } catch (e) {
-    console.error('[demo-limit] Redis error, failing closed:', (e as Error).message);
-    return { allowed: false, used: 0, limit: DEMO_DAILY_LIMIT_PER_IP };
+  // Both counters increment on every call — even one that ends up
+  // blocked by the OTHER limit — same "counters increment regardless
+  // of what happens after" convention as lib/rate-limit.ts. Run in
+  // parallel: they're independent keys, no ordering dependency.
+  const [perIpUsed, globalUsed] = await Promise.all([
+    incrementDailyCounter(perIpKey),
+    incrementDailyCounter(globalKey),
+  ]);
+
+  // A Redis error on EITHER counter fails closed — same reasoning as
+  // v1.1's "Redis not configured" case: an anonymous, unmetered surface
+  // is the wrong place to fail open.
+  if (perIpUsed === null || globalUsed === null) {
+    return { allowed: false, used: 0, limit: DEMO_DAILY_LIMIT_PER_IP, reason: 'per_ip' };
   }
+
+  if (globalUsed > DEMO_DAILY_LIMIT_GLOBAL) {
+    return { allowed: false, used: globalUsed, limit: DEMO_DAILY_LIMIT_GLOBAL, reason: 'global' };
+  }
+
+  return {
+    allowed: perIpUsed <= DEMO_DAILY_LIMIT_PER_IP,
+    used: perIpUsed,
+    limit: DEMO_DAILY_LIMIT_PER_IP,
+    reason: perIpUsed > DEMO_DAILY_LIMIT_PER_IP ? 'per_ip' : undefined,
+  };
 }
