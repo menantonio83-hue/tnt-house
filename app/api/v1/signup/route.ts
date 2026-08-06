@@ -25,6 +25,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
 import { generateApiKey } from '@/lib/api-key';
 import { insertApiKey } from '@/lib/api-key-store';
+import { FREE_DAILY_LIMIT } from '@/lib/billing-pricing';
 
 export const dynamic = 'force-dynamic';
 
@@ -75,7 +76,13 @@ export async function POST(request: NextRequest) {
       api_key: rawKey,
       key_prefix: keyPrefix,
       tier: record.tier,
-      daily_limit: 100,
+      // FIX: was hardcoded 100 -- stale from before the pricing finalized
+      // at 15/day (see lib/rate-limit.ts FREE_DAILY_LIMIT, which was
+      // already correctly enforcing 15). This response text told every
+      // new signup a wrong, 6.6x-too-generous number while the real
+      // limit silently kicked in at 15. Now reads the same constant the
+      // rate limiter actually enforces, so the two can't drift apart again.
+      daily_limit: FREE_DAILY_LIMIT,
       created_at: record.created_at,
       warning: 'This key is shown once and cannot be retrieved again. Store it securely.',
     });
