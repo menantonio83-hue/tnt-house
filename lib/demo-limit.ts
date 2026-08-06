@@ -1,4 +1,19 @@
-// Version 1.0 — lib/demo-limit.ts
+// Version 1.1 — lib/demo-limit.ts
+//
+// v1.1: FIXED WRONG ENV VAR NAMES on first deploy — checked
+// UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN, which don't exist
+// on this project. The real integration (connected Aug 1) is "Vercel
+// KV", exposing KV_REST_API_URL / KV_REST_API_TOKEN instead — same REST
+// protocol the @upstash/redis client speaks, just different product
+// naming. Confirmed directly from the Vercel Environment Variables page
+// (KV_URL, KV_REST_API_URL, KV_REST_API_TOKEN, KV_REST_API_READ_ONLY_TOKEN,
+// REDIS_URL all present, "Production and Preview", added Aug 1). This
+// file's fail-closed design is exactly what surfaced the mismatch in
+// the first place — first real anonymous demo call logged
+// "[demo-limit] Redis not configured" instead of silently limping along
+// like lib/webhook-lock.ts's fail-open had been doing for this same
+// wrong-name bug the whole time. See lib/funder-cache.ts v1.2 for the
+// full discovery story.
 //
 // Zero-friction anonymous trial for check_token_risk via MCP — aimed at
 // people testing the server straight from a directory's built-in
@@ -14,9 +29,9 @@
 // DEMO_DAILY_LIMIT_PER_IP below), per-IP rather than per-key, and every
 // response upsells getting a real key for the full quota.
 //
-// Reuses the same Upstash Redis credentials as lib/webhook-lock.ts /
-// lib/funder-cache.ts (UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN)
-// — same database, separate key namespace ("demo-limit:").
+// Reuses the same Redis credentials as lib/webhook-lock.ts /
+// lib/funder-cache.ts (KV_REST_API_URL / KV_REST_API_TOKEN) — same
+// database, separate key namespace ("demo-limit:").
 //
 // FAIL-CLOSED here — the opposite of webhook-lock's fail-open. That's
 // deliberate: webhook-lock guards a monitoring sweep where missing a
@@ -30,10 +45,10 @@
 import { Redis } from '@upstash/redis';
 
 const redis =
-  process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
+  process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN
     ? new Redis({
-        url: process.env.UPSTASH_REDIS_REST_URL,
-        token: process.env.UPSTASH_REDIS_REST_TOKEN,
+        url: process.env.KV_REST_API_URL,
+        token: process.env.KV_REST_API_TOKEN,
       })
     : null;
 
