@@ -75,11 +75,27 @@ export default function RiskApiSignupForm() {
           <CopyButton text={issuedKey.api_key} label={t.copyLabel} />
         </div>
 
-        <div className="flex items-start gap-2 text-[11px] text-amber-300/90 bg-amber-500/5 border border-amber-500/20 rounded px-3 py-2">
+        <div className="flex items-start gap-2 text-[11px] text-amber-300/90 bg-amber-500/5 border border-amber-500/20 rounded px-3 py-2 mb-3">
           <AlertTriangle size={13} className="shrink-0 mt-0.5" />
           <span>
             {t.signupWarningPrefix} {issuedKey.daily_limit} {t.signupWarningSuffix}
           </span>
+        </div>
+
+        <div className="border-t border-purple-500/20 pt-3">
+          <p className="text-[11px] text-slate-400 mb-2">{t.signupQuickStartLabel}</p>
+          <div className="flex items-start gap-2 bg-black border border-purple-500/30 rounded px-3 py-2.5">
+            <code className="text-[10px] sm:text-[11px] text-emerald-300 break-all flex-1 font-mono leading-relaxed">
+              curl "https://tnt-audit.com/api/v1/token-risk?mint=&lt;MINT_ADDRESS&gt;" \
+              <br />
+              {'  '}-H "Authorization: Bearer {issuedKey.api_key}"
+            </code>
+            <CopyButton
+              text={`curl "https://tnt-audit.com/api/v1/token-risk?mint=<MINT_ADDRESS>" \\\n  -H "Authorization: Bearer ${issuedKey.api_key}"`}
+              label={t.copyLabel}
+            />
+          </div>
+          <p className="text-[10px] text-slate-500 mt-1.5">{t.signupQuickStartHint}</p>
         </div>
       </div>
     );
