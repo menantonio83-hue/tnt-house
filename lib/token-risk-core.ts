@@ -1,4 +1,20 @@
-// Version 1.2 — lib/token-risk-core.ts
+// Version 1.3 — lib/token-risk-core.ts
+//
+// v1.3: ported maturityCap + marketHealthCap from app/page.js (the
+// public TNT House site's scorer, v1.121/v1.124) into
+// computeApiSafetyScore's output. Found via a real discrepancy: a
+// pump.fun mint with top10Percent=96.4% (one wallet holding 94.9% of
+// supply) scored 58 via the Risk-Data API but would have been CAPPED
+// at 30 on the site — same token, two different scores depending on
+// which product checked it, because this file's additive weighted-sum
+// scorer had no cross-metric cap the way the site's does. Ported both
+// caps verbatim (same thresholds, same "cap the lesser, don't stack
+// penalties" reasoning as page.js's own comments explain) so a mint
+// scores identically regardless of which product surface checked it.
+// Exposed as maturity_capped / market_health_capped booleans in the
+// response, mirroring the site's own auditResult.maturityCapped /
+// marketHealthCapped fields, so an API caller can tell a cap fired
+// rather than just seeing a lower number with no explanation.
 //
 // v1.2: honeypot_risk and lp_locked are now real values from RugCheck
 // (lib/rugcheck-client.ts) instead of hardcoded null. See that file's
@@ -77,6 +93,13 @@ export interface TokenRiskResult {
   error?: string;
   details?: string;
   safety_score?: number;
+  // v1.3: true when a cap (see applyScoreCaps below) actually pulled
+  // the score down below what the raw weighted sum would have been —
+  // same semantics as app/page.js's auditResult.maturityCapped /
+  // marketHealthCapped. false (not omitted) when no cap fired, so a
+  // caller can distinguish "checked, no cap" from "field not present".
+  maturity_capped?: boolean;
+  market_health_capped?: boolean;
   cluster_analysis?: 'complete' | 'pending';
   insider_clusters?: InsiderCluster[];
   mint_authority?: { revoked: boolean; address: string | null };
@@ -154,6 +177,52 @@ export function computeApiSafetyScore(
   return Math.min(100, Math.max(0, Math.round(total)));
 }
 
+// Ported from app/page.js's maturityCap (v1.121) + marketHealthCap
+// (v1.124) — see this file's v1.3 header note for why. Deliberately
+// the EXACT same thresholds and CAP (not subtract) reasoning as the
+// site: a token that's both young AND thin-holder isn't double-
+// punished, it just gets whichever single cap is lowest. Applied on
+// top of computeApiSafetyScore's output, never inside it, same
+// separation the site keeps between its base audit score and these
+// caps.
+export interface ScoreCapResult {
+  score: number;
+  maturityCapped: boolean;
+  marketHealthCapped: boolean;
+}
+
+export function applyScoreCaps(
+  baseScore: number,
+  dexData: { liquidity: number | null; ageDays: number | null },
+  holderRisk: { top10Percent: number; holderCount: number },
+): ScoreCapResult {
+  let maturityCap = 100;
+  if (dexData.ageDays !== null && dexData.ageDays < 1) {
+    maturityCap = 55;
+  } else if (dexData.ageDays !== null && dexData.ageDays < 7 && holderRisk.holderCount < 50) {
+    maturityCap = 65;
+  } else if (dexData.ageDays !== null && dexData.ageDays < 7) {
+    maturityCap = 75;
+  }
+  const maturityCapped = maturityCap < 100 && baseScore > maturityCap;
+  const afterMaturity = Math.min(baseScore, maturityCap);
+
+  let marketHealthCap = 100;
+  if (dexData.liquidity !== null && dexData.liquidity < 500) {
+    marketHealthCap = 25;
+  } else if (holderRisk.top10Percent > 90) {
+    marketHealthCap = Math.min(marketHealthCap, 30);
+  } else if (holderRisk.top10Percent > 80) {
+    marketHealthCap = Math.min(marketHealthCap, 50);
+  } else if (holderRisk.holderCount < 20) {
+    marketHealthCap = Math.min(marketHealthCap, 60);
+  }
+  const marketHealthCapped = marketHealthCap < 100 && afterMaturity > marketHealthCap;
+  const finalScore = Math.min(afterMaturity, marketHealthCap);
+
+  return { score: finalScore, maturityCapped, marketHealthCapped };
+}
+
 // Validates + fetches + scores a single mint. Never throws — every
 // failure path (bad address, upstream fetch failure, unexpected
 // exception) resolves to a TokenRiskFailure so a batch of N mints can
@@ -211,13 +280,19 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
       waitUntil(runBackgroundClusterDetection(mint));
     }
 
-    const safetyScore = computeApiSafetyScore(
+    const rawSafetyScore = computeApiSafetyScore(
       mintAuthorityRevoked,
       freezeAuthorityRevoked,
       holderRisk,
       dexData,
       insiderClusters,
       clusterAnalysis,
+    );
+
+    const { score: safetyScore, maturityCapped, marketHealthCapped } = applyScoreCaps(
+      rawSafetyScore,
+      dexData,
+      holderRisk,
     );
 
     // History write: fire-and-forget, never awaited, never allowed to
@@ -245,6 +320,8 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
       ok: true,
       mint,
       safety_score: safetyScore,
+      maturity_capped: maturityCapped,
+      market_health_capped: marketHealthCapped,
       cluster_analysis: clusterAnalysis,
       insider_clusters: insiderClusters,
       mint_authority: {
