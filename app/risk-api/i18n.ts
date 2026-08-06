@@ -197,6 +197,8 @@ export interface RiskApiTranslations {
   signupReadyTitle: string;
   signupWarningPrefix: string;
   signupWarningSuffix: string;
+  signupQuickStartLabel: string;
+  signupQuickStartHint: string;
   generatingText: string;
   getFreeKeyBtn: string;
   freeTierNote: string;
@@ -392,6 +394,8 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     signupReadyTitle: 'Your API key is ready',
     signupWarningPrefix: 'This key is shown once and can\'t be retrieved again. Copy it now and store it somewhere safe —',
     signupWarningSuffix: 'requests/day, free tier.',
+    signupQuickStartLabel: 'Try it now — your key is already in this command:',
+    signupQuickStartHint: 'Paste it in a terminal, or drop it into any HTTP client as an Authorization: Bearer header.',
     generatingText: 'Generating...',
     getFreeKeyBtn: 'Get free API key',
     freeTierNote: 'Free tier: 15 requests/day. No credit card. One key per email.',
@@ -585,6 +589,8 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     signupReadyTitle: 'Tu API key está lista',
     signupWarningPrefix: 'Esta key se muestra una sola vez y no se puede recuperar después. Cópiala ahora y guárdala en un lugar seguro —',
     signupWarningSuffix: 'peticiones/día, nivel gratuito.',
+    signupQuickStartLabel: 'Pruébalo ahora — tu key ya está en este comando:',
+    signupQuickStartHint: 'Pégalo en una terminal, o úsalo en cualquier cliente HTTP como encabezado Authorization: Bearer.',
     generatingText: 'Generando...',
     getFreeKeyBtn: 'Obtener API key gratis',
     freeTierNote: 'Nivel gratuito: 15 peticiones/día. Sin tarjeta de crédito. Una key por email.',
@@ -778,6 +784,8 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     signupReadyTitle: 'Votre clé API est prête',
     signupWarningPrefix: 'Cette clé n\'est affichée qu\'une seule fois et ne peut plus être récupérée. Copiez-la maintenant et conservez-la en lieu sûr —',
     signupWarningSuffix: 'requêtes/jour, niveau gratuit.',
+    signupQuickStartLabel: 'Essayez-le maintenant — votre clé est déjà dans cette commande :',
+    signupQuickStartHint: 'Collez-la dans un terminal, ou utilisez-la dans n\'importe quel client HTTP comme en-tête Authorization: Bearer.',
     generatingText: 'Génération...',
     getFreeKeyBtn: 'Obtenir une clé API gratuite',
     freeTierNote: 'Niveau gratuit : 15 requêtes/jour. Pas de carte bancaire. Une clé par email.',
@@ -971,6 +979,8 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     signupReadyTitle: 'Το API key σου είναι έτοιμο',
     signupWarningPrefix: 'Αυτό το key εμφανίζεται μία φορά και δεν μπορεί να ανακτηθεί ξανά. Αντέγραψέ το τώρα και φύλαξέ το κάπου ασφαλές —',
     signupWarningSuffix: 'αιτήματα/ημέρα, δωρεάν επίπεδο.',
+    signupQuickStartLabel: 'Δοκιμάστε το τώρα — το κλειδί σας βρίσκεται ήδη σε αυτήν την εντολή:',
+    signupQuickStartHint: 'Επικολλήστε το σε ένα τερματικό, ή χρησιμοποιήστε το σε οποιονδήποτε HTTP client ως κεφαλίδα Authorization: Bearer.',
     generatingText: 'Δημιουργία...',
     getFreeKeyBtn: 'Πάρε δωρεάν API key',
     freeTierNote: 'Δωρεάν επίπεδο: 15 αιτήματα/ημέρα. Χωρίς πιστωτική κάρτα. Ένα key ανά email.',
@@ -1164,6 +1174,8 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     signupReadyTitle: 'Твой API-ключ готов',
     signupWarningPrefix: 'Этот ключ показывается один раз и не может быть получен повторно. Скопируй его сейчас и сохрани в надёжном месте —',
     signupWarningSuffix: 'запросов/день, бесплатный тариф.',
+    signupQuickStartLabel: 'Попробуй прямо сейчас — твой ключ уже в этой команде:',
+    signupQuickStartHint: 'Вставь в терминал, или используй в любом HTTP-клиенте как заголовок Authorization: Bearer.',
     generatingText: 'Генерация...',
     getFreeKeyBtn: 'Получить бесплатный API-ключ',
     freeTierNote: 'Бесплатный тариф: 15 запросов/день. Без карты. Один ключ на email.',
@@ -1357,6 +1369,8 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     signupReadyTitle: 'La tua API key è pronta',
     signupWarningPrefix: 'Questa key viene mostrata una sola volta e non può essere recuperata di nuovo. Copiala ora e conservala in un posto sicuro —',
     signupWarningSuffix: 'richieste/giorno, livello gratuito.',
+    signupQuickStartLabel: 'Provalo subito — la tua chiave è già in questo comando:',
+    signupQuickStartHint: 'Incollalo in un terminale, oppure usalo in qualsiasi client HTTP come header Authorization: Bearer.',
     generatingText: 'Generazione...',
     getFreeKeyBtn: 'Ottieni API key gratuita',
     freeTierNote: 'Livello gratuito: 15 richieste/giorno. Nessuna carta di credito. Una key per email.',
@@ -1550,6 +1564,8 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     signupReadyTitle: '你的 API 密钥已就绪',
     signupWarningPrefix: '此密钥仅显示一次，之后无法再次查看。请立即复制并妥善保存 ——',
     signupWarningSuffix: '次请求/天，免费套餐。',
+    signupQuickStartLabel: '立即试试 —— 你的密钥已经填入这条命令：',
+    signupQuickStartHint: '粘贴到终端里，或在任意 HTTP 客户端中作为 Authorization: Bearer 请求头使用。',
     generatingText: '生成中…',
     getFreeKeyBtn: '获取免费 API 密钥',
     freeTierNote: '免费套餐：15 次请求/天。无需信用卡。每个邮箱一个密钥。',
