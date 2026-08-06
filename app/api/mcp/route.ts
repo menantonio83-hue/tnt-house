@@ -1,3 +1,12 @@
+// Version 1.3 — app/api/mcp/route.ts
+//
+// v1.3: demo error message now distinguishes which limit blocked the
+// call — lib/demo-limit.ts v1.2 added a global daily cap (100/day
+// across ALL anonymous callers) on top of the existing per-IP cap
+// (3/day), since Vercel prevents x-forwarded-for spoofing but not
+// legitimate IP rotation (VPN, mobile NAT). See that file's header for
+// the full reasoning. No change to the demo-eligibility logic itself.
+//
 // Version 1.2 — app/api/mcp/route.ts
 //
 // v1.2: added a zero-key anonymous demo path for check_token_risk ONLY
@@ -151,12 +160,11 @@ function buildServer(apiKey: ApiKeyRecord | null, clientIp: string): McpServer {
         const startedAt = Date.now();
         const demo = await checkDemoLimit(clientIp);
         if (!demo.allowed) {
-          return jsonResult(
-            {
-              error: `Demo limit reached (${demo.limit} free calls/day without a key). Get a free API key with a real 15/day quota at https://tnt-audit.com/risk-api`,
-            },
-            true,
-          );
+          const message =
+            demo.reason === 'global'
+              ? `Anonymous demo calls are at today's site-wide cap (${demo.limit}/day across all visitors) — try again after UTC midnight, or get a free API key for guaranteed access at https://tnt-audit.com/risk-api`
+              : `Demo limit reached (${demo.limit} free calls/day without a key). Get a free API key with a real 15/day quota at https://tnt-audit.com/risk-api`;
+          return jsonResult({ error: message }, true);
         }
         const result = await fetchTokenRisk(mint);
         waitUntil(
