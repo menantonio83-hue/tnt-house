@@ -1,3 +1,21 @@
+// Version 1.2 — app/api/mcp/route.ts
+//
+// v1.2: added a zero-key anonymous demo path for check_token_risk ONLY
+// (not the batch or history tools). Context: Glama analytics showed 411
+// search impressions / 471 profile views / 0 tool calls over 30 days —
+// people were reaching the listing but nobody had a real API key handy
+// to actually invoke the tool from a directory's built-in
+// inspector/playground, so the very first "does this thing work" call
+// never happened. Fix: if "tools/call" arrives with NO Authorization
+// header AND the tool being called is check_token_risk, don't 401 at
+// the POST() gate — let it through with apiKey = null, and the tool
+// handler itself enforces a small per-IP daily cap via
+// checkDemoLimit() (lib/demo-limit.ts, DEMO_DAILY_LIMIT_PER_IP = 3,
+// Upstash Redis). Every other method/tool combination is completely
+// unchanged from v1.1 — batch and history still require a real key,
+// same as before. Demo calls are logged with keyId: null so they never
+// touch a real key's billing/quota rows.
+//
 // Version 1.1 — app/api/mcp/route.ts
 //
 // POST /api/mcp — remote MCP server for the Risk-Data API, "simple path"
@@ -23,8 +41,8 @@
 // exposed — the tool schemas are already public in
 // public/.well-known/mcp/server-card.json). Every other method
 // (importantly "tools/call", where the actual paid work happens)
-// still goes through requireApiKey() exactly as before. No change to
-// rate limiting, billing, or the tool logic itself.
+// still goes through requireApiKey() exactly as before — EXCEPT the
+// v1.2 demo carve-out for check_token_risk specifically, see above.
 //
 // Architecture: this does NOT proxy HTTP calls to our own
 // /api/v1/token-risk endpoints. It calls the same underlying library
@@ -43,7 +61,9 @@
 // Rate limiting / billing: exactly the existing enforceRateLimit() /
 // enforceRateLimitBatch() (lib/rate-limit.ts) — an MCP tool call is
 // charged and capped identically to the equivalent REST call. There is
-// no separate "MCP tier" or bypass.
+// no separate "MCP tier" or bypass for a real key. The v1.2 anonymous
+// path is a SEPARATE, much smaller limiter (checkDemoLimit()) that
+// never touches enforceRateLimit() or any api_keys row.
 //
 // Transport: WebStandardStreamableHttp, STATELESS mode
 // (sessionIdGenerator: undefined). Deliberate, not a default left
@@ -65,6 +85,7 @@ import { enforceRateLimit, enforceRateLimitBatch } from '@/lib/rate-limit';
 import { fetchTokenRisk } from '@/lib/token-risk-core';
 import { getMintRiskHistory } from '@/lib/mint-risk-history-store';
 import { logApiRequest } from '@/lib/request-logger';
+import { checkDemoLimit } from '@/lib/demo-limit';
 import type { ApiKeyRecord } from '@/lib/api-key-store';
 
 export const dynamic = 'force-dynamic';
@@ -82,17 +103,35 @@ const MAX_BATCH_SIZE = 25;
 // clients can discover this server before a person has an API key.
 const PUBLIC_METHODS = new Set(['initialize', 'notifications/initialized', 'ping', 'tools/list']);
 
+// The ONLY tool an unauthenticated "tools/call" is allowed to reach —
+// see v1.2 note above. Deliberately not batch or history: batch can
+// burn up to MAX_BATCH_SIZE upstream calls in one shot, and history
+// has no natural per-call cost signal to rate-limit against.
+const DEMO_ELIGIBLE_TOOL = 'check_token_risk';
+
 function jsonResult(data: unknown, isError = false) {
   return { content: [{ type: 'text' as const, text: JSON.stringify(data) }], isError };
 }
 
-// A server instance built with no ApiKeyRecord — used only for the
-// PUBLIC_METHODS path. Tool handlers below still individually assume
-// apiKey is set for the paid calls, so this is only ever reached for
-// initialize/tools list/ping, never for an actual tools/call — see
-// the routing in POST() below, which forces unauthenticated requests
-// down this path only when the method is in PUBLIC_METHODS.
-function buildServer(apiKey: ApiKeyRecord | null): McpServer {
+// Best-effort client IP for the anonymous demo limiter ONLY — never
+// used for auth or billing of a real key. Vercel sets x-forwarded-for;
+// first entry is the original client. Falls back to a constant bucket
+// key if the header is somehow missing (rare on Vercel), which just
+// means every header-less anonymous caller shares one small daily
+// pool instead of getting an individual one — an acceptable, safe
+// degradation, not an open door.
+function extractClientIp(request: NextRequest): string {
+  const forwardedFor = request.headers.get('x-forwarded-for');
+  if (forwardedFor) return forwardedFor.split(',')[0].trim();
+  return 'unknown';
+}
+
+// A server instance built with no ApiKeyRecord — reached for
+// PUBLIC_METHODS (initialize/tools list/ping) AND, as of v1.2, for an
+// unauthenticated "tools/call" of check_token_risk specifically (the
+// demo path). clientIp is only meaningful in that second case; it's
+// unused by every other tool.
+function buildServer(apiKey: ApiKeyRecord | null, clientIp: string): McpServer {
   const server = new McpServer({ name: 'tnt-house-risk-data-api', version: '1.0.0' });
 
   server.registerTool(
@@ -104,9 +143,46 @@ function buildServer(apiKey: ApiKeyRecord | null): McpServer {
       inputSchema: { mint: z.string().describe('The Solana token mint address to check') },
     },
     async ({ mint }) => {
+      // v1.2: no key — try the small anonymous demo allowance instead
+      // of an immediate Unauthorized, so a first-time visitor testing
+      // straight from a directory's inspector gets ONE real response
+      // with zero setup.
       if (!apiKey) {
-        return jsonResult({ error: 'Unauthorized — provide an Authorization: Bearer <api_key> header. Get a free key at https://tnt-audit.com/risk-api' }, true);
+        const startedAt = Date.now();
+        const demo = await checkDemoLimit(clientIp);
+        if (!demo.allowed) {
+          return jsonResult(
+            {
+              error: `Demo limit reached (${demo.limit} free calls/day without a key). Get a free API key with a real 15/day quota at https://tnt-audit.com/risk-api`,
+            },
+            true,
+          );
+        }
+        const result = await fetchTokenRisk(mint);
+        waitUntil(
+          logApiRequest({
+            keyId: null,
+            mint,
+            statusCode: result.ok ? 200 : result.status ?? 502,
+            safetyScore: result.ok ? result.safety_score ?? null : null,
+            clusterAnalysis: result.ok ? result.cluster_analysis ?? null : null,
+            responseTimeMs: Date.now() - startedAt,
+            error: result.ok ? null : result.error ?? 'unknown_error',
+          }),
+        );
+        return jsonResult(
+          {
+            ...result,
+            _demo: {
+              used: demo.used,
+              limit: demo.limit,
+              note: `Anonymous demo call ${demo.used}/${demo.limit} today. Get a free key for a real 15/day quota: https://tnt-audit.com/risk-api`,
+            },
+          },
+          !result.ok,
+        );
       }
+
       const startedAt = Date.now();
       const rateLimit = await enforceRateLimit(apiKey, {});
       if (!rateLimit.allowed) {
@@ -235,32 +311,43 @@ function buildServer(apiKey: ApiKeyRecord | null): McpServer {
 }
 
 export async function POST(request: NextRequest) {
-  // Peek at the JSON-RPC method without consuming the request body,
-  // so it can still be read normally by transport.handleRequest()
-  // below. NextRequest bodies are streams — clone() gives us a
-  // throwaway copy to inspect.
+  // Peek at the JSON-RPC method (and, for tools/call, the tool name)
+  // without consuming the request body, so it can still be read
+  // normally by transport.handleRequest() below. NextRequest bodies
+  // are streams — clone() gives us a throwaway copy to inspect.
   let method: string | undefined;
+  let toolName: string | undefined;
   try {
     const peek = await request.clone().json();
     method = typeof peek?.method === 'string' ? peek.method : undefined;
+    toolName = typeof peek?.params?.name === 'string' ? peek.params.name : undefined;
   } catch {
     // Not valid JSON, or a batch array — fall through to requiring
     // auth, same as before. Malformed/unrecognized bodies never get
-    // the public-method pass.
+    // the public-method or demo pass.
   }
 
   const isPublic = method !== undefined && PUBLIC_METHODS.has(method);
+  const isDemoEligibleCall = method === 'tools/call' && toolName === DEMO_ELIGIBLE_TOOL;
 
   let apiKey: ApiKeyRecord | null = null;
   if (!isPublic) {
     const auth = await requireApiKey(request, {});
     if (!auth.ok || !auth.key) {
-      return auth.response ?? NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      // v1.2: a missing/invalid key on tools/call no longer hard-blocks
+      // here IF this specific call is the demo-eligible tool — let it
+      // through with apiKey = null, and the tool handler's own
+      // checkDemoLimit() decides. Every other unauthenticated
+      // tools/call (batch, history) still 401s here exactly as before.
+      if (!isDemoEligibleCall) {
+        return auth.response ?? NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+    } else {
+      apiKey = auth.key;
     }
-    apiKey = auth.key;
   }
 
-  const server = buildServer(apiKey);
+  const server = buildServer(apiKey, extractClientIp(request));
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined });
   await server.connect(transport);
   return transport.handleRequest(request);
