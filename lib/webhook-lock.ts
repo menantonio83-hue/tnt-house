@@ -1,4 +1,17 @@
-// Version 1.0 — lib/webhook-lock.ts
+// Version 1.1 — lib/webhook-lock.ts
+//
+// v1.1: FIXED WRONG ENV VAR NAMES — was checking
+// UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN, which were never
+// actually set on this project. The real integration (connected Aug 1)
+// is "Vercel KV", exposing KV_REST_API_URL / KV_REST_API_TOKEN instead
+// (same REST protocol, different product naming) — see
+// lib/funder-cache.ts v1.2 for the full discovery story. This lock was
+// fail-open, so the wrong names never crashed anything; the mutex had
+// just silently never been active (every sweep proceeded as if it
+// always won the lock, i.e. exactly the pre-lock behavior this file
+// was written to fix). Not believed to have caused a real duplicate
+// delivery in practice — 15-minute cron ticks rarely overlap — but
+// worth having actually working now that it costs nothing to fix.
 //
 // Tiny Redis-backed mutex for app/api/v1/webhooks/check/route.ts. QStash
 // guarantees AT-LEAST-once delivery of its scheduled invocation — a
@@ -9,22 +22,22 @@
 // the same pre-crossing score and both fire the same webhook — a real
 // duplicate-delivery bug, not a theoretical one.
 //
-// Reuses the same Upstash Redis credentials as lib/funder-cache.ts
-// (UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN) — same database,
-// separate key namespace. FAIL-OPEN if Redis isn't reachable for any
-// reason: acquireCheckLock() returns true (proceeds without the lock)
-// rather than silently skipping every scheduled sweep forever because
-// of an infra hiccup. A missed lock in that rare window trades a small
+// Reuses the same Redis credentials as lib/funder-cache.ts
+// (KV_REST_API_URL / KV_REST_API_TOKEN) — same database, separate key
+// namespace. FAIL-OPEN if Redis isn't reachable for any reason:
+// acquireCheckLock() returns true (proceeds without the lock) rather
+// than silently skipping every scheduled sweep forever because of an
+// infra hiccup. A missed lock in that rare window trades a small
 // chance of one duplicate notification for never going fully silent —
 // the better failure mode for a monitoring feature.
 
 import { Redis } from '@upstash/redis';
 
 const redis =
-  process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
+  process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN
     ? new Redis({
-        url: process.env.UPSTASH_REDIS_REST_URL,
-        token: process.env.UPSTASH_REDIS_REST_TOKEN,
+        url: process.env.KV_REST_API_URL,
+        token: process.env.KV_REST_API_TOKEN,
       })
     : null;
 
