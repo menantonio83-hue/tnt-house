@@ -1,3 +1,17 @@
+// Version 1.4 — lib/token-risk-core.ts
+//
+// v1.4: exposes lib/rugcheck-client.ts v1.2's four new fields
+// (deployer_address, rugged, jup_verified, insider_holder_count) — all
+// free, from the SAME RugCheck call this file already makes. Also adds
+// a third cap tier to applyScoreCaps: ruggedCap. If RugCheck has
+// ITSELF already confirmed this mint rugged (data.rugged === true from
+// their own tracking, not a heuristic), the score is capped at 5,
+// full stop — no combination of clean mint/freeze/liquidity numbers
+// should ever make an already-rugged token look investable. Same
+// "cap, don't stack" reasoning as the other two caps: applied after
+// maturityCap and marketHealthCap, whichever of the three caps is
+// lowest wins.
+//
 // Version 1.3 — lib/token-risk-core.ts
 //
 // v1.3: ported maturityCap + marketHealthCap from app/page.js (the
@@ -62,7 +76,14 @@ export const HOLDER_RISK_TIMEOUT_MS = 40000;
 export const DEX_TIMEOUT_MS = 8000;
 export const RUGCHECK_TIMEOUT_MS = 8000;
 
-const RUGCHECK_FALLBACK: RugCheckRiskData = { honeypot_risk: null, lp_locked: null };
+const RUGCHECK_FALLBACK: RugCheckRiskData = {
+  honeypot_risk: null,
+  lp_locked: null,
+  deployer_address: null,
+  rugged: null,
+  jup_verified: null,
+  insider_holder_count: null,
+};
 
 const HOLDER_RISK_FALLBACK = {
   riskLevel: 'ERROR',
@@ -100,6 +121,10 @@ export interface TokenRiskResult {
   // caller can distinguish "checked, no cap" from "field not present".
   maturity_capped?: boolean;
   market_health_capped?: boolean;
+  // v1.4 — true only when RugCheck's own `rugged` flag (not a
+  // heuristic, their tracked confirmation) fired and actually pulled
+  // the score down. See applyScoreCaps below.
+  rugged_capped?: boolean;
   cluster_analysis?: 'complete' | 'pending';
   insider_clusters?: InsiderCluster[];
   mint_authority?: { revoked: boolean; address: string | null };
@@ -110,6 +135,14 @@ export interface TokenRiskResult {
   // market data reported for this mint), never a false-clean default.
   honeypot_risk?: boolean | null;
   lp_locked?: { locked: boolean; percent: number } | null;
+  // v1.4 — from lib/rugcheck-client.ts v1.2, same RugCheck call as
+  // honeypot_risk/lp_locked above, zero extra cost. null follows the
+  // same "couldn't check" rule as the other two RugCheck-sourced
+  // fields — never a false-clean/false-safe default.
+  deployer_address?: string | null;
+  rugged?: boolean | null;
+  jup_verified?: boolean | null;
+  insider_holder_count?: number | null;
   holder_distribution?: {
     risk_level: string;
     largest_holder_percent: number;
@@ -189,12 +222,14 @@ export interface ScoreCapResult {
   score: number;
   maturityCapped: boolean;
   marketHealthCapped: boolean;
+  ruggedCapped: boolean;
 }
 
 export function applyScoreCaps(
   baseScore: number,
   dexData: { liquidity: number | null; ageDays: number | null },
   holderRisk: { top10Percent: number; holderCount: number },
+  rugged: boolean | null,
 ): ScoreCapResult {
   let maturityCap = 100;
   if (dexData.ageDays !== null && dexData.ageDays < 1) {
@@ -218,9 +253,16 @@ export function applyScoreCaps(
     marketHealthCap = Math.min(marketHealthCap, 60);
   }
   const marketHealthCapped = marketHealthCap < 100 && afterMaturity > marketHealthCap;
-  const finalScore = Math.min(afterMaturity, marketHealthCap);
+  const afterMarketHealth = Math.min(afterMaturity, marketHealthCap);
 
-  return { score: finalScore, maturityCapped, marketHealthCapped };
+  // v1.4: RugCheck's OWN confirmed-rugged flag — not a heuristic on
+  // our side, their tracked ground truth. No clean mint/freeze/
+  // liquidity combination should override an already-confirmed rug.
+  const RUGGED_CAP = 5;
+  const ruggedCapped = rugged === true && afterMarketHealth > RUGGED_CAP;
+  const finalScore = rugged === true ? Math.min(afterMarketHealth, RUGGED_CAP) : afterMarketHealth;
+
+  return { score: finalScore, maturityCapped, marketHealthCapped, ruggedCapped };
 }
 
 // Validates + fetches + scores a single mint. Never throws — every
@@ -289,10 +331,11 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
       clusterAnalysis,
     );
 
-    const { score: safetyScore, maturityCapped, marketHealthCapped } = applyScoreCaps(
+    const { score: safetyScore, maturityCapped, marketHealthCapped, ruggedCapped } = applyScoreCaps(
       rawSafetyScore,
       dexData,
       holderRisk,
+      rugCheckData.rugged,
     );
 
     // History write: fire-and-forget, never awaited, never allowed to
@@ -322,6 +365,7 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
       safety_score: safetyScore,
       maturity_capped: maturityCapped,
       market_health_capped: marketHealthCapped,
+      rugged_capped: ruggedCapped,
       cluster_analysis: clusterAnalysis,
       insider_clusters: insiderClusters,
       mint_authority: {
@@ -334,6 +378,10 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
       },
       honeypot_risk: rugCheckData.honeypot_risk,
       lp_locked: rugCheckData.lp_locked,
+      deployer_address: rugCheckData.deployer_address,
+      rugged: rugCheckData.rugged,
+      jup_verified: rugCheckData.jup_verified,
+      insider_holder_count: rugCheckData.insider_holder_count,
       holder_distribution: {
         risk_level: holderRisk.riskLevel,
         largest_holder_percent: holderRisk.largestHolderPercent,
