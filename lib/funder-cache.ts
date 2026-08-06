@@ -1,37 +1,47 @@
-// Version 1.1 — lib/funder-cache.ts
+// Version 1.2 — lib/funder-cache.ts
+//
+// v1.2: FIXED WRONG ENV VAR NAMES — this file (and lib/webhook-lock.ts,
+// lib/demo-limit.ts) checked process.env.UPSTASH_REDIS_REST_URL /
+// UPSTASH_REDIS_REST_TOKEN, which were NEVER SET. The actual Vercel
+// Marketplace integration that was connected on Aug 1 is the "Vercel
+// KV" product (Upstash-backed under the hood, but exposed under its
+// own var names): KV_URL, KV_REST_API_URL, KV_REST_API_TOKEN,
+// KV_REST_API_READ_ONLY_TOKEN, REDIS_URL — confirmed directly from the
+// Environment Variables page, all "Production and Preview", added Aug
+// 1. KV_REST_API_URL / KV_REST_API_TOKEN are the correct REST
+// credentials for the @upstash/redis client (same protocol, just a
+// different product wrapper/naming than raw Upstash). This file was
+// fail-open by design (see below), so the wrong var names never
+// crashed anything — the cache had just silently never been active
+// since it was first written, always falling through to uncached RPC.
+// Discovered via lib/demo-limit.ts (v1.0, fail-CLOSED) logging an
+// explicit "Redis not configured" error the moment real traffic hit
+// it, which this file's silent fail-open never would have surfaced.
 //
 // v1.1: added a plain console.log per lookup ('[funder-cache] HIT' /
 // 'MISS' + address) so real hit/miss rates are visible in Vercel
 // function logs on live traffic — no counter table, no extra moving
 // parts, just grep-able log lines.
 //
-// Optional Upstash Redis cache for wallet funder resolution, used by
+// Optional Redis cache for wallet funder resolution, used by
 // lib/insider-cluster-detector.ts. A wallet's first-funding source is a
 // historical on-chain fact that can never change once observed, so
 // entries here have NO TTL — they're valid forever, no expiry logic
 // needed.
 //
-// FAIL-OPEN BY DESIGN: if UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN
-// aren't set (Upstash integration not connected yet, or briefly down),
-// every function below is a safe no-op — callers just fall through to
-// the uncached RPC path exactly as if this file didn't exist. No crash,
-// no behavior change either way. Caching activates automatically the
-// moment those env vars are present — nothing else to wire up.
-//
-// ONE-TIME MANUAL SETUP (cannot be done from here — needs the Vercel
-// dashboard): project -> Storage -> Marketplace Database Storage ->
-// Upstash Redis -> Free tier (no card required). This sets
-// UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN on the project
-// automatically. A redeploy (or the next deploy) is needed for a
-// running serverless function to pick up newly-added env vars.
+// FAIL-OPEN BY DESIGN: if KV_REST_API_URL / KV_REST_API_TOKEN aren't
+// set (integration not connected, or briefly down), every function
+// below is a safe no-op — callers just fall through to the uncached
+// RPC path exactly as if this file didn't exist. No crash, no behavior
+// change either way.
 
 import { Redis } from '@upstash/redis';
 
 const redis =
-  process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
+  process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN
     ? new Redis({
-        url: process.env.UPSTASH_REDIS_REST_URL,
-        token: process.env.UPSTASH_REDIS_REST_TOKEN,
+        url: process.env.KV_REST_API_URL,
+        token: process.env.KV_REST_API_TOKEN,
       })
     : null;
 
