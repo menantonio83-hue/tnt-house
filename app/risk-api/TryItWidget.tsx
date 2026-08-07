@@ -1,3 +1,17 @@
+// Version 1.1 — app/risk-api/TryItWidget.tsx
+//
+// v1.1: result card redesigned to match Бро's reference layout — a
+// branded "RISK-DATA API / tnt-audit.com" score card (big score +
+// progress bar, then a row-by-row stat list: insider clusters, mint/
+// freeze authority, honeypot, LP locked, top holder %, top-10 %,
+// liquidity, 24h volume, 24h change), replacing the earlier compact
+// 4-item grid — that version only surfaced 4 fields, this surfaces up
+// to 10 whenever the underlying fetchTokenRisk() result has them.
+// New StatRow helper renders each line; fields silently omitted when
+// the API result doesn't include them (e.g. holder_distribution/market
+// can be absent on a fetch partial-failure) rather than showing a
+// placeholder for data we don't have.
+//
 // Version 1.0 — app/risk-api/TryItWidget.tsx
 //
 // Landing-page "try it now" widget for the Risk-Data API — the anon
@@ -26,7 +40,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Loader2, Sparkles, ShieldAlert, ShieldCheck, ShieldX, Lock } from 'lucide-react';
+import { Loader2, Sparkles, Lock } from 'lucide-react';
 import { useRiskApiLang } from './LangContext';
 
 const FINGERPRINT_STORAGE_KEY = 'tnt_trial_fp';
@@ -38,12 +52,37 @@ interface TrialResult {
   mint: string;
   safety_score: number;
   insider_clusters: unknown[];
-  mint_authority: string | null;
-  freeze_authority: string | null;
+  mint_authority: { revoked: boolean; address: string | null } | null;
+  freeze_authority: { revoked: boolean; address: string | null } | null;
   honeypot_risk: boolean | null;
-  lp_locked: boolean | null;
+  lp_locked: { locked: boolean; percent: number } | null;
+  rugged: boolean | null;
+  jup_verified: boolean | null;
+  holder_distribution?: {
+    risk_level: string;
+    largest_holder_percent: number;
+    top10_percent: number;
+    holder_count: number;
+  };
+  market?: {
+    price_usd: number | null;
+    liquidity_usd: number | null;
+    volume_24h_usd: number | null;
+    price_change_24h_percent: number | null;
+    age_days: number | null;
+  };
   trial_calls_used: number;
   trial_calls_remaining: number;
+}
+
+// Compact number formatting for market figures ($1.2K / $3.4M) — same
+// spirit as the rest of the site's compact-currency displays, kept
+// local here since this is the only place in this component that needs it.
+function formatUsdCompact(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) return '—';
+  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(2)}M`;
+  if (value >= 1_000) return `$${(value / 1_000).toFixed(1)}K`;
+  return `$${value.toFixed(2)}`;
 }
 
 // Stable-ish browser fingerprint, hashed client-side. Not a security
@@ -197,38 +236,100 @@ export default function TryItWidget() {
           )}
 
           {status === 'success' && result && (
-            <div className="border border-purple-500/30 rounded-lg bg-black/40 p-4 space-y-2">
-              <div className="flex items-center gap-2">
-                {result.safety_score >= 70 ? (
-                  <ShieldCheck size={18} className="text-emerald-400" />
-                ) : result.safety_score >= 40 ? (
-                  <ShieldAlert size={18} className="text-amber-400" />
-                ) : (
-                  <ShieldX size={18} className="text-red-400" />
-                )}
-                <span className="text-lg font-black text-white">{result.safety_score}/100</span>
-                <span className="text-[11px] text-slate-400 font-mono truncate">{result.mint}</span>
+            <div className="border-2 border-purple-500/30 rounded-lg bg-slate-950 overflow-hidden">
+              {/* Card header */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-purple-500/20 bg-slate-900/40">
+                <span className="text-xs font-black text-purple-300 tracking-widest">RISK-DATA API</span>
+                <span className="text-[10px] text-slate-500 font-mono">tnt-audit.com</span>
               </div>
-              <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-300">
-                <div>
-                  Honeypot:{' '}
-                  <span className="font-bold">
-                    {result.honeypot_risk === null ? '—' : result.honeypot_risk ? '⚠️' : '✅'}
-                  </span>
+
+              {/* Score */}
+              <div className="px-4 pt-5 pb-4 text-center border-b border-purple-500/10">
+                <div className="text-[10px] text-slate-500 tracking-widest mb-1">SAFETY SCORE</div>
+                <div
+                  className={
+                    'text-5xl font-black mb-3 ' +
+                    (result.safety_score >= 70
+                      ? 'text-emerald-400'
+                      : result.safety_score >= 40
+                        ? 'text-amber-400'
+                        : 'text-red-400')
+                  }
+                >
+                  {result.safety_score}
                 </div>
-                <div>
-                  LP locked:{' '}
-                  <span className="font-bold">
-                    {result.lp_locked === null ? '—' : result.lp_locked ? '✅' : '⚠️'}
-                  </span>
+                <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
+                  <div
+                    className={
+                      'h-full rounded-full ' +
+                      (result.safety_score >= 70
+                        ? 'bg-emerald-400'
+                        : result.safety_score >= 40
+                          ? 'bg-amber-400'
+                          : 'bg-red-400')
+                    }
+                    style={{ width: `${Math.max(0, Math.min(100, result.safety_score))}%` }}
+                  />
                 </div>
-                <div>
-                  Insider clusters: <span className="font-bold">{result.insider_clusters?.length ?? 0}</span>
-                </div>
-                <div>
-                  Mint authority:{' '}
-                  <span className="font-bold">{result.mint_authority ? '⚠️' : '✅'}</span>
-                </div>
+              </div>
+
+              {/* Row-by-row stats */}
+              <div className="divide-y divide-purple-500/10 text-xs">
+                <StatRow
+                  label="Insider clusters"
+                  value={result.insider_clusters?.length ?? 0}
+                  valueClassName={(result.insider_clusters?.length ?? 0) > 0 ? 'text-red-400' : 'text-emerald-400'}
+                  suffix={(result.insider_clusters?.length ?? 0) > 0 ? ' found' : ''}
+                />
+                <StatRow
+                  label="Mint authority"
+                  value={result.mint_authority?.revoked ? 'revoked ✓' : 'active ⚠️'}
+                  valueClassName={result.mint_authority?.revoked ? 'text-emerald-400' : 'text-amber-400'}
+                />
+                <StatRow
+                  label="Freeze authority"
+                  value={result.freeze_authority?.revoked ? 'revoked ✓' : 'active ⚠️'}
+                  valueClassName={result.freeze_authority?.revoked ? 'text-emerald-400' : 'text-amber-400'}
+                />
+                <StatRow
+                  label="Honeypot"
+                  value={result.honeypot_risk === null ? '—' : result.honeypot_risk ? 'risk ⚠️' : 'clear ✓'}
+                  valueClassName={result.honeypot_risk ? 'text-red-400' : 'text-emerald-400'}
+                />
+                <StatRow
+                  label="LP locked"
+                  value={
+                    result.lp_locked === null
+                      ? '—'
+                      : result.lp_locked.locked
+                        ? `${result.lp_locked.percent.toFixed(0)}% ✓`
+                        : 'no ⚠️'
+                  }
+                  valueClassName={result.lp_locked?.locked ? 'text-emerald-400' : 'text-amber-400'}
+                />
+                {result.holder_distribution && (
+                  <>
+                    <StatRow label="Top holder" value={`${result.holder_distribution.largest_holder_percent.toFixed(1)}%`} />
+                    <StatRow label="Top-10 holders" value={`${result.holder_distribution.top10_percent.toFixed(1)}%`} />
+                  </>
+                )}
+                {result.market && (
+                  <>
+                    <StatRow label="Liquidity" value={formatUsdCompact(result.market.liquidity_usd)} valueClassName="text-emerald-400" />
+                    <StatRow label="24h volume" value={formatUsdCompact(result.market.volume_24h_usd)} valueClassName="text-emerald-400" />
+                    {result.market.price_change_24h_percent !== null && (
+                      <StatRow
+                        label="24h change"
+                        value={`${result.market.price_change_24h_percent >= 0 ? '+' : ''}${result.market.price_change_24h_percent.toFixed(1)}%`}
+                        valueClassName={result.market.price_change_24h_percent >= 0 ? 'text-emerald-400' : 'text-red-400'}
+                      />
+                    )}
+                  </>
+                )}
+              </div>
+
+              <div className="px-4 py-2.5 text-center border-t border-purple-500/10">
+                <span className="text-[10px] text-slate-600 font-mono">tnt-audit.com/risk-api</span>
               </div>
             </div>
           )}
@@ -238,6 +339,32 @@ export default function TryItWidget() {
           )}
         </>
       )}
+    </div>
+  );
+}
+
+// Single label/value line in the score card's stat list — small,
+// reusable, and keeps the JSX above readable given how many rows the
+// v1.1 layout now renders. suffix lets a row append e.g. " found"
+// without forcing the caller to pre-format the whole string.
+function StatRow({
+  label,
+  value,
+  valueClassName = 'text-white',
+  suffix = '',
+}: {
+  label: string;
+  value: string | number;
+  valueClassName?: string;
+  suffix?: string;
+}) {
+  return (
+    <div className="flex items-center justify-between px-4 py-2.5">
+      <span className="text-slate-400">{label}</span>
+      <span className={`font-bold ${valueClassName}`}>
+        {value}
+        {suffix}
+      </span>
     </div>
   );
 }

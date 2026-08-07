@@ -120,6 +120,8 @@ export async function POST(request: NextRequest) {
         freeze_authority: result.freeze_authority,
         honeypot_risk: result.honeypot_risk,
         lp_locked: result.lp_locked,
+        rugged: result.rugged,
+        jup_verified: result.jup_verified,
         holder_distribution: result.holder_distribution,
         market: result.market,
         checked_at: result.checked_at,
