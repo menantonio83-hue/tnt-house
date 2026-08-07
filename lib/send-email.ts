@@ -1,3 +1,25 @@
+// Version 1.5 — lib/send-email.ts
+//
+// v1.5: TRANSLATED into all 7 languages (EN/ES/FR/EL/RU/IT/ZH), not
+// just English — a real gap Бро caught, and correctly: this email is
+// the ONLY instructions a non-technical, non-English-fluent signup
+// ever gets (the on-screen success state has translated labels via
+// RiskApiSignupForm.tsx's useRiskApiLang(), but the follow-up email
+// was English-only, silently breaking the site's own "every i18n
+// surface covers all 7 languages" rule for the one surface that
+// matters most here). Human-facing prose (intro, three option
+// titles/descriptions, warning) now comes from
+// lib/email-translations.ts, keyed by a new `lang` param threaded
+// through from the frontend (RiskApiSignupForm.tsx already has the
+// visitor's chosen language via LangContext — just wasn't being sent
+// to the signup API before this). Code-facing content (the curl
+// command, the Python snippet, the literal text of the AI-assistant
+// prompt) stays in English on purpose — those are read by a terminal /
+// Python interpreter / AI model, not by the person, and every
+// mainstream AI parses English instructions regardless of the
+// recipient's own language; translating THAT text would only risk
+// mistranslated field names or broken code, not help anyone.
+//
 // Version 1.4 — lib/send-email.ts
 //
 // v1.4: FULL RESTRUCTURE of the email body, after a live review (Бро +
@@ -112,6 +134,9 @@
 // address with zero setup if that var isn't set yet (works, but often
 // lands in spam and looks unpolished).
 
+import type { LangCode } from '@/app/risk-api/i18n';
+import { EMAIL_TRANSLATIONS } from '@/lib/email-translations';
+
 const RESEND_API_URL = 'https://api.resend.com/emails';
 const DEFAULT_FROM = 'TNT House Risk-Data API <onboarding@resend.dev>';
 
@@ -119,14 +144,20 @@ interface SendKeyEmailParams {
   to: string;
   apiKey: string;
   dailyLimit: number;
+  lang?: LangCode;
 }
 
-export async function sendApiKeyEmail({ to, apiKey, dailyLimit }: SendKeyEmailParams): Promise<void> {
+export async function sendApiKeyEmail({ to, apiKey, dailyLimit, lang }: SendKeyEmailParams): Promise<void> {
   const resendApiKey = process.env.RESEND_API_KEY;
   if (!resendApiKey) {
     console.warn('[send-email] RESEND_API_KEY not set — skipping email, key was still shown on screen.');
     return;
   }
+
+  // Falls back to English for an unrecognized/missing lang — same
+  // "never let a bad/absent value break the send" posture as the rest
+  // of this file's fail-soft design.
+  const t = EMAIL_TRANSLATIONS[lang as LangCode] || EMAIL_TRANSLATIONS.en;
 
   const fromAddress = process.env.RESEND_EMAIL_DOMAIN
     ? `TNT House Risk-Data API <noreply@${process.env.RESEND_EMAIL_DOMAIN}>`
@@ -145,41 +176,46 @@ export async function sendApiKeyEmail({ to, apiKey, dailyLimit }: SendKeyEmailPa
   const html = `
     <div style="font-family: monospace, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; background: #0a0a0f; color: #e2e2e2;">
       <h2 style="color: #a78bfa;">Your TNT House Risk-Data API key</h2>
-      <p>Your free-tier key (${dailyLimit} requests/day) is ready:</p>
+      <p>${t.keyReadyIntro.replace('{dailyLimit}', String(dailyLimit))}</p>
       <div style="background: #000; border: 1px solid #a78bfa55; border-radius: 6px; padding: 12px; margin: 16px 0; word-break: break-all; color: #c4b5fd;">
         ${apiKey}
       </div>
 
       <p style="font-size: 13px; color: #d4d4d8;">
-        This key checks any Solana token for scam risk — mint authority, insider wallets, holder concentration, and more. To check a token, you need its <strong style="color: #e2e2e2;">mint address</strong> — a long string of letters and numbers that's the token's unique ID on Solana (not its name or ticker). You can copy it from <strong>DexScreener</strong> (click the token, copy the contract address), <strong>pump.fun</strong> (shown under the token name), or your wallet.
+        ${t.mintExplainer}
       </p>
 
-      <h3 style="color: #a78bfa; font-size: 15px; margin-top: 28px;">Option A — Easiest: ask an AI to check it for you</h3>
+      <h3 style="color: #a78bfa; font-size: 15px; margin-top: 28px;">${t.optionATitle}</h3>
       <p style="font-size: 13px; color: #d4d4d8;">
-        Copy this whole block, paste it into ChatGPT or Claude, and replace the placeholder with the token's mint address:
+        ${t.optionADesc}
       </p>
       <pre style="background: #000; border: 1px solid #a78bfa55; border-radius: 6px; padding: 12px; overflow-x: auto; color: #6ee7b7; font-size: 12px; white-space: pre-wrap;">${aiPrompt}</pre>
       <p style="font-size: 12px; color: #94a3b8;">
-        ⚠️ This only runs automatically if your AI assistant can actually execute code or browse the internet (e.g. Claude with Code Execution enabled, or ChatGPT with Code Interpreter / browsing turned on). A plain chat-only AI will just write you code instead of running it — in that case, use Option B below with whatever code it gives you.
+        ⚠️ ${t.optionAWarning}
       </p>
 
-      <h3 style="color: #a78bfa; font-size: 15px; margin-top: 28px;">Option B — I already have a bot (Python)</h3>
+      <h3 style="color: #a78bfa; font-size: 15px; margin-top: 28px;">${t.optionBTitle}</h3>
       <p style="font-size: 13px; color: #d4d4d8;">
-        Copy-paste this as-is to test it (it checks USDC as an example) — then swap the address on the marked line for the token you actually want to check:
+        ${t.optionBDesc}
       </p>
       <pre style="background: #000; border: 1px solid #a78bfa55; border-radius: 6px; padding: 12px; overflow-x: auto; color: #6ee7b7; font-size: 12px; white-space: pre-wrap;">${pythonExample}</pre>
 
-      <h3 style="color: #a78bfa; font-size: 15px; margin-top: 28px;">Option C — Terminal / curl (for developers)</h3>
+      <h3 style="color: #a78bfa; font-size: 15px; margin-top: 28px;">${t.optionCTitle}</h3>
       <pre style="background: #000; border: 1px solid #a78bfa55; border-radius: 6px; padding: 12px; overflow-x: auto; color: #6ee7b7; font-size: 13px;">${curlExample}</pre>
 
-      <p style="color: #fbbf24; font-size: 13px; margin-top: 24px;">⚠️ This key is shown once on the website and cannot be retrieved again there — keep this email as your backup.</p>
+      <p style="color: #fbbf24; font-size: 13px; margin-top: 24px;">⚠️ ${t.keyWarning}</p>
       <p style="color: #94a3b8; font-size: 12px; margin-top: 12px;">
-        Docs: <a href="https://tnt-audit.com/risk-api" style="color: #a78bfa;">tnt-audit.com/risk-api</a>
+        ${t.docsLabel} <a href="https://tnt-audit.com/risk-api" style="color: #a78bfa;">tnt-audit.com/risk-api</a>
       </p>
     </div>
   `.trim();
 
-  const text = `Your TNT House Risk-Data API key (${dailyLimit} requests/day):\n\n${apiKey}\n\nThis key checks any Solana token for scam risk. To check a token, you need its MINT ADDRESS — a long string of letters/numbers that's the token's unique ID (not its name). Copy it from DexScreener (click the token, copy the contract address), pump.fun (under the token name), or your wallet.\n\n--- OPTION A — Easiest: ask an AI to check it for you ---\nCopy this into ChatGPT or Claude, replace the placeholder with a real token address:\n\n${aiPrompt}\n\n(Only runs automatically if your AI can execute code / browse the internet — e.g. Claude with Code Execution, or ChatGPT with Code Interpreter. A plain chat-only AI will just write code for you instead — use Option B with that code.)\n\n--- OPTION B — I already have a bot (Python) ---\nCopy-paste as-is to test (checks USDC as an example), then swap the marked line for your token:\n\n${pythonExample}\n\n--- OPTION C — Terminal / curl (developers) ---\n${curlExample}\n\nThis key is shown once on the website and cannot be retrieved again there — keep this email as your backup.\n\nDocs: https://tnt-audit.com/risk-api`;
+  // Plain-text version: same content, <strong> tags in mintExplainer
+  // stripped since plain text has no bold — the two words that were
+  // bolded (mint address name in each language, DexScreener, pump.fun)
+  // read fine as plain words without it.
+  const mintExplainerPlain = t.mintExplainer.replace(/<\/?strong[^>]*>/g, '');
+  const text = `Your TNT House Risk-Data API key:\n\n${apiKey}\n\n${t.keyReadyIntro.replace('{dailyLimit}', String(dailyLimit))}\n\n${mintExplainerPlain}\n\n--- ${t.optionATitle} ---\n${t.optionADesc}\n\n${aiPrompt}\n\n(${t.optionAWarning})\n\n--- ${t.optionBTitle} ---\n${t.optionBDesc}\n\n${pythonExample}\n\n--- ${t.optionCTitle} ---\n${curlExample}\n\n${t.keyWarning}\n\n${t.docsLabel} https://tnt-audit.com/risk-api`;
 
   const attempt = await sendViaResend(resendApiKey, fromAddress, to, html, text);
 
