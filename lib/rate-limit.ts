@@ -258,10 +258,6 @@ export async function enforceRateLimit(
       response: null,
     };
   }
-      usedOverageCredit: false,
-      response: null,
-    };
-  }
 
   const newBalance = await decrementCreditIfSufficient(key.id, OVERAGE_RATE_FREE_USD);
   if (newBalance !== null) {
