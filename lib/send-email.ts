@@ -1,3 +1,16 @@
+// Version 1.1 — lib/send-email.ts
+//
+// v1.1: FIXED WRONG ENV VAR NAME — assumed EMAIL_FROM_ADDRESS (a full
+// email like "noreply@tnt-audit.com"), but the actual Vercel Marketplace
+// Resend integration (connected 2026-08-07) creates RESEND_EMAIL_DOMAIN
+// instead — just the bare domain (e.g. "tnt-audit.com"), not a full
+// address. Confirmed directly from the Environment Variables page:
+// RESEND_API_KEY + RESEND_EMAIL_DOMAIN, both "Production and Preview".
+// Same "wrong assumed name, fix once confirmed against the real
+// dashboard" pattern as lib/demo-limit.ts's KV_REST_API_* discovery —
+// this one was caught before deploy instead of after, by actually
+// checking the Environment Variables screenshot rather than assuming.
+//
 // Version 1.0 — lib/send-email.ts
 //
 // Sends the newly-issued API key + a copy-pasteable curl example to the
@@ -22,12 +35,12 @@
 // screen either way, exactly as before this file existed. Email is a
 // backup channel, not a dependency.
 //
-// SENDER DOMAIN: defaults to Resend's own onboarding@resend.dev sandbox
-// address, which works with zero setup but often lands in spam and
-// looks unpolished. Set EMAIL_FROM_ADDRESS (e.g.
-// "noreply@tnt-audit.com") once the tnt-audit.com domain is verified in
-// the Resend dashboard (Domains -> Add Domain -> a few DNS records) —
-// no code change needed here when that happens, just the env var.
+// SENDER DOMAIN: reads RESEND_EMAIL_DOMAIN (set automatically by the
+// Vercel Marketplace Resend integration once a domain is verified —
+// just the bare domain, e.g. "tnt-audit.com", NOT a full email
+// address). Falls back to Resend's own onboarding@resend.dev sandbox
+// address with zero setup if that var isn't set yet (works, but often
+// lands in spam and looks unpolished).
 
 const RESEND_API_URL = 'https://api.resend.com/emails';
 const DEFAULT_FROM = 'TNT House Risk-Data API <onboarding@resend.dev>';
@@ -45,8 +58,8 @@ export async function sendApiKeyEmail({ to, apiKey, dailyLimit }: SendKeyEmailPa
     return;
   }
 
-  const fromAddress = process.env.EMAIL_FROM_ADDRESS
-    ? `TNT House Risk-Data API <${process.env.EMAIL_FROM_ADDRESS}>`
+  const fromAddress = process.env.RESEND_EMAIL_DOMAIN
+    ? `TNT House Risk-Data API <noreply@${process.env.RESEND_EMAIL_DOMAIN}>`
     : DEFAULT_FROM;
 
   const curlExample = `curl "https://tnt-audit.com/api/v1/token-risk?mint=<MINT_ADDRESS>" \\\n  -H "Authorization: Bearer ${apiKey}"`;
