@@ -1,3 +1,19 @@
+// Version 1.3 — lib/send-email.ts
+//
+// v1.3: added a plain-language "no-code" section to the email, after
+// Бро pointed out the curl example alone means nothing to someone who
+// isn't already a developer but wants to plug this into a bot/AI
+// assistant — a real, previously-seen failure mode (Blossom Scanner's
+// 401s earlier were consistent with exactly this: someone with a key
+// but no clear idea how to actually wire up the Authorization header).
+// Added: a Python snippet (most common language for the kind of
+// trading-bot audience this API targets) and a one-paragraph tip to
+// literally paste the curl command + "I'm using [language]" into an AI
+// assistant (Claude/ChatGPT) and ask it to wire up the integration —
+// genuinely the most accessible path for a non-developer, not a
+// throwaway line. No change to the fail-soft/fallback logic below,
+// content-only addition.
+//
 // Version 1.2 — lib/send-email.ts
 //
 // v1.2: AUTOMATIC FALLBACK when the custom domain isn't verified yet.
@@ -83,6 +99,8 @@ export async function sendApiKeyEmail({ to, apiKey, dailyLimit }: SendKeyEmailPa
 
   const curlExample = `curl "https://tnt-audit.com/api/v1/token-risk?mint=<MINT_ADDRESS>" \\\n  -H "Authorization: Bearer ${apiKey}"`;
 
+  const pythonExample = `import requests\n\nresponse = requests.get(\n    "https://tnt-audit.com/api/v1/token-risk",\n    params={"mint": "<MINT_ADDRESS>"},\n    headers={"Authorization": "Bearer ${apiKey}"}\n)\ndata = response.json()\nprint(data["safety_score"])  # 0-100, higher = safer`;
+
   const html = `
     <div style="font-family: monospace, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; background: #0a0a0f; color: #e2e2e2;">
       <h2 style="color: #a78bfa;">Your TNT House Risk-Data API key</h2>
@@ -90,8 +108,13 @@ export async function sendApiKeyEmail({ to, apiKey, dailyLimit }: SendKeyEmailPa
       <div style="background: #000; border: 1px solid #a78bfa55; border-radius: 6px; padding: 12px; margin: 16px 0; word-break: break-all; color: #c4b5fd;">
         ${apiKey}
       </div>
-      <p>Quick start:</p>
+      <p>Quick start (terminal / any HTTP client):</p>
       <pre style="background: #000; border: 1px solid #a78bfa55; border-radius: 6px; padding: 12px; overflow-x: auto; color: #6ee7b7; font-size: 13px;">${curlExample}</pre>
+      <p>Quick start (Python, e.g. for a trading bot):</p>
+      <pre style="background: #000; border: 1px solid #a78bfa55; border-radius: 6px; padding: 12px; overflow-x: auto; color: #6ee7b7; font-size: 13px; white-space: pre-wrap;">${pythonExample}</pre>
+      <div style="background: #1e1b3a; border: 1px solid #a78bfa55; border-radius: 6px; padding: 12px; margin: 16px 0; font-size: 13px; color: #d4d4d8;">
+        <strong style="color: #a78bfa;">Not a developer?</strong> Paste the code block above into ChatGPT or Claude along with "wire this into my [Telegram bot / trading bot / whatever you're building], written in [your language]" — any AI assistant can do the integration for you from just that.
+      </div>
       <p style="color: #fbbf24; font-size: 13px;">⚠️ This key is shown once on the website and cannot be retrieved again there — keep this email as your backup.</p>
       <p style="color: #94a3b8; font-size: 12px; margin-top: 24px;">
         Docs: <a href="https://tnt-audit.com/risk-api" style="color: #a78bfa;">tnt-audit.com/risk-api</a>
@@ -99,7 +122,7 @@ export async function sendApiKeyEmail({ to, apiKey, dailyLimit }: SendKeyEmailPa
     </div>
   `.trim();
 
-  const text = `Your TNT House Risk-Data API key (${dailyLimit} requests/day):\n\n${apiKey}\n\nQuick start:\n${curlExample}\n\nThis key is shown once on the website and cannot be retrieved again there — keep this email as your backup.\n\nDocs: https://tnt-audit.com/risk-api`;
+  const text = `Your TNT House Risk-Data API key (${dailyLimit} requests/day):\n\n${apiKey}\n\nQuick start (terminal):\n${curlExample}\n\nQuick start (Python):\n${pythonExample}\n\nNot a developer? Paste the code above into ChatGPT or Claude along with "wire this into my [Telegram bot / trading bot], written in [your language]" — any AI assistant can do the integration for you.\n\nThis key is shown once on the website and cannot be retrieved again there — keep this email as your backup.\n\nDocs: https://tnt-audit.com/risk-api`;
 
   const attempt = await sendViaResend(resendApiKey, fromAddress, to, html, text);
 
