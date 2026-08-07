@@ -1,72 +1,44 @@
-// Version 3.7 — lib/rate-limit.ts
+// Version 3.8 — lib/rate-limit.ts
 //
-// v3.7: FIXES A REAL RACE CONDITION in enforceRateLimitBatch()'s
-// subscription-tier branch, found on review before anything touched a
-// real database. v3.6 used key.subscription_cycle_calls_used (read
-// earlier in the request, by requireApiKey()) as the "before" baseline
-// for splitting a batch into free-quota vs overage calls. Two
-// concurrent batch requests on the same key could both read that same
-// stale baseline and together under-charge overage credit — confirmed
-// with a concrete run (usedBefore=997, quota=1000, two concurrent
-// batches of 20: old code charges 17+17=34 overage calls total when
-// the real number is 37). Fixed by using incrementSubscriptionUsageBy()'s
-// own oldCount (lib/billing-store.ts v7.16, SELECT...FOR UPDATE inside
-// the same atomic operation as the increment) instead — no more
-// separate earlier read for the batch math. The free-tier branch was
-// NOT affected: its usedBefore is derived as usedAfter - count from
-// THIS SAME call's own atomic result, not a stale pre-fetch, so it was
-// already race-free (confirmed on review, unchanged here).
+// v3.8: layered lib/free-tier-global-pool.ts's site-wide 100/day cap on
+// top of each key's personal FREE_DAILY_LIMIT (15/day) — explicit
+// product decision (Бро, 2026-08-07), not a technical default: bounds
+// total upstream cost across ALL free keys combined, since a signup
+// costs us nothing to issue but every call costs real Helius/
+// DexScreener requests. Only gates the WITHIN-personal-quota free path
+// — never the overage-credit path (that's a paying call, see that
+// file's header) or subscription/paid tiers.
 //
-// Version 3.6 — lib/rate-limit.ts
+// Two DISTINCT error messages now exist (buildLimitReachedResponse for
+// "you personally used your 15" vs buildGlobalPoolReachedResponse for
+// "the whole free tier is at capacity today, not your fault") — a
+// vendor review (Kimi) flagged that a single generic 402 makes a
+// blameless "site is at capacity" case read as "you did something
+// wrong", which is a real problem for a B2B integrator debugging their
+// own code at 2am. Both responses also gained resets_in — a
+// human-readable string ("6 hours", "23 minutes") alongside the
+// existing raw reset_at ISO timestamp, so a caller doesn't have to do
+// their own date math just to show a sensible retry time.
 //
-// v3.6: added enforceRateLimitBatch() for the batch endpoint — same
-// free/subscription/paid logic as enforceRateLimit(), generalized to
-// charge N calls (one per mint in the batch) instead of 1, per the
-// explicitly-decided batch billing model (N mints = N calls, no bulk
-// discount). All-or-nothing: the whole batch is blocked with one 402
-// if it can't be fully covered, never partially processed/billed. See
-// that function's own comment for the subscription-tier approximation
-// note. Uses new incrementDailyUsageBy() / incrementSubscriptionUsageBy()
-// (lib/rate-limit-store.ts v6.5 / lib/billing-store.ts v7.15) — NOT the
-// existing single-increment functions, which enforceRateLimit() (used by
-// the single-mint route) keeps using unchanged.
-//
-// Version 3.5 — lib/rate-limit.ts
-//
-// v3.5: incrementSubscriptionUsage() now takes the quota so its RPC can
-// cap subscription_cycle_calls_used growth at quota+1 once a subscriber
-// is definitively in overage — see lib/billing-store.ts's version note.
-//
-// v3.4: full billing model implemented (see lib/billing-pricing.ts):
-// - free tier: 15 requests / calendar day (UTC) — lowered from 100 as
-//   part of the finalized pricing (free/pay-per-call/subscription)
-// - over the free daily cap: draws down credit_balance_usd at
-//   OVERAGE_RATE_FREE_USD ($0.07/call) instead of hard-blocking, if the
-//   key has a balance (topped up via the billing panel on /risk-api)
-// - 'subscription' tier (self-serve, $49/30 days via Solana Pay — see
-//   app/api/v1/billing/*): 1000 calls per 30-day cycle from the payment
-//   date, then draws down credit_balance_usd at
-//   OVERAGE_RATE_SUBSCRIBED_USD ($0.03/call) instead of the free rate.
-//   An expired subscription (subscription_expires_at in the past) falls
-//   straight back to free-tier rules.
-// - 'paid' tier: unchanged — a manually-issued, truly unlimited admin
-//   override (app/api/v1/admin/keys), separate from 'subscription'.
-//
-// NOTE: same flat-interface pattern as lib/api-auth.ts, not a
-// discriminated union — this repo's tsconfig.json has "strict": false,
-// under which TS's narrowing on boolean-literal discriminants is
-// unreliable (confirmed in Stage 2). A flat interface with nullable
-// fields avoids the issue.
-//
-// Design choice: counters increment on every authenticated call,
-// including ones that later fail validation (bad mint address, upstream
-// error). This matches how most commercial APIs meter usage — simpler
-// to reason about than trying to only charge "successful" calls.
+// FIRST-CALL GRACE (also from the same review, cheap and worth taking):
+// if a key's OWN daily counter is exactly 1 (this is the very first
+// call this key has made today) and the global pool is exhausted, this
+// one call is let through anyway. Rationale: someone who just signed up
+// and made their first-ever call landing on "sorry, everyone else used
+// up today's shared pool before you got here" is the single worst
+// first impression this API can give — a signup that got literally
+// zero value is far more likely to just leave than a signup that used
+// 3 of their 15 before hitting a fair, explained cap. Single-call path
+// only (enforceRateLimit) — NOT extended to enforceRateLimitBatch,
+// where "first call today" doesn't cleanly generalize to "first batch,
+// however large" without risking a big grace-covered spike; documented
+// simplification, not an oversight.
 
 import { NextResponse } from 'next/server';
 import type { ApiKeyRecord } from '@/lib/api-key-store';
 import { incrementDailyUsage, incrementDailyUsageBy, todayUtcDateString, nextUtcMidnightIso } from '@/lib/rate-limit-store';
 import { incrementSubscriptionUsage, incrementSubscriptionUsageBy, decrementCreditIfSufficient } from '@/lib/billing-store';
+import { consumeGlobalFreePool, GLOBAL_FREE_DAILY_LIMIT } from '@/lib/free-tier-global-pool';
 import {
   FREE_DAILY_LIMIT,
   SUBSCRIPTION_MONTHLY_QUOTA,
@@ -85,6 +57,21 @@ export interface RateLimitResult {
   response: NextResponse | null; // 402 response when blocked, else null
 }
 
+// "2026-08-08T00:00:00.000Z" -> "6 hours" / "23 minutes" / "under a
+// minute". Best-effort, never throws — an unparseable input just
+// degrades to omitting the phrase rather than crashing the response.
+function humanizeResetAt(resetAtIso: string): string | null {
+  const target = new Date(resetAtIso).getTime();
+  if (Number.isNaN(target)) return null;
+  const diffMs = target - Date.now();
+  if (diffMs <= 0) return 'under a minute';
+  const minutes = Math.round(diffMs / 60000);
+  if (minutes < 1) return 'under a minute';
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'}`;
+  const hours = Math.round(minutes / 60);
+  return `${hours} hour${hours === 1 ? '' : 's'}`;
+}
+
 function buildLimitReachedResponse(
   message: string,
   limit: number,
@@ -99,9 +86,34 @@ function buildLimitReachedResponse(
       limit,
       used,
       reset_at: resetAt,
+      resets_in: humanizeResetAt(resetAt),
       overage_rate_usd: overageRate,
       upgrade_url: 'https://tnt-audit.com/risk-api#billing',
       note: `Top up call credits or subscribe on the upgrade_url page — overage is billed at $${overageRate}/call once you have a balance.`,
+    },
+    { status: 402, headers: extraHeaders },
+  );
+}
+
+// v3.8: the SITE-WIDE cap being full — deliberately worded so it does
+// NOT read as "you did something wrong" (see header note). The caller
+// still has personal quota left; upgrading buys guaranteed access
+// instead of sharing the free pool.
+function buildGlobalPoolReachedResponse(
+  personalUsed: number,
+  personalLimit: number,
+  resetAt: string,
+  extraHeaders: HeadersInit,
+): NextResponse {
+  return NextResponse.json(
+    {
+      error: `Free tier is at capacity for today (${GLOBAL_FREE_DAILY_LIMIT}/${GLOBAL_FREE_DAILY_LIMIT} shared calls used across all free keys) — this is not specific to your key, you've only used ${personalUsed}/${personalLimit} of your own quota.`,
+      limit: GLOBAL_FREE_DAILY_LIMIT,
+      used: GLOBAL_FREE_DAILY_LIMIT,
+      reset_at: resetAt,
+      resets_in: humanizeResetAt(resetAt),
+      upgrade_url: 'https://tnt-audit.com/risk-api#billing',
+      note: 'Subscribe or top up call credits for guaranteed access that never depends on the shared free pool.',
     },
     { status: 402, headers: extraHeaders },
   );
@@ -215,6 +227,26 @@ export async function enforceRateLimit(
   }
 
   if (used <= FREE_DAILY_LIMIT) {
+    // v3.8: this call is within the KEY's own personal quota — but
+    // still gate it against the site-wide pool, since it's genuinely
+    // free (no credit drawn). Overage-credit calls below this branch
+    // are NOT gated — those are paying calls.
+    const isFirstCallToday = used === 1;
+    const globalPool = await consumeGlobalFreePool(1);
+
+    if (!globalPool.allowed && !isFirstCallToday) {
+      return {
+        allowed: false,
+        limit: FREE_DAILY_LIMIT,
+        used,
+        remaining: Math.max(0, FREE_DAILY_LIMIT - used),
+        resetAt,
+        creditBalanceUsd: key.credit_balance_usd,
+        usedOverageCredit: false,
+        response: buildGlobalPoolReachedResponse(used, FREE_DAILY_LIMIT, resetAt, extraHeaders),
+      };
+    }
+
     return {
       allowed: true,
       limit: FREE_DAILY_LIMIT,
@@ -222,6 +254,10 @@ export async function enforceRateLimit(
       remaining: Math.max(0, FREE_DAILY_LIMIT - used),
       resetAt,
       creditBalanceUsd: key.credit_balance_usd,
+      usedOverageCredit: false,
+      response: null,
+    };
+  }
       usedOverageCredit: false,
       response: null,
     };
@@ -403,6 +439,30 @@ export async function enforceRateLimitBatch(
   const usedBefore = usedAfter - count;
   const withinFreeCount = Math.max(0, Math.min(count, FREE_DAILY_LIMIT - usedBefore));
   const overCount = count - withinFreeCount;
+
+  // v3.8: gate the genuinely-free portion of this batch against the
+  // site-wide pool — same concept as enforceRateLimit() above, but
+  // NO first-batch grace here (deliberate simplification: "first call
+  // today" doesn't cleanly generalize to "first batch, however large"
+  // without risking one grace-covered batch draining a big chunk of
+  // the shared pool). Only checked when some of the batch is actually
+  // free (withinFreeCount > 0) — a batch that's ENTIRELY overage
+  // doesn't touch the free pool at all.
+  if (withinFreeCount > 0) {
+    const globalPool = await consumeGlobalFreePool(withinFreeCount);
+    if (!globalPool.allowed) {
+      return {
+        allowed: false,
+        limit: FREE_DAILY_LIMIT,
+        used: usedAfter,
+        remaining: Math.max(0, FREE_DAILY_LIMIT - usedAfter),
+        resetAt,
+        creditBalanceUsd: key.credit_balance_usd,
+        usedOverageCredit: false,
+        response: buildGlobalPoolReachedResponse(usedAfter, FREE_DAILY_LIMIT, resetAt, extraHeaders),
+      };
+    }
+  }
 
   if (overCount === 0) {
     return {
