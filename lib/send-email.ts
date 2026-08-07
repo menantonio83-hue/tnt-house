@@ -1,3 +1,38 @@
+// Version 1.4 — lib/send-email.ts
+//
+// v1.4: FULL RESTRUCTURE of the email body, after a live review (Бро +
+// external AI review) confirmed v1.3's content-only addition wasn't
+// enough — the ordering itself was wrong for our actual audience. This
+// product has zero brand recognition yet: nobody experienced is
+// choosing us over an established competitor on purpose. Whoever signs
+// up right now is, by definition, someone who stumbled onto a brand-new
+// product — realistically a beginner or a casual trader, not a
+// seasoned dev team with an existing pipeline. v1.3 buried the one
+// genuinely accessible path (paste into an AI assistant) as the THIRD
+// block, after two code snippets a non-developer can't parse at all —
+// wrong order for who's actually opening this email.
+//
+// v1.4 reorders so the easiest path is FIRST and most prominent: a
+// plain-language explanation of what a "mint address" even is (and
+// where to find one — DexScreener / pump.fun / a wallet), then a
+// ready-to-copy prompt block for ChatGPT/Claude that already has the
+// key filled in — paste it, add a token address, done. The Python
+// snippet moves to second position (for people who already have a bot
+// and just need to wire this in) and now uses a REAL working example
+// (USDC's mint) instead of an empty `""` placeholder that would run
+// but silently return nothing useful — a genuine bug an external
+// review caught: copy-pasting the old snippet as-is produced no
+// visible error AND no visible result, the worst kind of silent
+// failure for someone who doesn't know what to expect. curl drops to
+// third/last, clearly labeled for people who already know what a
+// terminal is — this API is used by real bot-builders too, so it stays,
+// just no longer first.
+//
+// Explicitly NOT building: a Telegram bot, a hosted web checker page,
+// or any other new product surface an external review also suggested.
+// Those are real, separate features with their own scope — tonight's
+// fix is entirely email-content-only, no new infrastructure.
+//
 // Version 1.3 — lib/send-email.ts
 //
 // v1.3: added a plain-language "no-code" section to the email, after
@@ -99,7 +134,13 @@ export async function sendApiKeyEmail({ to, apiKey, dailyLimit }: SendKeyEmailPa
 
   const curlExample = `curl "https://tnt-audit.com/api/v1/token-risk?mint=<MINT_ADDRESS>" \\\n  -H "Authorization: Bearer ${apiKey}"`;
 
-  const pythonExample = `import requests\n\nresponse = requests.get(\n    "https://tnt-audit.com/api/v1/token-risk",\n    params={"mint": "<MINT_ADDRESS>"},\n    headers={"Authorization": "Bearer ${apiKey}"}\n)\ndata = response.json()\nprint(data["safety_score"])  # 0-100, higher = safer`;
+  // Real working example (USDC's mint) instead of an empty "" — see
+  // v1.4 header. Comment marks exactly what to swap, right on the line
+  // that matters, not a separate paragraph someone has to cross-
+  // reference back to the code.
+  const pythonExample = `import requests\n\nresponse = requests.get(\n    "https://tnt-audit.com/api/v1/token-risk",\n    params={"mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"},  # <-- replace with the token you want to check\n    headers={"Authorization": "Bearer ${apiKey}"}\n)\ndata = response.json()\nprint(data["safety_score"])  # 0-100, higher = safer`;
+
+  const aiPrompt = `I have a Solana token risk-checking API key: ${apiKey}\n\nI want to check if this token is a scam before I buy it — the token's mint address is: <PASTE THE TOKEN ADDRESS HERE>\n\nSend a GET request to https://tnt-audit.com/api/v1/token-risk?mint=<the address above>\nwith header: Authorization: Bearer ${apiKey}\n\nThen explain the result to me in plain language: is the safety_score good or bad, and what are the biggest risks (holder concentration, mint/freeze authority, liquidity)?`;
 
   const html = `
     <div style="font-family: monospace, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; background: #0a0a0f; color: #e2e2e2;">
@@ -108,21 +149,37 @@ export async function sendApiKeyEmail({ to, apiKey, dailyLimit }: SendKeyEmailPa
       <div style="background: #000; border: 1px solid #a78bfa55; border-radius: 6px; padding: 12px; margin: 16px 0; word-break: break-all; color: #c4b5fd;">
         ${apiKey}
       </div>
-      <p>Quick start (terminal / any HTTP client):</p>
+
+      <p style="font-size: 13px; color: #d4d4d8;">
+        This key checks any Solana token for scam risk — mint authority, insider wallets, holder concentration, and more. To check a token, you need its <strong style="color: #e2e2e2;">mint address</strong> — a long string of letters and numbers that's the token's unique ID on Solana (not its name or ticker). You can copy it from <strong>DexScreener</strong> (click the token, copy the contract address), <strong>pump.fun</strong> (shown under the token name), or your wallet.
+      </p>
+
+      <h3 style="color: #a78bfa; font-size: 15px; margin-top: 28px;">Option A — Easiest: ask an AI to check it for you</h3>
+      <p style="font-size: 13px; color: #d4d4d8;">
+        Copy this whole block, paste it into ChatGPT or Claude, and replace the placeholder with the token's mint address:
+      </p>
+      <pre style="background: #000; border: 1px solid #a78bfa55; border-radius: 6px; padding: 12px; overflow-x: auto; color: #6ee7b7; font-size: 12px; white-space: pre-wrap;">${aiPrompt}</pre>
+      <p style="font-size: 12px; color: #94a3b8;">
+        ⚠️ This only runs automatically if your AI assistant can actually execute code or browse the internet (e.g. Claude with Code Execution enabled, or ChatGPT with Code Interpreter / browsing turned on). A plain chat-only AI will just write you code instead of running it — in that case, use Option B below with whatever code it gives you.
+      </p>
+
+      <h3 style="color: #a78bfa; font-size: 15px; margin-top: 28px;">Option B — I already have a bot (Python)</h3>
+      <p style="font-size: 13px; color: #d4d4d8;">
+        Copy-paste this as-is to test it (it checks USDC as an example) — then swap the address on the marked line for the token you actually want to check:
+      </p>
+      <pre style="background: #000; border: 1px solid #a78bfa55; border-radius: 6px; padding: 12px; overflow-x: auto; color: #6ee7b7; font-size: 12px; white-space: pre-wrap;">${pythonExample}</pre>
+
+      <h3 style="color: #a78bfa; font-size: 15px; margin-top: 28px;">Option C — Terminal / curl (for developers)</h3>
       <pre style="background: #000; border: 1px solid #a78bfa55; border-radius: 6px; padding: 12px; overflow-x: auto; color: #6ee7b7; font-size: 13px;">${curlExample}</pre>
-      <p>Quick start (Python, e.g. for a trading bot):</p>
-      <pre style="background: #000; border: 1px solid #a78bfa55; border-radius: 6px; padding: 12px; overflow-x: auto; color: #6ee7b7; font-size: 13px; white-space: pre-wrap;">${pythonExample}</pre>
-      <div style="background: #1e1b3a; border: 1px solid #a78bfa55; border-radius: 6px; padding: 12px; margin: 16px 0; font-size: 13px; color: #d4d4d8;">
-        <strong style="color: #a78bfa;">Not a developer?</strong> Paste the code block above into ChatGPT or Claude along with "wire this into my [Telegram bot / trading bot / whatever you're building], written in [your language]" — any AI assistant can do the integration for you from just that.
-      </div>
-      <p style="color: #fbbf24; font-size: 13px;">⚠️ This key is shown once on the website and cannot be retrieved again there — keep this email as your backup.</p>
-      <p style="color: #94a3b8; font-size: 12px; margin-top: 24px;">
+
+      <p style="color: #fbbf24; font-size: 13px; margin-top: 24px;">⚠️ This key is shown once on the website and cannot be retrieved again there — keep this email as your backup.</p>
+      <p style="color: #94a3b8; font-size: 12px; margin-top: 12px;">
         Docs: <a href="https://tnt-audit.com/risk-api" style="color: #a78bfa;">tnt-audit.com/risk-api</a>
       </p>
     </div>
   `.trim();
 
-  const text = `Your TNT House Risk-Data API key (${dailyLimit} requests/day):\n\n${apiKey}\n\nQuick start (terminal):\n${curlExample}\n\nQuick start (Python):\n${pythonExample}\n\nNot a developer? Paste the code above into ChatGPT or Claude along with "wire this into my [Telegram bot / trading bot], written in [your language]" — any AI assistant can do the integration for you.\n\nThis key is shown once on the website and cannot be retrieved again there — keep this email as your backup.\n\nDocs: https://tnt-audit.com/risk-api`;
+  const text = `Your TNT House Risk-Data API key (${dailyLimit} requests/day):\n\n${apiKey}\n\nThis key checks any Solana token for scam risk. To check a token, you need its MINT ADDRESS — a long string of letters/numbers that's the token's unique ID (not its name). Copy it from DexScreener (click the token, copy the contract address), pump.fun (under the token name), or your wallet.\n\n--- OPTION A — Easiest: ask an AI to check it for you ---\nCopy this into ChatGPT or Claude, replace the placeholder with a real token address:\n\n${aiPrompt}\n\n(Only runs automatically if your AI can execute code / browse the internet — e.g. Claude with Code Execution, or ChatGPT with Code Interpreter. A plain chat-only AI will just write code for you instead — use Option B with that code.)\n\n--- OPTION B — I already have a bot (Python) ---\nCopy-paste as-is to test (checks USDC as an example), then swap the marked line for your token:\n\n${pythonExample}\n\n--- OPTION C — Terminal / curl (developers) ---\n${curlExample}\n\nThis key is shown once on the website and cannot be retrieved again there — keep this email as your backup.\n\nDocs: https://tnt-audit.com/risk-api`;
 
   const attempt = await sendViaResend(resendApiKey, fromAddress, to, html, text);
 
