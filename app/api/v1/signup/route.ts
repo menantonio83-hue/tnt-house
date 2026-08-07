@@ -1,3 +1,18 @@
+// Version 6.8 — app/api/v1/signup/route.ts
+//
+// v6.8: fire-and-forget email delivery of the key (lib/send-email.ts)
+// on top of the existing on-screen display — see that file's header
+// for the "clipboard can fail silently, key is shown once, email is
+// the recovery path" reasoning. Deliberately does NOT touch the
+// existing one-key-per-email / 409-on-duplicate logic below (explicit
+// decision, Бро 2026-08-07: keep the reissue behavior exactly as-is,
+// simplify by adding email delivery only — no account model, no
+// reissue-with-carried-over-quota, no magic-link dashboard).
+// sendApiKeyEmail() is fail-soft by design (see its own header) — a
+// Resend outage or missing RESEND_API_KEY never blocks or degrades
+// this response; the key is still returned and shown on screen exactly
+// as before this version.
+//
 // Version 6.7 — app/api/v1/signup/route.ts
 //
 // v6.7: switched the duplicate-email lookup to the service-role Supabase
@@ -22,10 +37,12 @@
 // key-issuing flow from Stage 2).
 
 import { NextRequest, NextResponse } from 'next/server';
+import { waitUntil } from '@vercel/functions';
 import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
 import { generateApiKey } from '@/lib/api-key';
 import { insertApiKey } from '@/lib/api-key-store';
 import { FREE_DAILY_LIMIT } from '@/lib/billing-pricing';
+import { sendApiKeyEmail } from '@/lib/send-email';
 
 export const dynamic = 'force-dynamic';
 
@@ -71,6 +88,10 @@ export async function POST(request: NextRequest) {
     if (!record) {
       return NextResponse.json({ error: 'Failed to create API key, please try again' }, { status: 500 });
     }
+
+    // Fire-and-forget — never blocks or fails this response, see
+    // lib/send-email.ts's header for why.
+    waitUntil(sendApiKeyEmail({ to: email, apiKey: rawKey, dailyLimit: FREE_DAILY_LIMIT }));
 
     return NextResponse.json({
       api_key: rawKey,
