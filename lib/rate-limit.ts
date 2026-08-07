@@ -1,3 +1,17 @@
+// Version 3.9 — lib/rate-limit.ts
+//
+// v3.9: 402 responses from buildLimitReachedResponse() now include
+// subscription_price_usd / subscription_monthly_quota alongside the
+// existing overage_rate_usd — Бро caught that the JSON only surfaced
+// the pay-per-call option, forcing anyone parsing this response
+// programmatically to go scrape the pricing page's HTML just to learn
+// the other number, which contradicts this API's own "clean JSON for
+// bots, not a dashboard for humans" positioning (see app/risk-api's
+// own hero copy). buildGlobalPoolReachedResponse() doesn't get these
+// two fields — a full site-wide outage isn't really an "upgrade for
+// more calls" moment the same way a personal cap is, subscribing
+// doesn't change when the shared pool resets.
+//
 // Version 3.8 — lib/rate-limit.ts
 //
 // v3.8: layered lib/free-tier-global-pool.ts's site-wide 100/day cap on
@@ -41,6 +55,7 @@ import { incrementSubscriptionUsage, incrementSubscriptionUsageBy, decrementCred
 import { consumeGlobalFreePool, GLOBAL_FREE_DAILY_LIMIT } from '@/lib/free-tier-global-pool';
 import {
   FREE_DAILY_LIMIT,
+  SUBSCRIPTION_USD,
   SUBSCRIPTION_MONTHLY_QUOTA,
   OVERAGE_RATE_FREE_USD,
   OVERAGE_RATE_SUBSCRIBED_USD,
@@ -88,8 +103,10 @@ function buildLimitReachedResponse(
       reset_at: resetAt,
       resets_in: humanizeResetAt(resetAt),
       overage_rate_usd: overageRate,
+      subscription_price_usd: SUBSCRIPTION_USD,
+      subscription_monthly_quota: SUBSCRIPTION_MONTHLY_QUOTA,
       upgrade_url: 'https://tnt-audit.com/risk-api#billing',
-      note: `Top up call credits or subscribe on the upgrade_url page — overage is billed at $${overageRate}/call once you have a balance.`,
+      note: `Two ways to keep going: pay overage at $${overageRate}/call once you top up a balance, or subscribe for $${SUBSCRIPTION_USD} = ${SUBSCRIPTION_MONTHLY_QUOTA} calls/30 days at a lower $${OVERAGE_RATE_SUBSCRIBED_USD}/call overage rate after that. Details at upgrade_url.`,
     },
     { status: 402, headers: extraHeaders },
   );
