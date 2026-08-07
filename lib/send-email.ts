@@ -1,3 +1,22 @@
+// Version 1.2 — lib/send-email.ts
+//
+// v1.2: AUTOMATIC FALLBACK when the custom domain isn't verified yet.
+// Caught live: first real signup after connecting Resend got a silent
+// non-delivery — Resend's API correctly rejected the send with 403
+// "The tnt-audit.com domain is not verified", but this file just
+// logged it and gave up, matching v1.0/v1.1's fail-soft design ("never
+// block the signup") a little TOO literally — the person got their key
+// on screen (fine) but the promised email backup silently never
+// existed (not fine, and not obviously visible without checking logs).
+//
+// Fix: if the RESEND_EMAIL_DOMAIN send comes back with Resend's
+// specific "domain not verified" validation_error, retry ONCE
+// immediately with the always-available onboarding@resend.dev sandbox
+// address instead of just giving up. Once tnt-audit.com is verified in
+// the Resend dashboard (Domains -> Add Domain -> DNS records), sends
+// will succeed on the first try and this fallback path simply never
+// triggers again — no code change needed for that transition either.
+//
 // Version 1.1 — lib/send-email.ts
 //
 // v1.1: FIXED WRONG ENV VAR NAME — assumed EMAIL_FROM_ADDRESS (a full
@@ -82,15 +101,52 @@ export async function sendApiKeyEmail({ to, apiKey, dailyLimit }: SendKeyEmailPa
 
   const text = `Your TNT House Risk-Data API key (${dailyLimit} requests/day):\n\n${apiKey}\n\nQuick start:\n${curlExample}\n\nThis key is shown once on the website and cannot be retrieved again there — keep this email as your backup.\n\nDocs: https://tnt-audit.com/risk-api`;
 
+  const attempt = await sendViaResend(resendApiKey, fromAddress, to, html, text);
+
+  // v1.2: the ONE Resend error worth a fallback retry — domain not
+  // verified yet is a temporary, known, self-resolving state (fixed by
+  // finishing DNS verification in the Resend dashboard, not by us).
+  // Every other failure (bad API key, rate limit, network error, etc.)
+  // just logs and gives up, same as before — retrying those wouldn't
+  // help and could mask a real problem.
+  if (!attempt.ok && attempt.status === 403 && attempt.body?.includes('domain is not verified')) {
+    console.warn(
+      `[send-email] Custom domain (${fromAddress}) not verified yet — retrying with sandbox address.`,
+    );
+    const retry = await sendViaResend(resendApiKey, DEFAULT_FROM, to, html, text);
+    if (!retry.ok) {
+      console.error(`[send-email] Sandbox fallback also failed: ${retry.status} ${retry.body}`);
+    }
+    return;
+  }
+
+  if (!attempt.ok) {
+    console.error(`[send-email] Resend API returned ${attempt.status}: ${attempt.body}`);
+  }
+}
+
+interface ResendAttempt {
+  ok: boolean;
+  status: number;
+  body: string;
+}
+
+async function sendViaResend(
+  apiKey: string,
+  from: string,
+  to: string,
+  html: string,
+  text: string,
+): Promise<ResendAttempt> {
   try {
     const res = await fetch(RESEND_API_URL, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${resendApiKey}`,
+        Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: fromAddress,
+        from,
         to: [to],
         subject: 'Your TNT House Risk-Data API key',
         html,
@@ -98,12 +154,9 @@ export async function sendApiKeyEmail({ to, apiKey, dailyLimit }: SendKeyEmailPa
       }),
       signal: AbortSignal.timeout(8000),
     });
-
-    if (!res.ok) {
-      const body = await res.text().catch(() => '');
-      console.error(`[send-email] Resend API returned ${res.status}: ${body}`);
-    }
+    const body = res.ok ? '' : await res.text().catch(() => '');
+    return { ok: res.ok, status: res.status, body };
   } catch (e) {
-    console.error('[send-email] Failed to send key email:', (e as Error).message);
+    return { ok: false, status: 0, body: (e as Error).message };
   }
 }
