@@ -1,3 +1,15 @@
+// Version 6.9 — app/api/v1/signup/route.ts
+//
+// v6.9: accepts an optional `lang` field in the request body and
+// threads it through to sendApiKeyEmail() — see lib/send-email.ts v1.5
+// / lib/email-translations.ts for why (email content is now translated
+// into all 7 site languages, but needs to know which one to use).
+// Validated against the same LangCode union the rest of the site uses
+// rather than trusted blindly — an unrecognized or missing value falls
+// straight through as undefined, and send-email.ts's own fallback
+// already handles that by defaulting to English. Doesn't touch the
+// duplicate-email / reissue logic below at all.
+//
 // Version 6.8 — app/api/v1/signup/route.ts
 //
 // v6.8: fire-and-forget email delivery of the key (lib/send-email.ts)
@@ -43,15 +55,18 @@ import { generateApiKey } from '@/lib/api-key';
 import { insertApiKey } from '@/lib/api-key-store';
 import { FREE_DAILY_LIMIT } from '@/lib/billing-pricing';
 import { sendApiKeyEmail } from '@/lib/send-email';
+import type { LangCode } from '@/app/risk-api/i18n';
 
 export const dynamic = 'force-dynamic';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const VALID_LANGS: LangCode[] = ['en', 'es', 'fr', 'el', 'ru', 'it', 'zh'];
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => ({}));
     const rawEmail = typeof body.email === 'string' ? body.email.trim() : '';
+    const lang = VALID_LANGS.includes(body.lang) ? (body.lang as LangCode) : undefined;
 
     if (!rawEmail || !EMAIL_REGEX.test(rawEmail) || rawEmail.length > 200) {
       return NextResponse.json({ error: 'Enter a valid email address' }, { status: 400 });
@@ -91,7 +106,7 @@ export async function POST(request: NextRequest) {
 
     // Fire-and-forget — never blocks or fails this response, see
     // lib/send-email.ts's header for why.
-    waitUntil(sendApiKeyEmail({ to: email, apiKey: rawKey, dailyLimit: FREE_DAILY_LIMIT }));
+    waitUntil(sendApiKeyEmail({ to: email, apiKey: rawKey, dailyLimit: FREE_DAILY_LIMIT, lang }));
 
     return NextResponse.json({
       api_key: rawKey,
