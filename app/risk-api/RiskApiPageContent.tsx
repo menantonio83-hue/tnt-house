@@ -1,3 +1,13 @@
+// Version 1.6 — app/risk-api/RiskApiPageContent.tsx
+//
+// v1.6: inserted TryItWidget right after the hero section — the anon
+// trial funnel step (fingerprint, no email, 3 free checks) that used to
+// not exist on the landing page at all (email-gate was the very first
+// friction point a visitor hit). See TryItWidget.tsx and
+// app/api/v1/trial/check/route.ts for the full funnel:
+// fingerprint (3 free) -> email (existing RiskApiSignupForm, 15/day) ->
+// paid.
+//
 // Version 1.5 — app/risk-api/RiskApiPageContent.tsx
 //
 // v1.5: new "Webhooks" docs section (between Rate Limiting and
@@ -63,6 +73,7 @@ import { useState } from 'react';
 import { Bot, Shield, Terminal, Database, Lock, Zap, CheckCircle2, CreditCard } from 'lucide-react';
 import CopyButton from './CopyButton';
 import RiskApiSignupForm from './RiskApiSignupForm';
+import TryItWidget from './TryItWidget';
 import BillingPanel from './BillingPanel';
 import LangSwitcher from './LangSwitcher';
 import ChatWidget from './ChatWidget';
@@ -267,6 +278,11 @@ export default function RiskApiPageContent() {
               {t.btnReadDocs}
             </a>
           </div>
+        </section>
+
+        {/* Anon trial widget — no signup, 3 free checks via browser fingerprint */}
+        <section className="pb-14">
+          <TryItWidget />
         </section>
 
         {/* Signature element: live terminal preview of a real response shape */}

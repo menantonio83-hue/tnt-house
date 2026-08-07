@@ -1,3 +1,11 @@
+// Version 1.4 — app/risk-api/i18n.ts
+//
+// v1.4: added tryIt* keys (10 strings x 7 languages) for the new
+// TryItWidget.tsx anon trial funnel step — see that component and
+// app/api/v1/trial/check/route.ts. tryItRemaining uses a {n} template
+// placeholder replaced client-side (same convention as the rest of
+// this file having no built-in i18n interpolation library).
+//
 // Version 1.3 — app/risk-api/i18n.ts
 //
 // v1.3: REVERSED the v1.2 decision to leave changelog entries in
@@ -204,6 +212,18 @@ export interface RiskApiTranslations {
   freeTierNote: string;
   emailPlaceholder: string;
   signupHint: string;
+
+  // Try-it-now anon trial widget (no signup)
+  tryItTitle: string;
+  tryItSubtitle: string;
+  tryItPlaceholder: string;
+  tryItButton: string;
+  tryItLoading: string;
+  tryItRemaining: string;
+  tryItLimitTitle: string;
+  tryItLimitBody: string;
+  tryItInvalidMint: string;
+  tryItErrorGeneric: string;
 }
 
 export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
@@ -401,6 +421,16 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     freeTierNote: 'Free tier: 15 requests/day. No credit card. One key per email.',
     signupHint: 'Enter your email, then copy the key that appears — shown once.',
     emailPlaceholder: 'Email address',
+    tryItTitle: 'Try it now — no signup',
+    tryItSubtitle: '3 free checks, no email required',
+    tryItPlaceholder: 'Paste a Solana mint address',
+    tryItButton: 'Check risk',
+    tryItLoading: 'Analyzing...',
+    tryItRemaining: '{n} free check(s) left',
+    tryItLimitTitle: "You've used all 3 free checks",
+    tryItLimitBody: 'Get a free API key below — 15 checks/day, no card required.',
+    tryItInvalidMint: 'Enter a valid Solana mint address',
+    tryItErrorGeneric: 'Something went wrong. Try again.',
   },
   es: {
     flag: '🇪🇸',
@@ -596,6 +626,16 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     freeTierNote: 'Nivel gratuito: 15 peticiones/día. Sin tarjeta de crédito. Una key por email.',
     signupHint: 'Escribe tu email y copia la key que aparece — se muestra una sola vez.',
     emailPlaceholder: 'Correo electrónico',
+    tryItTitle: 'Pruébalo ahora — sin registro',
+    tryItSubtitle: '3 comprobaciones gratis, sin email',
+    tryItPlaceholder: 'Pega una dirección mint de Solana',
+    tryItButton: 'Comprobar riesgo',
+    tryItLoading: 'Analizando...',
+    tryItRemaining: '{n} comprobación(es) gratis restantes',
+    tryItLimitTitle: 'Has usado tus 3 comprobaciones gratis',
+    tryItLimitBody: 'Consigue una API key gratis abajo — 15 comprobaciones/día, sin tarjeta.',
+    tryItInvalidMint: 'Introduce una dirección mint de Solana válida',
+    tryItErrorGeneric: 'Algo salió mal. Inténtalo de nuevo.',
   },
   fr: {
     flag: '🇫🇷',
@@ -791,6 +831,16 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     freeTierNote: 'Niveau gratuit : 15 requêtes/jour. Pas de carte bancaire. Une clé par email.',
     signupHint: 'Entrez votre email, puis copiez la clé affichée — elle n’apparaît qu’une fois.',
     emailPlaceholder: 'Adresse email',
+    tryItTitle: 'Essayez maintenant — sans inscription',
+    tryItSubtitle: '3 vérifications gratuites, sans email',
+    tryItPlaceholder: 'Collez une adresse mint Solana',
+    tryItButton: 'Vérifier le risque',
+    tryItLoading: 'Analyse en cours...',
+    tryItRemaining: '{n} vérification(s) gratuite(s) restante(s)',
+    tryItLimitTitle: 'Vous avez utilisé vos 3 vérifications gratuites',
+    tryItLimitBody: 'Obtenez une clé API gratuite ci-dessous — 15 vérifications/jour, sans carte.',
+    tryItInvalidMint: 'Entrez une adresse mint Solana valide',
+    tryItErrorGeneric: "Une erreur s'est produite. Réessayez.",
   },
   el: {
     flag: '🇬🇷',
@@ -986,6 +1036,16 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     freeTierNote: 'Δωρεάν επίπεδο: 15 αιτήματα/ημέρα. Χωρίς πιστωτική κάρτα. Ένα key ανά email.',
     signupHint: 'Γράψε το email σου και αντέγραψε το key που θα εμφανιστεί — εμφανίζεται μόνο μία φορά.',
     emailPlaceholder: 'Διεύθυνση email',
+    tryItTitle: 'Δοκίμασέ το τώρα — χωρίς εγγραφή',
+    tryItSubtitle: '3 δωρεάν έλεγχοι, χωρίς email',
+    tryItPlaceholder: 'Επικόλλησε μια διεύθυνση mint Solana',
+    tryItButton: 'Έλεγχος ρίσκου',
+    tryItLoading: 'Ανάλυση...',
+    tryItRemaining: '{n} δωρεάν έλεγχος/οι απομένουν',
+    tryItLimitTitle: 'Χρησιμοποίησες και τους 3 δωρεάν ελέγχους',
+    tryItLimitBody: 'Πάρε δωρεάν API key παρακάτω — 15 έλεγχοι/ημέρα, χωρίς κάρτα.',
+    tryItInvalidMint: 'Βάλε μια έγκυρη διεύθυνση mint Solana',
+    tryItErrorGeneric: 'Κάτι πήγε στραβά. Δοκίμασε ξανά.',
   },
   ru: {
     flag: '🇷🇺',
@@ -1181,6 +1241,16 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     freeTierNote: 'Бесплатный тариф: 15 запросов/день. Без карты. Один ключ на email.',
     signupHint: 'Введи email и скопируй ключ, который появится — показывается один раз.',
     emailPlaceholder: 'Email адрес',
+    tryItTitle: 'Попробуй прямо сейчас — без регистрации',
+    tryItSubtitle: '3 бесплатные проверки, без email',
+    tryItPlaceholder: 'Вставь mint-адрес токена Solana',
+    tryItButton: 'Проверить риск',
+    tryItLoading: 'Анализ...',
+    tryItRemaining: 'Осталось бесплатных проверок: {n}',
+    tryItLimitTitle: 'Ты использовал все 3 бесплатные проверки',
+    tryItLimitBody: 'Получи бесплатный API-ключ ниже — 15 проверок/день, без карты.',
+    tryItInvalidMint: 'Введи корректный mint-адрес Solana',
+    tryItErrorGeneric: 'Что-то пошло не так. Попробуй ещё раз.',
   },
   it: {
     flag: '🇮🇹',
@@ -1376,6 +1446,16 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     freeTierNote: 'Livello gratuito: 15 richieste/giorno. Nessuna carta di credito. Una key per email.',
     signupHint: 'Inserisci la tua email, poi copia la key che appare — mostrata una sola volta.',
     emailPlaceholder: 'Indirizzo email',
+    tryItTitle: 'Provalo ora — senza registrazione',
+    tryItSubtitle: '3 controlli gratuiti, senza email',
+    tryItPlaceholder: 'Incolla un indirizzo mint Solana',
+    tryItButton: 'Controlla rischio',
+    tryItLoading: 'Analisi in corso...',
+    tryItRemaining: '{n} controllo/i gratuito/i rimasto/i',
+    tryItLimitTitle: 'Hai usato tutti e 3 i controlli gratuiti',
+    tryItLimitBody: 'Ottieni una API key gratuita qui sotto — 15 controlli/giorno, senza carta.',
+    tryItInvalidMint: 'Inserisci un indirizzo mint Solana valido',
+    tryItErrorGeneric: 'Qualcosa è andato storto. Riprova.',
   },
   zh: {
     flag: '🇨🇳',
@@ -1571,6 +1651,16 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     freeTierNote: '免费套餐：15 次请求/天。无需信用卡。每个邮箱一个密钥。',
     signupHint: '输入邮箱，然后复制出现的密钥 —— 只显示一次。',
     emailPlaceholder: '邮箱地址',
+    tryItTitle: '立即试用 — 无需注册',
+    tryItSubtitle: '3 次免费查询，无需邮箱',
+    tryItPlaceholder: '粘贴 Solana mint 地址',
+    tryItButton: '检查风险',
+    tryItLoading: '分析中...',
+    tryItRemaining: '剩余 {n} 次免费查询',
+    tryItLimitTitle: '你已用完 3 次免费查询',
+    tryItLimitBody: '在下方获取免费 API 密钥 —— 每天 15 次查询，无需信用卡。',
+    tryItInvalidMint: '请输入有效的 Solana mint 地址',
+    tryItErrorGeneric: '出错了，请重试。',
   },
 };
 
