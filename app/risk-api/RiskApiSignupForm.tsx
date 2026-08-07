@@ -1,3 +1,12 @@
+// Version 5.6 — app/risk-api/RiskApiSignupForm.tsx
+//
+// v5.6: sends `lang` in the signup POST body — see lib/send-email.ts
+// v1.5 / lib/email-translations.ts. useRiskApiLang() already exposed
+// the visitor's chosen language (this component was already using its
+// `t` object for on-screen labels); this just also destructures `lang`
+// and forwards it, so the follow-up email lands in the same language
+// the signup form itself was in, instead of always English.
+//
 // Version 5.5 — app/risk-api/RiskApiSignupForm.tsx
 //
 // v5.5: wired up for the 7-language i18n system (see app/risk-api/
@@ -27,7 +36,7 @@ interface IssuedKey {
 }
 
 export default function RiskApiSignupForm() {
-  const { t } = useRiskApiLang();
+  const { t, lang } = useRiskApiLang();
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<Status>('idle');
   const [errorMsg, setErrorMsg] = useState('');
@@ -42,7 +51,7 @@ export default function RiskApiSignupForm() {
       const res = await fetch('/api/v1/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, lang }),
       });
       const data = await res.json();
 
