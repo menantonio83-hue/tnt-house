@@ -1,3 +1,11 @@
+// Version 1.5 — app/risk-api/i18n.ts
+//
+// v1.5: 5 new response-fields-table description keys (fieldOwnerDelegate,
+// fieldTax, fieldDevWallet, fieldProgramRenounced, fieldCapsTriggered)
+// x 7 languages, plus a v1.11 changelog entry x 7 languages, covering
+// the 6 new API fields + contractRiskCap scoring tier from
+// token-risk-core.ts v1.5 / rugcheck-client.ts v1.3.
+//
 // Version 1.4 — app/risk-api/i18n.ts
 //
 // v1.4: added tryIt* keys (10 strings x 7 languages) for the new
@@ -103,6 +111,11 @@ export interface RiskApiTranslations {
   fieldHoneypotLpLocked: string;
   fieldHolderDistribution: string;
   fieldMarket: string;
+  fieldOwnerDelegate: string;
+  fieldTax: string;
+  fieldDevWallet: string;
+  fieldProgramRenounced: string;
+  fieldCapsTriggered: string;
   rateLimitHeadersNote: string;
   openApiUsageNote: string;
   chatBubbleLabel: string;
@@ -253,6 +266,11 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     fieldHoneypotLpLocked: 'honeypot_risk (boolean) and lp_locked ({ locked, percent }) from RugCheck. null means it could not be checked, not "safe."',
     fieldHolderDistribution: 'Largest holder %, top-10 %, risk level, and holder_count — the number of accounts in Solana\u2019s top-20-largest-holders response (a real RPC limit, not a full holder count for widely-held tokens like BONK or USDC).',
     fieldMarket: 'Live price, liquidity, 24h volume, 24h change, and token age from DexScreener.',
+    fieldOwnerDelegate: 'hidden_owner and permanent_delegate (booleans) from RugCheck\'s risk list. permanent_delegate is a Token-2022 extension letting that address move or burn ANY holder\'s tokens without permission — a severe risk. null means not checked, never a false "safe".',
+    fieldTax: 'buy_tax_percent / sell_tax_percent — Token-2022 transfer-fee extension. Solana\'s transfer fee is symmetric, so both carry the same value. null means the mint has no such extension (not a failed check).',
+    fieldDevWallet: 'dev_wallet_percent — the deployer\'s own on-chain holding as % of total supply. A distinct concentration signal from holder_distribution.top10_percent, since the deployer can hold a large stake while sitting outside any top-10 cutoff.',
+    fieldProgramRenounced: 'token_program: "standard" if the mint uses one of Solana\'s two canonical token programs, "nonstandard" otherwise. contract_renounced: convenience boolean for mint_authority.revoked && freeze_authority.revoked.',
+    fieldCapsTriggered: 'caps_triggered lists every scoring cap that fired for this mint (reason + cap value); dominant_cap is the single tightest one — the actual reason safety_score is what it is, not just a number.',
     rateLimitHeadersNote: 'Every response also includes X-RateLimit-Limit, X-RateLimit-Remaining, and X-RateLimit-Reset headers — plus X-Credit-Balance-Usd once you have a paid tier or credit balance — so your bot can track its quota without ever hitting a 429.',
     openApiUsageNote: 'Works out of the box with ChatGPT Custom GPT Actions (just paste the URL). For Claude, Gemini, or agent frameworks like LangChain/CrewAI, use this spec as the schema source for your own tool integration — most of those need a small adapter, LangChain\'s OpenAPISpec.from_url() being the one that imports it directly.',
     chatBubbleLabel: 'Ask about the API',
@@ -287,6 +305,16 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'Changelog',
     changelogNote: 'No mailing list or webhooks yet for update announcements — this page and the X / Telegram links in the footer are the way to stay current.',
     changelogEntries: [
+      {
+        version: 'v1.11',
+        date: '2026-08-08',
+        changes: [
+          'Six new fields: hidden_owner, permanent_delegate, buy_tax_percent, sell_tax_percent, dev_wallet_percent, token_program, plus contract_renounced — all from the same RugCheck call, zero extra latency.',
+          'safety_score now includes a new contractRiskCap tier (permanent_delegate, hidden_owner, tax, non-standard token_program) and a dev-wallet-% axis on the existing market health cap — a token can no longer score high on liquidity/volume alone while carrying a severe contract-level red flag.',
+          'New caps_triggered array and dominant_cap field on every response — every scoring cap that fired, plus the single tightest one, so you can see WHY a score is low, not just that it is.',
+          'Fixed: rugged, jup_verified, deployer_address, insider_holder_count, and the maturity/market-health/rugged capped booleans were computed since v1.4 but never actually returned by the main, batch, or x402 endpoints — now present on all of them.',
+        ],
+      },
       {
         version: 'v1.10',
         date: '2026-08-05',
@@ -458,6 +486,11 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     fieldHoneypotLpLocked: 'honeypot_risk (booleano) y lp_locked ({ locked, percent }) de RugCheck. null significa que no se pudo comprobar, no "seguro".',
     fieldHolderDistribution: '% del mayor holder, % del top-10, nivel de riesgo, y holder_count — el número de cuentas en la respuesta de los 20 mayores holders de Solana (un límite real de la RPC, no un recuento total de holders para tokens muy distribuidos como BONK o USDC).',
     fieldMarket: 'Precio en vivo, liquidez, volumen 24h, cambio 24h y antigüedad del token desde DexScreener.',
+    fieldOwnerDelegate: 'hidden_owner y permanent_delegate (booleanos) de la lista de riesgos de RugCheck. permanent_delegate es una extensión Token-2022 que permite a esa dirección mover o quemar los tokens de CUALQUIER holder sin permiso — un riesgo severo. null significa que no se comprobó, nunca un falso "seguro".',
+    fieldTax: 'buy_tax_percent / sell_tax_percent — extensión de comisión de transferencia de Token-2022. La comisión de Solana es simétrica, así que ambos valores coinciden. null significa que el mint no tiene esa extensión (no un fallo de comprobación).',
+    fieldDevWallet: 'dev_wallet_percent — la propia tenencia on-chain del deployer, como % del suministro total. Señal de concentración distinta de holder_distribution.top10_percent, ya que el deployer puede tener una posición grande sin estar en el top-10.',
+    fieldProgramRenounced: 'token_program: "standard" si el mint usa uno de los dos programas de token canónicos de Solana, "nonstandard" en caso contrario. contract_renounced: booleano de conveniencia para mint_authority.revoked && freeze_authority.revoked.',
+    fieldCapsTriggered: 'caps_triggered lista cada tope de puntuación activado para este mint (motivo + valor del tope); dominant_cap es el más estricto — la razón real del safety_score, no solo un número.',
     rateLimitHeadersNote: 'Cada respuesta también incluye las cabeceras X-RateLimit-Limit, X-RateLimit-Remaining y X-RateLimit-Reset — además de X-Credit-Balance-Usd en cuanto tengas un nivel de pago o saldo de crédito — para que tu bot controle su cuota sin llegar nunca a un 429.',
     openApiUsageNote: 'Funciona directamente con las Actions de Custom GPT de ChatGPT (solo pega la URL). Para Claude, Gemini o frameworks de agentes como LangChain/CrewAI, usa esta spec como fuente del esquema para tu propia integración de herramienta — la mayoría necesita un pequeño adaptador; OpenAPISpec.from_url() de LangChain es el que la importa directamente.',
     chatBubbleLabel: 'Pregunta sobre la API',
@@ -492,6 +525,16 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'Registro de cambios',
     changelogNote: 'Todavía no hay lista de correo ni webhooks para anunciar novedades — esta página y los enlaces de X / Telegram del pie son la forma de mantenerte al día.',
     changelogEntries: [
+      {
+        version: 'v1.11',
+        date: '2026-08-08',
+        changes: [
+          'Seis campos nuevos: hidden_owner, permanent_delegate, buy_tax_percent, sell_tax_percent, dev_wallet_percent, token_program, más contract_renounced — todos de la misma llamada a RugCheck, sin latencia adicional.',
+          'safety_score ahora incluye un nuevo nivel contractRiskCap (permanent_delegate, hidden_owner, tax, token_program no estándar) y un eje de dev-wallet-% en el tope de salud de mercado existente — un token ya no puede puntuar alto solo por liquidez/volumen mientras arrastra una señal de alerta grave a nivel de contrato.',
+          'Nuevo array caps_triggered y campo dominant_cap en cada respuesta — cada tope de puntuación activado, más el más estricto, para que veas POR QUÉ una puntuación es baja, no solo que lo es.',
+          'Corregido: rugged, jup_verified, deployer_address, insider_holder_count y los booleanos capped de maturity/market-health/rugged se calculaban desde v1.4 pero nunca se devolvían realmente en los endpoints principal, batch o x402 — ahora presentes en los tres.',
+        ],
+      },
       {
         version: 'v1.10',
         date: '2026-08-05',
@@ -663,6 +706,11 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     fieldHoneypotLpLocked: "honeypot_risk (booléen) et lp_locked ({ locked, percent }) issus de RugCheck. null signifie que la vérification a échoué, jamais « sûr ».",
     fieldHolderDistribution: '% du plus gros holder, % du top-10, niveau de risque, et holder_count — le nombre de comptes dans la réponse des 20 plus gros holders de Solana (une vraie limite de la RPC, pas un décompte complet des holders pour des tokens très détenus comme BONK ou USDC).',
     fieldMarket: 'Prix en direct, liquidité, volume 24h, variation 24h et âge du token, via DexScreener.',
+    fieldOwnerDelegate: 'hidden_owner et permanent_delegate (booléens) issus de la liste de risques de RugCheck. permanent_delegate est une extension Token-2022 permettant à cette adresse de déplacer ou brûler les tokens de N\'IMPORTE QUEL holder sans permission — un risque sévère. null signifie non vérifié, jamais un faux "sûr".',
+    fieldTax: 'buy_tax_percent / sell_tax_percent — extension de frais de transfert Token-2022. Les frais de Solana sont symétriques, donc les deux valeurs sont identiques. null signifie que le mint n\'a pas cette extension (pas un échec de vérification).',
+    fieldDevWallet: 'dev_wallet_percent — la propre participation on-chain du déployeur, en % de l\'offre totale. Signal de concentration distinct de holder_distribution.top10_percent, car le déployeur peut détenir une part importante sans figurer dans le top 10.',
+    fieldProgramRenounced: 'token_program : "standard" si le mint utilise l\'un des deux programmes de token canoniques de Solana, "nonstandard" sinon. contract_renounced : booléen pratique pour mint_authority.revoked && freeze_authority.revoked.',
+    fieldCapsTriggered: 'caps_triggered liste chaque plafond de score déclenché pour ce mint (raison + valeur du plafond) ; dominant_cap est le plus strict — la vraie raison du safety_score, pas juste un chiffre.',
     rateLimitHeadersNote: 'Chaque réponse inclut aussi les en-têtes X-RateLimit-Limit, X-RateLimit-Remaining et X-RateLimit-Reset — plus X-Credit-Balance-Usd dès que vous avez un abonnement payant ou un solde de crédit — pour que votre bot suive son quota sans jamais tomber sur un 429.',
     openApiUsageNote: 'Fonctionne directement avec les Actions des Custom GPT de ChatGPT (il suffit de coller l\'URL). Pour Claude, Gemini ou des frameworks d\'agents comme LangChain/CrewAI, utilisez cette spec comme source de schéma pour votre propre intégration d\'outil — la plupart ont besoin d\'un petit adaptateur, OpenAPISpec.from_url() de LangChain étant celui qui l\'importe directement.',
     chatBubbleLabel: 'Question sur l\'API',
@@ -697,6 +745,16 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'Journal des modifications',
     changelogNote: 'Pas encore de liste de diffusion ni de webhooks pour les annonces — cette page et les liens X / Telegram en pied de page sont le moyen de rester à jour.',
     changelogEntries: [
+      {
+        version: 'v1.11',
+        date: '2026-08-08',
+        changes: [
+          "Six nouveaux champs : hidden_owner, permanent_delegate, buy_tax_percent, sell_tax_percent, dev_wallet_percent, token_program, plus contract_renounced — tous issus du même appel RugCheck, sans latence supplémentaire.",
+          "safety_score inclut désormais un nouveau niveau contractRiskCap (permanent_delegate, hidden_owner, taxe, token_program non standard) et un axe dev-wallet-% sur le plafond de santé de marché existant — un token ne peut plus obtenir un score élevé uniquement grâce à la liquidité/au volume tout en portant un signal d'alerte grave au niveau du contrat.",
+          "Nouveau tableau caps_triggered et champ dominant_cap sur chaque réponse — chaque plafond de score déclenché, plus le plus strict, pour voir POURQUOI un score est bas, pas seulement qu'il l'est.",
+          "Corrigé : rugged, jup_verified, deployer_address, insider_holder_count et les booléens capped de maturity/market-health/rugged étaient calculés depuis v1.4 mais jamais réellement renvoyés par les endpoints principal, batch ou x402 — désormais présents sur les trois.",
+        ],
+      },
       {
         version: 'v1.10',
         date: '2026-08-05',
@@ -868,6 +926,11 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     fieldHoneypotLpLocked: 'honeypot_risk (boolean) και lp_locked ({ locked, percent }) από το RugCheck. Το null σημαίνει ότι δεν ήταν δυνατός ο έλεγχος, όχι «ασφαλές».',
     fieldHolderDistribution: '% μεγαλύτερου holder, top-10 %, επίπεδο κινδύνου, και holder_count — ο αριθμός λογαριασμών στην απόκριση των 20 μεγαλύτερων holders της Solana (πραγματικό όριο του RPC, όχι πλήρης αριθμός holders για ευρέως κατεχόμενα tokens όπως το BONK ή το USDC).',
     fieldMarket: 'Τιμή σε πραγματικό χρόνο, ρευστότητα, όγκος 24ω, μεταβολή 24ω και ηλικία του token, από το DexScreener.',
+    fieldOwnerDelegate: 'hidden_owner και permanent_delegate (boolean) από τη λίστα κινδύνων του RugCheck. Το permanent_delegate είναι επέκταση Token-2022 που επιτρέπει σε εκείνη τη διεύθυνση να μετακινεί ή να καίει τα tokens ΟΠΟΙΟΥΔΗΠΟΤΕ holder χωρίς άδεια — σοβαρός κίνδυνος. Το null σημαίνει ότι δεν ελέγχθηκε, ποτέ ψευδές «ασφαλές».',
+    fieldTax: 'buy_tax_percent / sell_tax_percent — επέκταση transfer-fee του Token-2022. Η προμήθεια στη Solana είναι συμμετρική, οπότε και τα δύο έχουν την ίδια τιμή. Το null σημαίνει ότι το mint δεν έχει τέτοια επέκταση (όχι αποτυχημένος έλεγχος).',
+    fieldDevWallet: 'dev_wallet_percent — το δικό του on-chain μερίδιο του deployer ως % της συνολικής προσφοράς. Διαφορετικό σήμα συγκέντρωσης από το holder_distribution.top10_percent, αφού ο deployer μπορεί να κρατά μεγάλο μερίδιο χωρίς να είναι στους top-10.',
+    fieldProgramRenounced: 'token_program: «standard» αν το mint χρησιμοποιεί ένα από τα δύο κανονικά token programs της Solana, αλλιώς «nonstandard». contract_renounced: βολικό boolean για mint_authority.revoked && freeze_authority.revoked.',
+    fieldCapsTriggered: 'Το caps_triggered απαριθμεί κάθε όριο βαθμολογίας που ενεργοποιήθηκε για αυτό το mint (λόγος + τιμή ορίου)· το dominant_cap είναι το πιο αυστηρό — ο πραγματικός λόγος για το safety_score, όχι απλώς ένας αριθμός.',
     rateLimitHeadersNote: 'Κάθε απόκριση περιλαμβάνει επίσης τα headers X-RateLimit-Limit, X-RateLimit-Remaining και X-RateLimit-Reset — συν το X-Credit-Balance-Usd μόλις έχεις πληρωμένο επίπεδο ή υπόλοιπο πίστωσης — ώστε το bot σου να παρακολουθεί το όριό του χωρίς ποτέ να πέσει σε 429.',
     openApiUsageNote: 'Λειτουργεί απευθείας με τα Custom GPT Actions του ChatGPT (απλώς επικόλλησε το URL). Για Claude, Gemini ή agent frameworks όπως LangChain/CrewAI, χρησιμοποίησε αυτό το spec ως πηγή σχήματος για τη δική σου ενσωμάτωση εργαλείου — τα περισσότερα χρειάζονται έναν μικρό προσαρμογέα, με το OpenAPISpec.from_url() του LangChain να το εισάγει απευθείας.',
     chatBubbleLabel: 'Ρώτα για το API',
@@ -902,6 +965,16 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'Ιστορικό αλλαγών',
     changelogNote: 'Δεν υπάρχει ακόμα mailing list ή webhooks για ανακοινώσεις ενημερώσεων — αυτή η σελίδα και οι σύνδεσμοι X / Telegram στο footer είναι ο τρόπος να μένεις ενήμερος.',
     changelogEntries: [
+      {
+        version: 'v1.11',
+        date: '2026-08-08',
+        changes: [
+          'Έξι νέα πεδία: hidden_owner, permanent_delegate, buy_tax_percent, sell_tax_percent, dev_wallet_percent, token_program, συν contract_renounced — όλα από την ίδια κλήση στο RugCheck, χωρίς επιπλέον καθυστέρηση.',
+          'Το safety_score πλέον περιλαμβάνει νέο επίπεδο contractRiskCap (permanent_delegate, hidden_owner, φόρος, μη τυπικό token_program) και έναν άξονα dev-wallet-% στο υπάρχον όριο υγείας αγοράς — ένα token δεν μπορεί πια να βαθμολογηθεί ψηλά μόνο από ρευστότητα/όγκο ενώ φέρει σοβαρή ένδειξη κινδύνου σε επίπεδο συμβολαίου.',
+          'Νέος πίνακας caps_triggered και πεδίο dominant_cap σε κάθε απόκριση — κάθε όριο βαθμολογίας που ενεργοποιήθηκε, συν το πιο αυστηρό, ώστε να βλέπεις ΓΙΑΤΙ μια βαθμολογία είναι χαμηλή, όχι μόνο ότι είναι.',
+          'Διορθώθηκε: τα rugged, jup_verified, deployer_address, insider_holder_count και τα capped booleans των maturity/market-health/rugged υπολογίζονταν από το v1.4 αλλά ποτέ δεν επιστρέφονταν πραγματικά από τα endpoints main, batch ή x402 — τώρα υπάρχουν και στα τρία.',
+        ],
+      },
       {
         version: 'v1.10',
         date: '2026-08-05',
@@ -1073,6 +1146,11 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     fieldHoneypotLpLocked: 'honeypot_risk (булево) и lp_locked ({ locked, percent }) от RugCheck. null означает "не удалось проверить", а не "безопасно".',
     fieldHolderDistribution: '% крупнейшего холдера, % топ-10, уровень риска и holder_count — число аккаунтов в ответе топ-20 крупнейших холдеров Solana (реальное ограничение самого RPC, а не полное число холдеров для широко распределённых токенов вроде BONK или USDC).',
     fieldMarket: 'Живая цена, ликвидность, объём за 24ч, изменение за 24ч и возраст токена — с DexScreener.',
+    fieldOwnerDelegate: 'hidden_owner и permanent_delegate (булевы) из списка рисков RugCheck. permanent_delegate — расширение Token-2022, позволяющее этому адресу списывать или сжигать токены ЛЮБОГО холдера без разрешения — серьёзный риск. null значит "не проверялось", никогда не ложное "безопасно".',
+    fieldTax: 'buy_tax_percent / sell_tax_percent — расширение Token-2022 transfer fee. Комиссия в Solana симметрична, поэтому оба поля совпадают. null значит, что у минта нет такого расширения (а не что проверка провалилась).',
+    fieldDevWallet: 'dev_wallet_percent — собственная он-чейн доля деплойера в % от общего supply. Отдельный сигнал концентрации от holder_distribution.top10_percent — деплойер может держать крупную долю, не входя при этом в топ-10.',
+    fieldProgramRenounced: 'token_program: "standard", если минт использует одну из двух канонических token-программ Solana, иначе "nonstandard". contract_renounced: удобное булево поле для mint_authority.revoked && freeze_authority.revoked.',
+    fieldCapsTriggered: 'caps_triggered перечисляет каждый сработавший потолок скоринга для этого минта (причина + значение потолка); dominant_cap — самый жёсткий из них, реальная причина текущего safety_score, а не просто цифра.',
     rateLimitHeadersNote: 'Каждый ответ также включает заголовки X-RateLimit-Limit, X-RateLimit-Remaining и X-RateLimit-Reset — плюс X-Credit-Balance-Usd, если у тебя платный тариф или баланс кредитов — чтобы бот мог отслеживать свою квоту, не ловя 429.',
     openApiUsageNote: 'Работает из коробки с ChatGPT Custom GPT Actions (просто вставь ссылку). Для Claude, Gemini или агентских фреймворков вроде LangChain/CrewAI используй эту спеку как источник схемы для своей интеграции — большинству нужен небольшой адаптер, LangChain\'s OpenAPISpec.from_url() импортирует её напрямую.',
     chatBubbleLabel: 'Спросить про API',
@@ -1107,6 +1185,16 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'История изменений',
     changelogNote: 'Пока нет рассылки или вебхуков для анонсов обновлений — следить за актуальным состоянием можно по этой странице и ссылкам на X / Telegram в подвале.',
     changelogEntries: [
+      {
+        version: 'v1.11',
+        date: '2026-08-08',
+        changes: [
+          'Шесть новых полей: hidden_owner, permanent_delegate, buy_tax_percent, sell_tax_percent, dev_wallet_percent, token_program, плюс contract_renounced — все из того же запроса к RugCheck, без доп. задержки.',
+          'safety_score теперь включает новый уровень contractRiskCap (permanent_delegate, hidden_owner, налог, нестандартный token_program) и ось dev-wallet-% в существующем потолке рыночного здоровья — токен больше не может получить высокий score только за счёт ликвидности/объёма, неся при этом серьёзный красный флаг на уровне контракта.',
+          'Новый массив caps_triggered и поле dominant_cap в каждом ответе — каждый сработавший потолок скоринга плюс самый жёсткий из них, чтобы видеть ПОЧЕМУ score низкий, а не просто что он такой.',
+          'Исправлено: rugged, jup_verified, deployer_address, insider_holder_count и булевы capped для maturity/market-health/rugged считались с v1.4, но никогда реально не возвращались основным, batch- и x402-эндпоинтами — теперь присутствуют во всех трёх.',
+        ],
+      },
       {
         version: 'v1.10',
         date: '2026-08-05',
@@ -1278,6 +1366,11 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     fieldHoneypotLpLocked: 'honeypot_risk (booleano) e lp_locked ({ locked, percent }) da RugCheck. null significa che non è stato possibile verificarlo, non "sicuro".',
     fieldHolderDistribution: '% del maggior holder, % del top-10, livello di rischio, e holder_count — il numero di account nella risposta dei 20 maggiori holder di Solana (un vero limite dell\'RPC, non un conteggio completo degli holder per token molto distribuiti come BONK o USDC).',
     fieldMarket: 'Prezzo live, liquidità, volume 24h, variazione 24h ed età del token, da DexScreener.',
+    fieldOwnerDelegate: 'hidden_owner e permanent_delegate (booleani) dalla lista di rischi di RugCheck. permanent_delegate è un\'estensione Token-2022 che permette a quell\'indirizzo di spostare o bruciare i token di QUALSIASI holder senza permesso — un rischio grave. null significa non verificato, mai un falso "sicuro".',
+    fieldTax: 'buy_tax_percent / sell_tax_percent — estensione transfer-fee di Token-2022. La commissione di Solana è simmetrica, quindi entrambi i valori coincidono. null significa che il mint non ha questa estensione (non un controllo fallito).',
+    fieldDevWallet: 'dev_wallet_percent — la partecipazione on-chain del deployer stesso, come % dell\'offerta totale. Segnale di concentrazione distinto da holder_distribution.top10_percent, poiché il deployer può detenere una quota importante pur restando fuori dalla top-10.',
+    fieldProgramRenounced: 'token_program: "standard" se il mint usa uno dei due programmi token canonici di Solana, "nonstandard" altrimenti. contract_renounced: booleano di comodo per mint_authority.revoked && freeze_authority.revoked.',
+    fieldCapsTriggered: 'caps_triggered elenca ogni tetto di punteggio attivato per questo mint (motivo + valore del tetto); dominant_cap è il più severo — il vero motivo del safety_score, non solo un numero.',
     rateLimitHeadersNote: 'Ogni risposta include anche gli header X-RateLimit-Limit, X-RateLimit-Remaining e X-RateLimit-Reset — più X-Credit-Balance-Usd non appena hai un livello a pagamento o un saldo di credito — così il tuo bot può monitorare la sua quota senza mai incontrare un 429.',
     openApiUsageNote: 'Funziona subito con le Custom GPT Actions di ChatGPT (basta incollare l\'URL). Per Claude, Gemini o framework di agenti come LangChain/CrewAI, usa questa spec come fonte dello schema per la tua integrazione — la maggior parte richiede un piccolo adattatore, con OpenAPISpec.from_url() di LangChain che la importa direttamente.',
     chatBubbleLabel: 'Chiedi info sull\'API',
@@ -1312,6 +1405,16 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'Changelog',
     changelogNote: "Non c'è ancora una mailing list o webhook per gli annunci di aggiornamento — questa pagina e i link X / Telegram nel footer sono il modo per restare aggiornati.",
     changelogEntries: [
+      {
+        version: 'v1.11',
+        date: '2026-08-08',
+        changes: [
+          "Sei nuovi campi: hidden_owner, permanent_delegate, buy_tax_percent, sell_tax_percent, dev_wallet_percent, token_program, più contract_renounced — tutti dalla stessa chiamata RugCheck, senza latenza aggiuntiva.",
+          "safety_score ora include un nuovo livello contractRiskCap (permanent_delegate, hidden_owner, tassa, token_program non standard) e un asse dev-wallet-% sul tetto di salute di mercato esistente — un token non può più ottenere un punteggio alto solo grazie a liquidità/volume pur portando un grave segnale di allarme a livello di contratto.",
+          "Nuovo array caps_triggered e campo dominant_cap in ogni risposta — ogni tetto di punteggio attivato, più il più severo, così vedi PERCHÉ un punteggio è basso, non solo che lo è.",
+          "Corretto: rugged, jup_verified, deployer_address, insider_holder_count e i booleani capped di maturity/market-health/rugged venivano calcolati dalla v1.4 ma non venivano mai realmente restituiti dagli endpoint principale, batch o x402 — ora presenti su tutti e tre.",
+        ],
+      },
       {
         version: 'v1.10',
         date: '2026-08-05',
@@ -1483,6 +1586,11 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     fieldHoneypotLpLocked: 'honeypot_risk（布尔值）和 lp_locked（{ locked, percent }）来自 RugCheck。null 表示无法检测，而不是"安全"。',
     fieldHolderDistribution: '最大持币者占比、前10名占比、风险等级，以及 holder_count —— 即 Solana 前20大持币者响应中的账户数量（这是 RPC 本身的真实限制，对于 BONK 或 USDC 这类持有非常分散的代币，并不代表完整持币人数）。',
     fieldMarket: '来自 DexScreener 的实时价格、流动性、24小时交易量、24小时涨跌幅及代币存在天数。',
+    fieldOwnerDelegate: 'hidden_owner 和 permanent_delegate（布尔值）来自 RugCheck 的风险列表。permanent_delegate 是 Token-2022 扩展，允许该地址在未经许可的情况下转移或销毁任意持币者的代币 —— 严重风险。null 表示未检测，绝不代表虚假的"安全"。',
+    fieldTax: 'buy_tax_percent / sell_tax_percent —— Token-2022 转账手续费扩展。Solana 的手续费是对称的，因此两个字段值相同。null 表示该 mint 没有此扩展（而非检测失败）。',
+    fieldDevWallet: 'dev_wallet_percent —— 部署者自身链上持仓占总供应量的百分比。这是与 holder_distribution.top10_percent 不同的独立集中度信号，因为部署者可能持有大量份额却不在前10名之列。',
+    fieldProgramRenounced: 'token_program：若 mint 使用 Solana 两种标准代币程序之一则为 "standard"，否则为 "nonstandard"。contract_renounced：mint_authority.revoked && freeze_authority.revoked 的便捷布尔字段。',
+    fieldCapsTriggered: 'caps_triggered 列出了该 mint 触发的每一个评分上限（原因 + 上限值）；dominant_cap 是其中最严格的一个 —— 也就是 safety_score 真正的成因，而不仅仅是一个数字。',
     rateLimitHeadersNote: '每个响应还包含 X-RateLimit-Limit、X-RateLimit-Remaining 和 X-RateLimit-Reset 请求头 —— 一旦你有付费套餐或信用余额，还会附带 X-Credit-Balance-Usd —— 这样你的机器人无需触发 429 就能追踪自己的配额。',
     openApiUsageNote: '可直接配合 ChatGPT 的 Custom GPT Actions 使用（只需粘贴链接即可）。若用于 Claude、Gemini 或 LangChain/CrewAI 等智能体框架，请将此规范作为你自己工具集成的 schema 来源 —— 大多数平台仍需一个小型适配层，其中 LangChain 的 OpenAPISpec.from_url() 可以直接导入。',
     chatBubbleLabel: '咨询 API',
@@ -1517,6 +1625,16 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: '更新日志',
     changelogNote: '目前还没有邮件列表或 webhook 用于更新通知——请通过本页面以及页脚的 X / Telegram 链接来获取最新动态。',
     changelogEntries: [
+      {
+        version: 'v1.11',
+        date: '2026-08-08',
+        changes: [
+          '新增六个字段：hidden_owner、permanent_delegate、buy_tax_percent、sell_tax_percent、dev_wallet_percent、token_program，以及 contract_renounced —— 均来自同一次 RugCheck 请求，无额外延迟。',
+          'safety_score 现在包含新的 contractRiskCap 层级（permanent_delegate、hidden_owner、税费、非标准 token_program），并在现有市场健康上限中加入了 dev-wallet-% 维度 —— 代币不能再仅凭流动性/交易量获得高分，同时却携带严重的合约层面风险信号。',
+          '每个响应新增 caps_triggered 数组和 dominant_cap 字段 —— 列出所有触发的评分上限，以及其中最严格的一个，让你清楚看到分数低的真正原因，而不仅仅是一个数字。',
+          '修复：rugged、jup_verified、deployer_address、insider_holder_count 以及 maturity/market-health/rugged 的 capped 布尔字段自 v1.4 起就已计算，但从未真正在主接口、批量接口或 x402 接口中返回 —— 现已在三者中全部补齐。',
+        ],
+      },
       {
         version: 'v1.10',
         date: '2026-08-05',

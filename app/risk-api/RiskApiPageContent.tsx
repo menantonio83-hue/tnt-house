@@ -1,3 +1,10 @@
+// Version 1.7 — app/risk-api/RiskApiPageContent.tsx
+//
+// v1.7: docs updated for the 6 new API fields + contractRiskCap tier
+// (token-risk-core.ts v1.5) — EXAMPLE_RESPONSE now shows all new
+// fields with realistic values, and 5 new rows added to the response
+// fields table (responseFields array).
+//
 // Version 1.6 — app/risk-api/RiskApiPageContent.tsx
 //
 // v1.6: inserted TryItWidget right after the hero section — the anon
@@ -173,12 +180,29 @@ const CODE_EXAMPLES: Record<CodeTab, { label: string; code: string }> = {
 const EXAMPLE_RESPONSE = {
   mint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
   safety_score: 78,
+  maturity_capped: false,
+  market_health_capped: false,
+  contract_risk_capped: false,
+  rugged_capped: false,
+  caps_triggered: [],
+  dominant_cap: null,
   cluster_analysis: 'complete',
   insider_clusters: [{ funder: '9xQe...k2Pd', wallets: ['7uF3...aZ1', '3mN8...qR2'] }],
+  insider_holder_count: 2,
   mint_authority: { revoked: true, address: null },
   freeze_authority: { revoked: true, address: null },
+  contract_renounced: true,
   honeypot_risk: false,
   lp_locked: { locked: true, percent: 100 },
+  rugged: false,
+  jup_verified: true,
+  deployer_address: '9xQe...k2Pd',
+  hidden_owner: false,
+  permanent_delegate: false,
+  buy_tax_percent: null,
+  sell_tax_percent: null,
+  dev_wallet_percent: 1.8,
+  token_program: 'standard',
   holder_distribution: {
     risk_level: 'LOW',
     largest_holder_percent: 4.2,
@@ -207,6 +231,11 @@ export default function RiskApiPageContent() {
     { field: 'honeypot_risk / lp_locked', desc: t.fieldHoneypotLpLocked },
     { field: 'holder_distribution', desc: t.fieldHolderDistribution },
     { field: 'market', desc: t.fieldMarket },
+    { field: 'hidden_owner / permanent_delegate', desc: t.fieldOwnerDelegate },
+    { field: 'buy_tax_percent / sell_tax_percent', desc: t.fieldTax },
+    { field: 'dev_wallet_percent', desc: t.fieldDevWallet },
+    { field: 'token_program / contract_renounced', desc: t.fieldProgramRenounced },
+    { field: 'caps_triggered / dominant_cap', desc: t.fieldCapsTriggered },
   ];
 
   const steps = [
