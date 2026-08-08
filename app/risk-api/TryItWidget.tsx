@@ -1,3 +1,12 @@
+// Version 1.2 — app/risk-api/TryItWidget.tsx
+//
+// v1.2: Liquidity/24h volume rows now show muted "—" (not green) plus a
+// one-line "no DEX pool data found for this mint" note when both are
+// null, instead of a bare dash that reads like a loading/error state.
+// null here means DexScreener has no pool for this mint (new/illiquid
+// token, or genuinely no pair) — distinct from $0, which would mean a
+// real pool with zero liquidity.
+//
 // Version 1.1 — app/risk-api/TryItWidget.tsx
 //
 // v1.1: result card redesigned to match Бро's reference layout — a
@@ -315,8 +324,21 @@ export default function TryItWidget() {
                 )}
                 {result.market && (
                   <>
-                    <StatRow label="Liquidity" value={formatUsdCompact(result.market.liquidity_usd)} valueClassName="text-emerald-400" />
-                    <StatRow label="24h volume" value={formatUsdCompact(result.market.volume_24h_usd)} valueClassName="text-emerald-400" />
+                    <StatRow
+                      label="Liquidity"
+                      value={formatUsdCompact(result.market.liquidity_usd)}
+                      valueClassName={result.market.liquidity_usd === null ? 'text-slate-500' : 'text-emerald-400'}
+                    />
+                    <StatRow
+                      label="24h volume"
+                      value={formatUsdCompact(result.market.volume_24h_usd)}
+                      valueClassName={result.market.volume_24h_usd === null ? 'text-slate-500' : 'text-emerald-400'}
+                    />
+                    {result.market.liquidity_usd === null && result.market.volume_24h_usd === null && (
+                      <div className="px-4 py-2 text-[10px] text-slate-500 text-center">
+                        no DEX pool data found for this mint
+                      </div>
+                    )}
                     {result.market.price_change_24h_percent !== null && (
                       <StatRow
                         label="24h change"
