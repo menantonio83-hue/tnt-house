@@ -1,3 +1,47 @@
+// Version 1.3 — lib/rugcheck-client.ts
+//
+// v1.3: six more fields, same "same /report payload, zero extra
+// latency" pattern as v1.2. Ported field-for-field from app/page.js's
+// proven browser-side extraction (runAuditAndSave, ~line 2364-2440) so
+// the API and the site's own audit card derive these identically —
+// not reinvented, just the same logic moved server-side:
+//
+// - hidden_owner: true only if RugCheck's risks[] names a proxy/owner
+//   risk; false if report fetched clean; null if couldn't check. Same
+//   "don't assume No falsely" rule as honeypot_risk below.
+// - permanent_delegate: true only if risks[] names a delegate risk —
+//   Token-2022's permanent-delegate extension lets that address move
+//   or burn ANY holder's tokens without permission, a real drain
+//   vector distinct from mint/freeze authority.
+// - buy_tax_percent / sell_tax_percent: from data.transferFee.pct
+//   (Token-2022 transfer-fee extension). Solana's transfer fee is
+//   symmetric — same rate applies to any transfer, there's no separate
+//   buy/sell rate — so both fields carry the same value, matching
+//   page.js's own comment on this exact point.
+// - dev_wallet_percent: creatorBalance / token.supply, i.e. the
+//   deployer's own on-chain holding — a distinct risk axis from
+//   top10_percent, since the deployer can hold a large stake while
+//   sitting outside any top-10 cutoff if they've spread it across
+//   several wallets AND this codebase's insider-cluster-detector
+//   hasn't yet linked those wallets back to them.
+// - token_program: 'standard' if the mint uses one of Solana's two
+//   canonical token programs (classic SPL Token or Token-2022,
+//   verified by their real deployed program IDs below), 'nonstandard'
+//   if RugCheck reports something else, null if RugCheck didn't report
+//   a token program at all.
+// - contract_renounced: mint_authority.revoked && freeze_authority.
+//   revoked — a convenience boolean for callers who want one field
+//   instead of checking both authorities themselves. Purely derived,
+//   not a new signal, so it carries no separate scoring weight in
+//   computeApiSafetyScore/applyScoreCaps (see v1.5 of this score logic
+//   in token-risk-core.ts) — the underlying mint/freeze revocations are
+//   already scored.
+//
+// All six follow the same null-means-unchecked rule as the rest of
+// this file: a RugCheck failure returns all ten fields (four from v1.2
+// plus these six) as null together, never a partial success mixing
+// real and defaulted values.
+//
 // Version 1.2 — lib/rugcheck-client.ts
 //
 // v1.2: added four more fields extracted from the SAME RugCheck
@@ -62,6 +106,13 @@ export interface RugCheckRiskData {
   rugged: boolean | null;
   jup_verified: boolean | null;
   insider_holder_count: number | null;
+  // v1.3 — see header note above.
+  hidden_owner: boolean | null;
+  permanent_delegate: boolean | null;
+  buy_tax_percent: number | null;
+  sell_tax_percent: number | null;
+  dev_wallet_percent: number | null;
+  token_program: 'standard' | 'nonstandard' | null;
 }
 
 const EMPTY_RESULT: RugCheckRiskData = {
@@ -71,7 +122,20 @@ const EMPTY_RESULT: RugCheckRiskData = {
   rugged: null,
   jup_verified: null,
   insider_holder_count: null,
+  hidden_owner: null,
+  permanent_delegate: null,
+  buy_tax_percent: null,
+  sell_tax_percent: null,
+  dev_wallet_percent: null,
+  token_program: null,
 };
+
+// Real, deployed Solana program IDs for the two canonical token
+// programs — same list as app/page.js's STANDARD_TOKEN_PROGRAMS.
+const STANDARD_TOKEN_PROGRAMS = [
+  'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA', // classic SPL Token
+  'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb', // Token-2022
+];
 
 export async function getRugCheckRiskData(mint: string): Promise<RugCheckRiskData> {
   try {
@@ -112,7 +176,56 @@ export async function getRugCheckRiskData(mint: string): Promise<RugCheckRiskDat
       ? data.topHolders.filter((h: any) => h && h.insider === true).length
       : null;
 
-    return { honeypot_risk, lp_locked, deployer_address, rugged, jup_verified, insider_holder_count };
+    // v1.3 — hidden owner / permanent delegate: only flagged if
+    // RugCheck's risks[] actually names such a risk, same
+    // don't-assume-false-negative rule as honeypot_risk above.
+    const hidden_owner = risks.some(
+      (r) =>
+        typeof r.name === 'string' &&
+        (r.name.toLowerCase().includes('proxy') || r.name.toLowerCase().includes('owner')),
+    );
+    const permanent_delegate = risks.some(
+      (r) => typeof r.name === 'string' && r.name.toLowerCase().includes('delegate'),
+    );
+
+    // Token-2022 transfer fee — symmetric, same rate both directions.
+    let buy_tax_percent: number | null = null;
+    let sell_tax_percent: number | null = null;
+    if (data.transferFee && typeof data.transferFee.pct === 'number') {
+      buy_tax_percent = data.transferFee.pct;
+      sell_tax_percent = data.transferFee.pct;
+    }
+
+    // Deployer's own holding, as a percent of total supply.
+    const dev_wallet_percent =
+      typeof data.creatorBalance === 'number' &&
+      data.token &&
+      typeof data.token.supply === 'number' &&
+      data.token.supply > 0
+        ? Math.round((data.creatorBalance / data.token.supply) * 1000) / 10
+        : null;
+
+    const token_program =
+      typeof data.tokenProgram === 'string' && data.tokenProgram.length > 0
+        ? STANDARD_TOKEN_PROGRAMS.includes(data.tokenProgram)
+          ? 'standard'
+          : 'nonstandard'
+        : null;
+
+    return {
+      honeypot_risk,
+      lp_locked,
+      deployer_address,
+      rugged,
+      jup_verified,
+      insider_holder_count,
+      hidden_owner,
+      permanent_delegate,
+      buy_tax_percent,
+      sell_tax_percent,
+      dev_wallet_percent,
+      token_program,
+    };
   } catch {
     // Timeout (AbortSignal), network failure, or invalid JSON.
     return EMPTY_RESULT;

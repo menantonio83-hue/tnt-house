@@ -1,3 +1,44 @@
+// Version 1.5 — lib/token-risk-core.ts
+//
+// v1.5: extends applyScoreCaps with a new contractRiskCap tier and
+// folds three more site-only signals (dev wallet %, tax, token
+// program) into the caps that already exist — following the exact
+// cap-architecture consensus reached across three independent model
+// reviews (Kimi, DeepSeek, Gemini) of the proposed thresholds. Every
+// number below reflects the majority/strongest-argument pick where the
+// three disagreed:
+//
+// New contractRiskCap tier (mirrors ruggedCap's "structural risk
+// overrides everything" reasoning, one step less severe):
+//   permanent_delegate === true  -> cap 10  (near-rug: can move/burn
+//     ANY holder's tokens without permission — Token-2022 extension)
+//   hidden_owner === true        -> cap 30  (2-of-3 models: control-
+//     level risk, same severity tier as top10>90%)
+//   token_program === 'nonstandard' -> cap 50 (unaudited code path)
+//   tax(buy/sell) > 10%          -> cap 30  (2-of-3: honeypot-tier,
+//     not just "friction" — legitimate Token-2022 fee tokens are
+//     almost always well under 10%)
+//   tax > 3%                     -> cap 65  (moderate friction)
+//
+// marketHealthCap gains a dev-wallet-% axis, independent of
+// top10Percent because a deployer can hold a large stake while sitting
+// outside any top-10 cutoff if it's split across wallets this
+// codebase's insider-cluster-detector hasn't yet linked back to them:
+//   dev_wallet_percent > 30 -> cap 30
+//   dev_wallet_percent > 15 -> cap 50
+//   dev_wallet_percent > 5  -> cap 75
+//
+// contract_renounced is NOT scored here — see rugcheck-client.ts v1.3
+// header: it's mint_authority.revoked && freeze_authority.revoked,
+// already fully counted in computeApiSafetyScore's foundation term.
+//
+// Response gains contract_risk_capped (new boolean, same "did this
+// tier actually bind" semantics as the existing three) plus
+// caps_triggered (every fired condition + its cap value) and
+// dominant_cap (the single tightest one) so a caller can see WHY a
+// score is low, not just that it is — same reasoning all three model
+// reviews converged on independently.
+//
 // Version 1.4 — lib/token-risk-core.ts
 //
 // v1.4: exposes lib/rugcheck-client.ts v1.2's four new fields
@@ -83,6 +124,12 @@ const RUGCHECK_FALLBACK: RugCheckRiskData = {
   rugged: null,
   jup_verified: null,
   insider_holder_count: null,
+  hidden_owner: null,
+  permanent_delegate: null,
+  buy_tax_percent: null,
+  sell_tax_percent: null,
+  dev_wallet_percent: null,
+  token_program: null,
 };
 
 const HOLDER_RISK_FALLBACK = {
@@ -125,6 +172,15 @@ export interface TokenRiskResult {
   // heuristic, their tracked confirmation) fired and actually pulled
   // the score down. See applyScoreCaps below.
   rugged_capped?: boolean;
+  // v1.5 — see header note above. true only when the new
+  // permanent_delegate/hidden_owner/token_program/tax tier actually
+  // pulled the score down.
+  contract_risk_capped?: boolean;
+  // v1.5 — every cap condition that fired this call, and the single
+  // tightest one (the actual reason the score is what it is). Empty
+  // array / null dominant_cap when no cap fired at all.
+  caps_triggered?: Array<{ reason: string; cap: number }>;
+  dominant_cap?: string | null;
   cluster_analysis?: 'complete' | 'pending';
   insider_clusters?: InsiderCluster[];
   mint_authority?: { revoked: boolean; address: string | null };
@@ -143,6 +199,17 @@ export interface TokenRiskResult {
   rugged?: boolean | null;
   jup_verified?: boolean | null;
   insider_holder_count?: number | null;
+  // v1.5 — from lib/rugcheck-client.ts v1.3, same RugCheck call, zero
+  // extra cost. contract_renounced is purely derived (mint + freeze
+  // both revoked) and carries no separate scoring weight — see that
+  // file's header.
+  hidden_owner?: boolean | null;
+  permanent_delegate?: boolean | null;
+  buy_tax_percent?: number | null;
+  sell_tax_percent?: number | null;
+  dev_wallet_percent?: number | null;
+  token_program?: 'standard' | 'nonstandard' | null;
+  contract_renounced?: boolean;
   holder_distribution?: {
     risk_level: string;
     largest_holder_percent: number;
@@ -223,6 +290,9 @@ export interface ScoreCapResult {
   maturityCapped: boolean;
   marketHealthCapped: boolean;
   ruggedCapped: boolean;
+  contractRiskCapped: boolean;
+  capsTriggered: Array<{ reason: string; cap: number }>;
+  dominantCap: string | null;
 }
 
 export function applyScoreCaps(
@@ -230,6 +300,14 @@ export function applyScoreCaps(
   dexData: { liquidity: number | null; ageDays: number | null },
   holderRisk: { top10Percent: number; holderCount: number },
   rugged: boolean | null,
+  contractSignals: {
+    hiddenOwner: boolean | null;
+    permanentDelegate: boolean | null;
+    tokenProgram: 'standard' | 'nonstandard' | null;
+    buyTaxPercent: number | null;
+    sellTaxPercent: number | null;
+    devWalletPercent: number | null;
+  },
 ): ScoreCapResult {
   let maturityCap = 100;
   if (dexData.ageDays !== null && dexData.ageDays < 1) {
@@ -242,27 +320,105 @@ export function applyScoreCaps(
   const maturityCapped = maturityCap < 100 && baseScore > maturityCap;
   const afterMaturity = Math.min(baseScore, maturityCap);
 
+  // v1.5: dev_wallet_percent is a distinct concentration axis from
+  // top10Percent — see this file's v1.5 header note.
+  const devWalletPercent = contractSignals.devWalletPercent;
   let marketHealthCap = 100;
   if (dexData.liquidity !== null && dexData.liquidity < 500) {
     marketHealthCap = 25;
   } else if (holderRisk.top10Percent > 90) {
     marketHealthCap = Math.min(marketHealthCap, 30);
+  } else if (devWalletPercent !== null && devWalletPercent > 30) {
+    marketHealthCap = Math.min(marketHealthCap, 30);
   } else if (holderRisk.top10Percent > 80) {
+    marketHealthCap = Math.min(marketHealthCap, 50);
+  } else if (devWalletPercent !== null && devWalletPercent > 15) {
     marketHealthCap = Math.min(marketHealthCap, 50);
   } else if (holderRisk.holderCount < 20) {
     marketHealthCap = Math.min(marketHealthCap, 60);
+  } else if (devWalletPercent !== null && devWalletPercent > 5) {
+    marketHealthCap = Math.min(marketHealthCap, 75);
   }
   const marketHealthCapped = marketHealthCap < 100 && afterMaturity > marketHealthCap;
   const afterMarketHealth = Math.min(afterMaturity, marketHealthCap);
+
+  // v1.5: new contractRiskCap tier — structural/contract-level red
+  // flags, one severity notch below confirmed-rugged. See this file's
+  // v1.5 header for the exact numbers and the 3-model consensus behind
+  // them.
+  const { hiddenOwner, permanentDelegate, tokenProgram, buyTaxPercent, sellTaxPercent } = contractSignals;
+  const taxPercent =
+    buyTaxPercent !== null && sellTaxPercent !== null
+      ? Math.max(buyTaxPercent, sellTaxPercent)
+      : buyTaxPercent ?? sellTaxPercent;
+
+  let contractRiskCap = 100;
+  if (permanentDelegate === true) {
+    contractRiskCap = Math.min(contractRiskCap, 10);
+  }
+  if (hiddenOwner === true) {
+    contractRiskCap = Math.min(contractRiskCap, 30);
+  }
+  if (taxPercent !== null && taxPercent > 10) {
+    contractRiskCap = Math.min(contractRiskCap, 30);
+  }
+  if (tokenProgram === 'nonstandard') {
+    contractRiskCap = Math.min(contractRiskCap, 50);
+  }
+  if (taxPercent !== null && taxPercent > 3) {
+    contractRiskCap = Math.min(contractRiskCap, 65);
+  }
+  const contractRiskCapped = contractRiskCap < 100 && afterMarketHealth > contractRiskCap;
+  const afterContractRisk = Math.min(afterMarketHealth, contractRiskCap);
 
   // v1.4: RugCheck's OWN confirmed-rugged flag — not a heuristic on
   // our side, their tracked ground truth. No clean mint/freeze/
   // liquidity combination should override an already-confirmed rug.
   const RUGGED_CAP = 5;
-  const ruggedCapped = rugged === true && afterMarketHealth > RUGGED_CAP;
-  const finalScore = rugged === true ? Math.min(afterMarketHealth, RUGGED_CAP) : afterMarketHealth;
+  const ruggedCapped = rugged === true && afterContractRisk > RUGGED_CAP;
+  const finalScore = rugged === true ? Math.min(afterContractRisk, RUGGED_CAP) : afterContractRisk;
 
-  return { score: finalScore, maturityCapped, marketHealthCapped, ruggedCapped };
+  // Diagnostics: every condition that actually fired this call, plus
+  // the single tightest (lowest-cap) one — lets a caller see WHY a
+  // score is low without reverse-engineering the tier math themselves.
+  const capsTriggered: Array<{ reason: string; cap: number }> = [];
+  if (rugged === true) capsTriggered.push({ reason: 'rugged_confirmed', cap: RUGGED_CAP });
+  if (permanentDelegate === true) capsTriggered.push({ reason: 'permanent_delegate', cap: 10 });
+  if (hiddenOwner === true) capsTriggered.push({ reason: 'hidden_owner', cap: 30 });
+  if (taxPercent !== null && taxPercent > 10) capsTriggered.push({ reason: 'high_tax', cap: 30 });
+  if (dexData.liquidity !== null && dexData.liquidity < 500)
+    capsTriggered.push({ reason: 'low_liquidity', cap: 25 });
+  if (holderRisk.top10Percent > 90) capsTriggered.push({ reason: 'top10_gt_90', cap: 30 });
+  if (devWalletPercent !== null && devWalletPercent > 30)
+    capsTriggered.push({ reason: 'dev_wallet_gt_30', cap: 30 });
+  if (tokenProgram === 'nonstandard') capsTriggered.push({ reason: 'nonstandard_token_program', cap: 50 });
+  if (holderRisk.top10Percent > 80) capsTriggered.push({ reason: 'top10_gt_80', cap: 50 });
+  if (devWalletPercent !== null && devWalletPercent > 15)
+    capsTriggered.push({ reason: 'dev_wallet_gt_15', cap: 50 });
+  if (taxPercent !== null && taxPercent > 3) capsTriggered.push({ reason: 'moderate_tax', cap: 65 });
+  if (holderRisk.holderCount < 20) capsTriggered.push({ reason: 'holders_lt_20', cap: 60 });
+  if (devWalletPercent !== null && devWalletPercent > 5)
+    capsTriggered.push({ reason: 'dev_wallet_gt_5', cap: 75 });
+  if (dexData.ageDays !== null && dexData.ageDays < 1) capsTriggered.push({ reason: 'age_lt_1d', cap: 55 });
+  else if (dexData.ageDays !== null && dexData.ageDays < 7 && holderRisk.holderCount < 50)
+    capsTriggered.push({ reason: 'age_lt_7d_thin_holders', cap: 65 });
+  else if (dexData.ageDays !== null && dexData.ageDays < 7)
+    capsTriggered.push({ reason: 'age_lt_7d', cap: 75 });
+
+  const dominantCap =
+    capsTriggered.length > 0
+      ? capsTriggered.reduce((tightest, c) => (c.cap < tightest.cap ? c : tightest)).reason
+      : null;
+
+  return {
+    score: finalScore,
+    maturityCapped,
+    marketHealthCapped,
+    ruggedCapped,
+    contractRiskCapped,
+    capsTriggered,
+    dominantCap,
+  };
 }
 
 // Validates + fetches + scores a single mint. Never throws — every
@@ -331,12 +487,22 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
       clusterAnalysis,
     );
 
-    const { score: safetyScore, maturityCapped, marketHealthCapped, ruggedCapped } = applyScoreCaps(
-      rawSafetyScore,
-      dexData,
-      holderRisk,
-      rugCheckData.rugged,
-    );
+    const {
+      score: safetyScore,
+      maturityCapped,
+      marketHealthCapped,
+      ruggedCapped,
+      contractRiskCapped,
+      capsTriggered,
+      dominantCap,
+    } = applyScoreCaps(rawSafetyScore, dexData, holderRisk, rugCheckData.rugged, {
+      hiddenOwner: rugCheckData.hidden_owner,
+      permanentDelegate: rugCheckData.permanent_delegate,
+      tokenProgram: rugCheckData.token_program,
+      buyTaxPercent: rugCheckData.buy_tax_percent,
+      sellTaxPercent: rugCheckData.sell_tax_percent,
+      devWalletPercent: rugCheckData.dev_wallet_percent,
+    });
 
     // History write: fire-and-forget, never awaited, never allowed to
     // affect this response. Runs on every successful check regardless
@@ -366,6 +532,9 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
       maturity_capped: maturityCapped,
       market_health_capped: marketHealthCapped,
       rugged_capped: ruggedCapped,
+      contract_risk_capped: contractRiskCapped,
+      caps_triggered: capsTriggered,
+      dominant_cap: dominantCap,
       cluster_analysis: clusterAnalysis,
       insider_clusters: insiderClusters,
       mint_authority: {
@@ -382,6 +551,13 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
       rugged: rugCheckData.rugged,
       jup_verified: rugCheckData.jup_verified,
       insider_holder_count: rugCheckData.insider_holder_count,
+      hidden_owner: rugCheckData.hidden_owner,
+      permanent_delegate: rugCheckData.permanent_delegate,
+      buy_tax_percent: rugCheckData.buy_tax_percent,
+      sell_tax_percent: rugCheckData.sell_tax_percent,
+      dev_wallet_percent: rugCheckData.dev_wallet_percent,
+      token_program: rugCheckData.token_program,
+      contract_renounced: mintAuthorityRevoked && freezeAuthorityRevoked,
       holder_distribution: {
         risk_level: holderRisk.riskLevel,
         largest_holder_percent: holderRisk.largestHolderPercent,
