@@ -1,6 +1,6 @@
-# TNT House
+# TNT House — RiskDataApi
 
-TNT House ([tnt-audit.com](https://www.tnt-audit.com)) is an AI-powered Solana token audit and listing platform: safety scoring, insider wallet cluster detection, mint/freeze authority checks, honeypot and LP-lock detection.
+TNT House ([tnt-audit.com/risk-api](https://www.tnt-audit.com/risk-api)) is an AI-powered Solana token audit and listing platform: safety scoring, insider wallet cluster detection, mint/freeze authority checks, honeypot and LP-lock detection.
 
 This repository also hosts a remote **Model Context Protocol (MCP) server** exposing that same engine as the **Risk-Data API** — Solana token risk scoring and insider wallet cluster detection for AI agents (Claude, Cursor, and any other MCP-compatible client). See the [MCP Server section](#mcp-server--risk-data-api) below.
 
