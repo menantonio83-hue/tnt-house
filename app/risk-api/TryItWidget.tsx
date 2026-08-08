@@ -1,3 +1,14 @@
+// Version 1.3 — app/risk-api/TryItWidget.tsx
+//
+// v1.3: card now shows all 18 fields the API actually returns, not
+// just the original 10 — added hidden owner, permanent delegate,
+// buy/sell tax, dev wallet %, token program, and contract renounced
+// (the 6 new fields from token-risk-core.ts v1.5 / rugcheck-client.ts
+// v1.3), plus a human-readable "Score capped by: ..." strip driven by
+// the API's new dominant_cap field. This widget is the free-trial
+// showcase for the paid API — it should demonstrate the full depth of
+// what a real API key gets you, not a trimmed-down subset.
+//
 // Version 1.2 — app/risk-api/TryItWidget.tsx
 //
 // v1.2: Liquidity/24h volume rows now show muted "—" (not green) plus a
@@ -60,13 +71,21 @@ type Status = 'idle' | 'loading' | 'success' | 'error' | 'limit';
 interface TrialResult {
   mint: string;
   safety_score: number;
+  dominant_cap: string | null;
   insider_clusters: unknown[];
   mint_authority: { revoked: boolean; address: string | null } | null;
   freeze_authority: { revoked: boolean; address: string | null } | null;
+  contract_renounced: boolean;
   honeypot_risk: boolean | null;
   lp_locked: { locked: boolean; percent: number } | null;
   rugged: boolean | null;
   jup_verified: boolean | null;
+  hidden_owner: boolean | null;
+  permanent_delegate: boolean | null;
+  buy_tax_percent: number | null;
+  sell_tax_percent: number | null;
+  dev_wallet_percent: number | null;
+  token_program: 'standard' | 'nonstandard' | null;
   holder_distribution?: {
     risk_level: string;
     largest_holder_percent: number;
@@ -92,6 +111,31 @@ function formatUsdCompact(value: number | null | undefined): string {
   if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(2)}M`;
   if (value >= 1_000) return `$${(value / 1_000).toFixed(1)}K`;
   return `$${value.toFixed(2)}`;
+}
+
+// Maps the API's dominant_cap reason codes (see lib/token-risk-core.ts
+// v1.5's capsTriggered list) to short human-readable labels for the
+// widget's "why is this score low" strip.
+function formatDominantCap(reason: string): string {
+  const labels: Record<string, string> = {
+    rugged_confirmed: 'confirmed rug (RugCheck)',
+    permanent_delegate: 'permanent delegate enabled',
+    hidden_owner: 'hidden owner/proxy detected',
+    high_tax: 'transfer tax > 10%',
+    low_liquidity: 'liquidity under $500',
+    top10_gt_90: 'top-10 holders > 90%',
+    dev_wallet_gt_30: 'dev wallet > 30%',
+    nonstandard_token_program: 'non-standard token program',
+    top10_gt_80: 'top-10 holders > 80%',
+    dev_wallet_gt_15: 'dev wallet > 15%',
+    moderate_tax: 'transfer tax > 3%',
+    holders_lt_20: 'fewer than 20 holders',
+    dev_wallet_gt_5: 'dev wallet > 5%',
+    age_lt_1d: 'token under 1 day old',
+    age_lt_7d_thin_holders: 'token under 7 days old, few holders',
+    age_lt_7d: 'token under 7 days old',
+  };
+  return labels[reason] ?? reason;
 }
 
 // Stable-ish browser fingerprint, hashed client-side. Not a security
@@ -316,6 +360,72 @@ export default function TryItWidget() {
                   }
                   valueClassName={result.lp_locked?.locked ? 'text-emerald-400' : 'text-amber-400'}
                 />
+                <StatRow
+                  label="Hidden owner"
+                  value={result.hidden_owner === null ? '—' : result.hidden_owner ? 'yes ⚠️' : 'no ✓'}
+                  valueClassName={
+                    result.hidden_owner === null
+                      ? 'text-slate-500'
+                      : result.hidden_owner
+                        ? 'text-amber-400'
+                        : 'text-emerald-400'
+                  }
+                />
+                <StatRow
+                  label="Permanent delegate"
+                  value={result.permanent_delegate === null ? '—' : result.permanent_delegate ? 'yes 🚨' : 'no ✓'}
+                  valueClassName={
+                    result.permanent_delegate === null
+                      ? 'text-slate-500'
+                      : result.permanent_delegate
+                        ? 'text-red-400'
+                        : 'text-emerald-400'
+                  }
+                />
+                <StatRow
+                  label="Buy/sell tax"
+                  value={
+                    result.buy_tax_percent === null && result.sell_tax_percent === null
+                      ? '—'
+                      : `${(result.buy_tax_percent ?? 0).toFixed(1)}% / ${(result.sell_tax_percent ?? 0).toFixed(1)}%`
+                  }
+                  valueClassName={
+                    result.buy_tax_percent !== null && result.buy_tax_percent > 10
+                      ? 'text-red-400'
+                      : result.buy_tax_percent !== null && result.buy_tax_percent > 3
+                        ? 'text-amber-400'
+                        : 'text-slate-500'
+                  }
+                />
+                <StatRow
+                  label="Dev wallet"
+                  value={result.dev_wallet_percent === null ? '—' : `${result.dev_wallet_percent.toFixed(1)}%`}
+                  valueClassName={
+                    result.dev_wallet_percent === null
+                      ? 'text-slate-500'
+                      : result.dev_wallet_percent > 15
+                        ? 'text-red-400'
+                        : result.dev_wallet_percent > 5
+                          ? 'text-amber-400'
+                          : 'text-emerald-400'
+                  }
+                />
+                <StatRow
+                  label="Token program"
+                  value={result.token_program === null ? '—' : result.token_program === 'standard' ? 'standard ✓' : 'nonstandard ⚠️'}
+                  valueClassName={
+                    result.token_program === 'standard'
+                      ? 'text-emerald-400'
+                      : result.token_program === 'nonstandard'
+                        ? 'text-amber-400'
+                        : 'text-slate-500'
+                  }
+                />
+                <StatRow
+                  label="Contract renounced"
+                  value={result.contract_renounced ? 'yes ✓' : 'no ⚠️'}
+                  valueClassName={result.contract_renounced ? 'text-emerald-400' : 'text-amber-400'}
+                />
                 {result.holder_distribution && (
                   <>
                     <StatRow label="Top holder" value={`${result.holder_distribution.largest_holder_percent.toFixed(1)}%`} />
@@ -349,6 +459,14 @@ export default function TryItWidget() {
                   </>
                 )}
               </div>
+
+              {result.dominant_cap && (
+                <div className="px-4 py-2.5 border-t border-amber-500/20 bg-amber-500/5">
+                  <span className="text-[10px] text-amber-300">
+                    ⚠️ Score capped by: {formatDominantCap(result.dominant_cap)}
+                  </span>
+                </div>
+              )}
 
               <div className="px-4 py-2.5 text-center border-t border-purple-500/10">
                 <span className="text-[10px] text-slate-600 font-mono">tnt-audit.com/risk-api</span>
