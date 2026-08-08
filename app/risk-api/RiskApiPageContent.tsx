@@ -1,3 +1,14 @@
+// Version 1.8 — app/risk-api/RiskApiPageContent.tsx
+//
+// v1.8: added the missing 4th pricing card (X402 — pay per call, no
+// key) to the Limits & pricing grid (3-col -> 4-col), sourced from the
+// real values in app/api/v1/token-risk/x402/route.ts ($0.07/call =
+// PRICE_USDC_ATOMIC 70000, USDC on Solana mainnet). Also added a
+// dedicated "how to connect" card right below the pricing grid with
+// the actual 402 -> sign -> retry flow and a real curl example —
+// x402 pricing existed on x402scan.com since v1.8 of the changelog but
+// had zero visibility or connect instructions on this page itself.
+//
 // Version 1.7 — app/risk-api/RiskApiPageContent.tsx
 //
 // v1.7: docs updated for the 6 new API fields + contractRiskCap tier
@@ -549,7 +560,7 @@ X-RateLimit-Reset: 2026-07-24T00:00:00.000Z
           <h2 className="text-xl sm:text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400 mb-6">
             {t.pricingTitle}
           </h2>
-          <div className="grid sm:grid-cols-3 gap-4">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="border border-purple-500/30 rounded-lg p-5 bg-slate-900/40">
               <div className="text-[11px] font-bold text-purple-400 tracking-widest mb-1">{t.tierFree}</div>
               <div className="text-2xl font-black mb-3">{t.tierFreeAmount}</div>
@@ -595,8 +606,55 @@ X-RateLimit-Reset: 2026-07-24T00:00:00.000Z
                 </li>
               </ul>
             </div>
+            <div className="border border-emerald-500/30 rounded-lg p-5 bg-slate-900/40">
+              <div className="text-[11px] font-bold text-emerald-400 tracking-widest mb-1">{t.tierX402}</div>
+              <div className="text-2xl font-black mb-3">
+                $0.07<span className="text-sm text-slate-400">/call</span>
+              </div>
+              <ul className="space-y-2 text-xs text-slate-400">
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 size={13} className="text-emerald-400 shrink-0" /> {t.x402Feature1}
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 size={13} className="text-emerald-400 shrink-0" /> {t.x402Feature2}
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 size={13} className="text-emerald-400 shrink-0" /> {t.x402Feature3}
+                </li>
+              </ul>
+            </div>
           </div>
           <p className="text-[11px] text-slate-500 mt-4">{t.pricingNote}</p>
+
+          {/* x402 how-to-connect card */}
+          <div className="mt-6 bg-slate-950 border-2 border-emerald-500/30 rounded-lg shadow-[0_0_20px_rgba(16,185,129,0.1)] overflow-hidden">
+            <div className="flex items-center justify-between border-b border-emerald-500/20 px-4 py-2.5">
+              <div className="flex items-center gap-1.5 text-emerald-400 font-bold text-xs">
+                <Terminal size={13} />
+                GET /api/v1/token-risk/x402
+              </div>
+              <span className="text-[10px] text-slate-500">{t.x402HowToLabel}</span>
+            </div>
+            <div className="p-4 space-y-3">
+              <p className="text-xs text-slate-400 leading-relaxed">{t.x402HowToIntro}</p>
+              <ol className="space-y-2 text-xs text-slate-400 list-decimal list-inside">
+                <li>{t.x402Step1}</li>
+                <li>{t.x402Step2}</li>
+                <li>{t.x402Step3}</li>
+              </ol>
+              <div className="border-t border-emerald-500/10 pt-3">
+                <pre className="text-[11px] sm:text-xs text-emerald-400 overflow-x-auto leading-relaxed">
+{`curl "https://tnt-audit.com/api/v1/token-risk/x402?mint=<MINT_ADDRESS>"
+# -> 402 Payment Required, PAYMENT-REQUIRED header has the challenge
+
+# sign + pay with an x402-compatible client, then retry with:
+curl "https://tnt-audit.com/api/v1/token-risk/x402?mint=<MINT_ADDRESS>" \\
+  -H "X-PAYMENT: <base64 signed payment>"`}
+                </pre>
+              </div>
+              <p className="text-[11px] text-slate-500 leading-relaxed border-t border-emerald-500/10 pt-3">{t.x402HowToNote}</p>
+            </div>
+          </div>
         </section>
 
         {/* Billing */}

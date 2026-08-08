@@ -1,3 +1,12 @@
+// Version 1.6 — app/risk-api/i18n.ts
+//
+// v1.6: x402 pricing block — tierX402/x402Feature1-3 (4th pricing card)
+// plus x402HowToLabel/Intro/Step1-3/Note (the new "how to connect"
+// card below the pricing grid) x 7 languages. Pricing was already live
+// on x402scan.com (v1.8 changelog entry) but had no card on the
+// pricing section itself and no connect instructions anywhere on the
+// page — this closes that gap.
+//
 // Version 1.5 — app/risk-api/i18n.ts
 //
 // v1.5: 5 new response-fields-table description keys (fieldOwnerDelegate,
@@ -172,6 +181,16 @@ export interface RiskApiTranslations {
   subFeature1: string;
   subFeature2: string;
   subFeature3: string;
+  tierX402: string;
+  x402Feature1: string;
+  x402Feature2: string;
+  x402Feature3: string;
+  x402HowToLabel: string;
+  x402HowToIntro: string;
+  x402Step1: string;
+  x402Step2: string;
+  x402Step3: string;
+  x402HowToNote: string;
   pricingNote: string;
 
   // Section headers
@@ -402,6 +421,18 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     subFeature1: '1000 calls included',
     subFeature2: '$0.03/call overage after that',
     subFeature3: 'Manual renewal — no auto-charge',
+    tierX402: 'X402 (PAY PER CALL, NO KEY)',
+    x402Feature1: 'No API key, no signup — pay per request',
+    x402Feature2: 'USDC on Solana, settled per call via the x402 protocol',
+    x402Feature3: 'Built for autonomous agents that pay their own way',
+    x402HowToLabel: 'x402 protocol',
+    x402HowToIntro:
+      'x402 turns a 402 Payment Required into a working payment flow: call the endpoint with no auth, get a signed payment challenge back, pay it, retry with the receipt.',
+    x402Step1: 'GET the endpoint with a mint — no Authorization header needed.',
+    x402Step2: 'You get back HTTP 402 with a PAYMENT-REQUIRED header — a signed challenge for $0.07 in USDC on Solana.',
+    x402Step3: 'Sign and settle the payment with any x402-compatible client (or wallet/agent SDK), then retry the same request with an X-PAYMENT header carrying the signed payment.',
+    x402HowToNote:
+      'Same $0.07/call rate as the pay-per-call tier — this is just the same pricing exposed without an account, for agents that would rather transact per-call than hold a stored key. Listed on x402scan.com.',
     pricingNote: 'Paid in $MRDT / SOL / USDC via Solana Pay — same payment flow as the rest of TNT House. Solana Pay can\'t auto-charge, so the subscription is a manual 30-day top-up, not a recurring subscription in the traditional sense.',
     manageBillingTitle: 'Manage billing',
     getKeyTitle: 'Get your API key',
@@ -622,6 +653,18 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     subFeature1: '1000 llamadas incluidas',
     subFeature2: '$0.03/llamada de exceso después',
     subFeature3: 'Renovación manual — sin cobro automático',
+    tierX402: 'X402 (PAGO POR LLAMADA, SIN KEY)',
+    x402Feature1: 'Sin API key, sin registro — pagas por petición',
+    x402Feature2: 'USDC en Solana, liquidado por llamada vía el protocolo x402',
+    x402Feature3: 'Pensado para agentes autónomos que pagan por sí mismos',
+    x402HowToLabel: 'protocolo x402',
+    x402HowToIntro:
+      'x402 convierte un 402 Payment Required en un flujo de pago funcional: llamas al endpoint sin autenticación, recibes un reto de pago firmado, lo pagas y reintentas con el recibo.',
+    x402Step1: 'Haz GET al endpoint con un mint — no necesitas cabecera Authorization.',
+    x402Step2: 'Recibes un HTTP 402 con una cabecera PAYMENT-REQUIRED — un reto firmado por $0.07 en USDC en Solana.',
+    x402Step3: 'Firma y liquida el pago con cualquier cliente compatible con x402 (o SDK de wallet/agente), luego reintenta la misma petición con una cabecera X-PAYMENT que lleve el pago firmado.',
+    x402HowToNote:
+      'Misma tarifa de $0.07/llamada que el nivel pago por llamada — es el mismo precio expuesto sin cuenta, para agentes que prefieren pagar por llamada en vez de guardar una key. Listado en x402scan.com.',
     pricingNote: 'Se paga en $MRDT / SOL / USDC vía Solana Pay — el mismo flujo de pago que el resto de TNT House. Solana Pay no puede cobrar automáticamente, así que la suscripción es una recarga manual de 30 días, no una suscripción recurrente en el sentido tradicional.',
     manageBillingTitle: 'Gestionar facturación',
     getKeyTitle: 'Obtén tu API key',
@@ -842,6 +885,18 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     subFeature1: '1000 appels inclus',
     subFeature2: '$0.03/appel de dépassement ensuite',
     subFeature3: 'Renouvellement manuel — pas de prélèvement automatique',
+    tierX402: 'X402 (PAIEMENT À L\'APPEL, SANS CLÉ)',
+    x402Feature1: 'Sans clé API, sans inscription — paiement à la requête',
+    x402Feature2: 'USDC sur Solana, réglé par appel via le protocole x402',
+    x402Feature3: 'Conçu pour les agents autonomes qui paient eux-mêmes',
+    x402HowToLabel: 'protocole x402',
+    x402HowToIntro:
+      "x402 transforme un 402 Payment Required en un vrai flux de paiement : appelez l'endpoint sans authentification, recevez un défi de paiement signé, payez-le, puis réessayez avec le reçu.",
+    x402Step1: "Faites un GET sur l'endpoint avec un mint — pas besoin d'en-tête Authorization.",
+    x402Step2: 'Vous recevez un HTTP 402 avec un en-tête PAYMENT-REQUIRED — un défi signé pour 0,07 $ en USDC sur Solana.',
+    x402Step3: "Signez et réglez le paiement avec n'importe quel client compatible x402 (ou SDK wallet/agent), puis réessayez la même requête avec un en-tête X-PAYMENT contenant le paiement signé.",
+    x402HowToNote:
+      'Même tarif de 0,07 $/appel que le niveau paiement à l\'appel — c\'est le même prix, exposé sans compte, pour les agents qui préfèrent payer à l\'appel plutôt que stocker une clé. Référencé sur x402scan.com.',
     pricingNote: 'Payable en $MRDT / SOL / USDC via Solana Pay — le même flux de paiement que le reste de TNT House. Solana Pay ne peut pas prélever automatiquement, donc l\'abonnement est une recharge manuelle de 30 jours, pas un abonnement récurrent au sens traditionnel.',
     manageBillingTitle: 'Gérer la facturation',
     getKeyTitle: 'Obtenez votre clé API',
@@ -1062,6 +1117,18 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     subFeature1: '1000 κλήσεις περιλαμβάνονται',
     subFeature2: '$0.03/κλήση υπέρβασης μετά',
     subFeature3: 'Χειροκίνητη ανανέωση — καμία αυτόματη χρέωση',
+    tierX402: 'X402 (ΠΛΗΡΩΜΗ ΑΝΑ ΚΛΗΣΗ, ΧΩΡΙΣ KEY)',
+    x402Feature1: 'Χωρίς API key, χωρίς εγγραφή — πληρώνεις ανά αίτημα',
+    x402Feature2: 'USDC στη Solana, εκκαθάριση ανά κλήση μέσω του πρωτοκόλλου x402',
+    x402Feature3: 'Φτιαγμένο για αυτόνομους agents που πληρώνουν μόνοι τους',
+    x402HowToLabel: 'πρωτόκολλο x402',
+    x402HowToIntro:
+      'Το x402 μετατρέπει ένα 402 Payment Required σε λειτουργική ροή πληρωμής: καλείς το endpoint χωρίς αυθεντικοποίηση, παίρνεις πίσω μια υπογεγραμμένη πρόκληση πληρωμής, την πληρώνεις, ξαναδοκιμάζεις με την απόδειξη.',
+    x402Step1: 'Κάνε GET στο endpoint με ένα mint — δεν χρειάζεται header Authorization.',
+    x402Step2: 'Παίρνεις πίσω HTTP 402 με header PAYMENT-REQUIRED — μια υπογεγραμμένη πρόκληση για $0.07 σε USDC στη Solana.',
+    x402Step3: 'Υπόγραψε και εκκαθάρισε την πληρωμή με οποιονδήποτε client συμβατό με x402 (ή SDK wallet/agent), μετά ξαναδοκίμασε το ίδιο αίτημα με header X-PAYMENT που φέρει την υπογεγραμμένη πληρωμή.',
+    x402HowToNote:
+      'Ίδια τιμή $0.07/κλήση με το επίπεδο πληρωμής ανά κλήση — είναι η ίδια τιμολόγηση χωρίς λογαριασμό, για agents που προτιμούν να πληρώνουν ανά κλήση αντί να κρατούν αποθηκευμένο key. Καταχωρημένο στο x402scan.com.',
     pricingNote: 'Πληρωμή σε $MRDT / SOL / USDC μέσω Solana Pay — ίδια ροή πληρωμής με το υπόλοιπο TNT House. Το Solana Pay δεν μπορεί να χρεώσει αυτόματα, οπότε η συνδρομή είναι μια χειροκίνητη ανανέωση 30 ημερών, όχι επαναλαμβανόμενη συνδρομή με την παραδοσιακή έννοια.',
     manageBillingTitle: 'Διαχείριση χρέωσης',
     getKeyTitle: 'Πάρε το API key σου',
@@ -1282,6 +1349,18 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     subFeature1: '1000 запросов включено',
     subFeature2: '$0.03/запрос сверх лимита далее',
     subFeature3: 'Ручное продление — без автосписания',
+    tierX402: 'X402 (ОПЛАТА ЗА ЗВОНОК, БЕЗ КЛЮЧА)',
+    x402Feature1: 'Без API-ключа, без регистрации — платишь за каждый запрос',
+    x402Feature2: 'USDC в сети Solana, расчёт за звонок через протокол x402',
+    x402Feature3: 'Для автономных агентов, которые платят сами за себя',
+    x402HowToLabel: 'протокол x402',
+    x402HowToIntro:
+      'x402 превращает 402 Payment Required в рабочий платёжный флоу: дёргаешь эндпоинт без авторизации, получаешь подписанный платёжный челлендж, оплачиваешь его, повторяешь запрос с квитанцией.',
+    x402Step1: 'Делаешь GET на эндпоинт с mint — заголовок Authorization не нужен.',
+    x402Step2: 'В ответ приходит HTTP 402 с заголовком PAYMENT-REQUIRED — подписанный челлендж на $0.07 в USDC на Solana.',
+    x402Step3: 'Подписываешь и оплачиваешь через любой x402-совместимый клиент (или wallet/agent SDK), затем повторяешь тот же запрос с заголовком X-PAYMENT, содержащим подписанный платёж.',
+    x402HowToNote:
+      'Та же ставка $0.07/звонок, что и в pay-per-call тарифе — это тот же прайсинг, только без аккаунта, для агентов, которым удобнее платить за звонок, чем хранить ключ. Указан на x402scan.com.',
     pricingNote: 'Оплата в $MRDT / SOL / USDC через Solana Pay — тот же флоу, что и на остальном TNT House. Solana Pay не умеет автосписание, поэтому подписка — это ручное пополнение на 30 дней, а не рекуррентная подписка в привычном смысле.',
     manageBillingTitle: 'Управление биллингом',
     getKeyTitle: 'Получи свой API-ключ',
@@ -1502,6 +1581,18 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     subFeature1: '1000 chiamate incluse',
     subFeature2: '$0.03/chiamata di eccedenza dopo',
     subFeature3: 'Rinnovo manuale — nessun addebito automatico',
+    tierX402: 'X402 (PAGAMENTO A CHIAMATA, SENZA KEY)',
+    x402Feature1: 'Nessuna API key, nessuna registrazione — paghi per richiesta',
+    x402Feature2: 'USDC su Solana, regolato per chiamata tramite il protocollo x402',
+    x402Feature3: 'Pensato per agenti autonomi che pagano da soli',
+    x402HowToLabel: 'protocollo x402',
+    x402HowToIntro:
+      "x402 trasforma un 402 Payment Required in un flusso di pagamento funzionante: chiami l'endpoint senza autenticazione, ricevi una sfida di pagamento firmata, la paghi, riprovi con la ricevuta.",
+    x402Step1: "Fai una GET sull'endpoint con un mint — non serve l'header Authorization.",
+    x402Step2: "Ricevi un HTTP 402 con un header PAYMENT-REQUIRED — una sfida firmata per $0.07 in USDC su Solana.",
+    x402Step3: "Firma e salda il pagamento con qualsiasi client compatibile x402 (o SDK wallet/agent), poi riprova la stessa richiesta con un header X-PAYMENT contenente il pagamento firmato.",
+    x402HowToNote:
+      "Stessa tariffa di $0.07/chiamata del livello pagamento a chiamata — è lo stesso prezzo esposto senza account, per agenti che preferiscono pagare a chiamata invece di conservare una key. Elencato su x402scan.com.",
     pricingNote: 'Pagabile in $MRDT / SOL / USDC via Solana Pay — lo stesso flusso di pagamento del resto di TNT House. Solana Pay non può addebitare automaticamente, quindi l\'abbonamento è una ricarica manuale di 30 giorni, non un abbonamento ricorrente in senso tradizionale.',
     manageBillingTitle: 'Gestisci la fatturazione',
     getKeyTitle: 'Ottieni la tua API key',
@@ -1722,6 +1813,18 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     subFeature1: '含 1000 次调用',
     subFeature2: '超出后 $0.03/次',
     subFeature3: '手动续费 —— 不会自动扣款',
+    tierX402: 'X402（按次付费，无需密钥）',
+    x402Feature1: '无需 API 密钥，无需注册 —— 按请求付费',
+    x402Feature2: 'Solana 上的 USDC，通过 x402 协议按次结算',
+    x402Feature3: '专为自主支付的自动化 agent 设计',
+    x402HowToLabel: 'x402 协议',
+    x402HowToIntro:
+      'x402 把 402 Payment Required 变成一套可用的支付流程：无需鉴权即可调用接口，返回一个已签名的支付挑战，完成支付后携带凭证重试。',
+    x402Step1: '用 mint 参数 GET 该接口 —— 不需要 Authorization 请求头。',
+    x402Step2: '你会收到 HTTP 402，响应头带有 PAYMENT-REQUIRED —— 一个价值 $0.07 USDC（Solana 链上）的已签名支付挑战。',
+    x402Step3: '用任意兼容 x402 的客户端（或钱包/agent SDK）签名并完成支付，然后携带含已签名支付信息的 X-PAYMENT 请求头重试同一请求。',
+    x402HowToNote:
+      '与按次付费套餐相同的 $0.07/次费率 —— 只是同样的定价以无账户方式开放，适合那些更愿意按次付款而不是保存密钥的 agent。已收录在 x402scan.com。',
     pricingNote: '通过 Solana Pay 以 $MRDT / SOL / USDC 支付 —— 与 TNT House 其他部分相同的支付流程。Solana Pay 无法自动扣款，因此订阅本质上是每 30 天手动充值一次，而非传统意义上的自动续订。',
     manageBillingTitle: '管理账单',
     getKeyTitle: '获取你的 API 密钥',
