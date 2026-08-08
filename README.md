@@ -1,26 +1,19 @@
 # TNT House
 
-> This repo hosts both the TNT House web platform *and* a Model Context Protocol (MCP) server (`app/api/mcp`) exposing the Risk-Data API — Solana token risk scoring and insider wallet cluster detection for AI agents. See the [MCP Server section](#mcp-server--risk-data-api) below.
+TNT House ([tnt-audit.com](https://www.tnt-audit.com)) is an AI-powered Solana token audit and listing platform: safety scoring, insider wallet cluster detection, mint/freeze authority checks, honeypot and LP-lock detection.
 
-**Trench Construction Site v1.0** — Safe New Tokens Platform
-
-A modern Next.js landing page for discovering and submitting verified micro-cap gems on Solana.
-
-## Features
-- Live DexScreener feed for low MC gems ($5K–$100K)
-- AI Audit submission form (MVP mock)
-- Whale Club DAO section (hold $MRDT for access)
-- Blueprint/cinematic UI built with Tailwind
+This repository also hosts a remote **Model Context Protocol (MCP) server** exposing that same engine as the **Risk-Data API** — Solana token risk scoring and insider wallet cluster detection for AI agents (Claude, Cursor, and any other MCP-compatible client). See the [MCP Server section](#mcp-server--risk-data-api) below.
 
 ## Tech Stack
-- Next.js 14 (App Router) + React 18
+- Next.js 14 (App Router) + React 18 + TypeScript
 - Tailwind CSS
-- Lucide React icons
-- DexScreener public API
+- Supabase (auth, billing, key storage)
+- Helius (Solana RPC) + RugCheck + DexScreener (market/risk data)
+- Vercel (hosting, cron via QStash)
 
 ## MCP Server — Risk-Data API
 
-This repository includes a remote **[Model Context Protocol](https://modelcontextprotocol.io) (MCP) server**, built with the official **[`@modelcontextprotocol/sdk`](https://www.npmjs.com/package/@modelcontextprotocol/sdk)** (TypeScript), exposing Solana token risk data as tools for AI agents (Claude, Cursor, and any other MCP-compatible client).
+This repository includes a remote **[Model Context Protocol](https://modelcontextprotocol.io) (MCP) server**, built with the official **[`@modelcontextprotocol/sdk`](https://www.npmjs.com/package/@modelcontextprotocol/sdk)** (TypeScript), exposing Solana token risk data as tools for AI agents.
 
 - **Source:** [`app/api/mcp/route.ts`](./app/api/mcp/route.ts)
 - **Docs:** [`app/api/mcp/README.md`](./app/api/mcp/README.md)
@@ -50,8 +43,6 @@ Open [http://localhost:3000](http://localhost:3000)
 
 ## Deployment
 
-Vercel-ready. Connected to GitHub main branch for auto-deploys.
+Vercel-ready. Connected to this repo's `main` branch for auto-deploys.
 
-**Latest: Next.js full migration done. Forced new deploy trigger.**
-
-**Links:** [X @RiskDataApiSol](https://x.com/RiskDataApiSol) | [Site](https://www.tnt-audit.com/risk-api) | [Telegram](https://t.me/tnt_house2026)
+**Links:** [X @RiskDataApiSol](https://x.com/RiskDataApiSol) | [Risk-Data API](https://www.tnt-audit.com/risk-api) | [Telegram](https://t.me/tnt_house2026)
