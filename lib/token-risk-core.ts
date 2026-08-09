@@ -509,6 +509,9 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
         0,
       );
       freelyTradeableTop10Percent = Math.max(0, holderRisk.top10Percent - lockedDeduction);
+      console.log(
+        `[token-risk-core] ${mint}: vesting-adjusted top10Percent ${holderRisk.top10Percent.toFixed(1)}% -> ${freelyTradeableTop10Percent.toFixed(1)}% (deduction ${lockedDeduction.toFixed(1)}pp from ${vestingLocks.length} lock(s))`,
+      );
     }
     const holderRiskForScoring = { ...holderRisk, top10Percent: freelyTradeableTop10Percent };
 

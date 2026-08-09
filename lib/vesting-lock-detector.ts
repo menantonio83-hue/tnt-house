@@ -145,7 +145,7 @@ export async function findStreamflowLocks(mint: string, totalSupplyRaw: string):
       return numerator.muln(1000).div(denominator).toNumber() / 10;
     }
 
-    return results
+    const locks = results
       .filter((r) => !r.account.closed) // withdrawn-in-full streams no longer hold any supply
       .map(({ account: stream }) => {
         const deposited = stream.depositedAmount;
@@ -169,6 +169,23 @@ export async function findStreamflowLocks(mint: string, totalSupplyRaw: string):
         return lock;
       })
       .filter((l): l is VestingLock => l !== null);
+
+    // v1.3: explicit success-path log — previously only the error path
+    // logged anything, so a search that ran cleanly but found zero
+    // locks was indistinguishable in Vercel logs from "this code never
+    // ran at all". Needed this exact gap diagnosed live: after v1.2's
+    // fix, MRDT's score moved 30 -> 33 (barely), with no error logged,
+    // leaving genuine ambiguity between "found the lock, math applied
+    // correctly and this is right" vs "found nothing, the +3 was
+    // unrelated market-data noise between two calls."
+    console.log(
+      `[vesting-lock-detector] ${mint}: found ${results.length} raw stream(s), ${locks.length} usable lock(s)` +
+        (locks.length > 0
+          ? ` — ${locks.map((l) => `${l.holder_address.slice(0, 8)}...=${l.percent_of_supply}% (unlocked_now=${l.unlocked_now_percent}%, unlocks_30d=${l.unlocks_within_30d_percent}%, cancelable=${l.cancelable_by_sender})`).join('; ')}`
+          : ''),
+    );
+
+    return locks;
   } catch (error) {
     console.error('[vesting-lock-detector] Streamflow search failed:', (error as Error).message);
     return [];
