@@ -1,3 +1,10 @@
+// Version 1.7 — app/risk-api/i18n.ts
+//
+// v1.7: fieldVestingLocks description key x 7 languages, plus a v1.12
+// changelog entry x 7 languages covering the new vesting_locks[] field
+// and the "freely tradeable" top10% concentration-scoring adjustment
+// from token-risk-core.ts v1.6 / lib/vesting-lock-detector.ts.
+//
 // Version 1.6 — app/risk-api/i18n.ts
 //
 // v1.6: x402 pricing block — tierX402/x402Feature1-3 (4th pricing card)
@@ -125,6 +132,7 @@ export interface RiskApiTranslations {
   fieldDevWallet: string;
   fieldProgramRenounced: string;
   fieldCapsTriggered: string;
+  fieldVestingLocks: string;
   rateLimitHeadersNote: string;
   openApiUsageNote: string;
   chatBubbleLabel: string;
@@ -290,6 +298,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     fieldDevWallet: 'dev_wallet_percent — the deployer\'s own on-chain holding as % of total supply. A distinct concentration signal from holder_distribution.top10_percent, since the deployer can hold a large stake while sitting outside any top-10 cutoff.',
     fieldProgramRenounced: 'token_program: "standard" if the mint uses one of Solana\'s two canonical token programs, "nonstandard" otherwise. contract_renounced: convenience boolean for mint_authority.revoked && freeze_authority.revoked.',
     fieldCapsTriggered: 'caps_triggered lists every scoring cap that fired for this mint (reason + cap value); dominant_cap is the single tightest one — the actual reason safety_score is what it is, not just a number.',
+    fieldVestingLocks: 'vesting_locks lists known on-chain vesting/lock contracts found among this mint\'s top holders (Streamflow, v1). A large holder genuinely locked for the long term is scored differently from a freely-tradeable whale — the score already accounts for this, holder_distribution.top10_percent stays the raw on-chain figure.',
     rateLimitHeadersNote: 'Every response also includes X-RateLimit-Limit, X-RateLimit-Remaining, and X-RateLimit-Reset headers — plus X-Credit-Balance-Usd once you have a paid tier or credit balance — so your bot can track its quota without ever hitting a 429.',
     openApiUsageNote: 'Works out of the box with ChatGPT Custom GPT Actions (just paste the URL). For Claude, Gemini, or agent frameworks like LangChain/CrewAI, use this spec as the schema source for your own tool integration — most of those need a small adapter, LangChain\'s OpenAPISpec.from_url() being the one that imports it directly.',
     chatBubbleLabel: 'Ask about the API',
@@ -324,6 +333,14 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'Changelog',
     changelogNote: 'No mailing list or webhooks yet for update announcements — this page and the X / Telegram links in the footer are the way to stay current.',
     changelogEntries: [
+      {
+        version: 'v1.12',
+        date: '2026-08-08',
+        changes: [
+          'New vesting_locks[] field — detects known on-chain vesting/lock contracts (Streamflow, v1) among a mint\'s top holders, so a large holder genuinely locked long-term no longer scores identically to a freely-tradeable whale.',
+          'safety_score concentration scoring now uses a "freely tradeable" top10% that subtracts genuinely-locked supply (unless the lock is cancelable by its sender, or unlocking within 30 days) — holder_distribution.top10_percent itself stays the raw, unadjusted on-chain figure.',
+        ],
+      },
       {
         version: 'v1.11',
         date: '2026-08-08',
@@ -522,6 +539,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     fieldDevWallet: 'dev_wallet_percent — la propia tenencia on-chain del deployer, como % del suministro total. Señal de concentración distinta de holder_distribution.top10_percent, ya que el deployer puede tener una posición grande sin estar en el top-10.',
     fieldProgramRenounced: 'token_program: "standard" si el mint usa uno de los dos programas de token canónicos de Solana, "nonstandard" en caso contrario. contract_renounced: booleano de conveniencia para mint_authority.revoked && freeze_authority.revoked.',
     fieldCapsTriggered: 'caps_triggered lista cada tope de puntuación activado para este mint (motivo + valor del tope); dominant_cap es el más estricto — la razón real del safety_score, no solo un número.',
+    fieldVestingLocks: 'vesting_locks lista los contratos de vesting/lock on-chain conocidos entre los principales holders de este mint (Streamflow, v1). Un holder grande realmente bloqueado a largo plazo se puntúa de forma distinta a una ballena libremente negociable — el score ya lo tiene en cuenta, holder_distribution.top10_percent sigue siendo la cifra on-chain sin ajustar.',
     rateLimitHeadersNote: 'Cada respuesta también incluye las cabeceras X-RateLimit-Limit, X-RateLimit-Remaining y X-RateLimit-Reset — además de X-Credit-Balance-Usd en cuanto tengas un nivel de pago o saldo de crédito — para que tu bot controle su cuota sin llegar nunca a un 429.',
     openApiUsageNote: 'Funciona directamente con las Actions de Custom GPT de ChatGPT (solo pega la URL). Para Claude, Gemini o frameworks de agentes como LangChain/CrewAI, usa esta spec como fuente del esquema para tu propia integración de herramienta — la mayoría necesita un pequeño adaptador; OpenAPISpec.from_url() de LangChain es el que la importa directamente.',
     chatBubbleLabel: 'Pregunta sobre la API',
@@ -556,6 +574,14 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'Registro de cambios',
     changelogNote: 'Todavía no hay lista de correo ni webhooks para anunciar novedades — esta página y los enlaces de X / Telegram del pie son la forma de mantenerte al día.',
     changelogEntries: [
+      {
+        version: 'v1.12',
+        date: '2026-08-08',
+        changes: [
+          'Nuevo campo vesting_locks[] — detecta contratos de vesting/lock on-chain conocidos (Streamflow, v1) entre los principales holders de un mint, para que un holder grande realmente bloqueado a largo plazo ya no puntúe igual que una ballena libremente negociable.',
+          'La puntuación de concentración de safety_score ahora usa un top10% "libremente negociable" que resta el suministro realmente bloqueado (salvo que el lock sea cancelable por su sender, o se desbloquee en los próximos 30 días) — holder_distribution.top10_percent sigue siendo la cifra on-chain sin ajustar.',
+        ],
+      },
       {
         version: 'v1.11',
         date: '2026-08-08',
@@ -754,6 +780,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     fieldDevWallet: 'dev_wallet_percent — la propre participation on-chain du déployeur, en % de l\'offre totale. Signal de concentration distinct de holder_distribution.top10_percent, car le déployeur peut détenir une part importante sans figurer dans le top 10.',
     fieldProgramRenounced: 'token_program : "standard" si le mint utilise l\'un des deux programmes de token canoniques de Solana, "nonstandard" sinon. contract_renounced : booléen pratique pour mint_authority.revoked && freeze_authority.revoked.',
     fieldCapsTriggered: 'caps_triggered liste chaque plafond de score déclenché pour ce mint (raison + valeur du plafond) ; dominant_cap est le plus strict — la vraie raison du safety_score, pas juste un chiffre.',
+    fieldVestingLocks: "vesting_locks liste les contrats de vesting/lock on-chain connus parmi les principaux détenteurs de ce mint (Streamflow, v1). Un gros détenteur réellement bloqué à long terme est noté différemment d'une baleine librement négociable — le score en tient déjà compte, holder_distribution.top10_percent reste le chiffre on-chain brut.",
     rateLimitHeadersNote: 'Chaque réponse inclut aussi les en-têtes X-RateLimit-Limit, X-RateLimit-Remaining et X-RateLimit-Reset — plus X-Credit-Balance-Usd dès que vous avez un abonnement payant ou un solde de crédit — pour que votre bot suive son quota sans jamais tomber sur un 429.',
     openApiUsageNote: 'Fonctionne directement avec les Actions des Custom GPT de ChatGPT (il suffit de coller l\'URL). Pour Claude, Gemini ou des frameworks d\'agents comme LangChain/CrewAI, utilisez cette spec comme source de schéma pour votre propre intégration d\'outil — la plupart ont besoin d\'un petit adaptateur, OpenAPISpec.from_url() de LangChain étant celui qui l\'importe directement.',
     chatBubbleLabel: 'Question sur l\'API',
@@ -788,6 +815,14 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'Journal des modifications',
     changelogNote: 'Pas encore de liste de diffusion ni de webhooks pour les annonces — cette page et les liens X / Telegram en pied de page sont le moyen de rester à jour.',
     changelogEntries: [
+      {
+        version: 'v1.12',
+        date: '2026-08-08',
+        changes: [
+          "Nouveau champ vesting_locks[] — détecte les contrats de vesting/lock on-chain connus (Streamflow, v1) parmi les principaux détenteurs d'un mint, pour qu'un gros détenteur réellement bloqué à long terme n'obtienne plus le même score qu'une baleine librement négociable.",
+          'Le score de concentration de safety_score utilise désormais un top10% « librement négociable » qui soustrait l\'offre réellement bloquée (sauf si le lock est annulable par son sender, ou se débloque dans les 30 jours) — holder_distribution.top10_percent reste le chiffre on-chain brut, non ajusté.',
+        ],
+      },
       {
         version: 'v1.11',
         date: '2026-08-08',
@@ -986,6 +1021,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     fieldDevWallet: 'dev_wallet_percent — το δικό του on-chain μερίδιο του deployer ως % της συνολικής προσφοράς. Διαφορετικό σήμα συγκέντρωσης από το holder_distribution.top10_percent, αφού ο deployer μπορεί να κρατά μεγάλο μερίδιο χωρίς να είναι στους top-10.',
     fieldProgramRenounced: 'token_program: «standard» αν το mint χρησιμοποιεί ένα από τα δύο κανονικά token programs της Solana, αλλιώς «nonstandard». contract_renounced: βολικό boolean για mint_authority.revoked && freeze_authority.revoked.',
     fieldCapsTriggered: 'Το caps_triggered απαριθμεί κάθε όριο βαθμολογίας που ενεργοποιήθηκε για αυτό το mint (λόγος + τιμή ορίου)· το dominant_cap είναι το πιο αυστηρό — ο πραγματικός λόγος για το safety_score, όχι απλώς ένας αριθμός.',
+    fieldVestingLocks: 'Το vesting_locks απαριθμεί γνωστά on-chain vesting/lock συμβόλαια που βρέθηκαν ανάμεσα στους κορυφαίους κατόχους αυτού του mint (Streamflow, v1). Ένας μεγάλος κάτοχος πραγματικά κλειδωμένος μακροπρόθεσμα βαθμολογείται διαφορετικά από μια ελεύθερα διαπραγματεύσιμη φάλαινα — το score το λαμβάνει ήδη υπόψη, το holder_distribution.top10_percent παραμένει το ακατέργαστο on-chain νούμερο.',
     rateLimitHeadersNote: 'Κάθε απόκριση περιλαμβάνει επίσης τα headers X-RateLimit-Limit, X-RateLimit-Remaining και X-RateLimit-Reset — συν το X-Credit-Balance-Usd μόλις έχεις πληρωμένο επίπεδο ή υπόλοιπο πίστωσης — ώστε το bot σου να παρακολουθεί το όριό του χωρίς ποτέ να πέσει σε 429.',
     openApiUsageNote: 'Λειτουργεί απευθείας με τα Custom GPT Actions του ChatGPT (απλώς επικόλλησε το URL). Για Claude, Gemini ή agent frameworks όπως LangChain/CrewAI, χρησιμοποίησε αυτό το spec ως πηγή σχήματος για τη δική σου ενσωμάτωση εργαλείου — τα περισσότερα χρειάζονται έναν μικρό προσαρμογέα, με το OpenAPISpec.from_url() του LangChain να το εισάγει απευθείας.',
     chatBubbleLabel: 'Ρώτα για το API',
@@ -1020,6 +1056,14 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'Ιστορικό αλλαγών',
     changelogNote: 'Δεν υπάρχει ακόμα mailing list ή webhooks για ανακοινώσεις ενημερώσεων — αυτή η σελίδα και οι σύνδεσμοι X / Telegram στο footer είναι ο τρόπος να μένεις ενήμερος.',
     changelogEntries: [
+      {
+        version: 'v1.12',
+        date: '2026-08-08',
+        changes: [
+          'Νέο πεδίο vesting_locks[] — εντοπίζει γνωστά on-chain vesting/lock συμβόλαια (Streamflow, v1) ανάμεσα στους κορυφαίους κατόχους ενός mint, ώστε ένας μεγάλος κάτοχος πραγματικά κλειδωμένος μακροπρόθεσμα να μη βαθμολογείται πια όπως μια ελεύθερα διαπραγματεύσιμη φάλαινα.',
+          'Η βαθμολόγηση συγκέντρωσης του safety_score πλέον χρησιμοποιεί ένα «ελεύθερα διαπραγματεύσιμο» top10% που αφαιρεί την πραγματικά κλειδωμένη προσφορά (εκτός αν το lock μπορεί να ακυρωθεί από τον sender, ή ξεκλειδώνει εντός 30 ημερών) — το holder_distribution.top10_percent παραμένει το ακατέργαστο on-chain νούμερο.',
+        ],
+      },
       {
         version: 'v1.11',
         date: '2026-08-08',
@@ -1218,6 +1262,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     fieldDevWallet: 'dev_wallet_percent — собственная он-чейн доля деплойера в % от общего supply. Отдельный сигнал концентрации от holder_distribution.top10_percent — деплойер может держать крупную долю, не входя при этом в топ-10.',
     fieldProgramRenounced: 'token_program: "standard", если минт использует одну из двух канонических token-программ Solana, иначе "nonstandard". contract_renounced: удобное булево поле для mint_authority.revoked && freeze_authority.revoked.',
     fieldCapsTriggered: 'caps_triggered перечисляет каждый сработавший потолок скоринга для этого минта (причина + значение потолка); dominant_cap — самый жёсткий из них, реальная причина текущего safety_score, а не просто цифра.',
+    fieldVestingLocks: 'vesting_locks перечисляет известные on-chain вестинг/лок-контракты, найденные среди топ-холдеров этого минта (Streamflow, v1). Крупный холдер, реально заблокированный на длительный срок, оценивается иначе, чем свободно торгуемый кит — score уже это учитывает, holder_distribution.top10_percent остаётся сырой on-chain цифрой без поправки.',
     rateLimitHeadersNote: 'Каждый ответ также включает заголовки X-RateLimit-Limit, X-RateLimit-Remaining и X-RateLimit-Reset — плюс X-Credit-Balance-Usd, если у тебя платный тариф или баланс кредитов — чтобы бот мог отслеживать свою квоту, не ловя 429.',
     openApiUsageNote: 'Работает из коробки с ChatGPT Custom GPT Actions (просто вставь ссылку). Для Claude, Gemini или агентских фреймворков вроде LangChain/CrewAI используй эту спеку как источник схемы для своей интеграции — большинству нужен небольшой адаптер, LangChain\'s OpenAPISpec.from_url() импортирует её напрямую.',
     chatBubbleLabel: 'Спросить про API',
@@ -1252,6 +1297,14 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'История изменений',
     changelogNote: 'Пока нет рассылки или вебхуков для анонсов обновлений — следить за актуальным состоянием можно по этой странице и ссылкам на X / Telegram в подвале.',
     changelogEntries: [
+      {
+        version: 'v1.12',
+        date: '2026-08-08',
+        changes: [
+          'Новое поле vesting_locks[] — детектит известные on-chain вестинг/лок-контракты (Streamflow, v1) среди топ-холдеров минта, чтобы крупный холдер, реально заблокированный на долгий срок, больше не оценивался так же, как свободно торгуемый кит.',
+          'Скоринг концентрации в safety_score теперь использует "свободно торгуемый" top10%, из которого вычитается реально заблокированная доля (если только лок не отзывается отправителем или не разлочится в течение 30 дней) — сам holder_distribution.top10_percent остаётся сырой, неисправленной on-chain цифрой.',
+        ],
+      },
       {
         version: 'v1.11',
         date: '2026-08-08',
@@ -1450,6 +1503,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     fieldDevWallet: 'dev_wallet_percent — la partecipazione on-chain del deployer stesso, come % dell\'offerta totale. Segnale di concentrazione distinto da holder_distribution.top10_percent, poiché il deployer può detenere una quota importante pur restando fuori dalla top-10.',
     fieldProgramRenounced: 'token_program: "standard" se il mint usa uno dei due programmi token canonici di Solana, "nonstandard" altrimenti. contract_renounced: booleano di comodo per mint_authority.revoked && freeze_authority.revoked.',
     fieldCapsTriggered: 'caps_triggered elenca ogni tetto di punteggio attivato per questo mint (motivo + valore del tetto); dominant_cap è il più severo — il vero motivo del safety_score, non solo un numero.',
+    fieldVestingLocks: 'vesting_locks elenca i contratti di vesting/lock on-chain conosciuti trovati tra i principali holder di questo mint (Streamflow, v1). Un grande holder realmente bloccato a lungo termine viene valutato diversamente da una balena liberamente negoziabile — il punteggio ne tiene già conto, holder_distribution.top10_percent resta il dato grezzo on-chain.',
     rateLimitHeadersNote: 'Ogni risposta include anche gli header X-RateLimit-Limit, X-RateLimit-Remaining e X-RateLimit-Reset — più X-Credit-Balance-Usd non appena hai un livello a pagamento o un saldo di credito — così il tuo bot può monitorare la sua quota senza mai incontrare un 429.',
     openApiUsageNote: 'Funziona subito con le Custom GPT Actions di ChatGPT (basta incollare l\'URL). Per Claude, Gemini o framework di agenti come LangChain/CrewAI, usa questa spec come fonte dello schema per la tua integrazione — la maggior parte richiede un piccolo adattatore, con OpenAPISpec.from_url() di LangChain che la importa direttamente.',
     chatBubbleLabel: 'Chiedi info sull\'API',
@@ -1484,6 +1538,14 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'Changelog',
     changelogNote: "Non c'è ancora una mailing list o webhook per gli annunci di aggiornamento — questa pagina e i link X / Telegram nel footer sono il modo per restare aggiornati.",
     changelogEntries: [
+      {
+        version: 'v1.12',
+        date: '2026-08-08',
+        changes: [
+          "Nuovo campo vesting_locks[] — rileva contratti di vesting/lock on-chain conosciuti (Streamflow, v1) tra i principali holder di un mint, così un grande holder realmente bloccato a lungo termine non ottiene più lo stesso punteggio di una balena liberamente negoziabile.",
+          'Il punteggio di concentrazione di safety_score ora usa un top10% "liberamente negoziabile" che sottrae l\'offerta realmente bloccata (a meno che il lock non sia annullabile dal sender, o si sblocchi entro 30 giorni) — holder_distribution.top10_percent resta il dato grezzo on-chain, non modificato.',
+        ],
+      },
       {
         version: 'v1.11',
         date: '2026-08-08',
@@ -1682,6 +1744,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     fieldDevWallet: 'dev_wallet_percent —— 部署者自身链上持仓占总供应量的百分比。这是与 holder_distribution.top10_percent 不同的独立集中度信号，因为部署者可能持有大量份额却不在前10名之列。',
     fieldProgramRenounced: 'token_program：若 mint 使用 Solana 两种标准代币程序之一则为 "standard"，否则为 "nonstandard"。contract_renounced：mint_authority.revoked && freeze_authority.revoked 的便捷布尔字段。',
     fieldCapsTriggered: 'caps_triggered 列出了该 mint 触发的每一个评分上限（原因 + 上限值）；dominant_cap 是其中最严格的一个 —— 也就是 safety_score 真正的成因，而不仅仅是一个数字。',
+    fieldVestingLocks: 'vesting_locks 列出了在该 mint 主要持有者中发现的已知链上 vesting/lock 合约（Streamflow，v1）。真正长期锁定的大户持仓与可自由交易的巨鲸持仓在评分上会有区别 —— 评分已经考虑了这一点，holder_distribution.top10_percent 仍是未经调整的原始链上数据。',
     rateLimitHeadersNote: '每个响应还包含 X-RateLimit-Limit、X-RateLimit-Remaining 和 X-RateLimit-Reset 请求头 —— 一旦你有付费套餐或信用余额，还会附带 X-Credit-Balance-Usd —— 这样你的机器人无需触发 429 就能追踪自己的配额。',
     openApiUsageNote: '可直接配合 ChatGPT 的 Custom GPT Actions 使用（只需粘贴链接即可）。若用于 Claude、Gemini 或 LangChain/CrewAI 等智能体框架，请将此规范作为你自己工具集成的 schema 来源 —— 大多数平台仍需一个小型适配层，其中 LangChain 的 OpenAPISpec.from_url() 可以直接导入。',
     chatBubbleLabel: '咨询 API',
@@ -1716,6 +1779,14 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: '更新日志',
     changelogNote: '目前还没有邮件列表或 webhook 用于更新通知——请通过本页面以及页脚的 X / Telegram 链接来获取最新动态。',
     changelogEntries: [
+      {
+        version: 'v1.12',
+        date: '2026-08-08',
+        changes: [
+          '新增 vesting_locks[] 字段 —— 检测 mint 主要持有者中已知的链上 vesting/lock 合约（Streamflow，v1），使真正长期锁定的大户持仓不再与可自由交易的巨鲸持仓获得相同评分。',
+          'safety_score 的集中度评分现在使用"可自由交易"的 top10%，会扣除真正被锁定的供应量（除非该锁仓可由发起方取消，或将在 30 天内解锁）—— holder_distribution.top10_percent 本身仍保持未经调整的原始链上数值。',
+        ],
+      },
       {
         version: 'v1.11',
         date: '2026-08-08',

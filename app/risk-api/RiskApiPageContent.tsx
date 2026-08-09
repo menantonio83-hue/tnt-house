@@ -1,3 +1,11 @@
+// Version 1.9 — app/risk-api/RiskApiPageContent.tsx
+//
+// v1.9: docs updated for the new vesting_locks[] field
+// (token-risk-core.ts v1.6) — EXAMPLE_RESPONSE now shows the field
+// (empty array, with a comment documenting the populated shape since
+// the example mint has no vesting locks), and a new row in the
+// response fields table.
+//
 // Version 1.8 — app/risk-api/RiskApiPageContent.tsx
 //
 // v1.8: added the missing 4th pricing card (X402 — pay per call, no
@@ -214,6 +222,12 @@ const EXAMPLE_RESPONSE = {
   sell_tax_percent: null,
   dev_wallet_percent: 1.8,
   token_program: 'standard',
+  // No vesting/lock contract detected among top holders for this mint.
+  // When one is found (Streamflow, v1), each entry looks like:
+  // { protocol: "streamflow", holder_address, percent_of_supply,
+  //   unlocked_now_percent, unlocks_within_30d_percent,
+  //   next_unlock_at, fully_unlocked_at, cancelable_by_sender }
+  vesting_locks: [],
   holder_distribution: {
     risk_level: 'LOW',
     largest_holder_percent: 4.2,
@@ -247,6 +261,7 @@ export default function RiskApiPageContent() {
     { field: 'dev_wallet_percent', desc: t.fieldDevWallet },
     { field: 'token_program / contract_renounced', desc: t.fieldProgramRenounced },
     { field: 'caps_triggered / dominant_cap', desc: t.fieldCapsTriggered },
+    { field: 'vesting_locks', desc: t.fieldVestingLocks },
   ];
 
   const steps = [
