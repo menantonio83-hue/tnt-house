@@ -1,3 +1,11 @@
+// Version 6.18 — lib/holder-distribution.ts
+//
+// v6.18: exposes totalSupply on the return object — previously computed
+// internally but never returned. Needed by lib/vesting-lock-detector.ts
+// to convert a Streamflow stream's raw depositedAmount (token base
+// units) into a percent-of-supply figure, without a second, duplicate
+// getTokenSupply RPC call for the same mint.
+//
 // Version 6.17 — lib/holder-distribution.ts
 //
 // v6.17: fixed a real bug (not just a stale-audit-timing story) behind
@@ -173,6 +181,7 @@ export interface HolderDistributionResult {
   largestHolderPercent: number;
   top10Percent: number;
   holderCount: number;
+  totalSupply: number;
 }
 
 interface RawHolder {
@@ -282,7 +291,13 @@ export async function getHolderDistributionRobust(mint: string): Promise<HolderD
       );
 
       if (holders.length === 0) {
-        return { riskLevel: 'CRITICAL', largestHolderPercent: 100, top10Percent: 100, holderCount: 0 };
+        return {
+          riskLevel: 'CRITICAL',
+          largestHolderPercent: 100,
+          top10Percent: 100,
+          holderCount: 0,
+          totalSupply,
+        };
       }
 
       const withPercent = holders.map((h) => ({
@@ -358,6 +373,7 @@ export async function getHolderDistributionRobust(mint: string): Promise<HolderD
         largestHolderPercent,
         top10Percent,
         holderCount,
+        totalSupply,
       };
     }
 
@@ -388,5 +404,5 @@ export async function getHolderDistributionRobust(mint: string): Promise<HolderD
   // report "we don't know" (ERROR) rather than the misleading
   // "CRITICAL / 100% concentrated" a genuine zero-holder read would imply.
   console.error(`[holder-distribution] ${mint}: giving up, last reason: ${lastFailureReason}`);
-  return { riskLevel: 'ERROR', largestHolderPercent: 0, top10Percent: 0, holderCount: 0 };
+  return { riskLevel: 'ERROR', largestHolderPercent: 0, top10Percent: 0, holderCount: 0, totalSupply: 0 };
 }

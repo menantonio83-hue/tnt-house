@@ -1,3 +1,19 @@
+// Version 1.6 — lib/token-risk-core.ts
+//
+// v1.6: integrates lib/vesting-lock-detector.ts (Streamflow, v1 scope
+// — see that file's header). Concentration scoring (base score's
+// holderScore term + applyScoreCaps's top10-based caps) now runs
+// against a "freely tradeable" top10Percent that subtracts whatever
+// portion of a detected vesting lock genuinely can't be sold right
+// now, rather than the raw on-chain top10Percent. The API response's
+// holder_distribution.top10_percent field is UNCHANGED (still the raw
+// figure) — the adjustment only feeds the score, never silently
+// replaces what's shown to the caller. New vesting_locks[] field on
+// every response, empty when nothing detected. Fail-safe: any
+// detection failure (RPC error, SDK exception) yields an empty
+// vesting_locks array and the score behaves exactly as it did before
+// this version — see findStreamflowLocks's own try/catch.
+//
 // Version 1.5 — lib/token-risk-core.ts
 //
 // v1.5: extends applyScoreCaps with a new contractRiskCap tier and
@@ -109,6 +125,7 @@ import { getClusterCache, markClusterPending, saveClusterResult, markClusterFail
 import { withTimeout } from '@/lib/with-timeout';
 import { upsertMintRiskHistory } from '@/lib/mint-risk-history-store';
 import { getRugCheckRiskData, type RugCheckRiskData } from '@/lib/rugcheck-client';
+import { findStreamflowLocks, freelyTradeablePercentOfLock, type VestingLock } from '@/lib/vesting-lock-detector';
 
 // Same budgets as the single-mint route (app/api/v1/token-risk/route.ts) —
 // see that file's header comment for the reasoning behind each value.
@@ -116,6 +133,13 @@ export const MINT_INFO_TIMEOUT_MS = 12000;
 export const HOLDER_RISK_TIMEOUT_MS = 40000;
 export const DEX_TIMEOUT_MS = 8000;
 export const RUGCHECK_TIMEOUT_MS = 8000;
+// v1.6: runs sequentially AFTER the main Promise.all group below (it
+// needs holderRisk.totalSupply first), so this adds directly to total
+// request latency rather than running in parallel with it. Kept short
+// and fail-safe (times out to an empty array, same as any other
+// detection failure) rather than risking every single request paying
+// a slow-RPC tax for a feature that fires on a minority of mints.
+export const VESTING_LOCK_TIMEOUT_MS = 6000;
 
 const RUGCHECK_FALLBACK: RugCheckRiskData = {
   honeypot_risk: null,
@@ -137,6 +161,7 @@ const HOLDER_RISK_FALLBACK = {
   largestHolderPercent: 0,
   top10Percent: 0,
   holderCount: 0,
+  totalSupply: 0,
 };
 
 const DEX_DATA_FALLBACK = {
@@ -210,6 +235,11 @@ export interface TokenRiskResult {
   dev_wallet_percent?: number | null;
   token_program?: 'standard' | 'nonstandard' | null;
   contract_renounced?: boolean;
+  // v1.6 — see lib/vesting-lock-detector.ts. Empty array when no
+  // known vesting protocol was detected among this mint's holders —
+  // never null, so callers can safely check .length without a null
+  // guard.
+  vesting_locks?: VestingLock[];
   holder_distribution?: {
     risk_level: string;
     largest_holder_percent: number;
@@ -460,6 +490,27 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
     const mintAuthorityRevoked = mintInfo.info.mintAuthority === null;
     const freezeAuthorityRevoked = mintInfo.info.freezeAuthority === null;
 
+    // v1.6: detect known vesting/lock contracts (Streamflow, v1 scope —
+    // see lib/vesting-lock-detector.ts header) among this mint's
+    // holders, and use a "freely tradeable" top10% for concentration
+    // scoring instead of the raw on-chain figure. holder_distribution
+    // in the API response still shows the RAW top10_percent — this
+    // adjustment only affects what feeds the score.
+    const vestingLocks = await withTimeout(
+      findStreamflowLocks(mint, holderRisk.totalSupply),
+      VESTING_LOCK_TIMEOUT_MS,
+      [],
+    );
+    let freelyTradeableTop10Percent = holderRisk.top10Percent;
+    if (vestingLocks.length > 0) {
+      const lockedDeduction = vestingLocks.reduce(
+        (sum, lock) => sum + (lock.percent_of_supply - freelyTradeablePercentOfLock(lock)),
+        0,
+      );
+      freelyTradeableTop10Percent = Math.max(0, holderRisk.top10Percent - lockedDeduction);
+    }
+    const holderRiskForScoring = { ...holderRisk, top10Percent: freelyTradeableTop10Percent };
+
     const { row, isFresh } = await getClusterCache(mint);
 
     let insiderClusters: InsiderCluster[] = [];
@@ -481,7 +532,7 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
     const rawSafetyScore = computeApiSafetyScore(
       mintAuthorityRevoked,
       freezeAuthorityRevoked,
-      holderRisk,
+      holderRiskForScoring,
       dexData,
       insiderClusters,
       clusterAnalysis,
@@ -495,7 +546,7 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
       contractRiskCapped,
       capsTriggered,
       dominantCap,
-    } = applyScoreCaps(rawSafetyScore, dexData, holderRisk, rugCheckData.rugged, {
+    } = applyScoreCaps(rawSafetyScore, dexData, holderRiskForScoring, rugCheckData.rugged, {
       hiddenOwner: rugCheckData.hidden_owner,
       permanentDelegate: rugCheckData.permanent_delegate,
       tokenProgram: rugCheckData.token_program,
@@ -558,6 +609,7 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
       dev_wallet_percent: rugCheckData.dev_wallet_percent,
       token_program: rugCheckData.token_program,
       contract_renounced: mintAuthorityRevoked && freezeAuthorityRevoked,
+      vesting_locks: vestingLocks,
       holder_distribution: {
         risk_level: holderRisk.riskLevel,
         largest_holder_percent: holderRisk.largestHolderPercent,
