@@ -1,3 +1,19 @@
+// Version 1.2 — lib/vesting-lock-detector.ts
+//
+// v1.2: fixed a SECOND precision bug found live on the same MRDT test
+// right after v1.1's fix — "Assertion failed" from bn.js. v1.1 built
+// totalSupplyBN via `new BN(Math.round(totalSupply))`, but totalSupply
+// itself was ALREADY a lossy JS number (holder-distribution.ts parses
+// the RPC's exact decimal string through parseInt, which silently
+// loses precision past Number.MAX_SAFE_INTEGER — MRDT's raw supply is
+// ~9.98e17, over 100x past that limit). Constructing a BN from an
+// already-imprecise huge float trips a different internal bn.js
+// assertion than the one v1.1 fixed. Real fix: take the RPC's exact
+// decimal STRING (holder-distribution.ts v6.19's new totalSupplyRaw
+// field) and build the BN directly from that — bn.js parses decimal
+// strings with no JS-number intermediate step, so there's no magnitude
+// limit to trip on regardless of how large the mint's raw supply is.
+//
 // Version 1.1 — lib/vesting-lock-detector.ts
 //
 // v1.1: fixed a real production crash — "Number can only safely store
@@ -95,8 +111,12 @@ function getClient(): SolanaStreamClient {
 // regardless of whether the recipient is currently a top holder — the
 // caller (token-risk-core.ts) matches these against the top-N holder
 // list it already fetched. Never throws.
-export async function findStreamflowLocks(mint: string, totalSupply: number): Promise<VestingLock[]> {
-  if (!totalSupply || totalSupply <= 0) return [];
+//
+// totalSupplyRaw MUST be the exact RPC decimal string (holder-
+// distribution.ts's totalSupplyRaw field), not a JS-number conversion
+// of it — see this file's v1.2 header for why.
+export async function findStreamflowLocks(mint: string, totalSupplyRaw: string): Promise<VestingLock[]> {
+  if (!totalSupplyRaw || totalSupplyRaw === '0') return [];
 
   try {
     const client = getClient();
@@ -104,14 +124,13 @@ export async function findStreamflowLocks(mint: string, totalSupply: number): Pr
 
     const now = Math.floor(Date.now() / 1000);
     const soon = now + SOON_WINDOW_SECONDS;
-    // totalSupply arrives as a JS number (already computed, and already
-    // subject to whatever precision holder-distribution.ts's own
-    // parseInt gave it for very-high-decimal mints — a separate,
-    // pre-existing characteristic of that function, not something this
-    // module can fix). Converting it TO a BN here is safe either way:
-    // BN's number constructor doesn't throw the way .toNumber() does
-    // going the other direction.
-    const totalSupplyBN = new BN(Math.round(totalSupply));
+    // Built directly from the exact RPC string — bn.js parses decimal
+    // strings digit-by-digit with no intermediate JS-number step, so
+    // there's no magnitude limit here (unlike new BN(hugeJsNumber),
+    // which either silently carries forward whatever precision that
+    // number already lost, or throws outright — confirmed live, see
+    // v1.2 header).
+    const totalSupplyBN = new BN(totalSupplyRaw);
 
     // Percent-of-X as a one-decimal-precision integer, computed entirely
     // in BN arithmetic (numerator.muln(1000).div(denominator)) so the

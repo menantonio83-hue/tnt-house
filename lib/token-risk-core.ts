@@ -162,6 +162,7 @@ const HOLDER_RISK_FALLBACK = {
   top10Percent: 0,
   holderCount: 0,
   totalSupply: 0,
+  totalSupplyRaw: '0',
 };
 
 const DEX_DATA_FALLBACK = {
@@ -497,7 +498,7 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
     // in the API response still shows the RAW top10_percent — this
     // adjustment only affects what feeds the score.
     const vestingLocks = await withTimeout(
-      findStreamflowLocks(mint, holderRisk.totalSupply),
+      findStreamflowLocks(mint, holderRisk.totalSupplyRaw),
       VESTING_LOCK_TIMEOUT_MS,
       [],
     );

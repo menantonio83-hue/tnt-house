@@ -182,6 +182,7 @@ export interface HolderDistributionResult {
   top10Percent: number;
   holderCount: number;
   totalSupply: number;
+  totalSupplyRaw: string;
 }
 
 interface RawHolder {
@@ -244,7 +245,7 @@ async function callSolanaRpc(method: string, params: unknown[], timeoutMs: numbe
 
 async function fetchHolderSnapshot(
   mint: string,
-): Promise<RpcOutcome<{ holders: RawHolder[]; totalSupply: number }>> {
+): Promise<RpcOutcome<{ holders: RawHolder[]; totalSupply: number; totalSupplyRaw: string }>> {
   const largest = await callSolanaRpc('getTokenLargestAccounts', [mint], LARGEST_ACCOUNTS_TIMEOUT_MS);
   if (!largest.ok || !largest.data) {
     return { ok: false, data: null, reason: largest.reason ?? 'unknown RPC failure' };
@@ -259,7 +260,7 @@ async function fetchHolderSnapshot(
   // yet — trust it immediately, no retry needed, no need to even ask
   // for supply.
   if (holders.length === 0) {
-    return { ok: true, data: { holders: [], totalSupply: 0 }, reason: null };
+    return { ok: true, data: { holders: [], totalSupply: 0, totalSupplyRaw: '0' }, reason: null };
   }
 
   const supply = await callSolanaRpc('getTokenSupply', [mint], SUPPLY_TIMEOUT_MS);
@@ -267,8 +268,22 @@ async function fetchHolderSnapshot(
     return { ok: false, data: null, reason: supply.reason ?? 'unknown RPC failure' };
   }
 
+  // v6.19: keep the RPC's raw decimal STRING alongside the parseInt'd
+  // number. parseInt silently loses precision for any mint with raw
+  // atomic-unit supply past Number.MAX_SAFE_INTEGER (~9.007e15) — very
+  // common for high-decimal mints (MRDT's raw supply is ~9.98e17). The
+  // existing top10Percent/largestHolderPercent math below tolerates
+  // that imprecision fine (it's a percentage, small errors don't
+  // matter), but lib/vesting-lock-detector.ts needs an EXACT integer
+  // to do BN arithmetic against — constructing a BN from the
+  // already-lossy JS number throws ("Assertion failed" / "Number can
+  // only safely store up to 53 bits" depending on which internal check
+  // trips first), confirmed live on this exact mint. Solana's RPC
+  // already gives us the exact value as a string for precisely this
+  // reason — no reason to throw that precision away before any BN math
+  // gets a chance to use it.
   const totalSupply = parseInt(supply.data.value.amount, 10);
-  return { ok: true, data: { holders, totalSupply }, reason: null };
+  return { ok: true, data: { holders, totalSupply, totalSupplyRaw: supply.data.value.amount }, reason: null };
 }
 
 function classifyRisk(largestHolderPercent: number, top10Percent: number): string {
@@ -285,7 +300,7 @@ export async function getHolderDistributionRobust(mint: string): Promise<HolderD
     const snapshot = await fetchHolderSnapshot(mint);
 
     if (snapshot.ok && snapshot.data) {
-      const { holders, totalSupply } = snapshot.data;
+      const { holders, totalSupply, totalSupplyRaw } = snapshot.data;
       console.log(
         `[holder-distribution] ${mint} attempt ${attempt}/${MAX_ATTEMPTS}: ok — ${holders.length} holders, supply=${totalSupply}`,
       );
@@ -297,6 +312,7 @@ export async function getHolderDistributionRobust(mint: string): Promise<HolderD
           top10Percent: 100,
           holderCount: 0,
           totalSupply,
+          totalSupplyRaw,
         };
       }
 
@@ -374,6 +390,7 @@ export async function getHolderDistributionRobust(mint: string): Promise<HolderD
         top10Percent,
         holderCount,
         totalSupply,
+        totalSupplyRaw,
       };
     }
 
@@ -404,5 +421,5 @@ export async function getHolderDistributionRobust(mint: string): Promise<HolderD
   // report "we don't know" (ERROR) rather than the misleading
   // "CRITICAL / 100% concentrated" a genuine zero-holder read would imply.
   console.error(`[holder-distribution] ${mint}: giving up, last reason: ${lastFailureReason}`);
-  return { riskLevel: 'ERROR', largestHolderPercent: 0, top10Percent: 0, holderCount: 0, totalSupply: 0 };
+  return { riskLevel: 'ERROR', largestHolderPercent: 0, top10Percent: 0, holderCount: 0, totalSupply: 0, totalSupplyRaw: '0' };
 }
