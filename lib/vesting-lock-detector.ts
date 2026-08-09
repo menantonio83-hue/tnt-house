@@ -1,3 +1,23 @@
+// Version 1.1 — lib/vesting-lock-detector.ts
+//
+// v1.1: fixed a real production crash — "Number can only safely store
+// up to 53 bits" — caught live on MRDT's own vesting lock (raw
+// depositedAmount as atomic units: 998346736293317600, far past
+// Number.MAX_SAFE_INTEGER ~9.007e15). getNumberFromBN(bn, 0) calls
+// BN.toNumber() internally, which THROWS (unlike a plain Number cast,
+// which would just silently lose precision) once the magnitude exceeds
+// 53 bits — exactly what a high-decimal mint's raw token amounts do
+// routinely. Fixed by never converting the raw deposited/unlocked
+// amounts to JS Number at all: percentOf() does the division entirely
+// in BN arithmetic (numerator.muln(1000).div(denominator)) and only
+// calls .toNumber() on the final result, which is always a small,
+// bounded percentage (0-1000-ish) — safely within 53 bits regardless
+// of how large the underlying token amounts are. This bug meant
+// vesting_locks silently came back empty for every real lock detected
+// so far (search itself succeeded; only the post-processing threw,
+// caught by this file's own try/catch — exactly as designed, just
+// hiding a bug rather than a genuine "no lock found").
+//
 // Version 1.0 — lib/vesting-lock-detector.ts
 //
 // Detects Solana vesting/lock contracts among a token's top holders, so
@@ -40,7 +60,8 @@
 // response. Same philosophy as RUGCHECK_FALLBACK elsewhere in this
 // codebase.
 
-import { SolanaStreamClient, ICluster, getNumberFromBN } from '@streamflow/stream';
+import { SolanaStreamClient, ICluster } from '@streamflow/stream';
+import BN from 'bn.js';
 
 const HELIUS_RPC_URL = process.env.HELIUS_RPC_URL || 'https://api.mainnet-beta.solana.com';
 
@@ -83,24 +104,46 @@ export async function findStreamflowLocks(mint: string, totalSupply: number): Pr
 
     const now = Math.floor(Date.now() / 1000);
     const soon = now + SOON_WINDOW_SECONDS;
+    // totalSupply arrives as a JS number (already computed, and already
+    // subject to whatever precision holder-distribution.ts's own
+    // parseInt gave it for very-high-decimal mints — a separate,
+    // pre-existing characteristic of that function, not something this
+    // module can fix). Converting it TO a BN here is safe either way:
+    // BN's number constructor doesn't throw the way .toNumber() does
+    // going the other direction.
+    const totalSupplyBN = new BN(Math.round(totalSupply));
+
+    // Percent-of-X as a one-decimal-precision integer, computed entirely
+    // in BN arithmetic (numerator.muln(1000).div(denominator)) so the
+    // only value ever handed to .toNumber() is the small, bounded
+    // result (0-1000ish) — never the raw token amount itself, which for
+    // a high-decimal mint like this one is `998346736293317600` atomic
+    // units, comfortably past Number.MAX_SAFE_INTEGER (~9.007e15) and
+    // exactly what threw "Number can only safely store up to 53 bits"
+    // in production before this fix.
+    function percentOf(numerator: BN, denominator: BN): number {
+      if (denominator.isZero()) return 0;
+      return numerator.muln(1000).div(denominator).toNumber() / 10;
+    }
 
     return results
       .filter((r) => !r.account.closed) // withdrawn-in-full streams no longer hold any supply
       .map(({ account: stream }) => {
-        const deposited = getNumberFromBN(stream.depositedAmount, 0);
-        if (!deposited) return null;
+        const deposited = stream.depositedAmount;
+        if (deposited.isZero()) return null;
 
-        const unlockedNow = getNumberFromBN(stream.unlocked(now), 0);
-        const unlockedSoon = getNumberFromBN(stream.unlocked(soon), 0);
+        const unlockedNow = stream.unlocked(now);
+        const unlockedSoon = stream.unlocked(soon);
         const fullyUnlockedAt = stream.end ? new Date(stream.end * 1000).toISOString() : null;
 
         const lock: VestingLock = {
           protocol: 'streamflow',
           holder_address: stream.recipient,
-          percent_of_supply: Math.round((deposited / totalSupply) * 1000) / 10,
-          unlocked_now_percent: Math.round((unlockedNow / deposited) * 1000) / 10,
-          unlocks_within_30d_percent: Math.round((unlockedSoon / deposited) * 1000) / 10,
-          next_unlock_at: unlockedNow < deposited && stream.start ? new Date(stream.start * 1000).toISOString() : null,
+          percent_of_supply: percentOf(deposited, totalSupplyBN),
+          unlocked_now_percent: percentOf(unlockedNow, deposited),
+          unlocks_within_30d_percent: percentOf(unlockedSoon, deposited),
+          next_unlock_at:
+            unlockedNow.lt(deposited) && stream.start ? new Date(stream.start * 1000).toISOString() : null,
           fully_unlocked_at: fullyUnlockedAt,
           cancelable_by_sender: stream.cancelableBySender,
         };
