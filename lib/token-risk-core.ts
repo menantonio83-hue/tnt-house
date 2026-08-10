@@ -503,17 +503,36 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
       [],
     );
     let freelyTradeableTop10Percent = holderRisk.top10Percent;
+    let freelyTradeableLargestHolderPercent = holderRisk.largestHolderPercent;
     if (vestingLocks.length > 0) {
-      const lockedDeduction = vestingLocks.reduce(
-        (sum, lock) => sum + (lock.percent_of_supply - freelyTradeablePercentOfLock(lock)),
-        0,
-      );
+      const perLockDeductions = vestingLocks.map((lock) => lock.percent_of_supply - freelyTradeablePercentOfLock(lock));
+      const lockedDeduction = perLockDeductions.reduce((sum, d) => sum + d, 0);
       freelyTradeableTop10Percent = Math.max(0, holderRisk.top10Percent - lockedDeduction);
+
+      // v1.7: classifyRisk() in holder-distribution.ts checks
+      // largestHolderPercent FIRST and independently of top10Percent
+      // (largestHolderPercent > 20% -> CRITICAL, full stop) — confirmed
+      // live: MRDT's top10Percent correctly dropped 97.7% -> 30.6%, but
+      // safety_score didn't move because largestHolderPercent (67.1%,
+      // the same wallet as the vesting recipient) was still raw and
+      // alone kept classifying the mint as CRITICAL. Use the single
+      // LARGEST individual lock deduction here (not the summed
+      // lockedDeduction above) — largestHolderPercent describes one
+      // wallet, so it can't be discounted by more than what that one
+      // wallet's own lock actually covers, even if several unrelated
+      // locks exist across other top-10 holders.
+      const maxSingleLockDeduction = Math.max(0, ...perLockDeductions);
+      freelyTradeableLargestHolderPercent = Math.max(0, holderRisk.largestHolderPercent - maxSingleLockDeduction);
+
       console.log(
-        `[token-risk-core] ${mint}: vesting-adjusted top10Percent ${holderRisk.top10Percent.toFixed(1)}% -> ${freelyTradeableTop10Percent.toFixed(1)}% (deduction ${lockedDeduction.toFixed(1)}pp from ${vestingLocks.length} lock(s))`,
+        `[token-risk-core] ${mint}: vesting-adjusted top10Percent ${holderRisk.top10Percent.toFixed(1)}% -> ${freelyTradeableTop10Percent.toFixed(1)}%, largestHolderPercent ${holderRisk.largestHolderPercent.toFixed(1)}% -> ${freelyTradeableLargestHolderPercent.toFixed(1)}% (${vestingLocks.length} lock(s))`,
       );
     }
-    const holderRiskForScoring = { ...holderRisk, top10Percent: freelyTradeableTop10Percent };
+    const holderRiskForScoring = {
+      ...holderRisk,
+      top10Percent: freelyTradeableTop10Percent,
+      largestHolderPercent: freelyTradeableLargestHolderPercent,
+    };
 
     const { row, isFresh } = await getClusterCache(mint);
 
