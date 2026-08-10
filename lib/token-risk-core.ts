@@ -1,3 +1,19 @@
+// Version 1.8 — lib/token-risk-core.ts
+//
+// v1.8: the actual fix for the vesting-adjustment-doesn't-move-the-
+// score bug — v1.7 correctly adjusted largestHolderPercent, but
+// computeApiSafetyScore reads holderRisk.riskLevel as a pre-computed
+// STRING ('LOW'/'MEDIUM'/'HIGH'/'CRITICAL'), not the raw percentages.
+// The v1.6/v1.7 spread carried the ORIGINAL riskLevel forward
+// unchanged, so a mint correctly discounted to largestHolderPercent=0%
+// / top10Percent=30.6% still scored using riskLevel='CRITICAL' from
+// before the vesting lock was known about. Now recomputes riskLevel
+// via holder-distribution.ts's newly-exported classifyRisk() whenever
+// a vesting lock was found. Confirmed this was the actual root cause
+// via the diagnostic logging added in v1.7 — the adjusted percentages
+// were correct in the logs the whole time, riskLevel was the silent
+// leak.
+//
 // Version 1.6 — lib/token-risk-core.ts
 //
 // v1.6: integrates lib/vesting-lock-detector.ts (Streamflow, v1 scope
@@ -118,7 +134,7 @@
 import { PublicKey } from '@solana/web3.js';
 import { waitUntil } from '@vercel/functions';
 import { getMintInfo, getDexScreenerData } from '@/lib/helius-client';
-import { getHolderDistributionRobust } from '@/lib/holder-distribution';
+import { getHolderDistributionRobust, classifyRisk } from '@/lib/holder-distribution';
 import { sanitizeDexMarketData } from '@/lib/sanitize-market-data';
 import { detectInsiderClusters, type InsiderCluster } from '@/lib/insider-cluster-detector';
 import { getClusterCache, markClusterPending, saveClusterResult, markClusterFailed } from '@/lib/risk-api-cache';
@@ -525,13 +541,25 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
       freelyTradeableLargestHolderPercent = Math.max(0, holderRisk.largestHolderPercent - maxSingleLockDeduction);
 
       console.log(
-        `[token-risk-core] ${mint}: vesting-adjusted top10Percent ${holderRisk.top10Percent.toFixed(1)}% -> ${freelyTradeableTop10Percent.toFixed(1)}%, largestHolderPercent ${holderRisk.largestHolderPercent.toFixed(1)}% -> ${freelyTradeableLargestHolderPercent.toFixed(1)}% (${vestingLocks.length} lock(s))`,
+        `[token-risk-core] ${mint}: vesting-adjusted top10Percent ${holderRisk.top10Percent.toFixed(1)}% -> ${freelyTradeableTop10Percent.toFixed(1)}%, largestHolderPercent ${holderRisk.largestHolderPercent.toFixed(1)}% -> ${freelyTradeableLargestHolderPercent.toFixed(1)}%, riskLevel ${holderRisk.riskLevel} -> ${classifyRisk(freelyTradeableLargestHolderPercent, freelyTradeableTop10Percent)} (${vestingLocks.length} lock(s))`,
       );
     }
     const holderRiskForScoring = {
       ...holderRisk,
       top10Percent: freelyTradeableTop10Percent,
       largestHolderPercent: freelyTradeableLargestHolderPercent,
+      // v1.8: computeApiSafetyScore reads riskLevel as a STRING, not
+      // the raw percentages — recompute it from the adjusted values,
+      // or the spread above just carries forward whatever riskLevel
+      // holder-distribution.ts originally classified BEFORE any
+      // vesting discount was known about, silently defeating the
+      // entire adjustment (confirmed live on MRDT: percentages moved
+      // correctly, riskLevel stayed 'CRITICAL', safety_score never
+      // budged).
+      riskLevel:
+        vestingLocks.length > 0
+          ? classifyRisk(freelyTradeableLargestHolderPercent, freelyTradeableTop10Percent)
+          : holderRisk.riskLevel,
     };
 
     const { row, isFresh } = await getClusterCache(mint);

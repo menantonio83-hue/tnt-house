@@ -1,3 +1,16 @@
+// Version 6.20 — lib/holder-distribution.ts
+//
+// v6.20: classifyRisk() exported (was private). token-risk-core.ts's
+// vesting-lock adjustment needs to recompute riskLevel after adjusting
+// largestHolderPercent/top10Percent — computeApiSafetyScore reads the
+// riskLevel STRING directly, not the raw percentages, so overriding
+// the percentages alone (v1.6/v1.7 of that file) left riskLevel frozen
+// at whatever it was BEFORE the vesting discount, silently defeating
+// the whole adjustment. Confirmed live: MRDT's largestHolderPercent
+// correctly computed 67.1% -> 0.0% and top10Percent 97.7% -> 30.6%,
+// but safety_score didn't move because riskLevel was still 'CRITICAL'
+// from the original (pre-adjustment) calculation.
+//
 // Version 6.18 — lib/holder-distribution.ts
 //
 // v6.18: exposes totalSupply on the return object — previously computed
@@ -286,7 +299,11 @@ async function fetchHolderSnapshot(
   return { ok: true, data: { holders, totalSupply, totalSupplyRaw: supply.data.value.amount }, reason: null };
 }
 
-function classifyRisk(largestHolderPercent: number, top10Percent: number): string {
+// v6.20: exported — token-risk-core.ts needs to recompute riskLevel
+// after adjusting largestHolderPercent/top10Percent for vesting locks
+// (see that file's v1.8 header). Previously private; this function's
+// logic and thresholds are unchanged, only its visibility.
+export function classifyRisk(largestHolderPercent: number, top10Percent: number): string {
   if (largestHolderPercent > 20) return 'CRITICAL';
   if (largestHolderPercent > 15) return 'HIGH';
   if (top10Percent > 50) return 'MEDIUM';
