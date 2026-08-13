@@ -334,6 +334,13 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogNote: 'No mailing list or webhooks yet for update announcements — this page and the X / Telegram links in the footer are the way to stay current.',
     changelogEntries: [
       {
+        version: 'v1.13',
+        date: '2026-08-13',
+        changes: [
+          'Price cut: pay-per-call $0.07 -> $0.04/call, subscribed overage $0.03 -> $0.02/call, subscription $49 -> $45 for 1000 calls/30 days, x402 $0.07 -> $0.02/call — brought in line with comparable market rates after reviewing direct competitors.',
+        ],
+      },
+      {
         version: 'v1.12',
         date: '2026-08-08',
         changes: [
@@ -433,10 +440,10 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     tierPayPerCall: 'PAY-PER-CALL',
     payPerCallFeature1: 'Top up any amount $5–$500',
     payPerCallFeature2: 'Only charged past the free 15/day',
-    payPerCallFeature3: 'Drops to $0.03/call once subscribed',
+    payPerCallFeature3: 'Drops to $0.02/call once subscribed',
     tierSubscription: 'SUBSCRIPTION',
     subFeature1: '1000 calls included',
-    subFeature2: '$0.03/call overage after that',
+    subFeature2: '$0.02/call overage after that',
     subFeature3: 'Manual renewal — no auto-charge',
     tierX402: 'X402 (PAY PER CALL, NO KEY)',
     x402Feature1: 'No API key, no signup — pay per request',
@@ -446,10 +453,10 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     x402HowToIntro:
       'x402 turns a 402 Payment Required into a working payment flow: call the endpoint with no auth, get a signed payment challenge back, pay it, retry with the receipt.',
     x402Step1: 'GET the endpoint with a mint — no Authorization header needed.',
-    x402Step2: 'You get back HTTP 402 with a PAYMENT-REQUIRED header — a signed challenge for $0.07 in USDC on Solana.',
+    x402Step2: 'You get back HTTP 402 with a PAYMENT-REQUIRED header — a signed challenge for $0.02 in USDC on Solana.',
     x402Step3: 'Sign and settle the payment with any x402-compatible client (or wallet/agent SDK), then retry the same request with an X-PAYMENT header carrying the signed payment.',
     x402HowToNote:
-      'Same $0.07/call rate as the pay-per-call tier — this is just the same pricing exposed without an account, for agents that would rather transact per-call than hold a stored key. Listed on x402scan.com.',
+      'A lower per-call rate than the standard pay-per-call tier ($0.02 vs $0.04) — no account needed, for agents that would rather transact per-call than hold a stored key. Listed on x402scan.com.',
     pricingNote: 'Paid in $MRDT / SOL / USDC via Solana Pay — same payment flow as the rest of TNT House. Solana Pay can\'t auto-charge, so the subscription is a manual 30-day top-up, not a recurring subscription in the traditional sense.',
     manageBillingTitle: 'Manage billing',
     getKeyTitle: 'Get your API key',
@@ -463,7 +470,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     callsUsedLabel: 'calls used',
     renewsLabel: 'renews',
     creditBalanceLabel: 'Credit balance:',
-    subscribeCardTitle: 'Subscribe — $49',
+    subscribeCardTitle: 'Subscribe — $45',
     subscribeCardSub: '1000 calls / 30 days',
     topupCardTitle: 'Top up credits',
     topupCardSub: 'Pay-per-call, $5–$500',
@@ -575,6 +582,13 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogNote: 'Todavía no hay lista de correo ni webhooks para anunciar novedades — esta página y los enlaces de X / Telegram del pie son la forma de mantenerte al día.',
     changelogEntries: [
       {
+        version: 'v1.13',
+        date: '2026-08-13',
+        changes: [
+          'Bajada de precios: pago por llamada $0.07 -> $0.04/llamada, exceso con suscripción $0.03 -> $0.02/llamada, suscripción $49 -> $45 por 1000 llamadas/30 días, x402 $0.07 -> $0.02/llamada — alineado con tarifas comparables del mercado tras revisar competidores directos.',
+        ],
+      },
+      {
         version: 'v1.12',
         date: '2026-08-08',
         changes: [
@@ -674,10 +688,10 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     tierPayPerCall: 'PAGO POR LLAMADA',
     payPerCallFeature1: 'Recarga cualquier importe entre $5 y $500',
     payPerCallFeature2: 'Solo se cobra al superar las 15/día gratis',
-    payPerCallFeature3: 'Baja a $0.03/llamada con suscripción activa',
+    payPerCallFeature3: 'Baja a $0.02/llamada con suscripción activa',
     tierSubscription: 'SUSCRIPCIÓN',
     subFeature1: '1000 llamadas incluidas',
-    subFeature2: '$0.03/llamada de exceso después',
+    subFeature2: '$0.02/llamada de exceso después',
     subFeature3: 'Renovación manual — sin cobro automático',
     tierX402: 'X402 (PAGO POR LLAMADA, SIN KEY)',
     x402Feature1: 'Sin API key, sin registro — pagas por petición',
@@ -687,10 +701,10 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     x402HowToIntro:
       'x402 convierte un 402 Payment Required en un flujo de pago funcional: llamas al endpoint sin autenticación, recibes un reto de pago firmado, lo pagas y reintentas con el recibo.',
     x402Step1: 'Haz GET al endpoint con un mint — no necesitas cabecera Authorization.',
-    x402Step2: 'Recibes un HTTP 402 con una cabecera PAYMENT-REQUIRED — un reto firmado por $0.07 en USDC en Solana.',
+    x402Step2: 'Recibes un HTTP 402 con una cabecera PAYMENT-REQUIRED — un reto firmado por $0.02 en USDC en Solana.',
     x402Step3: 'Firma y liquida el pago con cualquier cliente compatible con x402 (o SDK de wallet/agente), luego reintenta la misma petición con una cabecera X-PAYMENT que lleve el pago firmado.',
     x402HowToNote:
-      'Misma tarifa de $0.07/llamada que el nivel pago por llamada — es el mismo precio expuesto sin cuenta, para agentes que prefieren pagar por llamada en vez de guardar una key. Listado en x402scan.com.',
+      'Una tarifa por llamada más baja que el nivel de pago por llamada estándar ($0.02 frente a $0.04) — sin necesidad de cuenta, para agentes que prefieren pagar por llamada en vez de guardar una key. Listado en x402scan.com.',
     pricingNote: 'Se paga en $MRDT / SOL / USDC vía Solana Pay — el mismo flujo de pago que el resto de TNT House. Solana Pay no puede cobrar automáticamente, así que la suscripción es una recarga manual de 30 días, no una suscripción recurrente en el sentido tradicional.',
     manageBillingTitle: 'Gestionar facturación',
     getKeyTitle: 'Obtén tu API key',
@@ -704,7 +718,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     callsUsedLabel: 'llamadas usadas',
     renewsLabel: 'renueva',
     creditBalanceLabel: 'Saldo de crédito:',
-    subscribeCardTitle: 'Suscribirse — $49',
+    subscribeCardTitle: 'Suscribirse — $45',
     subscribeCardSub: '1000 llamadas / 30 días',
     topupCardTitle: 'Recargar créditos',
     topupCardSub: 'Pago por llamada, $5–$500',
@@ -816,6 +830,13 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogNote: 'Pas encore de liste de diffusion ni de webhooks pour les annonces — cette page et les liens X / Telegram en pied de page sont le moyen de rester à jour.',
     changelogEntries: [
       {
+        version: 'v1.13',
+        date: '2026-08-13',
+        changes: [
+          "Baisse de prix : paiement à l'appel 0,07 $ -> 0,04 $/appel, dépassement avec abonnement 0,03 $ -> 0,02 $/appel, abonnement 49 $ -> 45 $ pour 1000 appels/30 jours, x402 0,07 $ -> 0,02 $/appel — aligné sur les tarifs comparables du marché après examen des concurrents directs.",
+        ],
+      },
+      {
         version: 'v1.12',
         date: '2026-08-08',
         changes: [
@@ -915,10 +936,10 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     tierPayPerCall: 'PAIEMENT À L\'APPEL',
     payPerCallFeature1: 'Rechargez n\'importe quel montant entre $5 et $500',
     payPerCallFeature2: 'Facturé seulement au-delà des 15/jour gratuits',
-    payPerCallFeature3: 'Descend à $0.03/appel avec un abonnement actif',
+    payPerCallFeature3: 'Descend à $0.02/appel avec un abonnement actif',
     tierSubscription: 'ABONNEMENT',
     subFeature1: '1000 appels inclus',
-    subFeature2: '$0.03/appel de dépassement ensuite',
+    subFeature2: '$0.02/appel de dépassement ensuite',
     subFeature3: 'Renouvellement manuel — pas de prélèvement automatique',
     tierX402: 'X402 (PAIEMENT À L\'APPEL, SANS CLÉ)',
     x402Feature1: 'Sans clé API, sans inscription — paiement à la requête',
@@ -928,10 +949,10 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     x402HowToIntro:
       "x402 transforme un 402 Payment Required en un vrai flux de paiement : appelez l'endpoint sans authentification, recevez un défi de paiement signé, payez-le, puis réessayez avec le reçu.",
     x402Step1: "Faites un GET sur l'endpoint avec un mint — pas besoin d'en-tête Authorization.",
-    x402Step2: 'Vous recevez un HTTP 402 avec un en-tête PAYMENT-REQUIRED — un défi signé pour 0,07 $ en USDC sur Solana.',
+    x402Step2: 'Vous recevez un HTTP 402 avec un en-tête PAYMENT-REQUIRED — un défi signé pour 0,02 $ en USDC sur Solana.',
     x402Step3: "Signez et réglez le paiement avec n'importe quel client compatible x402 (ou SDK wallet/agent), puis réessayez la même requête avec un en-tête X-PAYMENT contenant le paiement signé.",
     x402HowToNote:
-      'Même tarif de 0,07 $/appel que le niveau paiement à l\'appel — c\'est le même prix, exposé sans compte, pour les agents qui préfèrent payer à l\'appel plutôt que stocker une clé. Référencé sur x402scan.com.',
+      'Un tarif par appel plus bas que le niveau paiement à l\'appel standard (0,02 $ contre 0,04 $) — sans compte nécessaire, pour les agents qui préfèrent payer à l\'appel plutôt que stocker une clé. Référencé sur x402scan.com.',
     pricingNote: 'Payable en $MRDT / SOL / USDC via Solana Pay — le même flux de paiement que le reste de TNT House. Solana Pay ne peut pas prélever automatiquement, donc l\'abonnement est une recharge manuelle de 30 jours, pas un abonnement récurrent au sens traditionnel.',
     manageBillingTitle: 'Gérer la facturation',
     getKeyTitle: 'Obtenez votre clé API',
@@ -945,7 +966,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     callsUsedLabel: 'appels utilisés',
     renewsLabel: 'se renouvelle',
     creditBalanceLabel: 'Solde de crédit :',
-    subscribeCardTitle: 'S\'abonner — $49',
+    subscribeCardTitle: 'S\'abonner — $45',
     subscribeCardSub: '1000 appels / 30 jours',
     topupCardTitle: 'Recharger des crédits',
     topupCardSub: 'Paiement à l\'appel, $5–$500',
@@ -1057,6 +1078,13 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogNote: 'Δεν υπάρχει ακόμα mailing list ή webhooks για ανακοινώσεις ενημερώσεων — αυτή η σελίδα και οι σύνδεσμοι X / Telegram στο footer είναι ο τρόπος να μένεις ενήμερος.',
     changelogEntries: [
       {
+        version: 'v1.13',
+        date: '2026-08-13',
+        changes: [
+          'Μείωση τιμών: pay-per-call $0.07 -> $0.04/κλήση, υπέρβαση με συνδρομή $0.03 -> $0.02/κλήση, συνδρομή $49 -> $45 για 1000 κλήσεις/30 ημέρες, x402 $0.07 -> $0.02/κλήση — ευθυγραμμίστηκε με συγκρίσιμες τιμές αγοράς μετά από έλεγχο άμεσων ανταγωνιστών.',
+        ],
+      },
+      {
         version: 'v1.12',
         date: '2026-08-08',
         changes: [
@@ -1156,10 +1184,10 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     tierPayPerCall: 'ΠΛΗΡΩΜΗ ΑΝΑ ΚΛΗΣΗ',
     payPerCallFeature1: 'Φόρτισε οποιοδήποτε ποσό $5–$500',
     payPerCallFeature2: 'Χρέωση μόνο πέρα από τις δωρεάν 15/ημέρα',
-    payPerCallFeature3: 'Πέφτει στα $0.03/κλήση μόλις γίνεις συνδρομητής',
+    payPerCallFeature3: 'Πέφτει στα $0.02/κλήση μόλις γίνεις συνδρομητής',
     tierSubscription: 'ΣΥΝΔΡΟΜΗ',
     subFeature1: '1000 κλήσεις περιλαμβάνονται',
-    subFeature2: '$0.03/κλήση υπέρβασης μετά',
+    subFeature2: '$0.02/κλήση υπέρβασης μετά',
     subFeature3: 'Χειροκίνητη ανανέωση — καμία αυτόματη χρέωση',
     tierX402: 'X402 (ΠΛΗΡΩΜΗ ΑΝΑ ΚΛΗΣΗ, ΧΩΡΙΣ KEY)',
     x402Feature1: 'Χωρίς API key, χωρίς εγγραφή — πληρώνεις ανά αίτημα',
@@ -1169,10 +1197,10 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     x402HowToIntro:
       'Το x402 μετατρέπει ένα 402 Payment Required σε λειτουργική ροή πληρωμής: καλείς το endpoint χωρίς αυθεντικοποίηση, παίρνεις πίσω μια υπογεγραμμένη πρόκληση πληρωμής, την πληρώνεις, ξαναδοκιμάζεις με την απόδειξη.',
     x402Step1: 'Κάνε GET στο endpoint με ένα mint — δεν χρειάζεται header Authorization.',
-    x402Step2: 'Παίρνεις πίσω HTTP 402 με header PAYMENT-REQUIRED — μια υπογεγραμμένη πρόκληση για $0.07 σε USDC στη Solana.',
+    x402Step2: 'Παίρνεις πίσω HTTP 402 με header PAYMENT-REQUIRED — μια υπογεγραμμένη πρόκληση για $0.02 σε USDC στη Solana.',
     x402Step3: 'Υπόγραψε και εκκαθάρισε την πληρωμή με οποιονδήποτε client συμβατό με x402 (ή SDK wallet/agent), μετά ξαναδοκίμασε το ίδιο αίτημα με header X-PAYMENT που φέρει την υπογεγραμμένη πληρωμή.',
     x402HowToNote:
-      'Ίδια τιμή $0.07/κλήση με το επίπεδο πληρωμής ανά κλήση — είναι η ίδια τιμολόγηση χωρίς λογαριασμό, για agents που προτιμούν να πληρώνουν ανά κλήση αντί να κρατούν αποθηκευμένο key. Καταχωρημένο στο x402scan.com.',
+      'Χαμηλότερη τιμή ανά κλήση από το βασικό επίπεδο πληρωμής ανά κλήση ($0.02 έναντι $0.04) — χωρίς λογαριασμό, για agents που προτιμούν να πληρώνουν ανά κλήση αντί να κρατούν αποθηκευμένο key. Καταχωρημένο στο x402scan.com.',
     pricingNote: 'Πληρωμή σε $MRDT / SOL / USDC μέσω Solana Pay — ίδια ροή πληρωμής με το υπόλοιπο TNT House. Το Solana Pay δεν μπορεί να χρεώσει αυτόματα, οπότε η συνδρομή είναι μια χειροκίνητη ανανέωση 30 ημερών, όχι επαναλαμβανόμενη συνδρομή με την παραδοσιακή έννοια.',
     manageBillingTitle: 'Διαχείριση χρέωσης',
     getKeyTitle: 'Πάρε το API key σου',
@@ -1186,7 +1214,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     callsUsedLabel: 'κλήσεις χρησιμοποιήθηκαν',
     renewsLabel: 'ανανεώνεται',
     creditBalanceLabel: 'Υπόλοιπο πίστωσης:',
-    subscribeCardTitle: 'Συνδρομή — $49',
+    subscribeCardTitle: 'Συνδρομή — $45',
     subscribeCardSub: '1000 κλήσεις / 30 ημέρες',
     topupCardTitle: 'Φόρτιση πίστωσης',
     topupCardSub: 'Πληρωμή ανά κλήση, $5–$500',
@@ -1298,6 +1326,13 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogNote: 'Пока нет рассылки или вебхуков для анонсов обновлений — следить за актуальным состоянием можно по этой странице и ссылкам на X / Telegram в подвале.',
     changelogEntries: [
       {
+        version: 'v1.13',
+        date: '2026-08-13',
+        changes: [
+          'Снижение цен: pay-per-call $0.07 -> $0.04/звонок, overage с подпиской $0.03 -> $0.02/звонок, подписка $49 -> $45 за 1000 звонков/30 дней, x402 $0.07 -> $0.02/звонок — приведено в соответствие с ценами прямых конкурентов после сравнительного анализа.',
+        ],
+      },
+      {
         version: 'v1.12',
         date: '2026-08-08',
         changes: [
@@ -1397,10 +1432,10 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     tierPayPerCall: 'PAY-PER-CALL',
     payPerCallFeature1: 'Пополнение на любую сумму $5–$500',
     payPerCallFeature2: 'Списывается только сверх бесплатных 15/день',
-    payPerCallFeature3: 'Падает до $0.03/запрос при активной подписке',
+    payPerCallFeature3: 'Падает до $0.02/запрос при активной подписке',
     tierSubscription: 'ПОДПИСКА',
     subFeature1: '1000 запросов включено',
-    subFeature2: '$0.03/запрос сверх лимита далее',
+    subFeature2: '$0.02/запрос сверх лимита далее',
     subFeature3: 'Ручное продление — без автосписания',
     tierX402: 'X402 (ОПЛАТА ЗА ЗВОНОК, БЕЗ КЛЮЧА)',
     x402Feature1: 'Без API-ключа, без регистрации — платишь за каждый запрос',
@@ -1410,10 +1445,10 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     x402HowToIntro:
       'x402 превращает 402 Payment Required в рабочий платёжный флоу: дёргаешь эндпоинт без авторизации, получаешь подписанный платёжный челлендж, оплачиваешь его, повторяешь запрос с квитанцией.',
     x402Step1: 'Делаешь GET на эндпоинт с mint — заголовок Authorization не нужен.',
-    x402Step2: 'В ответ приходит HTTP 402 с заголовком PAYMENT-REQUIRED — подписанный челлендж на $0.07 в USDC на Solana.',
+    x402Step2: 'В ответ приходит HTTP 402 с заголовком PAYMENT-REQUIRED — подписанный челлендж на $0.02 в USDC на Solana.',
     x402Step3: 'Подписываешь и оплачиваешь через любой x402-совместимый клиент (или wallet/agent SDK), затем повторяешь тот же запрос с заголовком X-PAYMENT, содержащим подписанный платёж.',
     x402HowToNote:
-      'Та же ставка $0.07/звонок, что и в pay-per-call тарифе — это тот же прайсинг, только без аккаунта, для агентов, которым удобнее платить за звонок, чем хранить ключ. Указан на x402scan.com.',
+      'Ставка ниже, чем в обычном pay-per-call тарифе ($0.02 против $0.04) — без аккаунта, для агентов, которым удобнее платить за звонок, чем хранить ключ. Указан на x402scan.com.',
     pricingNote: 'Оплата в $MRDT / SOL / USDC через Solana Pay — тот же флоу, что и на остальном TNT House. Solana Pay не умеет автосписание, поэтому подписка — это ручное пополнение на 30 дней, а не рекуррентная подписка в привычном смысле.',
     manageBillingTitle: 'Управление биллингом',
     getKeyTitle: 'Получи свой API-ключ',
@@ -1427,7 +1462,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     callsUsedLabel: 'запросов использовано',
     renewsLabel: 'обновление',
     creditBalanceLabel: 'Баланс кредитов:',
-    subscribeCardTitle: 'Подписка — $49',
+    subscribeCardTitle: 'Подписка — $45',
     subscribeCardSub: '1000 запросов / 30 дней',
     topupCardTitle: 'Пополнить баланс',
     topupCardSub: 'Pay-per-call, $5–$500',
@@ -1539,6 +1574,13 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogNote: "Non c'è ancora una mailing list o webhook per gli annunci di aggiornamento — questa pagina e i link X / Telegram nel footer sono il modo per restare aggiornati.",
     changelogEntries: [
       {
+        version: 'v1.13',
+        date: '2026-08-13',
+        changes: [
+          "Taglio prezzi: pay-per-call $0.07 -> $0.04/chiamata, eccedenza con abbonamento $0.03 -> $0.02/chiamata, abbonamento $49 -> $45 per 1000 chiamate/30 giorni, x402 $0.07 -> $0.02/chiamata — allineato a tariffe comparabili di mercato dopo un confronto con i concorrenti diretti.",
+        ],
+      },
+      {
         version: 'v1.12',
         date: '2026-08-08',
         changes: [
@@ -1638,10 +1680,10 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     tierPayPerCall: 'PAGAMENTO A CHIAMATA',
     payPerCallFeature1: 'Ricarica qualsiasi importo tra $5 e $500',
     payPerCallFeature2: 'Addebitato solo oltre le 15/giorno gratuite',
-    payPerCallFeature3: 'Scende a $0.03/chiamata con abbonamento attivo',
+    payPerCallFeature3: 'Scende a $0.02/chiamata con abbonamento attivo',
     tierSubscription: 'ABBONAMENTO',
     subFeature1: '1000 chiamate incluse',
-    subFeature2: '$0.03/chiamata di eccedenza dopo',
+    subFeature2: '$0.02/chiamata di eccedenza dopo',
     subFeature3: 'Rinnovo manuale — nessun addebito automatico',
     tierX402: 'X402 (PAGAMENTO A CHIAMATA, SENZA KEY)',
     x402Feature1: 'Nessuna API key, nessuna registrazione — paghi per richiesta',
@@ -1651,10 +1693,10 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     x402HowToIntro:
       "x402 trasforma un 402 Payment Required in un flusso di pagamento funzionante: chiami l'endpoint senza autenticazione, ricevi una sfida di pagamento firmata, la paghi, riprovi con la ricevuta.",
     x402Step1: "Fai una GET sull'endpoint con un mint — non serve l'header Authorization.",
-    x402Step2: "Ricevi un HTTP 402 con un header PAYMENT-REQUIRED — una sfida firmata per $0.07 in USDC su Solana.",
+    x402Step2: "Ricevi un HTTP 402 con un header PAYMENT-REQUIRED — una sfida firmata per $0.02 in USDC su Solana.",
     x402Step3: "Firma e salda il pagamento con qualsiasi client compatibile x402 (o SDK wallet/agent), poi riprova la stessa richiesta con un header X-PAYMENT contenente il pagamento firmato.",
     x402HowToNote:
-      "Stessa tariffa di $0.07/chiamata del livello pagamento a chiamata — è lo stesso prezzo esposto senza account, per agenti che preferiscono pagare a chiamata invece di conservare una key. Elencato su x402scan.com.",
+      "Una tariffa per chiamata più bassa rispetto al livello pagamento a chiamata standard ($0.02 contro $0.04) — senza necessità di account, per agenti che preferiscono pagare a chiamata invece di conservare una key. Elencato su x402scan.com.",
     pricingNote: 'Pagabile in $MRDT / SOL / USDC via Solana Pay — lo stesso flusso di pagamento del resto di TNT House. Solana Pay non può addebitare automaticamente, quindi l\'abbonamento è una ricarica manuale di 30 giorni, non un abbonamento ricorrente in senso tradizionale.',
     manageBillingTitle: 'Gestisci la fatturazione',
     getKeyTitle: 'Ottieni la tua API key',
@@ -1668,7 +1710,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     callsUsedLabel: 'chiamate usate',
     renewsLabel: 'si rinnova',
     creditBalanceLabel: 'Saldo crediti:',
-    subscribeCardTitle: 'Abbonati — $49',
+    subscribeCardTitle: 'Abbonati — $45',
     subscribeCardSub: '1000 chiamate / 30 giorni',
     topupCardTitle: 'Ricarica crediti',
     topupCardSub: 'Pagamento a chiamata, $5–$500',
@@ -1780,6 +1822,13 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogNote: '目前还没有邮件列表或 webhook 用于更新通知——请通过本页面以及页脚的 X / Telegram 链接来获取最新动态。',
     changelogEntries: [
       {
+        version: 'v1.13',
+        date: '2026-08-13',
+        changes: [
+          '价格下调：按次付费 $0.07 -> $0.04/次，订阅超额 $0.03 -> $0.02/次，订阅 $49 -> $45（1000次/30天），x402 $0.07 -> $0.02/次 —— 在对比直接竞争对手后，调整至具有市场竞争力的水平。',
+        ],
+      },
+      {
         version: 'v1.12',
         date: '2026-08-08',
         changes: [
@@ -1879,10 +1928,10 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     tierPayPerCall: '按次付费',
     payPerCallFeature1: '可充值 $5–$500 之间任意金额',
     payPerCallFeature2: '仅在超出免费的 15 次/天后才会扣费',
-    payPerCallFeature3: '订阅后降至 $0.03/次',
+    payPerCallFeature3: '订阅后降至 $0.02/次',
     tierSubscription: '订阅',
     subFeature1: '含 1000 次调用',
-    subFeature2: '超出后 $0.03/次',
+    subFeature2: '超出后 $0.02/次',
     subFeature3: '手动续费 —— 不会自动扣款',
     tierX402: 'X402（按次付费，无需密钥）',
     x402Feature1: '无需 API 密钥，无需注册 —— 按请求付费',
@@ -1892,10 +1941,10 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     x402HowToIntro:
       'x402 把 402 Payment Required 变成一套可用的支付流程：无需鉴权即可调用接口，返回一个已签名的支付挑战，完成支付后携带凭证重试。',
     x402Step1: '用 mint 参数 GET 该接口 —— 不需要 Authorization 请求头。',
-    x402Step2: '你会收到 HTTP 402，响应头带有 PAYMENT-REQUIRED —— 一个价值 $0.07 USDC（Solana 链上）的已签名支付挑战。',
+    x402Step2: '你会收到 HTTP 402，响应头带有 PAYMENT-REQUIRED —— 一个价值 $0.02 USDC（Solana 链上）的已签名支付挑战。',
     x402Step3: '用任意兼容 x402 的客户端（或钱包/agent SDK）签名并完成支付，然后携带含已签名支付信息的 X-PAYMENT 请求头重试同一请求。',
     x402HowToNote:
-      '与按次付费套餐相同的 $0.07/次费率 —— 只是同样的定价以无账户方式开放，适合那些更愿意按次付款而不是保存密钥的 agent。已收录在 x402scan.com。',
+      '比标准按次付费套餐更低的单次费率（$0.02 对比 $0.04）—— 无需账户，适合那些更愿意按次付款而不是保存密钥的 agent。已收录在 x402scan.com。',
     pricingNote: '通过 Solana Pay 以 $MRDT / SOL / USDC 支付 —— 与 TNT House 其他部分相同的支付流程。Solana Pay 无法自动扣款，因此订阅本质上是每 30 天手动充值一次，而非传统意义上的自动续订。',
     manageBillingTitle: '管理账单',
     getKeyTitle: '获取你的 API 密钥',
@@ -1909,7 +1958,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     callsUsedLabel: '次已使用',
     renewsLabel: '续期于',
     creditBalanceLabel: '信用余额：',
-    subscribeCardTitle: '订阅 —— $49',
+    subscribeCardTitle: '订阅 —— $45',
     subscribeCardSub: '1000 次调用 / 30 天',
     topupCardTitle: '充值信用额度',
     topupCardSub: '按次付费，$5–$500',

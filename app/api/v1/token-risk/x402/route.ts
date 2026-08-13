@@ -23,7 +23,14 @@ const CORS_HEADERS = {
     'X-PAYMENT-RESPONSE, PAYMENT-RESPONSE, PAYMENT-REQUIRED',
 };
 
-const PRICE_USDC_ATOMIC = '70000';
+// v1.9 price cut (2026-08-13): $0.07 -> $0.02/call. Deliberately priced
+// BELOW the human-facing pay-per-call rate ($0.04, lib/billing-pricing.ts)
+// — x402 buyers are autonomous agents comparing prices programmatically
+// against a hard budget ceiling, not a person inferring quality from
+// cost on the pricing page, so this channel can go lower without the
+// "looks cheap = looks bad" risk that capped the PAYG number. Matches
+// the closest direct x402 competitor (token-rugcheck, $0.02/call).
+const PRICE_USDC_ATOMIC = '20000';
 const RESOURCE_PATH = '/api/v1/token-risk/x402';
 const DESCRIPTION = 'TNT House Risk-Data API — single token risk score lookup';
 

@@ -4,8 +4,9 @@
 // subscription_expires_at, subscription_cycle_calls_used) and the new
 // 'subscription' tier — see lib/billing-pricing.ts / lib/rate-limit.ts.
 // 'paid' is kept as-is: a manually-issued, truly unlimited admin
-// override (app/api/v1/admin/keys), distinct from the new self-serve
-// $49/30-day 'subscription' tier.
+// override (app/api/v1/admin/keys), distinct from the self-serve
+// $45/30-day 'subscription' tier (price cut from $49, see
+// lib/billing-pricing.ts v8.5).
 //
 // Supabase-backed storage for Risk-Data API keys.
 //

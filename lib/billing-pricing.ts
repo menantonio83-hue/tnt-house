@@ -43,12 +43,32 @@
 // Pricing model (per project brief, confirmed after consulting three
 // other AIs on the approach):
 //   - Free:          15 req/day, full functionality, no card
-//   - Pay-per-call:  $0.07/call over the free limit (rate drops to
-//                    $0.03/call once subscribed — see below)
-//   - Subscription:  $49 one-time payment = 1000 calls / 30 days from
+//   - Pay-per-call:  $0.04/call over the free limit (rate drops to
+//                    $0.02/call once subscribed — see below)
+//   - Subscription:  $45 one-time payment = 1000 calls / 30 days from
 //                     payment date (Solana Pay has no auto-recurring
 //                     billing, so "subscription" means manual renewal,
 //                     not auto-charge)
+//
+// v8.5 price cut (2026-08-13): $0.07 -> $0.04 pay-per-call, $0.03 -> $0.02
+// subscribed overage, $49 -> $45 subscription — brought in line with
+// market comparables (Harvey Intel $0.01/call, token-rugcheck $0.02/call
+// via x402) after a 4-model consensus review (self + Kimi + DeepSeek +
+// Gemini). $45/1000 = $0.045/call for the included block, deliberately
+// kept ABOVE the new $0.04 PAYG rate — this was the one point all
+// models agreed mattered: if the subscription's included-call rate
+// drops below PAYG, there's no coherent reason to prepay $45 instead
+// of just paying per call, and the subscription stops making sense as
+// a product. The subscription's real value only kicks in past the
+// included 1000 calls, where overage ($0.02) undercuts PAYG ($0.04) by
+// half — i.e. it's priced for genuinely heavy users, not casual ones.
+// x402's separate, lower rate ($0.02 — see
+// app/api/v1/token-risk/x402/route.ts's PRICE_USDC_ATOMIC) is a
+// deliberate exception to the "don't go too low" instinct that shaped
+// the PAYG number: x402 buyers are autonomous agents comparing prices
+// programmatically against a hard budget ceiling, not a human on the
+// pricing page inferring quality from cost, so the two channels can
+// (and should) diverge.
 //
 // Reuses the SAME recipient wallet, MRDT/USDC mints, and price source
 // (DexScreener via lib/helius-client.js's getDexScreenerData — already
@@ -71,11 +91,11 @@ export type Currency = 'SOL' | 'MRDT' | 'USDC';
 export type InvoiceKind = 'subscription' | 'topup';
 
 export const FREE_DAILY_LIMIT = 15;
-export const SUBSCRIPTION_USD = 49;
+export const SUBSCRIPTION_USD = 45;
 export const SUBSCRIPTION_MONTHLY_QUOTA = 1000;
 export const SUBSCRIPTION_CYCLE_DAYS = 30;
-export const OVERAGE_RATE_FREE_USD = 0.07; // per call, free tier over the daily cap
-export const OVERAGE_RATE_SUBSCRIBED_USD = 0.03; // per call, subscribed and over monthly quota
+export const OVERAGE_RATE_FREE_USD = 0.04; // per call, free tier over the daily cap
+export const OVERAGE_RATE_SUBSCRIBED_USD = 0.02; // per call, subscribed and over monthly quota
 export const MIN_TOPUP_USD = 5;
 export const MAX_TOPUP_USD = 500;
 export const PENDING_INVOICE_TTL_MINUTES = 45;

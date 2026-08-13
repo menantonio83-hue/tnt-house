@@ -1,3 +1,13 @@
+// Version 1.10 — app/risk-api/RiskApiPageContent.tsx
+//
+// v1.10 price cut (4-model consensus: self + Kimi + DeepSeek + Gemini,
+// see lib/billing-pricing.ts v8.5 for the full reasoning): pay-per-call
+// $0.07 -> $0.04, subscription $49 -> $45, x402 $0.07 -> $0.02. Updated
+// both pricing-card numbers and the 402 example JSON's
+// overage_rate_usd/note to match — those were hardcoded display values,
+// not pulled from the actual constants, so they needed a manual edit
+// alongside the code-side price change.
+//
 // Version 1.9 — app/risk-api/RiskApiPageContent.tsx
 //
 // v1.9: docs updated for the new vesting_locks[] field
@@ -474,9 +484,9 @@ X-RateLimit-Reset: 2026-07-24T00:00:00.000Z
   "limit": 15,
   "used": 16,
   "reset_at": "2026-07-24T00:00:00.000Z",
-  "overage_rate_usd": 0.07,
+  "overage_rate_usd": 0.04,
   "upgrade_url": "https://tnt-audit.com/risk-api#billing",
-  "note": "Top up call credits or subscribe on the upgrade_url page — overage is billed at $0.07/call once you have a balance."
+  "note": "Top up call credits or subscribe on the upgrade_url page — overage is billed at $0.04/call once you have a balance."
 }`}
             </pre>
           </div>
@@ -593,7 +603,7 @@ X-RateLimit-Reset: 2026-07-24T00:00:00.000Z
             </div>
             <div className="border border-emerald-500/30 rounded-lg p-5 bg-slate-900/40">
               <div className="text-[11px] font-bold text-emerald-400 tracking-widest mb-1">{t.tierPayPerCall}</div>
-              <div className="text-2xl font-black mb-3">$0.07<span className="text-sm text-slate-400">/call</span></div>
+              <div className="text-2xl font-black mb-3">$0.04<span className="text-sm text-slate-400">/call</span></div>
               <ul className="space-y-2 text-xs text-slate-400">
                 <li className="flex items-center gap-2">
                   <CheckCircle2 size={13} className="text-emerald-400 shrink-0" /> {t.payPerCallFeature1}
@@ -608,7 +618,7 @@ X-RateLimit-Reset: 2026-07-24T00:00:00.000Z
             </div>
             <div className="border border-purple-500/30 rounded-lg p-5 bg-slate-900/40">
               <div className="text-[11px] font-bold text-purple-400 tracking-widest mb-1">{t.tierSubscription}</div>
-              <div className="text-2xl font-black mb-3">$49<span className="text-sm text-slate-400">/30 days</span></div>
+              <div className="text-2xl font-black mb-3">$45<span className="text-sm text-slate-400">/30 days</span></div>
               <ul className="space-y-2 text-xs text-slate-400">
                 <li className="flex items-center gap-2">
                   <CheckCircle2 size={13} className="text-emerald-400 shrink-0" /> {t.subFeature1}
@@ -624,7 +634,7 @@ X-RateLimit-Reset: 2026-07-24T00:00:00.000Z
             <div className="border border-emerald-500/30 rounded-lg p-5 bg-slate-900/40">
               <div className="text-[11px] font-bold text-emerald-400 tracking-widest mb-1">{t.tierX402}</div>
               <div className="text-2xl font-black mb-3">
-                $0.07<span className="text-sm text-slate-400">/call</span>
+                $0.02<span className="text-sm text-slate-400">/call</span>
               </div>
               <ul className="space-y-2 text-xs text-slate-400">
                 <li className="flex items-center gap-2">

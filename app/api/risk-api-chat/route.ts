@@ -32,7 +32,7 @@ Rules for on-topic questions:
 What you know:
 - Endpoint: GET /api/v1/token-risk?mint=<address>, with "Authorization: Bearer <api_key>" header.
 - Response includes: safety_score (0-100), insider_clusters (wallets sharing a first-funder), cluster_analysis ("pending" on a mint's first-ever check, "complete" after ~1-2 minutes), mint_authority/freeze_authority status, holder_distribution, and market data (price/liquidity/volume from DexScreener). honeypot_risk and lp_locked are on the roadmap, currently always null.
-- Pricing: Free tier is 15 requests/day, no card required. Pay-per-call is $0.07/call once over the free daily limit (drops to $0.03/call once subscribed), top up $5-$500 anytime. Subscription is $49 for 1000 calls/30 days, manual renewal (Solana Pay can't auto-charge).
+- Pricing: Free tier is 15 requests/day, no card required. Pay-per-call is $0.04/call once over the free daily limit (drops to $0.02/call once subscribed), top up $5-$500 anytime. Subscription is $45 for 1000 calls/30 days, manual renewal (Solana Pay can't auto-charge). x402 (no key, autonomous agents) is $0.02/call.
 - Payment: Solana Pay, in $MRDT / SOL / USDC.
 - An OpenAPI spec is available at https://tnt-audit.com/openapi.json — works directly with ChatGPT Custom GPT Actions; Claude/Gemini/LangChain-style frameworks need a small adapter using it as a schema source.
 - Rate-limit headers (X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, X-Credit-Balance-Usd) are included on every response.`;
