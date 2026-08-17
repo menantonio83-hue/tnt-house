@@ -4,6 +4,12 @@ TNT House ([tnt-audit.com/risk-api](https://www.tnt-audit.com/risk-api)) is an A
 
 This repository also hosts a remote **Model Context Protocol (MCP) server** exposing that same engine as the **Risk-Data API** — Solana token risk scoring and insider wallet cluster detection for AI agents (Claude, Cursor, and any other MCP-compatible client). See the [MCP Server section](#mcp-server--risk-data-api) below.
 
+## Getting Started (3 steps)
+
+1. **Try it now, no signup** — call `check_token_risk` right here in Glama's "Try in Browser" / Inspector, or via curl. No API key needed for your first **3 calls/day** (per IP).
+2. **Want more?** — get a free API key in seconds at [tnt-audit.com/risk-api](https://www.tnt-audit.com/risk-api) (email only, no card). A free key raises your limit to **15 calls/day**.
+3. **Need higher volume?** — on the same page, paste your key into the pricing section and pay per-call ($0.04), by subscription ($45/1000 calls), or via x402 (autonomous agents, no key at all, $0.02/call).
+
 ## Tech Stack
 - Next.js 14 (App Router) + React 18 + TypeScript
 - Tailwind CSS
@@ -46,3 +52,4 @@ Open [http://localhost:3000](http://localhost:3000)
 Vercel-ready. Connected to this repo's `main` branch for auto-deploys.
 
 **Links:** [X @RiskDataApiSol](https://x.com/RiskDataApiSol) | [Risk-Data API](https://www.tnt-audit.com/risk-api) | [Telegram](https://t.me/tnt_house2026)
+
