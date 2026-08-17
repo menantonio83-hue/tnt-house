@@ -6,7 +6,7 @@ This repository also hosts a remote **Model Context Protocol (MCP) server** expo
 
 ## Getting Started (3 steps)
 
-1. **Try it now, no signup** — call `check_token_risk` right here in Glama's "Try in Browser" / Inspector, or via curl. No API key needed for your first **3 calls/day** (per IP).
+1. **Try it now, no signup** — call `check_token_risk` right here in Glama's "Try in Browser" / Inspector, or via curl. **In the "Try in Browser" popup, the `TNT_API_KEY` field is optional — leave it empty and click "Start Inspector" directly.** No API key needed for your first **3 calls/day** (per IP).
 2. **Want more?** — get a free API key in seconds at [tnt-audit.com/risk-api](https://www.tnt-audit.com/risk-api) (email only, no card). A free key raises your limit to **15 calls/day**.
 3. **Need higher volume?** — on the same page, paste your key into the pricing section and pay per-call ($0.04), by subscription ($45/1000 calls), or via x402 (autonomous agents, no key at all, $0.02/call).
 
@@ -52,4 +52,5 @@ Open [http://localhost:3000](http://localhost:3000)
 Vercel-ready. Connected to this repo's `main` branch for auto-deploys.
 
 **Links:** [X @RiskDataApiSol](https://x.com/RiskDataApiSol) | [Risk-Data API](https://www.tnt-audit.com/risk-api) | [Telegram](https://t.me/tnt_house2026)
+
 
