@@ -141,14 +141,24 @@ function extractClientIp(request: NextRequest): string {
 // demo path). clientIp is only meaningful in that second case; it's
 // unused by every other tool.
 function buildServer(apiKey: ApiKeyRecord | null, clientIp: string): McpServer {
-  const server = new McpServer({ name: 'tnt-house-risk-data-api', version: '1.0.0' });
+  const server = new McpServer({
+    name: 'tnt-house-risk-data-api',
+    version: '1.0.0',
+    // v1.4: MCP's initialize response supports an `instructions` field
+    // that clients/inspectors (Glama, Smithery, Claude Desktop) often
+    // surface directly on connect — this is the one place a first-time
+    // visitor reliably sees BEFORE they're asked for a key, unlike
+    // README.md or server-card.json which not every client reads.
+    instructions:
+      'check_token_risk works with NO API key for your first 3 calls/day (per IP) — just call the tool directly. Need more? Get a free key with a 15/day quota at https://tnt-audit.com/risk-api. check_token_risk_batch and get_token_risk_history require a key.',
+  });
 
   server.registerTool(
     'check_token_risk',
     {
       title: 'Check Solana token risk',
       description:
-        'Returns a 0-100 safety score, on-chain insider wallet clusters (wallets sharing a first funder), mint/freeze authority status, holder concentration, and live price/liquidity/volume for a single Solana token mint. Use before recommending or executing a trade on any Solana token.',
+        'Returns a 0-100 safety score, on-chain insider wallet clusters (wallets sharing a first funder), mint/freeze authority status, holder concentration, and live price/liquidity/volume for a single Solana token mint. Use before recommending or executing a trade on any Solana token. First 3 calls/day work with no API key.',
       inputSchema: { mint: z.string().describe('The Solana token mint address to check') },
     },
     async ({ mint }) => {
