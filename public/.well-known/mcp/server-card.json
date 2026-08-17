@@ -1,12 +1,13 @@
 {
   "serverInfo": {
     "name": "tnt-house-risk-data-api",
-    "version": "1.0.0",
-    "description": "Solana token risk-scoring MCP server for AI trading agents — 0-100 safety score, on-chain-provable insider wallet cluster detection (shared first-funder tracing), mint/freeze authority checks, and historical risk data via 3 tools."
+    "version": "1.1.0",
+    "description": "Solana token risk-scoring MCP server for AI trading agents — 0-100 safety score, on-chain-provable insider wallet cluster detection (shared first-funder tracing), mint/freeze authority checks, and historical risk data via 3 tools. 3 free anonymous calls/day, no signup, no API key — get a full key with 15 free calls/day at tnt-audit.com/risk-api."
   },
   "authentication": {
-    "required": true,
-    "schemes": ["bearer"]
+    "required": false,
+    "schemes": ["bearer"],
+    "notes": "Bearer token is optional. Without one, calls are limited to 3/day per IP (100/day global cap) as an anonymous trial. With a free API key from tnt-audit.com/risk-api, the limit rises to 15/day."
   },
   "tools": [
     {
