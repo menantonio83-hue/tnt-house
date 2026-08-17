@@ -141,17 +141,27 @@ function extractClientIp(request: NextRequest): string {
 // demo path). clientIp is only meaningful in that second case; it's
 // unused by every other tool.
 function buildServer(apiKey: ApiKeyRecord | null, clientIp: string): McpServer {
-  const server = new McpServer({
-    name: 'tnt-house-risk-data-api',
-    version: '1.0.0',
-    // v1.4: MCP's initialize response supports an `instructions` field
-    // that clients/inspectors (Glama, Smithery, Claude Desktop) often
-    // surface directly on connect — this is the one place a first-time
-    // visitor reliably sees BEFORE they're asked for a key, unlike
-    // README.md or server-card.json which not every client reads.
-    instructions:
-      'check_token_risk works with NO API key for your first 3 calls/day (per IP) — just call the tool directly. Need more? Get a free key with a 15/day quota at https://tnt-audit.com/risk-api. check_token_risk_batch and get_token_risk_history require a key.',
-  });
+  const server = new McpServer(
+    { name: 'tnt-house-risk-data-api', version: '1.0.0' },
+    {
+      // v1.5 FIX: instructions belongs in the SECOND constructor arg
+      // (ServerOptions), not merged into the first (Implementation) —
+      // the v1.4 attempt put it in the wrong object, which compiles
+      // fine in plain JS but fails TypeScript's type check on `next
+      // build` (Implementation has no `instructions` field). Confirmed
+      // against the actual @modelcontextprotocol/sdk .d.ts: constructor(
+      // serverInfo: Implementation, options?: ServerOptions), with
+      // instructions?: string living on ServerOptions.
+      //
+      // v1.4: MCP's initialize response supports an `instructions` field
+      // that clients/inspectors (Glama, Smithery, Claude Desktop) often
+      // surface directly on connect — this is the one place a first-time
+      // visitor reliably sees BEFORE they're asked for a key, unlike
+      // README.md or server-card.json which not every client reads.
+      instructions:
+        'check_token_risk works with NO API key for your first 3 calls/day (per IP) — just call the tool directly. Need more? Get a free key with a 15/day quota at https://tnt-audit.com/risk-api. check_token_risk_batch and get_token_risk_history require a key.',
+    },
+  );
 
   server.registerTool(
     'check_token_risk',
