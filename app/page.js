@@ -1231,8 +1231,16 @@ async function loadTokensFromSupabase() {
     // created_at (fixed at first insert forever) — see saveTokenToSupabase
     // for why. Fall back to created_at is unnecessary: the migration
     // backfilled last_audit_at = created_at for every pre-existing row.
+    //
+    // FEAT v1.115: limit raised from 20 to 100. The Discover-lane filters
+    // (age/score/honeypot/LP-lock/top10%) run client-side over whatever
+    // this fetch returns — at limit=20, turning on even one filter could
+    // easily leave zero visible rows just because the 20 most recent
+    // audits happened not to match, not because no matching tokens exist.
+    // 100 rows is still a single small PostgREST request (no pagination
+    // needed) and gives the filters a realistic pool to work with.
     var res = await fetch(
-      SUPABASE_URL + '/rest/v1/listed_tokens?select=*&order=last_audit_at.desc&limit=20',
+      SUPABASE_URL + '/rest/v1/listed_tokens?select=*&order=last_audit_at.desc&limit=100',
       { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } },
     );
     if (!res.ok) return [];
@@ -1459,6 +1467,17 @@ export default function TntHouse() {
   var [tableSort, setTableSort] = useState('default'); // default | score | volume | liquidity
   var [watchlist, setWatchlist] = useState([]); // array of CA strings, persisted to localStorage
   var [showWatchlistOnly, setShowWatchlistOnly] = useState(false);
+
+  // v1.115: Discover-lane filters. All fields already exist on every row
+  // in listed_tokens (saved by saveTokenToSupabase on every audit) — this
+  // just exposes them as filter controls instead of leaving them unused.
+  // 'any' means the filter is off / not applied.
+  var [filterMaxAge, setFilterMaxAge] = useState('any'); // 'any' | '1' | '6h' | '24h' | '7'
+  var [filterMinScore, setFilterMinScore] = useState(0); // 0-100, 0 = no minimum
+  var [filterHideHoneypot, setFilterHideHoneypot] = useState(false);
+  var [filterLpLockedOnly, setFilterLpLockedOnly] = useState(false);
+  var [filterMaxTop10, setFilterMaxTop10] = useState(100); // 0-100, 100 = no cap
+  var [showDiscoverFilters, setShowDiscoverFilters] = useState(false); // collapsed by default on mobile
   var [votedTokens, setVotedTokens] = useState({}); // { [ca]: 'up' | 'down' } — this browser's own votes
   var [loading, setLoading] = useState(true);
   var [error, setError] = useState('');
@@ -1636,6 +1655,42 @@ export default function TntHouse() {
         return watchlist.includes(tk.ca);
       });
     }
+
+    // v1.115: Discover-lane filters. Each one only applies when the user
+    // has actually touched the control (age !== 'any', minScore > 0, etc.)
+    // — a token with a missing/null field is never silently excluded by a
+    // filter that's off, but IS excluded once a filter that needs that
+    // field is turned on (e.g. turning on "LP locked only" hides tokens
+    // where lp_locked_percent is null, since we can't confirm they're
+    // locked).
+    if (filterMaxAge !== 'any') {
+      var maxAgeDays =
+        filterMaxAge === '6h' ? 0.25 : filterMaxAge === '24h' ? 1 : parseInt(filterMaxAge, 10);
+      filtered = filtered.filter(function (tk) {
+        return typeof tk.ageDays === 'number' && tk.ageDays <= maxAgeDays;
+      });
+    }
+    if (filterMinScore > 0) {
+      filtered = filtered.filter(function (tk) {
+        return getSafetyScore(tk) >= filterMinScore;
+      });
+    }
+    if (filterHideHoneypot) {
+      filtered = filtered.filter(function (tk) {
+        return tk.isHoneypot !== true && tk.isHoneypot !== 'true';
+      });
+    }
+    if (filterLpLockedOnly) {
+      filtered = filtered.filter(function (tk) {
+        return typeof tk.lpLockedPercent === 'number' && tk.lpLockedPercent >= 50;
+      });
+    }
+    if (filterMaxTop10 < 100) {
+      filtered = filtered.filter(function (tk) {
+        return typeof tk.top10Percent === 'number' && tk.top10Percent <= filterMaxTop10;
+      });
+    }
+
     if (tableSort === 'default') return filtered;
     var sorted = filtered.slice();
     if (tableSort === 'score') {
@@ -3934,7 +3989,125 @@ export default function TntHouse() {
               >
                 ⭐ {watchlist.length > 0 ? watchlist.length : ''}
               </button>
+              {/* v1.115: Discover filter panel toggle. Collapsed by default
+                  — mobile-first, keeps the toolbar from being cluttered
+                  until the user actually wants to narrow the list down. */}
+              <button
+                onClick={function () {
+                  setShowDiscoverFilters(!showDiscoverFilters);
+                }}
+                title="Discover filters"
+                className={
+                  'shrink-0 px-2 py-1.5 rounded-lg border text-[10px] font-bold transition ' +
+                  (showDiscoverFilters ||
+                  filterMaxAge !== 'any' ||
+                  filterMinScore > 0 ||
+                  filterHideHoneypot ||
+                  filterLpLockedOnly ||
+                  filterMaxTop10 < 100
+                    ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300'
+                    : 'bg-slate-950 border-cyan-400/25 text-slate-400 hover:text-cyan-300')
+                }
+              >
+                🎛️
+              </button>
             </div>
+
+            {/* v1.115: Discover filter panel — every field here is already
+                stored on each listed_tokens row (populated by every audit
+                run through the site), so this is pure client-side
+                filtering, no new backend/scraping needed. */}
+            {showDiscoverFilters && (
+              <div className="flex flex-wrap items-center gap-2 mb-2 p-2 border border-cyan-400/20 rounded-lg bg-slate-950/40">
+                <select
+                  value={filterMaxAge}
+                  onChange={function (e) {
+                    setFilterMaxAge(e.target.value);
+                  }}
+                  className="bg-slate-950 border border-cyan-400/25 rounded-lg px-2 py-1 text-[9px] text-cyan-300 focus:border-cyan-400 focus:outline-none"
+                >
+                  <option value="any">Age: Any</option>
+                  <option value="6h">Age: &lt;6h</option>
+                  <option value="24h">Age: &lt;24h</option>
+                  <option value="1">Age: &lt;1 day</option>
+                  <option value="7">Age: &lt;7 days</option>
+                </select>
+
+                <select
+                  value={filterMinScore}
+                  onChange={function (e) {
+                    setFilterMinScore(parseInt(e.target.value, 10));
+                  }}
+                  className="bg-slate-950 border border-cyan-400/25 rounded-lg px-2 py-1 text-[9px] text-cyan-300 focus:border-cyan-400 focus:outline-none"
+                >
+                  <option value="0">Score: Any</option>
+                  <option value="40">Score: 40+</option>
+                  <option value="60">Score: 60+</option>
+                  <option value="80">Score: 80+</option>
+                </select>
+
+                <select
+                  value={filterMaxTop10}
+                  onChange={function (e) {
+                    setFilterMaxTop10(parseInt(e.target.value, 10));
+                  }}
+                  className="bg-slate-950 border border-cyan-400/25 rounded-lg px-2 py-1 text-[9px] text-cyan-300 focus:border-cyan-400 focus:outline-none"
+                >
+                  <option value="100">Top10: Any</option>
+                  <option value="15">Top10: &lt;15%</option>
+                  <option value="30">Top10: &lt;30%</option>
+                  <option value="50">Top10: &lt;50%</option>
+                </select>
+
+                <button
+                  onClick={function () {
+                    setFilterHideHoneypot(!filterHideHoneypot);
+                  }}
+                  className={
+                    'px-2 py-1 rounded-lg border text-[9px] font-bold transition ' +
+                    (filterHideHoneypot
+                      ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300'
+                      : 'bg-slate-950 border-cyan-400/25 text-slate-400 hover:text-emerald-300')
+                  }
+                >
+                  🚫 No honeypots
+                </button>
+
+                <button
+                  onClick={function () {
+                    setFilterLpLockedOnly(!filterLpLockedOnly);
+                  }}
+                  className={
+                    'px-2 py-1 rounded-lg border text-[9px] font-bold transition ' +
+                    (filterLpLockedOnly
+                      ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300'
+                      : 'bg-slate-950 border-cyan-400/25 text-slate-400 hover:text-emerald-300')
+                  }
+                >
+                  🔒 LP locked
+                </button>
+
+                {(filterMaxAge !== 'any' ||
+                  filterMinScore > 0 ||
+                  filterHideHoneypot ||
+                  filterLpLockedOnly ||
+                  filterMaxTop10 < 100) && (
+                  <button
+                    onClick={function () {
+                      setFilterMaxAge('any');
+                      setFilterMinScore(0);
+                      setFilterHideHoneypot(false);
+                      setFilterLpLockedOnly(false);
+                      setFilterMaxTop10(100);
+                    }}
+                    className="px-2 py-1 rounded-lg border border-red-400/40 text-red-300 text-[9px] font-bold hover:bg-red-500/10 transition"
+                  >
+                    ✕ Reset
+                  </button>
+                )}
+              </div>
+            )}
+
             <div className="max-h-[320px] overflow-y-auto border border-cyan-400/25 rounded-lg">
               <table className="w-full text-left border-collapse text-[9px]">
                 <thead>
