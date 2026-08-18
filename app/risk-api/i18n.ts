@@ -334,6 +334,14 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogNote: 'No mailing list or webhooks yet for update announcements — this page and the X / Telegram links in the footer are the way to stay current.',
     changelogEntries: [
       {
+        version: 'v1.14',
+        date: '2026-08-18',
+        changes: [
+          'Listed in the DeepSeek Harness (dsh-plugin) ecosystem — the repo now carries the dsh-plugin GitHub topic, making it discoverable by DSH plugin directories and the in-app plugin marketplace.',
+          'Submitted a Security skill to the Solana Skills marketplace (sendaifun/skills, feeding solana.com/skills) — pending maintainer review.',
+        ],
+      },
+      {
         version: 'v1.13',
         date: '2026-08-13',
         changes: [
@@ -581,6 +589,14 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'Registro de cambios',
     changelogNote: 'Todavía no hay lista de correo ni webhooks para anunciar novedades — esta página y los enlaces de X / Telegram del pie son la forma de mantenerte al día.',
     changelogEntries: [
+      {
+        version: 'v1.14',
+        date: '2026-08-18',
+        changes: [
+          'Listado en el ecosistema DeepSeek Harness (dsh-plugin) — el repositorio ahora lleva el topic de GitHub dsh-plugin, haciéndolo descubrible por los directorios de plugins DSH y el marketplace de plugins integrado.',
+          'Skill de Seguridad enviado al marketplace Solana Skills (sendaifun/skills, que alimenta solana.com/skills) — pendiente de revisión por los mantenedores.',
+        ],
+      },
       {
         version: 'v1.13',
         date: '2026-08-13',
@@ -830,6 +846,14 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogNote: 'Pas encore de liste de diffusion ni de webhooks pour les annonces — cette page et les liens X / Telegram en pied de page sont le moyen de rester à jour.',
     changelogEntries: [
       {
+        version: 'v1.14',
+        date: '2026-08-18',
+        changes: [
+          "Référencé dans l'écosystème DeepSeek Harness (dsh-plugin) — le dépôt porte désormais le topic GitHub dsh-plugin, ce qui le rend détectable par les annuaires de plugins DSH et la marketplace de plugins intégrée.",
+          "Skill de Sécurité soumise à la marketplace Solana Skills (sendaifun/skills, qui alimente solana.com/skills) — en attente de revue par les mainteneurs.",
+        ],
+      },
+      {
         version: 'v1.13',
         date: '2026-08-13',
         changes: [
@@ -1077,6 +1101,14 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'Ιστορικό αλλαγών',
     changelogNote: 'Δεν υπάρχει ακόμα mailing list ή webhooks για ανακοινώσεις ενημερώσεων — αυτή η σελίδα και οι σύνδεσμοι X / Telegram στο footer είναι ο τρόπος να μένεις ενήμερος.',
     changelogEntries: [
+      {
+        version: 'v1.14',
+        date: '2026-08-18',
+        changes: [
+          'Καταχωρήθηκε στο οικοσύστημα DeepSeek Harness (dsh-plugin) — το αποθετήριο φέρει πλέον το GitHub topic dsh-plugin, καθιστώντας το ανιχνεύσιμο από καταλόγους DSH plugin και το ενσωματωμένο marketplace plugin.',
+          'Υποβλήθηκε skill Ασφάλειας στο marketplace Solana Skills (sendaifun/skills, που τροφοδοτεί το solana.com/skills) — σε αναμονή ελέγχου από τους συντηρητές.',
+        ],
+      },
       {
         version: 'v1.13',
         date: '2026-08-13',
@@ -1326,6 +1358,14 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogNote: 'Пока нет рассылки или вебхуков для анонсов обновлений — следить за актуальным состоянием можно по этой странице и ссылкам на X / Telegram в подвале.',
     changelogEntries: [
       {
+        version: 'v1.14',
+        date: '2026-08-18',
+        changes: [
+          'Листинг в экосистеме DeepSeek Harness (dsh-plugin) — репозиторий теперь несёт GitHub topic dsh-plugin, благодаря чему его находят каталоги DSH-плагинов и встроенный маркетплейс плагинов.',
+          'Подан Security-скилл в маркетплейс Solana Skills (sendaifun/skills, откуда данные подтягиваются на solana.com/skills) — ожидает ревью мейнтейнеров.',
+        ],
+      },
+      {
         version: 'v1.13',
         date: '2026-08-13',
         changes: [
@@ -1574,6 +1614,14 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogNote: "Non c'è ancora una mailing list o webhook per gli annunci di aggiornamento — questa pagina e i link X / Telegram nel footer sono il modo per restare aggiornati.",
     changelogEntries: [
       {
+        version: 'v1.14',
+        date: '2026-08-18',
+        changes: [
+          "Inserito nell'ecosistema DeepSeek Harness (dsh-plugin) — il repository ora porta il topic GitHub dsh-plugin, rendendolo rilevabile dalle directory di plugin DSH e dal marketplace di plugin integrato.",
+          "Skill di Sicurezza inviata al marketplace Solana Skills (sendaifun/skills, che alimenta solana.com/skills) — in attesa di revisione da parte dei maintainer.",
+        ],
+      },
+      {
         version: 'v1.13',
         date: '2026-08-13',
         changes: [
@@ -1821,6 +1869,14 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: '更新日志',
     changelogNote: '目前还没有邮件列表或 webhook 用于更新通知——请通过本页面以及页脚的 X / Telegram 链接来获取最新动态。',
     changelogEntries: [
+      {
+        version: 'v1.14',
+        date: '2026-08-18',
+        changes: [
+          '已收录至 DeepSeek Harness（dsh-plugin）生态系统 —— 仓库现已加上 dsh-plugin 这一 GitHub topic，使其可被 DSH 插件目录及内置插件市场发现。',
+          '已向 Solana Skills 市场（sendaifun/skills，为 solana.com/skills 提供数据）提交安全类 skill —— 等待维护者审核。',
+        ],
+      },
       {
         version: 'v1.13',
         date: '2026-08-13',
