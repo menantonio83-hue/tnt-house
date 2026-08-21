@@ -334,6 +334,14 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogNote: 'No mailing list or webhooks yet for update announcements — this page and the X / Telegram links in the footer are the way to stay current.',
     changelogEntries: [
       {
+        version: 'v1.15',
+        date: '2026-08-21',
+        changes: [
+          'Published an Agent Plugins 1.0 package (plugin.json + mcp.json, agent-plugins.org spec) — lets Agent Plugins-compatible clients discover and connect to the MCP server with no manual setup.',
+          'Submitted a Codex-native plugin package to the awesome-codex-plugins directory (hashgraph-online/awesome-codex-plugins, PR #380) — HOL Plugin Scanner score 91/100, no critical/high findings, CI passing — pending maintainer review.',
+        ],
+      },
+      {
         version: 'v1.14',
         date: '2026-08-18',
         changes: [
@@ -589,6 +597,14 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'Registro de cambios',
     changelogNote: 'Todavía no hay lista de correo ni webhooks para anunciar novedades — esta página y los enlaces de X / Telegram del pie son la forma de mantenerte al día.',
     changelogEntries: [
+      {
+        version: 'v1.15',
+        date: '2026-08-21',
+        changes: [
+          'Publicado un paquete Agent Plugins 1.0 (plugin.json + mcp.json, especificación agent-plugins.org) — permite que los clientes compatibles con Agent Plugins descubran y se conecten al servidor MCP sin configuración manual.',
+          'Enviado un paquete de plugin nativo de Codex al directorio awesome-codex-plugins (hashgraph-online/awesome-codex-plugins, PR #380) — puntuación del HOL Plugin Scanner 91/100, sin hallazgos críticos ni altos, CI en verde — pendiente de revisión de los mantenedores.',
+        ],
+      },
       {
         version: 'v1.14',
         date: '2026-08-18',
@@ -846,6 +862,14 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogNote: 'Pas encore de liste de diffusion ni de webhooks pour les annonces — cette page et les liens X / Telegram en pied de page sont le moyen de rester à jour.',
     changelogEntries: [
       {
+        version: 'v1.15',
+        date: '2026-08-21',
+        changes: [
+          "Publication d'un paquet Agent Plugins 1.0 (plugin.json + mcp.json, spécification agent-plugins.org) — permet aux clients compatibles Agent Plugins de découvrir et de se connecter au serveur MCP sans configuration manuelle.",
+          "Paquet de plugin natif Codex soumis à l'annuaire awesome-codex-plugins (hashgraph-online/awesome-codex-plugins, PR #380) — score HOL Plugin Scanner 91/100, aucune découverte critique ou élevée, CI au vert — en attente de revue par les mainteneurs.",
+        ],
+      },
+      {
         version: 'v1.14',
         date: '2026-08-18',
         changes: [
@@ -1101,6 +1125,14 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'Ιστορικό αλλαγών',
     changelogNote: 'Δεν υπάρχει ακόμα mailing list ή webhooks για ανακοινώσεις ενημερώσεων — αυτή η σελίδα και οι σύνδεσμοι X / Telegram στο footer είναι ο τρόπος να μένεις ενήμερος.',
     changelogEntries: [
+      {
+        version: 'v1.15',
+        date: '2026-08-21',
+        changes: [
+          'Δημοσιεύτηκε πακέτο Agent Plugins 1.0 (plugin.json + mcp.json, προδιαγραφή agent-plugins.org) — επιτρέπει σε συμβατούς clients Agent Plugins να ανακαλύπτουν και να συνδέονται με τον MCP server χωρίς χειροκίνητη ρύθμιση.',
+          'Υποβλήθηκε native πακέτο plugin για Codex στον κατάλογο awesome-codex-plugins (hashgraph-online/awesome-codex-plugins, PR #380) — βαθμολογία HOL Plugin Scanner 91/100, καμία κρίσιμη ή υψηλή εύρεση, CI επιτυχές — σε αναμονή ελέγχου από τους συντηρητές.',
+        ],
+      },
       {
         version: 'v1.14',
         date: '2026-08-18',
@@ -1358,6 +1390,14 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogNote: 'Пока нет рассылки или вебхуков для анонсов обновлений — следить за актуальным состоянием можно по этой странице и ссылкам на X / Telegram в подвале.',
     changelogEntries: [
       {
+        version: 'v1.15',
+        date: '2026-08-21',
+        changes: [
+          'Опубликован пакет Agent Plugins 1.0 (plugin.json + mcp.json, спецификация agent-plugins.org) — позволяет клиентам, совместимым с Agent Plugins, находить и подключаться к MCP-серверу без ручной настройки.',
+          'Подан нативный Codex-пакет плагина в каталог awesome-codex-plugins (hashgraph-online/awesome-codex-plugins, PR #380) — скор HOL Plugin Scanner 91/100, критичных и high-находок нет, CI зелёный — ожидает ревью мейнтейнеров.',
+        ],
+      },
+      {
         version: 'v1.14',
         date: '2026-08-18',
         changes: [
@@ -1614,6 +1654,14 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogNote: "Non c'è ancora una mailing list o webhook per gli annunci di aggiornamento — questa pagina e i link X / Telegram nel footer sono il modo per restare aggiornati.",
     changelogEntries: [
       {
+        version: 'v1.15',
+        date: '2026-08-21',
+        changes: [
+          "Pubblicato un pacchetto Agent Plugins 1.0 (plugin.json + mcp.json, specifica agent-plugins.org) — consente ai client compatibili con Agent Plugins di scoprire e connettersi al server MCP senza configurazione manuale.",
+          "Inviato un pacchetto di plugin nativo per Codex alla directory awesome-codex-plugins (hashgraph-online/awesome-codex-plugins, PR #380) — punteggio HOL Plugin Scanner 91/100, nessun rilievo critico o alto, CI verde — in attesa di revisione da parte dei maintainer.",
+        ],
+      },
+      {
         version: 'v1.14',
         date: '2026-08-18',
         changes: [
@@ -1869,6 +1917,14 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: '更新日志',
     changelogNote: '目前还没有邮件列表或 webhook 用于更新通知——请通过本页面以及页脚的 X / Telegram 链接来获取最新动态。',
     changelogEntries: [
+      {
+        version: 'v1.15',
+        date: '2026-08-21',
+        changes: [
+          '发布了 Agent Plugins 1.0 软件包（plugin.json + mcp.json，遵循 agent-plugins.org 规范）—— 让兼容 Agent Plugins 的客户端无需手动配置即可发现并连接到 MCP 服务器。',
+          '已向 awesome-codex-plugins 目录（hashgraph-online/awesome-codex-plugins，PR #380）提交了原生 Codex 插件包 —— HOL Plugin Scanner 评分 91/100，无严重或高危问题，CI 通过 —— 等待维护者审核。',
+        ],
+      },
       {
         version: 'v1.14',
         date: '2026-08-18',
