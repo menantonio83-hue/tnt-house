@@ -2,15 +2,17 @@
   "openapi": "3.1.0",
   "info": {
     "title": "TNT House Risk-Data API",
-    "description": "Real-time Solana token safety scores, on-chain-provable insider cluster detection, and market fundamentals — built for AI trading agents. Free tier: 15 requests/day, no card required. See https://tnt-audit.com/risk-api for pricing and to get a key.",
-    "version": "1.0.0",
+    "description": "Real-time Solana token safety scores, on-chain-provable insider cluster detection, and market fundamentals — built for AI trading agents. Free tier: 15 requests/day, no card required (try 3 anonymous calls with no signup at all via /api/v1/trial/check). See https://tnt-audit.com/risk-api for pricing and to get a key.",
+    "version": "1.15.0",
     "contact": {
       "url": "https://tnt-audit.com/risk-api",
       "email": "menantonio83@gmail.com"
     }
   },
   "servers": [
-    { "url": "https://tnt-audit.com" }
+    {
+      "url": "https://tnt-audit.com"
+    }
   ],
   "paths": {
     "/api/v1/token-risk": {
@@ -24,7 +26,10 @@
             "in": "query",
             "required": true,
             "description": "The Solana token mint address to analyze. `ca` is accepted as an alias for the same parameter.",
-            "schema": { "type": "string", "example": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v" }
+            "schema": {
+              "type": "string",
+              "example": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+            }
           }
         ],
         "responses": {
@@ -35,7 +40,9 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "mint": { "type": "string" },
+                    "mint": {
+                      "type": "string"
+                    },
                     "safety_score": {
                       "type": "integer",
                       "minimum": 0,
@@ -44,7 +51,10 @@
                     },
                     "cluster_analysis": {
                       "type": "string",
-                      "enum": ["pending", "complete"],
+                      "enum": [
+                        "pending",
+                        "complete"
+                      ],
                       "description": "\"pending\" on a mint's first-ever check while the insider trace runs in the background; \"complete\" after ~1-2 minutes."
                     },
                     "insider_clusters": {
@@ -53,43 +63,88 @@
                       "items": {
                         "type": "object",
                         "properties": {
-                          "funder": { "type": "string" },
-                          "wallets": { "type": "array", "items": { "type": "string" } }
+                          "funder": {
+                            "type": "string"
+                          },
+                          "wallets": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
                         }
                       }
                     },
                     "mint_authority": {
                       "type": "object",
                       "properties": {
-                        "revoked": { "type": "boolean" },
-                        "address": { "type": ["string", "null"] }
+                        "revoked": {
+                          "type": "boolean"
+                        },
+                        "address": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
                       }
                     },
                     "freeze_authority": {
                       "type": "object",
                       "properties": {
-                        "revoked": { "type": "boolean" },
-                        "address": { "type": ["string", "null"] }
+                        "revoked": {
+                          "type": "boolean"
+                        },
+                        "address": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
                       }
                     },
                     "honeypot_risk": {
-                      "type": ["boolean", "null"],
+                      "type": [
+                        "boolean",
+                        "null"
+                      ],
                       "description": "true = RugCheck flagged a honeypot-shaped risk, false = checked and clear, null = could not be checked (RugCheck timeout/failure) — never a false-clean default."
                     },
                     "lp_locked": {
-                      "type": ["object", "null"],
+                      "type": [
+                        "object",
+                        "null"
+                      ],
                       "properties": {
-                        "locked": { "type": "boolean" },
-                        "percent": { "type": "number", "description": "0-100, averaged across markets RugCheck reported for this mint." }
+                        "locked": {
+                          "type": "boolean"
+                        },
+                        "percent": {
+                          "type": "number",
+                          "description": "0-100, averaged across markets RugCheck reported for this mint."
+                        }
                       },
                       "description": "null = could not be checked (RugCheck timeout/failure, or no market data reported for this mint at all)."
                     },
                     "holder_distribution": {
                       "type": "object",
                       "properties": {
-                        "risk_level": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL", "ERROR"] },
-                        "largest_holder_percent": { "type": "number" },
-                        "top10_percent": { "type": "number" },
+                        "risk_level": {
+                          "type": "string",
+                          "enum": [
+                            "LOW",
+                            "MEDIUM",
+                            "HIGH",
+                            "CRITICAL",
+                            "ERROR"
+                          ]
+                        },
+                        "largest_holder_percent": {
+                          "type": "number"
+                        },
+                        "top10_percent": {
+                          "type": "number"
+                        },
                         "holder_count": {
                           "type": "integer",
                           "description": "Number of accounts in Solana's top-20-largest-holders response — a real RPC limit, not a full holder count for widely-held tokens."
@@ -99,32 +154,98 @@
                     "market": {
                       "type": "object",
                       "properties": {
-                        "price_usd": { "type": ["number", "null"] },
-                        "liquidity_usd": { "type": ["number", "null"] },
-                        "volume_24h_usd": { "type": ["number", "null"] },
-                        "price_change_24h_percent": { "type": ["number", "null"] },
-                        "age_days": { "type": ["number", "null"] }
+                        "price_usd": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "liquidity_usd": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "volume_24h_usd": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "price_change_24h_percent": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "age_days": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        }
                       }
                     },
                     "note": {
                       "type": "string",
                       "description": "Present only when honeypot_risk/lp_locked genuinely could not be checked for this mint."
                     },
-                    "checked_at": { "type": "string", "format": "date-time" }
+                    "checked_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
                   },
-                  "required": ["mint", "safety_score", "cluster_analysis", "insider_clusters", "mint_authority", "freeze_authority", "holder_distribution", "market", "checked_at"]
+                  "required": [
+                    "mint",
+                    "safety_score",
+                    "cluster_analysis",
+                    "insider_clusters",
+                    "mint_authority",
+                    "freeze_authority",
+                    "holder_distribution",
+                    "market",
+                    "checked_at"
+                  ]
                 },
                 "example": {
                   "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
                   "safety_score": 78,
                   "cluster_analysis": "complete",
-                  "insider_clusters": [{ "funder": "9xQe...k2Pd", "wallets": ["7uF3...aZ1", "3mN8...qR2"] }],
-                  "mint_authority": { "revoked": true, "address": null },
-                  "freeze_authority": { "revoked": true, "address": null },
+                  "insider_clusters": [
+                    {
+                      "funder": "9xQe...k2Pd",
+                      "wallets": [
+                        "7uF3...aZ1",
+                        "3mN8...qR2"
+                      ]
+                    }
+                  ],
+                  "mint_authority": {
+                    "revoked": true,
+                    "address": null
+                  },
+                  "freeze_authority": {
+                    "revoked": true,
+                    "address": null
+                  },
                   "honeypot_risk": false,
-                  "lp_locked": { "locked": true, "percent": 100 },
-                  "holder_distribution": { "risk_level": "LOW", "largest_holder_percent": 4.2, "top10_percent": 22.7, "holder_count": 20 },
-                  "market": { "price_usd": 0.0000412, "liquidity_usd": 84210, "volume_24h_usd": 512300, "price_change_24h_percent": 12.4, "age_days": 3 },
+                  "lp_locked": {
+                    "locked": true,
+                    "percent": 100
+                  },
+                  "holder_distribution": {
+                    "risk_level": "LOW",
+                    "largest_holder_percent": 4.2,
+                    "top10_percent": 22.7,
+                    "holder_count": 20
+                  },
+                  "market": {
+                    "price_usd": 4.12e-05,
+                    "liquidity_usd": 84210,
+                    "volume_24h_usd": 512300,
+                    "price_change_24h_percent": 12.4,
+                    "age_days": 3
+                  },
                   "checked_at": "2026-07-18T12:00:00.000Z"
                 }
               }
@@ -132,11 +253,33 @@
           },
           "400": {
             "description": "Missing or invalid `mint` parameter.",
-            "content": { "application/json": { "schema": { "type": "object", "properties": { "error": { "type": "string" } } } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
           },
           "401": {
             "description": "Missing, malformed, or revoked API key.",
-            "content": { "application/json": { "schema": { "type": "object", "properties": { "error": { "type": "string" } } } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
           },
           "402": {
             "description": "Daily free-tier limit or monthly subscription quota reached, with no call-credit balance to draw from. Response includes an upgrade_url.",
@@ -145,12 +288,25 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "error": { "type": "string" },
-                    "limit": { "type": "integer" },
-                    "used": { "type": "integer" },
-                    "reset_at": { "type": "string", "format": "date-time" },
-                    "overage_rate_usd": { "type": "number" },
-                    "upgrade_url": { "type": "string" }
+                    "error": {
+                      "type": "string"
+                    },
+                    "limit": {
+                      "type": "integer"
+                    },
+                    "used": {
+                      "type": "integer"
+                    },
+                    "reset_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "overage_rate_usd": {
+                      "type": "number"
+                    },
+                    "upgrade_url": {
+                      "type": "string"
+                    }
                   }
                 }
               }
@@ -158,14 +314,43 @@
           },
           "429": {
             "description": "Rate limited.",
-            "content": { "application/json": { "schema": { "type": "object", "properties": { "error": { "type": "string" } } } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
           },
           "502": {
             "description": "Could not fetch on-chain mint data (invalid mint, or the Solana RPC didn't respond in time).",
-            "content": { "application/json": { "schema": { "type": "object", "properties": { "error": { "type": "string" }, "details": { "type": "string" } } } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
-        "security": [{ "BearerAuth": [] }]
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ]
       }
     },
     "/api/v1/token-risk/x402": {
@@ -179,7 +364,10 @@
             "in": "query",
             "required": true,
             "description": "The Solana token mint address to analyze. `ca` is accepted as an alias for the same parameter. Note: this parameter is only validated AFTER a valid payment is verified — an unpaid request always receives 402 regardless of whether mint is present.",
-            "schema": { "type": "string", "example": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v" }
+            "schema": {
+              "type": "string",
+              "example": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+            }
           }
         ],
         "x-payment-info": {
@@ -192,7 +380,10 @@
           ],
           "pricing": {
             "mode": "fixed",
-            "price": { "amount": 0.07, "currency": "USD" }
+            "price": {
+              "amount": 0.02,
+              "currency": "USD"
+            }
           }
         },
         "responses": {
@@ -204,13 +395,41 @@
                   "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
                   "safety_score": 78,
                   "cluster_analysis": "complete",
-                  "insider_clusters": [{ "funder": "9xQe...k2Pd", "wallets": ["7uF3...aZ1", "3mN8...qR2"] }],
-                  "mint_authority": { "revoked": true, "address": null },
-                  "freeze_authority": { "revoked": true, "address": null },
+                  "insider_clusters": [
+                    {
+                      "funder": "9xQe...k2Pd",
+                      "wallets": [
+                        "7uF3...aZ1",
+                        "3mN8...qR2"
+                      ]
+                    }
+                  ],
+                  "mint_authority": {
+                    "revoked": true,
+                    "address": null
+                  },
+                  "freeze_authority": {
+                    "revoked": true,
+                    "address": null
+                  },
                   "honeypot_risk": false,
-                  "lp_locked": { "locked": true, "percent": 100 },
-                  "holder_distribution": { "risk_level": "LOW", "largest_holder_percent": 4.2, "top10_percent": 22.7, "holder_count": 20 },
-                  "market": { "price_usd": 0.0000412, "liquidity_usd": 84210, "volume_24h_usd": 512300, "price_change_24h_percent": 12.4, "age_days": 3 },
+                  "lp_locked": {
+                    "locked": true,
+                    "percent": 100
+                  },
+                  "holder_distribution": {
+                    "risk_level": "LOW",
+                    "largest_holder_percent": 4.2,
+                    "top10_percent": 22.7,
+                    "holder_count": 20
+                  },
+                  "market": {
+                    "price_usd": 4.12e-05,
+                    "liquidity_usd": 84210,
+                    "volume_24h_usd": 512300,
+                    "price_change_24h_percent": 12.4,
+                    "age_days": 3
+                  },
                   "checked_at": "2026-07-18T12:00:00.000Z"
                 }
               }
@@ -218,7 +437,18 @@
           },
           "400": {
             "description": "Missing or invalid `mint` parameter (only returned after a valid payment).",
-            "content": { "application/json": { "schema": { "type": "object", "properties": { "error": { "type": "string" } } } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
           },
           "402": {
             "description": "x402 payment required (no payment proof sent), or the sent payment failed verification/settlement. Body follows the x402 v2 PaymentRequired schema; the same object is also base64-encoded in the PAYMENT-REQUIRED response header per the x402 v2 HTTP transport spec.",
@@ -227,14 +457,27 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "x402Version": { "type": "integer", "enum": [2] },
-                    "error": { "type": "string" },
+                    "x402Version": {
+                      "type": "integer",
+                      "enum": [
+                        2
+                      ]
+                    },
+                    "error": {
+                      "type": "string"
+                    },
                     "resource": {
                       "type": "object",
                       "properties": {
-                        "url": { "type": "string" },
-                        "description": { "type": "string" },
-                        "mimeType": { "type": "string" }
+                        "url": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        },
+                        "mimeType": {
+                          "type": "string"
+                        }
                       }
                     },
                     "accepts": {
@@ -242,13 +485,32 @@
                       "items": {
                         "type": "object",
                         "properties": {
-                          "scheme": { "type": "string", "enum": ["exact"] },
-                          "network": { "type": "string", "description": "CAIP-2 network identifier." },
-                          "amount": { "type": "string", "description": "Price in USDC atomic units (6 decimals)." },
-                          "asset": { "type": "string" },
-                          "payTo": { "type": "string" },
-                          "maxTimeoutSeconds": { "type": "integer" },
-                          "extra": { "type": "object" }
+                          "scheme": {
+                            "type": "string",
+                            "enum": [
+                              "exact"
+                            ]
+                          },
+                          "network": {
+                            "type": "string",
+                            "description": "CAIP-2 network identifier."
+                          },
+                          "amount": {
+                            "type": "string",
+                            "description": "Price in USDC atomic units (6 decimals)."
+                          },
+                          "asset": {
+                            "type": "string"
+                          },
+                          "payTo": {
+                            "type": "string"
+                          },
+                          "maxTimeoutSeconds": {
+                            "type": "integer"
+                          },
+                          "extra": {
+                            "type": "object"
+                          }
                         }
                       }
                     }
@@ -270,7 +532,10 @@
                       "asset": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
                       "payTo": "9p5hBDTrFRzyW4VhKMaq96XCtWkRPA9ZaSTnsM9qvtEE",
                       "maxTimeoutSeconds": 60,
-                      "extra": { "name": "USDC", "version": "2" }
+                      "extra": {
+                        "name": "USDC",
+                        "version": "2"
+                      }
                     }
                   ]
                 }
@@ -279,10 +544,600 @@
           },
           "502": {
             "description": "Could not fetch on-chain mint data (invalid mint, or the Solana RPC didn't respond in time). No settlement occurs on this path — the agent is not charged.",
-            "content": { "application/json": { "schema": { "type": "object", "properties": { "error": { "type": "string" }, "details": { "type": "string" } } } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "security": []
+      }
+    },
+    "/api/v1/token-risk/batch": {
+      "post": {
+        "summary": "Check up to 25 Solana tokens in a single call",
+        "description": "Batched version of /api/v1/token-risk. All mints are fetched concurrently, so total latency is close to the single slowest mint, not the sum. Billing: N mints = N calls charged against your quota/credit balance -- no bulk discount. All-or-nothing rate limiting: if the batch can't be fully covered by remaining quota, the whole batch is rejected with a single 402 rather than partially processed.",
+        "operationId": "getTokenRiskBatch",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "mints"
+                ],
+                "properties": {
+                  "mints": {
+                    "type": "array",
+                    "description": "1-25 Solana mint addresses.",
+                    "minItems": 1,
+                    "maxItems": 25,
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Per-mint results. A failed individual mint (bad address, upstream error) does not fail the whole batch -- check each result's `ok` field.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "ok": {
+                            "type": "boolean"
+                          },
+                          "mint": {
+                            "type": "string"
+                          },
+                          "safety_score": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 100
+                          },
+                          "cluster_analysis": {
+                            "type": "string",
+                            "enum": [
+                              "pending",
+                              "complete"
+                            ]
+                          },
+                          "insider_clusters": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "funder": {
+                                  "type": "string"
+                                },
+                                "wallets": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          "mint_authority": {
+                            "type": "object",
+                            "properties": {
+                              "revoked": {
+                                "type": "boolean"
+                              },
+                              "address": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              }
+                            }
+                          },
+                          "freeze_authority": {
+                            "type": "object",
+                            "properties": {
+                              "revoked": {
+                                "type": "boolean"
+                              },
+                              "address": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              }
+                            }
+                          },
+                          "honeypot_risk": {
+                            "type": "boolean"
+                          },
+                          "lp_locked": {
+                            "type": "boolean"
+                          },
+                          "rugged": {
+                            "type": "boolean"
+                          },
+                          "vesting_locks": {
+                            "type": "array",
+                            "description": "On-chain-detected Streamflow vesting/lock contracts among top holders, so a long-term-locked whale isn't scored the same as a freely-tradable one.",
+                            "items": {
+                              "type": "object"
+                            }
+                          },
+                          "market": {
+                            "type": "object",
+                            "description": "Live price, liquidity, and volume from DexScreener."
+                          },
+                          "checked_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        }
+                      }
+                    },
+                    "batch_size": {
+                      "type": "integer"
+                    },
+                    "charged_calls": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Batch rejected -- remaining quota/credit balance can't cover all N mints in this batch."
+          }
+        }
+      }
+    },
+    "/api/v1/token-risk/history": {
+      "get": {
+        "summary": "Hourly safety-score and market history for a mint",
+        "description": "Pure read from TNT House's own database -- no live Solana RPC or DexScreener call, so it does NOT count against your metered call quota (still requires a valid API key to prevent unauthenticated scraping). Points only exist from the moment someone first checks a mint via /api/v1/token-risk or /api/v1/token-risk/batch; there is no historical backfill.",
+        "operationId": "getTokenRiskHistory",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "mint",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+            }
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "description": "Lookback window. Default 30, max 90 (matches the retention window).",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 90,
+              "default": 30
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hourly time-series points for the mint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mint": {
+                      "type": "string"
+                    },
+                    "days_requested": {
+                      "type": "integer"
+                    },
+                    "points": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "hour": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "safety_score": {
+                            "type": "integer"
+                          },
+                          "insider_cluster_count": {
+                            "type": "integer"
+                          },
+                          "holder_count": {
+                            "type": "integer"
+                          },
+                          "top10_percent": {
+                            "type": "number"
+                          },
+                          "price_usd": {
+                            "type": "number"
+                          },
+                          "liquidity_usd": {
+                            "type": "number"
+                          },
+                          "volume_24h_usd": {
+                            "type": "number"
+                          },
+                          "price_change_24h_percent": {
+                            "type": "number"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/webhooks/subscribe": {
+      "post": {
+        "summary": "Subscribe to a safety-score threshold crossing for a mint",
+        "description": "Registers a webhook that fires once when a mint's safety_score crosses your threshold (e.g. drops below 40). Checked every 15 minutes. Fires only on the crossing itself, not on every sweep that happens to be past the threshold, so you get one signal, not a flood. Delivered as a signed POST to your callback_url via QStash (automatic retry-with-backoff on delivery failure) with header X-Webhook-Signature -- verify it using the webhook_secret returned here (shown once, never again).",
+        "operationId": "createWebhookSubscription",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "mint",
+                  "threshold",
+                  "condition",
+                  "callback_url"
+                ],
+                "properties": {
+                  "mint": {
+                    "type": "string"
+                  },
+                  "threshold": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "condition": {
+                    "type": "string",
+                    "enum": [
+                      "below",
+                      "above"
+                    ]
+                  },
+                  "callback_url": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "Must be https and must not resolve to a private/loopback/link-local address."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Subscription created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "mint": {
+                      "type": "string"
+                    },
+                    "threshold": {
+                      "type": "number"
+                    },
+                    "condition": {
+                      "type": "string"
+                    },
+                    "callback_url": {
+                      "type": "string"
+                    },
+                    "active": {
+                      "type": "boolean"
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "webhook_secret": {
+                      "type": "string",
+                      "description": "Shown once. Required to verify X-Webhook-Signature on every delivery."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Active subscription limit reached for your tier."
+          }
+        }
+      },
+      "get": {
+        "summary": "List your webhook subscriptions",
+        "operationId": "listWebhookSubscriptions",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Your active and inactive subscriptions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "subscriptions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/signup": {
+      "post": {
+        "summary": "Get a free-tier API key by email",
+        "description": "Issues a free-tier key (15 requests/day) per email, no card required. The raw key is returned once and never stored -- only its hash is kept. One active free key per email; a second signup with the same email returns 409.",
+        "operationId": "signup",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "lang": {
+                    "type": "string",
+                    "enum": [
+                      "en",
+                      "es",
+                      "fr",
+                      "el",
+                      "ru",
+                      "it",
+                      "zh"
+                    ],
+                    "description": "Language for the confirmation email. Defaults to English."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Key created. Also emailed to the address given, as a recovery path -- but the key itself is shown here once and cannot be retrieved again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "api_key": {
+                      "type": "string"
+                    },
+                    "key_prefix": {
+                      "type": "string"
+                    },
+                    "tier": {
+                      "type": "string"
+                    },
+                    "daily_limit": {
+                      "type": "integer"
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "This email already has an active key. Keys can't be retrieved after creation -- contact support to have one reissued."
+          }
+        }
+      }
+    },
+    "/api/v1/trial/check": {
+      "post": {
+        "summary": "Anonymous trial check -- no API key, no email",
+        "description": "The 'try it now' entry point used on the risk-api landing page. 3 free checks per browser fingerprint, no signup. Once exhausted, returns 403 with an upgrade_url pointing at /api/v1/signup for a real key (15/day, still free). The fingerprint is a friction-reduction device, not a security boundary -- for production/automated use, get a real API key instead.",
+        "operationId": "trialCheck",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "fingerprint",
+                  "mint"
+                ],
+                "properties": {
+                  "fingerprint": {
+                    "type": "string",
+                    "description": "SHA-256 hex digest generated client-side."
+                  },
+                  "mint": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Token risk result, same fields as /api/v1/token-risk, plus trial usage counters.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "mint": {
+                      "type": "string"
+                    },
+                    "safety_score": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "cluster_analysis": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "complete"
+                      ]
+                    },
+                    "insider_clusters": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "funder": {
+                            "type": "string"
+                          },
+                          "wallets": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "mint_authority": {
+                      "type": "object",
+                      "properties": {
+                        "revoked": {
+                          "type": "boolean"
+                        },
+                        "address": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "freeze_authority": {
+                      "type": "object",
+                      "properties": {
+                        "revoked": {
+                          "type": "boolean"
+                        },
+                        "address": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    },
+                    "honeypot_risk": {
+                      "type": "boolean"
+                    },
+                    "lp_locked": {
+                      "type": "boolean"
+                    },
+                    "rugged": {
+                      "type": "boolean"
+                    },
+                    "vesting_locks": {
+                      "type": "array",
+                      "description": "On-chain-detected Streamflow vesting/lock contracts among top holders, so a long-term-locked whale isn't scored the same as a freely-tradable one.",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "market": {
+                      "type": "object",
+                      "description": "Live price, liquidity, and volume from DexScreener."
+                    },
+                    "checked_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "trial_calls_used": {
+                      "type": "integer"
+                    },
+                    "trial_calls_remaining": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Free trial exhausted (3 checks). upgrade_url points to signup for a real key."
+          }
+        }
       }
     }
   },
