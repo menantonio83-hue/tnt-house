@@ -334,6 +334,14 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogNote: 'No mailing list or webhooks yet for update announcements — this page and the X / Telegram links in the footer are the way to stay current.',
     changelogEntries: [
       {
+        version: 'v1.16',
+        date: '2026-08-22',
+        changes: [
+          "Synced the public OpenAPI spec (openapi.json) with all 5 live API endpoints -- batch, history, webhook subscribe/list, signup, and trial -- previously only the 2 core token-risk endpoints were documented. Also fixed a stale x402 price left over from before the v1.13 cut (spec said $0.07, live price is $0.02).",
+          'Added public/llms.txt -- a machine-readable index of the API built for LLM coding agents (Claude Code, Cursor, etc.) to onboard from directly, following the emerging llms.txt convention.',
+        ],
+      },
+      {
         version: 'v1.15',
         date: '2026-08-21',
         changes: [
@@ -597,6 +605,14 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'Registro de cambios',
     changelogNote: 'Todavía no hay lista de correo ni webhooks para anunciar novedades — esta página y los enlaces de X / Telegram del pie son la forma de mantenerte al día.',
     changelogEntries: [
+      {
+        version: 'v1.16',
+        date: '2026-08-22',
+        changes: [
+          "Se sincronizó la especificación pública OpenAPI (openapi.json) con los 5 endpoints en vivo de la API -- batch, history, webhook subscribe/list, signup y trial -- antes solo estaban documentados los 2 endpoints principales de token-risk. También se corrigió un precio de x402 desactualizado (la especificación decía $0.07, el precio real es $0.02).",
+          'Se añadió public/llms.txt -- un índice de la API legible por máquinas, pensado para que agentes de codificación con LLM (Claude Code, Cursor, etc.) se integren directamente, siguiendo la convención emergente llms.txt.',
+        ],
+      },
       {
         version: 'v1.15',
         date: '2026-08-21',
@@ -862,6 +878,14 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogNote: 'Pas encore de liste de diffusion ni de webhooks pour les annonces — cette page et les liens X / Telegram en pied de page sont le moyen de rester à jour.',
     changelogEntries: [
       {
+        version: 'v1.16',
+        date: '2026-08-22',
+        changes: [
+          "Synchronisation de la spécification OpenAPI publique (openapi.json) avec les 5 endpoints API en production -- batch, history, webhook subscribe/list, signup et trial -- seuls les 2 endpoints principaux token-risk étaient documentés jusqu'ici. Correction également d'un prix x402 obsolète dans la spec (elle indiquait 0,07 $, le prix réel est 0,02 $).",
+          "Ajout de public/llms.txt -- un index de l'API lisible par machine, conçu pour que les agents de codage LLM (Claude Code, Cursor, etc.) s'y intègrent directement, suivant la convention émergente llms.txt.",
+        ],
+      },
+      {
         version: 'v1.15',
         date: '2026-08-21',
         changes: [
@@ -1125,6 +1149,14 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'Ιστορικό αλλαγών',
     changelogNote: 'Δεν υπάρχει ακόμα mailing list ή webhooks για ανακοινώσεις ενημερώσεων — αυτή η σελίδα και οι σύνδεσμοι X / Telegram στο footer είναι ο τρόπος να μένεις ενήμερος.',
     changelogEntries: [
+      {
+        version: 'v1.16',
+        date: '2026-08-22',
+        changes: [
+          'Συγχρονίστηκε το δημόσιο OpenAPI spec (openapi.json) με όλα τα 5 ενεργά endpoints του API -- batch, history, webhook subscribe/list, signup και trial -- μέχρι τώρα ήταν τεκμηριωμένα μόνο τα 2 βασικά endpoints token-risk. Διορθώθηκε επίσης μια παλιά τιμή x402 στο spec (έγραφε $0.07, η πραγματική τιμή είναι $0.02).',
+          'Προστέθηκε το public/llms.txt -- ένα μηχανικά αναγνώσιμο ευρετήριο του API, φτιαγμένο για να μπορούν οι LLM coding agents (Claude Code, Cursor κ.λπ.) να ενσωματωθούν απευθείας, ακολουθώντας τη νέα σύμβαση llms.txt.',
+        ],
+      },
       {
         version: 'v1.15',
         date: '2026-08-21',
@@ -1390,6 +1422,14 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogNote: 'Пока нет рассылки или вебхуков для анонсов обновлений — следить за актуальным состоянием можно по этой странице и ссылкам на X / Telegram в подвале.',
     changelogEntries: [
       {
+        version: 'v1.16',
+        date: '2026-08-22',
+        changes: [
+          'Синхронизирована публичная OpenAPI-спека (openapi.json) со всеми 5 живыми эндпоинтами API -- batch, history, webhook subscribe/list, signup и trial -- раньше были задокументированы только 2 базовых token-risk эндпоинта. Заодно поправлена устаревшая цена x402 в спеке (было указано $0.07, реальная цена -- $0.02).',
+          'Добавлен public/llms.txt -- машиночитаемый индекс API для LLM coding-агентов (Claude Code, Cursor и т.д.), чтобы они могли сразу онбордиться, по новому стандарту llms.txt.',
+        ],
+      },
+      {
         version: 'v1.15',
         date: '2026-08-21',
         changes: [
@@ -1654,6 +1694,14 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogNote: "Non c'è ancora una mailing list o webhook per gli annunci di aggiornamento — questa pagina e i link X / Telegram nel footer sono il modo per restare aggiornati.",
     changelogEntries: [
       {
+        version: 'v1.16',
+        date: '2026-08-22',
+        changes: [
+          "Sincronizzata la spec OpenAPI pubblica (openapi.json) con tutti i 5 endpoint API live -- batch, history, webhook subscribe/list, signup e trial -- finora erano documentati solo i 2 endpoint principali token-risk. Corretto anche un prezzo x402 obsoleto nella spec (indicava $0.07, il prezzo reale è $0.02).",
+          "Aggiunto public/llms.txt -- un indice dell'API leggibile dalle macchine, pensato per gli agenti di coding LLM (Claude Code, Cursor, ecc.) per integrarsi direttamente, seguendo la convenzione emergente llms.txt.",
+        ],
+      },
+      {
         version: 'v1.15',
         date: '2026-08-21',
         changes: [
@@ -1917,6 +1965,14 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: '更新日志',
     changelogNote: '目前还没有邮件列表或 webhook 用于更新通知——请通过本页面以及页脚的 X / Telegram 链接来获取最新动态。',
     changelogEntries: [
+      {
+        version: 'v1.16',
+        date: '2026-08-22',
+        changes: [
+          '同步了公开的 OpenAPI 规范（openapi.json），涵盖全部 5 个已上线的 API 端点——batch、history、webhook subscribe/list、signup 和 trial——此前只记录了 2 个核心 token-risk 端点。同时修复了规范中过时的 x402 价格（原为 $0.07，实际价格为 $0.02）。',
+          '新增 public/llms.txt——一个供 LLM 编程代理（Claude Code、Cursor 等）直接读取的机器可读 API 索引，遵循新兴的 llms.txt 规范。',
+        ],
+      },
       {
         version: 'v1.15',
         date: '2026-08-21',
