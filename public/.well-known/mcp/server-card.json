@@ -1,12 +1,14 @@
 {
   "serverInfo": {
     "name": "tnt-house-risk-data-api",
-    "version": "1.1.0",
-    "description": "Solana token risk-scoring MCP server for AI trading agents — 0-100 safety score, on-chain-provable insider wallet cluster detection (shared first-funder tracing), mint/freeze authority checks, and historical risk data via 3 tools. 3 free anonymous calls/day, no signup, no API key — get a full key with 15 free calls/day at tnt-audit.com/risk-api."
+    "version": "1.2.0",
+    "description": "Solana token safety scanner for AI trading agents \u2014 18-point on-chain check in one call: on-chain-provable insider wallet cluster detection (shared first-funder tracing), mint/freeze authority, honeypot risk, LP lock, holder concentration, hidden owner, permanent delegate, buy/sell tax, and more. 3 free checks/day, no signup, no API key \u2014 15 free/day with an email key at tnt-audit.com/risk-api."
   },
   "authentication": {
     "required": false,
-    "schemes": ["bearer"],
+    "schemes": [
+      "bearer"
+    ],
     "notes": "Bearer token is optional. Without one, calls are limited to 3/day per IP (100/day global cap) as an anonymous trial. With a free API key from tnt-audit.com/risk-api, the limit rises to 15/day."
   },
   "tools": [
@@ -21,29 +23,35 @@
             "description": "The Solana token mint address to check"
           }
         },
-        "required": ["mint"]
+        "required": [
+          "mint"
+        ]
       }
     },
     {
       "name": "check_token_risk_batch",
-      "description": "Same as check_token_risk but for up to 25 mints in one call — N mints charged as N calls, same per-call economics as check_token_risk, no bulk discount. All-or-nothing: if the batch can't be fully covered by remaining quota/credit, the whole batch is rejected rather than partially processed.",
+      "description": "Same as check_token_risk but for up to 25 mints in one call \u2014 N mints charged as N calls, same per-call economics as check_token_risk, no bulk discount. All-or-nothing: if the batch can't be fully covered by remaining quota/credit, the whole batch is rejected rather than partially processed.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "mints": {
             "type": "array",
-            "items": { "type": "string" },
+            "items": {
+              "type": "string"
+            },
             "minItems": 1,
             "maxItems": 25,
             "description": "1-25 Solana token mint addresses"
           }
         },
-        "required": ["mints"]
+        "required": [
+          "mints"
+        ]
       }
     },
     {
       "name": "get_token_risk_history",
-      "description": "Returns hourly historical data points (safety_score, insider_cluster_count, holder_count, price, liquidity, volume) for a mint over the last N days (max 90). Does not count against the free/subscription call quota — pure read from stored history, no live upstream call.",
+      "description": "Returns hourly historical data points (safety_score, insider_cluster_count, holder_count, price, liquidity, volume) for a mint over the last N days (max 90). Does not count against the free/subscription call quota \u2014 pure read from stored history, no live upstream call.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -58,7 +66,9 @@
             "description": "How many days of history to return (default 30, max 90)"
           }
         },
-        "required": ["mint"]
+        "required": [
+          "mint"
+        ]
       }
     }
   ],
