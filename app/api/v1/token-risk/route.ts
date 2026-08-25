@@ -1,3 +1,38 @@
+// Version 1.12 — app/api/v1/token-risk/route.ts
+//
+// v1.12: adds a zero-key anonymous demo path, mirroring app/api/mcp/
+// route.ts v1.2/v1.3 exactly. Context: Supabase logs showed a steady
+// trickle of GET requests to this endpoint with NO Authorization
+// header at all (status 401, error "unauthorized") — people finding
+// the API via RapidAPI/Postman/raw curl (not through an MCP client)
+// hit a hard wall on their very first try and never came back, while
+// the MCP endpoint's check_token_risk tool already had a working
+// no-key demo allowance. This closes that gap for the REST path too.
+//
+// Fix: if requireApiKey() fails for ANY reason (missing header,
+// malformed key, invalid/revoked key), don't return 401 immediately —
+// fall through to checkDemoLimit() (lib/demo-limit.ts, same Redis
+// counters the MCP demo path already uses: 3/day per IP, 100/day
+// global across BOTH channels combined). If the demo allowance is
+// available, serve the real result with keyId: null, same as an
+// authenticated call minus the X-RateLimit-* / X-Credit-Balance-Usd
+// headers (those only make sense for a real key's quota). If the demo
+// allowance is exhausted, return the same explanatory upsell message
+// the MCP path uses instead of a bare "Unauthorized".
+//
+// Deliberately reuses the SAME Redis counters as the MCP demo path
+// (not a separate REST-only pool) — the global 100/day cap exists to
+// bound total unauthenticated upstream cost (Helius/DexScreener calls
+// via fetchTokenRisk) for the whole service, and that cost is the same
+// regardless of which channel the anonymous caller came in through.
+//
+// This is NOT the same as the website's fingerprint-based free trial
+// (anon_trials table, app/page.js) — that's a separate mechanism for
+// tnt-audit.com's own UI. This is the demo tier for people calling the
+// API directly. Also NOT the same as the real 15/day free tier that
+// comes with a signed-up API key (lib/rate-limit.ts FREE_DAILY_LIMIT)
+// — every demo response upsells getting a real key for that.
+//
 // Version 1.11 — app/api/v1/token-risk/route.ts
 //
 // v1.11: pure refactor, no behavior change. Per-mint fetch/scoring logic
@@ -52,7 +87,9 @@
 // upstream degrades the response instead of hanging it.
 //
 // GET /api/v1/token-risk?mint=<mint_address>   (or ?ca=<mint_address>)
-// Header: Authorization: Bearer <api_key>
+// Header: Authorization: Bearer <api_key>   (optional — see v1.12 above;
+// omitting it, or sending an invalid one, now gets a limited demo
+// response instead of a bare 401)
 //
 // Design decisions locked in so far:
 // - Accepts `mint` or `ca` as aliases for the same parameter.
@@ -66,15 +103,21 @@
 //   a minute or two later gets cluster_analysis: "complete" with real data.
 // - honeypot_risk / lp_locked: not implemented in the engine yet, stay
 //   null with an explanatory `note` field — schema won't change later.
-// - Every request requires a valid API key (see lib/api-auth.ts). Keys
-//   are minted via app/api/v1/admin/keys (temporary, until Stage 5's
-//   public signup form).
-// - free tier: 100 requests / calendar day (UTC). paid tier: unlimited
-//   (tier is set by hand for now — see lib/rate-limit.ts). The counter
-//   increments on every authenticated call, even ones that fail
-//   validation afterward (bad mint, upstream error).
+// - A real API key gets the full authenticated behavior (see
+//   lib/api-auth.ts). Keys are minted via app/api/v1/admin/keys
+//   (temporary, until Stage 5's public signup form). No key at all, or
+//   an invalid one, gets the v1.12 limited demo path instead of a flat
+//   rejection.
+// - free tier (with a real key): 15 requests / calendar day, shared
+//   100/day pool across all free keys. paid tier: unlimited (tier is
+//   set by hand for now — see lib/rate-limit.ts). The counter increments
+//   on every authenticated call, even ones that fail validation
+//   afterward (bad mint, upstream error).
+// - demo tier (no key, v1.12): 3 requests/day per IP, 100/day global —
+//   see lib/demo-limit.ts. Shared Redis counters with the MCP demo path.
 // - Every response (2xx/4xx/5xx) is logged via lib/request-logger.ts —
 //   fire-and-forget, never blocks or fails the actual API response.
+//   Demo responses log with keyId: null, same as before.
 //
 // Requires: `npm install @vercel/functions` (provides waitUntil() so the
 // background cluster job and the request log write both keep running
@@ -86,6 +129,7 @@ import { requireApiKey } from '@/lib/api-auth';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { logApiRequest } from '@/lib/request-logger';
 import { fetchTokenRisk } from '@/lib/token-risk-core';
+import { checkDemoLimit } from '@/lib/demo-limit';
 
 // Background job itself can take up to 60s (same budget as the existing
 // cluster-check feature) — waitUntil() (inside lib/token-risk-core.ts)
@@ -104,6 +148,17 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
+
+// Best-effort client IP for the anonymous demo limiter ONLY — never used
+// for auth or billing of a real key. Identical to the helper in
+// app/api/mcp/route.ts; kept as a literal duplicate rather than a shared
+// lib import, same reasoning as that file's MAX_BATCH_SIZE note — this
+// is a two-line, route-local concern, not worth a shared module.
+function extractClientIp(request: NextRequest): string {
+  const forwardedFor = request.headers.get('x-forwarded-for');
+  if (forwardedFor) return forwardedFor.split(',')[0].trim();
+  return 'unknown';
+}
 
 export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
@@ -139,41 +194,53 @@ export async function GET(request: NextRequest) {
   try {
     // 0. Auth first — before spending a single RPC call on an unpaid request.
     const auth = await requireApiKey(request, CORS_HEADERS);
-    if (!auth.ok) {
-      return respond(
-        auth.response ??
-          NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: CORS_HEADERS }),
-        { error: 'unauthorized' },
-      );
-    }
-    if (!auth.key) {
-      // Defensive — should be unreachable when auth.ok is true, but keeps
-      // this branch type-safe without relying on cross-field narrowing.
-      return respond(
-        NextResponse.json({ error: 'Unauthorized' }, { status: 401, headers: CORS_HEADERS }),
-        { error: 'unauthorized' },
-      );
-    }
-    keyId = auth.key.id;
 
-    // 0.5. Rate limit — counts against the key's daily quota before any
-    // RPC work happens, whether or not the request turns out valid.
-    const rateLimit = await enforceRateLimit(auth.key, CORS_HEADERS);
-    if (!rateLimit.allowed) {
-      return respond(
-        rateLimit.response ??
-          NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429, headers: CORS_HEADERS }),
-        { error: 'rate_limited' },
-      );
-    }
+    // Response headers built up differently depending on which path we
+    // end up on below — real key gets rate-limit/credit headers, demo
+    // gets none (there's no quota to report), so this starts as just
+    // CORS and gets extended only in the authenticated branch.
+    let responseHeaders: Record<string, string> = { ...CORS_HEADERS };
+    let isDemoCall = false;
 
-    const rateLimitHeaders: Record<string, string> = { ...CORS_HEADERS, 'X-RateLimit-Reset': rateLimit.resetAt };
-    if (rateLimit.limit !== null) {
-      rateLimitHeaders['X-RateLimit-Limit'] = String(rateLimit.limit);
-      rateLimitHeaders['X-RateLimit-Remaining'] = String(rateLimit.remaining ?? 0);
-    }
-    if (rateLimit.creditBalanceUsd !== null) {
-      rateLimitHeaders['X-Credit-Balance-Usd'] = rateLimit.creditBalanceUsd.toFixed(4);
+    if (auth.ok && auth.key) {
+      keyId = auth.key.id;
+
+      // 0.5. Rate limit — counts against the key's daily quota before any
+      // RPC work happens, whether or not the request turns out valid.
+      const rateLimit = await enforceRateLimit(auth.key, CORS_HEADERS);
+      if (!rateLimit.allowed) {
+        return respond(
+          rateLimit.response ??
+            NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429, headers: CORS_HEADERS }),
+          { error: 'rate_limited' },
+        );
+      }
+
+      responseHeaders = { ...CORS_HEADERS, 'X-RateLimit-Reset': rateLimit.resetAt };
+      if (rateLimit.limit !== null) {
+        responseHeaders['X-RateLimit-Limit'] = String(rateLimit.limit);
+        responseHeaders['X-RateLimit-Remaining'] = String(rateLimit.remaining ?? 0);
+      }
+      if (rateLimit.creditBalanceUsd !== null) {
+        responseHeaders['X-Credit-Balance-Usd'] = rateLimit.creditBalanceUsd.toFixed(4);
+      }
+    } else {
+      // v1.12: no valid key — try the small anonymous demo allowance
+      // instead of an immediate Unauthorized, mirroring app/api/mcp/
+      // route.ts's check_token_risk demo carve-out exactly.
+      isDemoCall = true;
+      const clientIp = extractClientIp(request);
+      const demo = await checkDemoLimit(clientIp);
+      if (!demo.allowed) {
+        const message =
+          demo.reason === 'global'
+            ? `Anonymous demo calls are at today's site-wide cap (${demo.limit}/day across all visitors) — try again after UTC midnight, or get a free API key for guaranteed access at https://tnt-audit.com/risk-api`
+            : `Demo limit reached (${demo.limit} free calls/day without a key). Get a free API key with a real 15/day quota at https://tnt-audit.com/risk-api`;
+        return respond(
+          NextResponse.json({ error: message }, { status: 401, headers: CORS_HEADERS }),
+          { error: 'demo_limit_exceeded' },
+        );
+      }
     }
 
     const { searchParams } = new URL(request.url);
@@ -183,7 +250,7 @@ export async function GET(request: NextRequest) {
       return respond(
         NextResponse.json(
           { error: 'Missing required parameter: mint (or ca)' },
-          { status: 400, headers: rateLimitHeaders },
+          { status: 400, headers: responseHeaders },
         ),
         { error: 'missing_mint' },
       );
@@ -198,7 +265,7 @@ export async function GET(request: NextRequest) {
       return respond(
         NextResponse.json(
           { error: result.error ?? 'Unknown error', ...(result.details ? { details: result.details } : {}) },
-          { status: result.status ?? 502, headers: rateLimitHeaders },
+          { status: result.status ?? 502, headers: responseHeaders },
         ),
         { error: result.error ?? 'unknown_error' },
       );
@@ -237,8 +304,15 @@ export async function GET(request: NextRequest) {
           market: result.market,
           note: result.note,
           checked_at: result.checked_at,
+          ...(isDemoCall
+            ? {
+                _demo: {
+                  note: 'This is a free anonymous demo response (limited per day). Get a free API key with a full 15/day quota at https://tnt-audit.com/risk-api',
+                },
+              }
+            : {}),
         },
-        { headers: rateLimitHeaders },
+        { headers: responseHeaders },
       ),
       { safetyScore: result.safety_score, clusterAnalysis: result.cluster_analysis },
     );
