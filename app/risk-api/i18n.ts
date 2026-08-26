@@ -1,3 +1,15 @@
+// Version 1.8 — app/risk-api/i18n.ts
+//
+// v1.8: new btnTryFree key x 7 languages. Context: the hero's only CTA
+// (btnGetKey, "Get a free API key") linked straight to #get-key — the
+// EMAIL signup form — even though the zero-friction, no-email TryItWidget
+// (3 free checks via browser fingerprint, just paste a mint/CA) sits in
+// the very next section on the same page. A visitor scanning the hero
+// saw one button, clicked it, and landed on an email form without ever
+// noticing the actually-free-right-now widget one scroll below. This
+// key powers a new primary button (RiskApiPageContent.tsx v1.7) linking
+// to #try-it instead, with btnGetKey demoted to secondary.
+//
 // Version 1.7 — app/risk-api/i18n.ts
 //
 // v1.7: fieldVestingLocks description key x 7 languages, plus a v1.12
@@ -103,6 +115,7 @@ export interface RiskApiTranslations {
   heroTitle1: string;
   heroTitle2: string;
   heroSub: string;
+  btnTryFree: string;
   btnGetKey: string;
   btnReadDocs: string;
 
@@ -275,6 +288,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     heroTitle1: 'Know what a token is hiding',
     heroTitle2: 'before your bot buys it.',
     heroSub: 'One GET request returns a safety score, live insider-cluster detection, and on-chain fundamentals for any Solana mint — the same engine behind TNT House audits, exposed as clean JSON for bots instead of a dashboard for humans.',
+    btnTryFree: 'Try it free — no email',
     btnGetKey: 'Get a free API key',
     btnReadDocs: 'Read the docs',
     copyCurl: 'Copy curl',
@@ -547,6 +561,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     heroTitle1: 'Descubre qué esconde un token',
     heroTitle2: 'antes de que tu bot lo compre.',
     heroSub: 'Una sola petición GET devuelve una puntuación de seguridad, detección de clústeres de insiders en tiempo real y datos fundamentales on-chain de cualquier mint de Solana — el mismo motor detrás de las auditorías de TNT House, expuesto como JSON limpio para bots en lugar de un panel para humanos.',
+    btnTryFree: 'Pruébalo gratis — sin email',
     btnGetKey: 'Obtener una API key gratis',
     btnReadDocs: 'Leer la documentación',
     copyCurl: 'Copiar curl',
@@ -819,6 +834,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     heroTitle1: 'Découvrez ce qu\'un token cache',
     heroTitle2: 'avant que votre bot ne l\'achète.',
     heroSub: 'Une seule requête GET renvoie un score de sécurité, une détection en temps réel des clusters d\'insiders et les fondamentaux on-chain de n\'importe quel mint Solana — le même moteur que les audits TNT House, exposé en JSON propre pour les bots plutôt qu\'un tableau de bord pour humains.',
+    btnTryFree: 'Essayez gratuitement — sans email',
     btnGetKey: 'Obtenir une clé API gratuite',
     btnReadDocs: 'Lire la documentation',
     copyCurl: 'Copier curl',
@@ -1091,6 +1107,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     heroTitle1: 'Μάθε τι κρύβει ένα token',
     heroTitle2: 'πριν το αγοράσει το bot σου.',
     heroSub: 'Ένα μόνο αίτημα GET επιστρέφει βαθμολογία ασφάλειας, ανίχνευση insider-cluster σε πραγματικό χρόνο και on-chain θεμελιώδη στοιχεία για κάθε Solana mint — η ίδια μηχανή πίσω από τα audits του TNT House, εκτεθειμένη ως καθαρό JSON για bots αντί για dashboard για ανθρώπους.',
+    btnTryFree: 'Δοκίμασέ το δωρεάν — χωρίς email',
     btnGetKey: 'Πάρε δωρεάν API key',
     btnReadDocs: 'Διάβασε την τεκμηρίωση',
     copyCurl: 'Αντιγραφή curl',
@@ -1363,6 +1380,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     heroTitle1: 'Узнай, что скрывает токен,',
     heroTitle2: 'прежде чем его купит твой бот.',
     heroSub: 'Один GET-запрос возвращает Safety Score, детект инсайдерских кластеров в реальном времени и он-чейн показатели для любого Solana-минта — тот же движок, что стоит за аудитами TNT House, только в виде чистого JSON для ботов, а не дашборда для людей.',
+    btnTryFree: 'Попробовать бесплатно — без email',
     btnGetKey: 'Получить бесплатный API-ключ',
     btnReadDocs: 'Читать документацию',
     copyCurl: 'Скопировать curl',
@@ -1635,6 +1653,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     heroTitle1: 'Scopri cosa nasconde un token',
     heroTitle2: 'prima che il tuo bot lo compri.',
     heroSub: 'Una singola richiesta GET restituisce un punteggio di sicurezza, il rilevamento in tempo reale dei cluster di insider e i fondamentali on-chain per qualsiasi mint Solana — lo stesso motore degli audit di TNT House, esposto come JSON pulito per i bot invece di una dashboard per gli umani.',
+    btnTryFree: 'Provalo gratis — senza email',
     btnGetKey: 'Ottieni una API key gratuita',
     btnReadDocs: 'Leggi la documentazione',
     copyCurl: 'Copia curl',
@@ -1907,6 +1926,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     heroTitle1: '在你的机器人买入之前',
     heroTitle2: '先看清代币在隐藏什么。',
     heroSub: '一次 GET 请求即可获取安全评分、实时内部人集群检测，以及任意 Solana mint 的链上基本面数据 —— 与 TNT House 审计所用的同一套引擎，以纯净的 JSON 形式面向机器人开放，而不是面向人类的仪表盘。',
+    btnTryFree: '免费试用 — 无需邮箱',
     btnGetKey: '获取免费 API 密钥',
     btnReadDocs: '查看文档',
     copyCurl: '复制 curl',
