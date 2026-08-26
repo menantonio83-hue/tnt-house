@@ -1,5 +1,7 @@
 # TNT House — RiskDataApi
 
+🚀 **3 free calls/day, no signup, no API key.** Remote MCP server for Claude/Cursor — Solana token risk scoring & insider wallet cluster detection.
+
 [![MCP Marketplace](https://img.shields.io/badge/MCP%20Marketplace-Indexed-blueviolet)](https://getlulu.dev/mcps)
 
 TNT House ([tnt-audit.com/risk-api](https://www.tnt-audit.com/risk-api)) is an AI-powered Solana token audit and listing platform: safety scoring, insider wallet cluster detection, mint/freeze authority checks, honeypot and LP-lock detection.
@@ -8,7 +10,20 @@ This repository also hosts a remote **Model Context Protocol (MCP) server** expo
 
 ## Getting Started (3 steps)
 
-1. **Try it now, no signup** — call `check_token_risk` right here in Glama's "Try in Browser" / Inspector, or via curl. **In the "Try in Browser" popup, the `TNT_API_KEY` field is optional — leave it empty and click "Start Inspector" directly.** No API key needed for your first **3 calls/day** (per IP).
+1. **Try it now, no signup** — no API key needed for your first **3 calls/day** (per IP). Three ways, pick whichever is easiest:
+   - **Claude Desktop / Cursor** — paste this into your MCP config, no key required:
+     ```json
+     {
+       "mcpServers": {
+         "tnt-risk-data-api": {
+           "command": "npx",
+           "args": ["-y", "mcp-remote", "https://tnt-audit.com/api/mcp"]
+         }
+       }
+     }
+     ```
+   - **Browser, zero setup** — open [a live example](https://tnt-audit.com/api/v1/token-risk?mint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v) directly, no install, no signup.
+   - **Glama's MCP Inspector** — go to [glama.ai/mcp/inspector](https://glama.ai/mcp/inspector) and paste `https://tnt-audit.com/api/mcp` as the server URL.
 2. **Want more?** — get a free API key in seconds at [tnt-audit.com/risk-api](https://www.tnt-audit.com/risk-api) (email only, no card). A free key raises your limit to **15 calls/day**.
 3. **Need higher volume?** — on the same page, paste your key into the pricing section and pay per-call ($0.04), by subscription ($45/1000 calls), or via x402 (autonomous agents, no key at all, $0.02/call).
 
