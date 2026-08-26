@@ -1,3 +1,14 @@
+// Version 1.11 — app/risk-api/RiskApiPageContent.tsx
+//
+// v1.11: hero CTA order fixed. The only button used to be btnGetKey
+// linking to #get-key (the EMAIL signup form) — a visitor clicked the
+// one button they saw and landed on an email form, never noticing
+// TryItWidget (3 free checks, no email, just paste a mint/CA) sitting
+// in the very next section on the same page. Now the primary
+// (gradient) button is btnTryFree -> #try-it (new id added to that
+// section), with btnGetKey demoted to a secondary outlined button
+// alongside btnReadDocs. See i18n.ts v1.8 for the new copy key.
+//
 // Version 1.10 — app/risk-api/RiskApiPageContent.tsx
 //
 // v1.10 price cut (4-model consensus: self + Kimi + DeepSeek + Gemini,
@@ -331,8 +342,14 @@ export default function RiskApiPageContent() {
           </p>
           <div className="flex flex-wrap gap-3">
             <a
-              href="#get-key"
+              href="#try-it"
               className="bg-gradient-to-r from-purple-500 to-emerald-400 hover:from-purple-400 hover:to-emerald-300 text-slate-950 font-black px-5 py-3 rounded text-sm transition shadow-[0_0_15px_rgba(153,69,255,0.4)]"
+            >
+              {t.btnTryFree}
+            </a>
+            <a
+              href="#get-key"
+              className="border border-purple-500/40 hover:border-purple-400 text-purple-300 hover:text-white font-bold px-5 py-3 rounded text-sm transition"
             >
               {t.btnGetKey}
             </a>
@@ -345,8 +362,10 @@ export default function RiskApiPageContent() {
           </div>
         </section>
 
-        {/* Anon trial widget — no signup, 3 free checks via browser fingerprint */}
-        <section className="pb-14">
+        {/* Anon trial widget — no signup, 3 free checks via browser fingerprint.
+            id="try-it" is the target of the hero's primary CTA (v1.7) — this
+            used to be reachable only by scrolling past the hero unprompted. */}
+        <section id="try-it" className="pb-14 scroll-mt-20">
           <TryItWidget />
         </section>
 
