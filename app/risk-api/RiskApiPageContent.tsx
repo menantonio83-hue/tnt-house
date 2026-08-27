@@ -355,29 +355,29 @@ export default function RiskApiPageContent({ requestsServed }: { requestsServed:
           <p className="text-sm sm:text-base text-slate-400 max-w-2xl mb-8 leading-relaxed">
             {t.heroSub}
           </p>
-          <div className="flex flex-wrap gap-3">
+          <div className="grid grid-cols-2 gap-3 max-w-md">
             <a
               href="#try-it"
-              className="bg-gradient-to-r from-purple-500 to-emerald-400 hover:from-purple-400 hover:to-emerald-300 text-slate-950 font-black px-5 py-3 rounded text-sm transition shadow-[0_0_15px_rgba(153,69,255,0.4)]"
+              className="flex items-center justify-center text-center bg-gradient-to-r from-purple-500 to-emerald-400 hover:from-purple-400 hover:to-emerald-300 text-slate-950 font-black px-4 py-3 rounded text-sm transition shadow-[0_0_15px_rgba(153,69,255,0.4)]"
             >
               {t.btnTryFree}
             </a>
             <a
               href="#get-key"
-              className="border border-purple-500/40 hover:border-purple-400 text-purple-300 hover:text-white font-bold px-5 py-3 rounded text-sm transition"
+              className="flex items-center justify-center text-center border border-purple-500/40 hover:border-purple-400 text-purple-300 hover:text-white font-bold px-4 py-3 rounded text-sm transition"
             >
               {t.btnGetKey}
             </a>
             <a
               href="/risk-api/docs"
-              className="border border-purple-500/40 hover:border-purple-400 text-purple-300 hover:text-white font-bold px-5 py-3 rounded text-sm transition"
+              className="flex items-center justify-center text-center border border-purple-500/40 hover:border-purple-400 text-purple-300 hover:text-white font-bold px-4 py-3 rounded text-sm transition"
             >
               {t.btnReadDocs}
             </a>
             <button
               type="button"
               onClick={() => window.dispatchEvent(new Event('open-risk-api-chat'))}
-              className="flex items-center gap-1.5 border border-purple-500/40 hover:border-purple-400 text-purple-300 hover:text-white font-bold px-5 py-3 rounded text-sm transition"
+              className="flex items-center justify-center gap-1.5 text-center border border-purple-500/40 hover:border-purple-400 text-purple-300 hover:text-white font-bold px-4 py-3 rounded text-sm transition"
             >
               <MessageCircle size={15} />
               {t.btnSiteAssistant}
