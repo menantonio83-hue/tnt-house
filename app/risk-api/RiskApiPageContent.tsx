@@ -117,7 +117,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Bot, Shield, Terminal, Database, Lock, Zap, CheckCircle2, Puzzle } from 'lucide-react';
+import { Bot, Shield, Terminal, Database, Lock, Zap, CheckCircle2, Puzzle, MessageCircle } from 'lucide-react';
 import CopyButton from './CopyButton';
 import RiskApiSignupForm from './RiskApiSignupForm';
 import TryItWidget from './TryItWidget';
@@ -374,6 +374,14 @@ export default function RiskApiPageContent({ requestsServed }: { requestsServed:
             >
               {t.btnReadDocs}
             </a>
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new Event('open-risk-api-chat'))}
+              className="flex items-center gap-1.5 border border-purple-500/40 hover:border-purple-400 text-purple-300 hover:text-white font-bold px-5 py-3 rounded text-sm transition"
+            >
+              <MessageCircle size={15} />
+              {t.btnSiteAssistant}
+            </button>
           </div>
 
           {requestsServed !== null && requestsServed > 0 && (

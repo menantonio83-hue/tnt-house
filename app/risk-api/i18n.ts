@@ -119,6 +119,7 @@ export interface RiskApiTranslations {
   btnTryFree: string;
   btnGetKey: string;
   btnReadDocs: string;
+  btnSiteAssistant: string;
 
   // Docs terminal
   copyCurl: string;
@@ -296,6 +297,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     btnTryFree: 'Try it free — no email',
     btnGetKey: 'Get a free API key',
     btnReadDocs: 'Read the docs',
+    btnSiteAssistant: 'Site Assistant',
     copyCurl: 'Copy curl',
     howItWorksTitle: 'How it works',
     integrationsTitle: 'Connect your bot or agent',
@@ -573,6 +575,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     btnTryFree: 'Pruébalo gratis — sin email',
     btnGetKey: 'Obtener una API key gratis',
     btnReadDocs: 'Leer la documentación',
+    btnSiteAssistant: 'Asistente del sitio',
     copyCurl: 'Copiar curl',
     howItWorksTitle: 'Cómo funciona',
     integrationsTitle: 'Conecta tu bot o agente',
@@ -850,6 +853,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     btnTryFree: 'Essayez gratuitement — sans email',
     btnGetKey: 'Obtenir une clé API gratuite',
     btnReadDocs: 'Lire la documentation',
+    btnSiteAssistant: 'Assistant du site',
     copyCurl: 'Copier curl',
     howItWorksTitle: 'Comment ça marche',
     integrationsTitle: 'Connectez votre bot ou agent',
@@ -1127,6 +1131,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     btnTryFree: 'Δοκίμασέ το δωρεάν — χωρίς email',
     btnGetKey: 'Πάρε δωρεάν API key',
     btnReadDocs: 'Διάβασε την τεκμηρίωση',
+    btnSiteAssistant: 'Βοηθός ιστότοπου',
     copyCurl: 'Αντιγραφή curl',
     howItWorksTitle: 'Πώς λειτουργεί',
     integrationsTitle: 'Σύνδεσε το bot ή τον agent σου',
@@ -1404,6 +1409,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     btnTryFree: 'Попробовать бесплатно — без email',
     btnGetKey: 'Получить бесплатный API-ключ',
     btnReadDocs: 'Читать документацию',
+    btnSiteAssistant: 'Помощник по сайту',
     copyCurl: 'Скопировать curl',
     howItWorksTitle: 'Как это работает',
     integrationsTitle: 'Подключи своего бота или агента',
@@ -1681,6 +1687,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     btnTryFree: 'Provalo gratis — senza email',
     btnGetKey: 'Ottieni una API key gratuita',
     btnReadDocs: 'Leggi la documentazione',
+    btnSiteAssistant: 'Assistente del sito',
     copyCurl: 'Copia curl',
     howItWorksTitle: 'Come funziona',
     integrationsTitle: 'Collega il tuo bot o agente',
@@ -1958,6 +1965,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     btnTryFree: '免费试用 — 无需邮箱',
     btnGetKey: '获取免费 API 密钥',
     btnReadDocs: '查看文档',
+    btnSiteAssistant: '网站助手',
     copyCurl: '复制 curl',
     howItWorksTitle: '工作原理',
     integrationsTitle: '连接你的机器人或智能体',
