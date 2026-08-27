@@ -117,7 +117,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Bot, Shield, Terminal, Database, Lock, Zap, CheckCircle2 } from 'lucide-react';
+import { Bot, Shield, Terminal, Database, Lock, Zap, CheckCircle2, Puzzle } from 'lucide-react';
 import CopyButton from './CopyButton';
 import RiskApiSignupForm from './RiskApiSignupForm';
 import TryItWidget from './TryItWidget';
@@ -216,6 +216,37 @@ const CODE_EXAMPLES: Record<CodeTab, { label: string; code: string }> = {
   typescript: { label: 'TypeScript', code: TYPESCRIPT_EXAMPLE },
 };
 
+type IntegrationId = 'claude' | 'chatgpt' | 'elizaos' | 'rest';
+
+const CLAUDE_MCP_CONFIG = `{
+  "mcpServers": {
+    "tnt-risk-data-api": {
+      "command": "npx",
+      "args": [
+        "-y", "mcp-remote",
+        "https://tnt-audit.com/api/mcp",
+        "--header", "Authorization: Bearer tnt_sk_your_key_here"
+      ]
+    }
+  }
+}`;
+
+const CHATGPT_ACTION_URL = 'https://tnt-audit.com/openapi.json';
+
+const ELIZAOS_INSTALL = `npm install eliza-plugin-tnt-risk-api`;
+
+const INTEGRATIONS: Array<{
+  id: IntegrationId;
+  label: string;
+  snippetLabel: string;
+  snippet: string;
+}> = [
+  { id: 'claude', label: 'Claude / Cursor', snippetLabel: 'claude_desktop_config.json (MCP)', snippet: CLAUDE_MCP_CONFIG },
+  { id: 'chatgpt', label: 'ChatGPT', snippetLabel: 'Custom GPT Action — Import from URL', snippet: CHATGPT_ACTION_URL },
+  { id: 'elizaos', label: 'ElizaOS', snippetLabel: 'npm install', snippet: ELIZAOS_INSTALL },
+  { id: 'rest', label: 'Custom REST', snippetLabel: 'curl', snippet: CURL_EXAMPLE },
+];
+
 const EXAMPLE_RESPONSE = {
   mint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
   safety_score: 78,
@@ -267,6 +298,7 @@ const EXAMPLE_RESPONSE = {
 export default function RiskApiPageContent({ requestsServed }: { requestsServed: number | null }) {
   const { t } = useRiskApiLang();
   const [codeTab, setCodeTab] = useState<CodeTab>('curl');
+  const [activeIntegration, setActiveIntegration] = useState<IntegrationId | null>(null);
 
   const steps = [
     { icon: Zap, title: t.step1Title, desc: t.step1Desc },
@@ -399,16 +431,81 @@ export default function RiskApiPageContent({ requestsServed }: { requestsServed:
               </div>
 
               <div className="border-t border-purple-500/10 pt-3">
-                <pre className="text-[10px] sm:text-[11px] text-slate-300 overflow-x-auto leading-relaxed max-h-96">
-                  {JSON.stringify(EXAMPLE_RESPONSE, null, 2)}
+                {/* Condensed JSON as a visual, not a reference table — per
+                    Kimi's landing/docs audit (2026-08-27): a demo should
+                    show what you get, not explain every field. safety_score
+                    and insider_clusters (the two fields the hero copy
+                    actually promises) are pulled straight/highlighted,
+                    everything else collapses behind "...". Full field-by-
+                    field descriptions live at /risk-api/docs#reference. */}
+                <pre className="text-[10px] sm:text-[11px] text-slate-300 overflow-x-auto leading-relaxed">
+{'{\n  "safety_score": '}<span className={
+                    EXAMPLE_RESPONSE.safety_score >= 70
+                      ? 'text-emerald-400 font-bold'
+                      : EXAMPLE_RESPONSE.safety_score >= 40
+                        ? 'text-amber-400 font-bold'
+                        : 'text-red-400 font-bold'
+                  }>{EXAMPLE_RESPONSE.safety_score}</span>{',\n  "insider_clusters": '}<span className={
+                    EXAMPLE_RESPONSE.insider_clusters.length > 0 ? 'text-red-400 font-bold' : 'text-emerald-400 font-bold'
+                  }>{JSON.stringify(EXAMPLE_RESPONSE.insider_clusters)}</span>{',\n  "honeypot_risk": '}<span className={EXAMPLE_RESPONSE.honeypot_risk ? 'text-red-400' : 'text-emerald-400'}>{String(EXAMPLE_RESPONSE.honeypot_risk)}</span>{',\n  "lp_locked": '}<span className={EXAMPLE_RESPONSE.lp_locked.locked ? 'text-emerald-400' : 'text-amber-400'}>{JSON.stringify(EXAMPLE_RESPONSE.lp_locked)}</span>{',\n  ...\n}'}
                 </pre>
               </div>
 
-              <p className="text-[10px] text-slate-500 leading-relaxed border-t border-purple-500/10 pt-3">
-                {t.openApiUsageNote}
-              </p>
+              <a
+                href="/risk-api/docs#reference"
+                className="inline-flex items-center gap-1.5 text-[11px] font-bold text-purple-300 hover:text-white transition border-t border-purple-500/10 pt-3 w-full"
+              >
+                {t.btnReadDocs} →
+              </a>
             </div>
           </div>
+        </section>
+
+        {/* Integrations — cards, not prose. Per Kimi's audit: "Where are
+            the buttons? Where's Add to ChatGPT, Add to Claude, Install
+            ElizaOS plugin?" Click a card, snippet expands below it. */}
+        <section className="pb-14">
+          <h2 className="text-xl sm:text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400 mb-1.5">
+            {t.integrationsTitle}
+          </h2>
+          <p className="text-xs text-slate-400 mb-5">{t.integrationsHint}</p>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {INTEGRATIONS.map((integration) => (
+              <button
+                key={integration.id}
+                onClick={() => setActiveIntegration(activeIntegration === integration.id ? null : integration.id)}
+                className={
+                  'flex flex-col items-center justify-center gap-2 rounded-lg border p-4 text-center transition ' +
+                  (activeIntegration === integration.id
+                    ? 'border-emerald-400 bg-emerald-500/10'
+                    : 'border-purple-500/30 bg-slate-900/40 hover:border-purple-400')
+                }
+              >
+                <Puzzle size={18} className={activeIntegration === integration.id ? 'text-emerald-400' : 'text-purple-400'} />
+                <span className="text-xs font-bold text-white">{integration.label}</span>
+              </button>
+            ))}
+          </div>
+
+          {activeIntegration && (
+            <div className="mt-4 bg-slate-950 border-2 border-emerald-500/30 rounded-lg shadow-[0_0_20px_rgba(16,185,129,0.1)] overflow-hidden">
+              <div className="flex items-center justify-between border-b border-emerald-500/20 px-4 py-2.5">
+                <span className="text-[11px] text-slate-500">
+                  {INTEGRATIONS.find((i) => i.id === activeIntegration)?.snippetLabel}
+                </span>
+              </div>
+              <div className="p-4 flex items-start justify-between gap-2">
+                <pre className="text-[11px] sm:text-xs text-emerald-400 overflow-x-auto flex-1 leading-relaxed whitespace-pre-wrap">
+                  {INTEGRATIONS.find((i) => i.id === activeIntegration)?.snippet}
+                </pre>
+                <CopyButton
+                  text={INTEGRATIONS.find((i) => i.id === activeIntegration)?.snippet ?? ''}
+                  label={t.copyLabel}
+                />
+              </div>
+            </div>
+          )}
         </section>
 
         {/* How it works — a real 3-step sequence, so numbering earns its place */}
