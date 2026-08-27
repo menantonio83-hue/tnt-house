@@ -94,6 +94,8 @@
 const RUGCHECK_URL = 'https://api.rugcheck.xyz/v1/tokens';
 const RUGCHECK_TIMEOUT_MS = 8000;
 
+import { alertAdmin } from './telegram-alert';
+
 export interface RugCheckRiskData {
   // true = RugCheck's risk list names a honeypot-shaped risk; false =
   // report fetched cleanly with no such risk; null = couldn't check.
@@ -226,8 +228,13 @@ export async function getRugCheckRiskData(mint: string): Promise<RugCheckRiskDat
       dev_wallet_percent,
       token_program,
     };
-  } catch {
-    // Timeout (AbortSignal), network failure, or invalid JSON.
+  } catch (err) {
+    // Timeout (AbortSignal), network failure, or invalid JSON — a real
+    // service problem, distinct from the !res.ok branch above (which
+    // covers ordinary per-token misses, e.g. RugCheck hasn't indexed a
+    // brand-new mint yet) that we deliberately do NOT alert on to avoid
+    // noise from expected per-token quirks.
+    void alertAdmin('rugcheck', err instanceof Error ? err.message : String(err));
     return EMPTY_RESULT;
   }
 }
