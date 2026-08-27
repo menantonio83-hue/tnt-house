@@ -264,7 +264,7 @@ const EXAMPLE_RESPONSE = {
   checked_at: '2026-07-18T12:00:00.000Z',
 };
 
-export default function RiskApiPageContent() {
+export default function RiskApiPageContent({ requestsServed }: { requestsServed: number | null }) {
   const { t } = useRiskApiLang();
   const [codeTab, setCodeTab] = useState<CodeTab>('curl');
 
@@ -343,6 +343,12 @@ export default function RiskApiPageContent() {
               {t.btnReadDocs}
             </a>
           </div>
+
+          {requestsServed !== null && requestsServed > 0 && (
+            <p className="text-[11px] text-slate-500 mt-5 tracking-wide">
+              {t.statsLine.replace('{n}', String(requestsServed))}
+            </p>
+          )}
         </section>
 
         {/* Anon trial widget — no signup, 3 free checks via browser fingerprint.

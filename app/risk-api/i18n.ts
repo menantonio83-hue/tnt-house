@@ -112,6 +112,7 @@ export interface RiskApiTranslations {
 
   // Hero
   heroEyebrow: string;
+  statsLine: string;
   heroTitle1: string;
   heroTitle2: string;
   heroSub: string;
@@ -269,6 +270,7 @@ export interface RiskApiTranslations {
   // Try-it-now anon trial widget (no signup)
   tryItTitle: string;
   tryItSubtitle: string;
+  tryItQuickTryLabel: string;
   tryItPlaceholder: string;
   tryItButton: string;
   tryItLoading: string;
@@ -285,6 +287,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     name: 'EN',
     headerBadge: 'RISK-DATA API',
     heroEyebrow: 'BUILT FOR AI TRADING AGENTS',
+    statsLine: '{n}+ risk checks performed · live on Solana mainnet · sub-1s response',
     heroTitle1: 'Know what a token is hiding',
     heroTitle2: 'before your bot buys it.',
     heroSub: 'One GET request returns a safety score, live insider-cluster detection, and on-chain fundamentals for any Solana mint — the same engine behind TNT House audits, exposed as clean JSON for bots instead of a dashboard for humans.',
@@ -544,6 +547,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     emailPlaceholder: 'Email address',
     tryItTitle: 'Try it now — no signup',
     tryItSubtitle: '3 free checks, no email required',
+    tryItQuickTryLabel: 'or try a well-known token:',
     tryItPlaceholder: 'Paste a Solana mint address',
     tryItButton: 'Check risk',
     tryItLoading: 'Analyzing...',
@@ -558,6 +562,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     name: 'ES',
     headerBadge: 'API DE DATOS DE RIESGO',
     heroEyebrow: 'CREADO PARA AGENTES DE TRADING CON IA',
+    statsLine: '{n}+ verificaciones de riesgo realizadas · en vivo en Solana mainnet · respuesta en menos de 1s',
     heroTitle1: 'Descubre qué esconde un token',
     heroTitle2: 'antes de que tu bot lo compre.',
     heroSub: 'Una sola petición GET devuelve una puntuación de seguridad, detección de clústeres de insiders en tiempo real y datos fundamentales on-chain de cualquier mint de Solana — el mismo motor detrás de las auditorías de TNT House, expuesto como JSON limpio para bots en lugar de un panel para humanos.',
@@ -817,6 +822,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     emailPlaceholder: 'Correo electrónico',
     tryItTitle: 'Pruébalo ahora — sin registro',
     tryItSubtitle: '3 comprobaciones gratis, sin email',
+    tryItQuickTryLabel: 'o prueba un token conocido:',
     tryItPlaceholder: 'Pega una dirección mint de Solana',
     tryItButton: 'Comprobar riesgo',
     tryItLoading: 'Analizando...',
@@ -831,6 +837,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     name: 'FR',
     headerBadge: 'API DE DONNÉES DE RISQUE',
     heroEyebrow: 'CONÇU POUR LES AGENTS DE TRADING IA',
+    statsLine: '{n}+ vérifications de risque effectuées · en direct sur Solana mainnet · réponse en moins d\'1s',
     heroTitle1: 'Découvrez ce qu\'un token cache',
     heroTitle2: 'avant que votre bot ne l\'achète.',
     heroSub: 'Une seule requête GET renvoie un score de sécurité, une détection en temps réel des clusters d\'insiders et les fondamentaux on-chain de n\'importe quel mint Solana — le même moteur que les audits TNT House, exposé en JSON propre pour les bots plutôt qu\'un tableau de bord pour humains.',
@@ -1090,6 +1097,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     emailPlaceholder: 'Adresse email',
     tryItTitle: 'Essayez maintenant — sans inscription',
     tryItSubtitle: '3 vérifications gratuites, sans email',
+    tryItQuickTryLabel: 'ou essayez un token connu :',
     tryItPlaceholder: 'Collez une adresse mint Solana',
     tryItButton: 'Vérifier le risque',
     tryItLoading: 'Analyse en cours...',
@@ -1104,6 +1112,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     name: 'EL',
     headerBadge: 'API ΔΕΔΟΜΕΝΩΝ ΚΙΝΔΥΝΟΥ',
     heroEyebrow: 'ΦΤΙΑΓΜΕΝΟ ΓΙΑ AI TRADING AGENTS',
+    statsLine: '{n}+ έλεγχοι ρίσκου έχουν εκτελεστεί · live στο Solana mainnet · απόκριση κάτω από 1 δευτ.',
     heroTitle1: 'Μάθε τι κρύβει ένα token',
     heroTitle2: 'πριν το αγοράσει το bot σου.',
     heroSub: 'Ένα μόνο αίτημα GET επιστρέφει βαθμολογία ασφάλειας, ανίχνευση insider-cluster σε πραγματικό χρόνο και on-chain θεμελιώδη στοιχεία για κάθε Solana mint — η ίδια μηχανή πίσω από τα audits του TNT House, εκτεθειμένη ως καθαρό JSON για bots αντί για dashboard για ανθρώπους.',
@@ -1363,6 +1372,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     emailPlaceholder: 'Διεύθυνση email',
     tryItTitle: 'Δοκίμασέ το τώρα — χωρίς εγγραφή',
     tryItSubtitle: '3 δωρεάν έλεγχοι, χωρίς email',
+    tryItQuickTryLabel: 'ή δοκίμασε ένα γνωστό token:',
     tryItPlaceholder: 'Επικόλλησε μια διεύθυνση mint Solana',
     tryItButton: 'Έλεγχος ρίσκου',
     tryItLoading: 'Ανάλυση...',
@@ -1377,6 +1387,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     name: 'RU',
     headerBadge: 'RISK-DATA API',
     heroEyebrow: 'СОЗДАНО ДЛЯ AI-ТРЕЙДИНГ-АГЕНТОВ',
+    statsLine: '{n}+ проверок риска выполнено · работает на Solana mainnet · ответ меньше 1 сек',
     heroTitle1: 'Узнай, что скрывает токен,',
     heroTitle2: 'прежде чем его купит твой бот.',
     heroSub: 'Один GET-запрос возвращает Safety Score, детект инсайдерских кластеров в реальном времени и он-чейн показатели для любого Solana-минта — тот же движок, что стоит за аудитами TNT House, только в виде чистого JSON для ботов, а не дашборда для людей.',
@@ -1636,6 +1647,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     emailPlaceholder: 'Email адрес',
     tryItTitle: 'Попробуй прямо сейчас — без регистрации',
     tryItSubtitle: '3 бесплатные проверки, без email',
+    tryItQuickTryLabel: 'или попробуй известный токен:',
     tryItPlaceholder: 'Вставь mint-адрес токена Solana',
     tryItButton: 'Проверить риск',
     tryItLoading: 'Анализ...',
@@ -1650,6 +1662,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     name: 'IT',
     headerBadge: 'API DATI DI RISCHIO',
     heroEyebrow: 'PROGETTATO PER AGENTI DI TRADING AI',
+    statsLine: '{n}+ controlli di rischio eseguiti · live su Solana mainnet · risposta in meno di 1s',
     heroTitle1: 'Scopri cosa nasconde un token',
     heroTitle2: 'prima che il tuo bot lo compri.',
     heroSub: 'Una singola richiesta GET restituisce un punteggio di sicurezza, il rilevamento in tempo reale dei cluster di insider e i fondamentali on-chain per qualsiasi mint Solana — lo stesso motore degli audit di TNT House, esposto come JSON pulito per i bot invece di una dashboard per gli umani.',
@@ -1909,6 +1922,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     emailPlaceholder: 'Indirizzo email',
     tryItTitle: 'Provalo ora — senza registrazione',
     tryItSubtitle: '3 controlli gratuiti, senza email',
+    tryItQuickTryLabel: 'oppure prova un token noto:',
     tryItPlaceholder: 'Incolla un indirizzo mint Solana',
     tryItButton: 'Controlla rischio',
     tryItLoading: 'Analisi in corso...',
@@ -1923,6 +1937,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     name: '中文',
     headerBadge: '风险数据 API',
     heroEyebrow: '专为 AI 交易机器人打造',
+    statsLine: '已完成 {n}+ 次风险检测 · 已上线 Solana 主网 · 响应时间低于 1 秒',
     heroTitle1: '在你的机器人买入之前',
     heroTitle2: '先看清代币在隐藏什么。',
     heroSub: '一次 GET 请求即可获取安全评分、实时内部人集群检测，以及任意 Solana mint 的链上基本面数据 —— 与 TNT House 审计所用的同一套引擎，以纯净的 JSON 形式面向机器人开放，而不是面向人类的仪表盘。',
@@ -2182,6 +2197,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     emailPlaceholder: '邮箱地址',
     tryItTitle: '立即试用 — 无需注册',
     tryItSubtitle: '3 次免费查询，无需邮箱',
+    tryItQuickTryLabel: '或试试知名代币：',
     tryItPlaceholder: '粘贴 Solana mint 地址',
     tryItButton: '检查风险',
     tryItLoading: '分析中...',

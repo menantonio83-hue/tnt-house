@@ -66,6 +66,15 @@ import { useRiskApiLang } from './LangContext';
 const FINGERPRINT_STORAGE_KEY = 'tnt_trial_fp';
 const MINT_REGEX = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/; // base58, Solana mint length range
 
+// Quick-try shortcuts — well-known, verified Solana mints (not
+// Ethereum tokens like PEPE, which don't exist as a canonical mint on
+// Solana). Lets a first-time visitor see a real result in one tap
+// instead of hunting down a mint address to paste first.
+const QUICK_TRY_TOKENS: Array<{ label: string; mint: string }> = [
+  { label: 'BONK', mint: 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263' },
+  { label: 'WIF', mint: 'EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm' },
+];
+
 type Status = 'idle' | 'loading' | 'success' | 'error' | 'limit';
 
 interface TrialResult {
@@ -186,11 +195,10 @@ export default function TryItWidget() {
     getFingerprint().catch(() => {});
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const runCheck = async (mintToCheck: string) => {
     setErrorMsg('');
 
-    const trimmed = mint.trim();
+    const trimmed = mintToCheck.trim();
     if (!MINT_REGEX.test(trimmed)) {
       setErrorMsg(t.tryItInvalidMint);
       setStatus('error');
@@ -227,6 +235,16 @@ export default function TryItWidget() {
       setErrorMsg(t.tryItErrorGeneric);
       setStatus('error');
     }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await runCheck(mint);
+  };
+
+  const handleQuickTry = async (quickMint: string) => {
+    setMint(quickMint);
+    await runCheck(quickMint);
   };
 
   const scrollToSignup = () => {
@@ -281,6 +299,21 @@ export default function TryItWidget() {
               )}
             </button>
           </form>
+
+          <div className="flex items-center gap-2 mb-3 flex-wrap">
+            <span className="text-[11px] text-slate-500">{t.tryItQuickTryLabel}</span>
+            {QUICK_TRY_TOKENS.map((token) => (
+              <button
+                key={token.mint}
+                type="button"
+                onClick={() => handleQuickTry(token.mint)}
+                disabled={status === 'loading'}
+                className="text-[11px] font-bold text-emerald-300 border border-emerald-500/30 hover:border-emerald-400 hover:bg-emerald-500/10 disabled:opacity-50 rounded-full px-3 py-1 transition"
+              >
+                {token.label}
+              </button>
+            ))}
+          </div>
 
           {status === 'error' && (
             <div className="text-[11px] text-red-400 bg-red-500/5 border border-red-500/20 rounded px-3 py-2 mb-3">
