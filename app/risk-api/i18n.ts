@@ -125,6 +125,8 @@ export interface RiskApiTranslations {
 
   // How it works
   howItWorksTitle: string;
+  integrationsTitle: string;
+  integrationsHint: string;
   step1Title: string;
   step1Desc: string;
   step2Title: string;
@@ -296,6 +298,8 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     btnReadDocs: 'Read the docs',
     copyCurl: 'Copy curl',
     howItWorksTitle: 'How it works',
+    integrationsTitle: 'Connect your bot or agent',
+    integrationsHint: 'Tap a platform to get a ready-to-copy snippet.',
     step1Title: 'Get a key',
     step1Desc: 'Enter your email below. No credit card, no approval wait — the key is issued instantly.',
     step2Title: 'Call the endpoint',
@@ -571,6 +575,8 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     btnReadDocs: 'Leer la documentación',
     copyCurl: 'Copiar curl',
     howItWorksTitle: 'Cómo funciona',
+    integrationsTitle: 'Conecta tu bot o agente',
+    integrationsHint: 'Toca una plataforma para obtener un snippet listo para copiar.',
     step1Title: 'Obtén una key',
     step1Desc: 'Introduce tu email abajo. Sin tarjeta de crédito, sin esperar aprobación — la key se emite al instante.',
     step2Title: 'Llama al endpoint',
@@ -846,6 +852,8 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     btnReadDocs: 'Lire la documentation',
     copyCurl: 'Copier curl',
     howItWorksTitle: 'Comment ça marche',
+    integrationsTitle: 'Connectez votre bot ou agent',
+    integrationsHint: 'Touchez une plateforme pour obtenir un extrait prêt à copier.',
     step1Title: 'Obtenez une clé',
     step1Desc: 'Entrez votre email ci-dessous. Pas de carte bancaire, pas d\'attente d\'approbation — la clé est émise instantanément.',
     step2Title: 'Appelez l\'endpoint',
@@ -1121,6 +1129,8 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     btnReadDocs: 'Διάβασε την τεκμηρίωση',
     copyCurl: 'Αντιγραφή curl',
     howItWorksTitle: 'Πώς λειτουργεί',
+    integrationsTitle: 'Σύνδεσε το bot ή τον agent σου',
+    integrationsHint: 'Πάτησε μια πλατφόρμα για ένα έτοιμο προς αντιγραφή snippet.',
     step1Title: 'Πάρε ένα key',
     step1Desc: 'Βάλε το email σου παρακάτω. Χωρίς πιστωτική κάρτα, χωρίς αναμονή έγκρισης — το key εκδίδεται άμεσα.',
     step2Title: 'Κάλεσε το endpoint',
@@ -1396,6 +1406,8 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     btnReadDocs: 'Читать документацию',
     copyCurl: 'Скопировать curl',
     howItWorksTitle: 'Как это работает',
+    integrationsTitle: 'Подключи своего бота или агента',
+    integrationsHint: 'Нажми на платформу, чтобы получить готовый сниппет для копирования.',
     step1Title: 'Получи ключ',
     step1Desc: 'Введи email ниже. Без карты, без ожидания одобрения — ключ выдаётся мгновенно.',
     step2Title: 'Дёрни эндпоинт',
@@ -1671,6 +1683,8 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     btnReadDocs: 'Leggi la documentazione',
     copyCurl: 'Copia curl',
     howItWorksTitle: 'Come funziona',
+    integrationsTitle: 'Collega il tuo bot o agente',
+    integrationsHint: 'Tocca una piattaforma per ottenere uno snippet pronto da copiare.',
     step1Title: 'Ottieni una key',
     step1Desc: 'Inserisci la tua email qui sotto. Nessuna carta di credito, nessuna attesa di approvazione — la key viene rilasciata immediatamente.',
     step2Title: 'Chiama l\'endpoint',
@@ -1946,6 +1960,8 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     btnReadDocs: '查看文档',
     copyCurl: '复制 curl',
     howItWorksTitle: '工作原理',
+    integrationsTitle: '连接你的机器人或智能体',
+    integrationsHint: '点击一个平台，获取可直接复制的代码片段。',
     step1Title: '获取密钥',
     step1Desc: '在下方输入邮箱。无需信用卡，无需等待审批 —— 密钥即时发放。',
     step2Title: '调用接口',
