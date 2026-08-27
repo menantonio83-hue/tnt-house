@@ -1,3 +1,14 @@
+// Version 5.7 — app/risk-api/page.tsx
+//
+// v5.7: fetches a real, honest count of total requests served
+// (api_request_log row count) server-side and passes it to
+// RiskApiPageContent as a trust-signal stat line under the hero
+// ("X risk checks performed"). Falls back to null (renders no stat
+// line at all, rather than a fake number) if the query fails — see
+// lib/supabase-admin.ts for why SUPABASE_SERVICE_ROLE_KEY might be
+// unset in some environments. Per product-owner decision 2026-08-27:
+// real number, however modest, never a placeholder/rounded-up figure.
+//
 // Version 5.6 — app/risk-api/page.tsx
 //
 // v5.6: split into a thin server wrapper (keeps `export const metadata`
@@ -22,6 +33,7 @@
 import type { Metadata } from 'next';
 import { LangProvider } from './LangContext';
 import RiskApiPageContent from './RiskApiPageContent';
+import { supabaseAdmin } from '../../lib/supabase-admin';
 
 export const metadata: Metadata = {
   title: 'Risk-Data API — TNT House',
@@ -29,10 +41,24 @@ export const metadata: Metadata = {
     'Insider-cluster detection and Solana token risk scoring as a JSON API, built for AI trading agents.',
 };
 
-export default function RiskApiPage() {
+async function getRequestsServedCount(): Promise<number | null> {
+  try {
+    const { count, error } = await supabaseAdmin
+      .from('api_request_log')
+      .select('*', { count: 'exact', head: true });
+    if (error || count === null) return null;
+    return count;
+  } catch {
+    return null;
+  }
+}
+
+export default async function RiskApiPage() {
+  const requestsServed = await getRequestsServedCount();
+
   return (
     <LangProvider>
-      <RiskApiPageContent />
+      <RiskApiPageContent requestsServed={requestsServed} />
     </LangProvider>
   );
 }
