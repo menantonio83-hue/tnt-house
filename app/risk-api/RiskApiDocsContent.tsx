@@ -187,9 +187,9 @@ export default function RiskApiDocsContent() {
       <header className="border-b border-purple-500/30 backdrop-blur-lg bg-slate-950/60 sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
           <a href="/risk-api" className="text-sm font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400 tracking-wide shrink-0">
-            TNT HOUSE — RISK-DATA API DOCS
+            RISK-DATA API DOCS
           </a>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 overflow-x-auto">
             <LangSwitcher />
           </div>
         </div>
