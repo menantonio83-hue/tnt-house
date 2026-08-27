@@ -117,7 +117,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Bot, Shield, Terminal, Database, Lock, Zap, CheckCircle2, Puzzle, MessageCircle } from 'lucide-react';
+import { Bot, Shield, Terminal, Database, Lock, Zap, CheckCircle2, Puzzle, MessageCircle, Users, ShieldCheck } from 'lucide-react';
 import CopyButton from './CopyButton';
 import RiskApiSignupForm from './RiskApiSignupForm';
 import TryItWidget from './TryItWidget';
@@ -396,6 +396,31 @@ export default function RiskApiPageContent({ requestsServed }: { requestsServed:
             used to be reachable only by scrolling past the hero unprompted. */}
         <section id="try-it" className="pb-14 scroll-mt-20">
           <TryItWidget />
+        </section>
+
+        {/* 3 value cards — plain-language "what this gets you", added per
+            Kimi's audit (2026-08-27): the JSON demo shows the fields, but
+            nothing translated them into "why this matters" before this.
+            Deliberately just 3 cards, not a field-by-field walkthrough —
+            that's what /risk-api/docs is for. */}
+        <section className="pb-14">
+          <div className="grid sm:grid-cols-3 gap-4">
+            <div className="border border-purple-500/20 rounded-lg p-5 bg-slate-900/40">
+              <Zap size={20} className="text-emerald-400 mb-3" />
+              <div className="text-sm font-bold text-white mb-1.5">{t.valueCard1Title}</div>
+              <p className="text-xs text-slate-400 leading-relaxed">{t.valueCard1Desc}</p>
+            </div>
+            <div className="border border-purple-500/20 rounded-lg p-5 bg-slate-900/40">
+              <Users size={20} className="text-emerald-400 mb-3" />
+              <div className="text-sm font-bold text-white mb-1.5">{t.valueCard2Title}</div>
+              <p className="text-xs text-slate-400 leading-relaxed">{t.valueCard2Desc}</p>
+            </div>
+            <div className="border border-purple-500/20 rounded-lg p-5 bg-slate-900/40">
+              <ShieldCheck size={20} className="text-emerald-400 mb-3" />
+              <div className="text-sm font-bold text-white mb-1.5">{t.valueCard3Title}</div>
+              <p className="text-xs text-slate-400 leading-relaxed">{t.valueCard3Desc}</p>
+            </div>
+          </div>
         </section>
 
         {/* Signature element: live terminal preview of a real response shape */}
