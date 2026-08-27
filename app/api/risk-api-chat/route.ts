@@ -1,3 +1,25 @@
+// Version 1.3 — app/api/risk-api-chat/route.ts
+//
+// v1.3: switched from Groq (openai/gpt-oss-20b) to DeepSeek
+// (deepseek-v4-flash) per product-owner decision 2026-08-27 — they
+// have an existing funded DeepSeek account ($7.85 balance, ~$0.0015/
+// request based on live usage) that was going unused. Also sidesteps
+// Groq's gpt-oss-20b reasoning-token issue fixed in v1.2 below —
+// V4-Flash defaults to non-thinking mode, no reasoning_effort param
+// needed. Verified deepseek-v4-flash is the current model ID before
+// switching: the legacy 'deepseek-chat' alias (used by the old, unused
+// app/api/deepseek-chat/route.js in this repo) was retired by DeepSeek
+// on 2026-07-24 with no fallback — would have repeated the exact same
+// silent-breakage pattern as the Groq deprecation below if migrated to
+// blindly. Same alertAdmin() wiring, updated service-name strings
+// (deepseek-chat-risk-api / deepseek-chat-risk-api-empty-content).
+//
+// Version 1.2 — app/api/risk-api-chat/route.ts
+//
+// v1.2: gpt-oss-20b returning empty content — see git history for
+// the full fix (reasoning_effort, max_tokens, empty-content alert).
+// Superseded by the DeepSeek switch above, kept for history.
+//
 // Version 1.1 — app/api/risk-api-chat/route.ts
 //
 // v1.1: Groq deprecated llama-3.1-8b-instant (shutdown Aug 16, 2026 —
@@ -59,53 +81,46 @@ export async function POST(request: Request) {
     const body = await request.json();
     const messages = body.messages || [];
 
-    const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    const dsRes = await fetch('https://api.deepseek.com/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: 'Bearer ' + process.env.GROQ_API_KEY,
+        Authorization: 'Bearer ' + process.env.DEEPSEEK_API_KEY,
       },
       body: JSON.stringify({
-        model: 'openai/gpt-oss-20b', // free, fast — Groq's recommended replacement for the deprecated llama-3.1-8b-instant
-        max_tokens: 600, // was 200 — too low for a reasoning model, see reasoning_effort note below
+        model: 'deepseek-v4-flash', // legacy alias 'deepseek-chat' retired by DeepSeek on 2026-07-24 (no fallback)
+        max_tokens: 600,
         temperature: 0.7,
-        // gpt-oss-20b is a reasoning model — it spends tokens on an
-        // internal "reasoning" field before the actual answer, and
-        // defaults to reasoning_effort "medium" if unset. With a small
-        // max_tokens budget that reasoning could consume the entire
-        // budget, leaving message.content empty (confirmed real-world
-        // 2026-08-27: a visitor got "Could not get a response" — see
-        // community.groq.com/t/gpt-oss-browser-response-empty-assistant-content).
-        // 'low' minimizes reasoning-token spend for this short,
-        // non-complex Q&A use case.
-        reasoning_effort: 'low',
+        // Deliberately NOT enabling thinking mode (V4-Flash defaults to
+        // non-thinking unless a `thinking` param is set) — same reasoning
+        // as the earlier Groq gpt-oss-20b fix: a reasoning pass eating
+        // the max_tokens budget can leave content empty for this short
+        // Q&A use case, and thinking mode isn't needed here anyway.
         messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...messages],
       }),
     });
 
-    if (!groqRes.ok) {
-      const errText = await groqRes.text();
-      await alertAdmin('groq-chat-risk-api', `${groqRes.status} — ${errText}`);
-      return new Response(JSON.stringify({ error: 'Groq error: ' + errText }), {
+    if (!dsRes.ok) {
+      const errText = await dsRes.text();
+      await alertAdmin('deepseek-chat-risk-api', `${dsRes.status} — ${errText}`);
+      return new Response(JSON.stringify({ error: 'DeepSeek error: ' + errText }), {
         status: 500,
         headers: { 'Content-Type': 'application/json' },
       });
     }
 
-    const data = await groqRes.json();
+    const data = await dsRes.json();
     const reply =
       data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content
         ? data.choices[0].message.content
         : 'Could not get a response. Please try again.';
 
     if (reply === 'Could not get a response. Please try again.') {
-      // Groq returned 200 OK but no usable content — e.g. the reasoning
-      // model spent its whole token budget "thinking" and left content
-      // empty. Not caught by the !groqRes.ok branch above since the
-      // HTTP call itself succeeded; alert separately so this class of
-      // failure doesn't go unnoticed the same way the deprecated-model
-      // issue did.
-      await alertAdmin('groq-chat-risk-api-empty-content', JSON.stringify(data).slice(0, 500));
+      // DeepSeek returned 200 OK but no usable content. Not caught by
+      // the !dsRes.ok branch above since the HTTP call itself succeeded;
+      // alert separately so this class of failure doesn't go unnoticed
+      // the same way the deprecated-model issue did.
+      await alertAdmin('deepseek-chat-risk-api-empty-content', JSON.stringify(data).slice(0, 500));
     }
 
     return new Response(JSON.stringify({ reply }), {

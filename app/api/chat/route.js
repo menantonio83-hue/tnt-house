@@ -1,5 +1,16 @@
 // app/api/chat/route.js
-// Server-side route — GROQ_API_KEY stays hidden in .env
+// Server-side route — DEEPSEEK_API_KEY stays hidden in .env
+//
+// v1.2 (2026-08-27): switched from Groq (openai/gpt-oss-20b) to
+// DeepSeek (deepseek-v4-flash) per product-owner decision — existing
+// funded DeepSeek account was going unused. Verified deepseek-v4-flash
+// is the current model ID first: the legacy 'deepseek-chat' alias
+// (used by the old, unused app/api/deepseek-chat/route.js in this
+// repo) was retired by DeepSeek on 2026-07-24 with no fallback — would
+// have repeated the exact same silent-breakage pattern as the Groq
+// deprecation below if migrated to blindly. Same alertAdmin() wiring,
+// updated service-name string. V4-Flash defaults to non-thinking mode,
+// sidestepping the reasoning-token/empty-content issue gpt-oss-20b had.
 //
 // v1.1 (2026-08-27): Groq deprecated llama-3.1-8b-instant (shutdown
 // Aug 16, 2026 — console.groq.com/docs/deprecations). Every request
@@ -34,22 +45,16 @@ export async function POST(request) {
     var body = await request.json();
     var messages = body.messages || [];
 
-    var groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    var dsRes = await fetch('https://api.deepseek.com/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + process.env.GROQ_API_KEY,
+        'Authorization': 'Bearer ' + process.env.DEEPSEEK_API_KEY,
       },
       body: JSON.stringify({
-        model: 'openai/gpt-oss-20b', // free, fast — Groq's recommended replacement for the deprecated llama-3.1-8b-instant
-        max_tokens: 600, // was 200 — too low for a reasoning model, see reasoning_effort note below
+        model: 'deepseek-v4-flash', // legacy alias 'deepseek-chat' retired by DeepSeek on 2026-07-24 (no fallback)
+        max_tokens: 600,
         temperature: 0.7,
-        // gpt-oss-20b spends tokens on internal reasoning before the
-        // actual answer (defaults to reasoning_effort "medium"); with a
-        // small max_tokens budget that could eat the whole budget and
-        // leave message.content empty. 'low' minimizes that for this
-        // short Q&A use case — same fix as app/api/risk-api-chat/route.ts.
-        reasoning_effort: 'low',
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           ...messages,
@@ -57,19 +62,23 @@ export async function POST(request) {
       }),
     });
 
-    if (!groqRes.ok) {
-      var errText = await groqRes.text();
-      await alertAdmin('groq-chat-main-site', groqRes.status + ' — ' + errText);
-      return new Response(JSON.stringify({ error: 'Groq error: ' + errText }), {
+    if (!dsRes.ok) {
+      var errText = await dsRes.text();
+      await alertAdmin('deepseek-chat-main-site', dsRes.status + ' — ' + errText);
+      return new Response(JSON.stringify({ error: 'DeepSeek error: ' + errText }), {
         status: 500,
         headers: { 'Content-Type': 'application/json' },
       });
     }
 
-    var data = await groqRes.json();
+    var data = await dsRes.json();
     var reply = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content
       ? data.choices[0].message.content
       : 'Не смог получить ответ. Попробуй ещё раз.';
+
+    if (reply === 'Не смог получить ответ. Попробуй ещё раз.') {
+      await alertAdmin('deepseek-chat-main-site-empty-content', JSON.stringify(data).slice(0, 500));
+    }
 
     return new Response(JSON.stringify({ reply: reply }), {
       status: 200,
