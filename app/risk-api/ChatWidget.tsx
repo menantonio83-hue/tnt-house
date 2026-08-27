@@ -51,6 +51,16 @@ export default function ChatWidget() {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Lets the hero's "Site Assistant" button (RiskApiPageContent.tsx)
+  // open this widget without lifting isOpen state up to the parent —
+  // a custom DOM event is simpler here than prop-drilling through the
+  // page for a single one-way "please open" signal.
+  useEffect(() => {
+    const openHandler = () => setIsOpen(true);
+    window.addEventListener('open-risk-api-chat', openHandler);
+    return () => window.removeEventListener('open-risk-api-chat', openHandler);
+  }, []);
+
   useEffect(() => {
     if (!resetTime) return;
     const interval = setInterval(() => {
