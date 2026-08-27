@@ -62,6 +62,7 @@
 import { useState, useEffect } from 'react';
 import { Loader2, Sparkles, Lock } from 'lucide-react';
 import { useRiskApiLang } from './LangContext';
+import RiskApiSignupForm from './RiskApiSignupForm';
 
 const FINGERPRINT_STORAGE_KEY = 'tnt_trial_fp';
 const MINT_REGEX = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/; // base58, Solana mint length range
@@ -247,10 +248,6 @@ export default function TryItWidget() {
     await runCheck(quickMint);
   };
 
-  const scrollToSignup = () => {
-    document.getElementById('get-key')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
-
   return (
     <div className="border-2 border-emerald-500/30 rounded-lg bg-slate-900/40 p-5 sm:p-6 backdrop-blur-md">
       <div className="flex items-center gap-2 text-base sm:text-lg font-black mb-1">
@@ -260,18 +257,21 @@ export default function TryItWidget() {
       <p className="text-xs text-slate-400 mb-4">{t.tryItSubtitle}</p>
 
       {status === 'limit' ? (
-        <div className="border border-amber-500/30 rounded-lg bg-amber-500/5 p-4 flex items-start gap-3">
-          <Lock size={16} className="text-amber-400 shrink-0 mt-0.5" />
-          <div className="flex-1">
-            <p className="text-sm font-bold text-amber-300 mb-1">{t.tryItLimitTitle}</p>
-            <p className="text-xs text-slate-300 mb-3">{t.tryItLimitBody}</p>
-            <button
-              onClick={scrollToSignup}
-              className="bg-gradient-to-r from-purple-500 to-emerald-400 hover:from-purple-400 hover:to-emerald-300 text-slate-950 font-black px-4 py-2 rounded text-xs transition shadow-[0_0_15px_rgba(153,69,255,0.4)]"
-            >
-              {t.getFreeKeyBtn}
-            </button>
+        <div className="border border-amber-500/30 rounded-lg bg-amber-500/5 p-4">
+          <div className="flex items-start gap-3 mb-4">
+            <Lock size={16} className="text-amber-400 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-bold text-amber-300 mb-1">{t.tryItLimitTitle}</p>
+              <p className="text-xs text-slate-300">{t.tryItLimitBody}</p>
+            </div>
           </div>
+          {/* Email form shown inline right here — used to be a button that
+              scrolled to the #get-key section further down the page. Per
+              product-owner decision 2026-08-27: one fewer click/scroll
+              right at the exact moment intent is highest (just hit the
+              limit, already engaged), instead of asking the visitor to
+              re-find the CTA elsewhere on the page. */}
+          <RiskApiSignupForm />
         </div>
       ) : (
         <>
