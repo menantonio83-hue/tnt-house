@@ -364,20 +364,20 @@ export default function RiskApiPageContent({ requestsServed }: { requestsServed:
             </a>
             <a
               href="#get-key"
-              className="flex items-center justify-center text-center border border-purple-500/40 hover:border-purple-400 text-purple-300 hover:text-white font-bold px-4 py-3 rounded text-sm transition"
+              className="flex items-center justify-center text-center bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-400 hover:to-purple-400 text-white font-bold px-4 py-3 rounded text-sm transition shadow-[0_0_15px_rgba(99,102,241,0.35)]"
             >
               {t.btnGetKey}
             </a>
             <a
               href="/risk-api/docs"
-              className="flex items-center justify-center text-center border border-purple-500/40 hover:border-purple-400 text-purple-300 hover:text-white font-bold px-4 py-3 rounded text-sm transition"
+              className="flex items-center justify-center text-center bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-bold px-4 py-3 rounded text-sm transition shadow-[0_0_15px_rgba(16,185,129,0.35)]"
             >
               {t.btnReadDocs}
             </a>
             <button
               type="button"
               onClick={() => window.dispatchEvent(new Event('open-risk-api-chat'))}
-              className="flex items-center justify-center gap-1.5 text-center border border-purple-500/40 hover:border-purple-400 text-purple-300 hover:text-white font-bold px-4 py-3 rounded text-sm transition"
+              className="flex items-center justify-center gap-1.5 text-center bg-gradient-to-r from-fuchsia-500 to-pink-500 hover:from-fuchsia-400 hover:to-pink-400 text-white font-bold px-4 py-3 rounded text-sm transition shadow-[0_0_15px_rgba(217,70,239,0.35)]"
             >
               <MessageCircle size={15} />
               {t.btnSiteAssistant}
