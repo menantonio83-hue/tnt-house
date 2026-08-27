@@ -1,5 +1,11 @@
 // app/api/chat/route.js
 // Server-side route — GROQ_API_KEY stays hidden in .env
+//
+// v1.1 (2026-08-27): Groq deprecated llama-3.1-8b-instant (shutdown
+// Aug 16, 2026 — console.groq.com/docs/deprecations). Every request
+// had been failing with a 500 "model does not exist" error since then.
+// Migrated to openai/gpt-oss-20b, Groq's own recommended replacement.
+// Same fix applied to app/api/risk-api-chat/route.ts.
 
 export const runtime = 'edge';
 
@@ -31,7 +37,7 @@ export async function POST(request) {
         'Authorization': 'Bearer ' + process.env.GROQ_API_KEY,
       },
       body: JSON.stringify({
-        model: 'llama-3.1-8b-instant', // free, very fast
+        model: 'openai/gpt-oss-20b', // free, fast — Groq's recommended replacement for the deprecated llama-3.1-8b-instant
         max_tokens: 200,
         temperature: 0.7,
         messages: [

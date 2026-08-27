@@ -1,3 +1,14 @@
+// Version 1.1 — app/api/risk-api-chat/route.ts
+//
+// v1.1: Groq deprecated llama-3.1-8b-instant (shutdown Aug 16, 2026 —
+// see console.groq.com/docs/deprecations); every chat request had been
+// failing with a 500 "model does not exist" error since then, silently
+// breaking the widget on the live /risk-api page (caught 2026-08-27 via
+// a real visitor screenshot, not monitoring — nothing alerts on this).
+// Migrated to openai/gpt-oss-20b, Groq's own recommended replacement
+// for llama-3.1-8b-instant (same free tier, faster inference per
+// Groq's docs). Same fix applied to app/api/chat/route.js.
+//
 // Version 1.0 — app/api/risk-api-chat/route.ts
 //
 // Separate from app/api/chat/route.js (existing file, not modified —
@@ -49,7 +60,7 @@ export async function POST(request: Request) {
         Authorization: 'Bearer ' + process.env.GROQ_API_KEY,
       },
       body: JSON.stringify({
-        model: 'llama-3.1-8b-instant', // free, very fast — same model the main site's chat already uses
+        model: 'openai/gpt-oss-20b', // free, fast — Groq's recommended replacement for the deprecated llama-3.1-8b-instant
         max_tokens: 200,
         temperature: 0.7,
         messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...messages],
