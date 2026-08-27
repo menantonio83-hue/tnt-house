@@ -42,8 +42,14 @@ export async function POST(request) {
       },
       body: JSON.stringify({
         model: 'openai/gpt-oss-20b', // free, fast — Groq's recommended replacement for the deprecated llama-3.1-8b-instant
-        max_tokens: 200,
+        max_tokens: 600, // was 200 — too low for a reasoning model, see reasoning_effort note below
         temperature: 0.7,
+        // gpt-oss-20b spends tokens on internal reasoning before the
+        // actual answer (defaults to reasoning_effort "medium"); with a
+        // small max_tokens budget that could eat the whole budget and
+        // leave message.content empty. 'low' minimizes that for this
+        // short Q&A use case — same fix as app/api/risk-api-chat/route.ts.
+        reasoning_effort: 'low',
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           ...messages,

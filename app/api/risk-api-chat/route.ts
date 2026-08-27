@@ -67,8 +67,18 @@ export async function POST(request: Request) {
       },
       body: JSON.stringify({
         model: 'openai/gpt-oss-20b', // free, fast — Groq's recommended replacement for the deprecated llama-3.1-8b-instant
-        max_tokens: 200,
+        max_tokens: 600, // was 200 — too low for a reasoning model, see reasoning_effort note below
         temperature: 0.7,
+        // gpt-oss-20b is a reasoning model — it spends tokens on an
+        // internal "reasoning" field before the actual answer, and
+        // defaults to reasoning_effort "medium" if unset. With a small
+        // max_tokens budget that reasoning could consume the entire
+        // budget, leaving message.content empty (confirmed real-world
+        // 2026-08-27: a visitor got "Could not get a response" — see
+        // community.groq.com/t/gpt-oss-browser-response-empty-assistant-content).
+        // 'low' minimizes reasoning-token spend for this short,
+        // non-complex Q&A use case.
+        reasoning_effort: 'low',
         messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...messages],
       }),
     });
@@ -87,6 +97,16 @@ export async function POST(request: Request) {
       data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content
         ? data.choices[0].message.content
         : 'Could not get a response. Please try again.';
+
+    if (reply === 'Could not get a response. Please try again.') {
+      // Groq returned 200 OK but no usable content — e.g. the reasoning
+      // model spent its whole token budget "thinking" and left content
+      // empty. Not caught by the !groqRes.ok branch above since the
+      // HTTP call itself succeeded; alert separately so this class of
+      // failure doesn't go unnoticed the same way the deprecated-model
+      // issue did.
+      await alertAdmin('groq-chat-risk-api-empty-content', JSON.stringify(data).slice(0, 500));
+    }
 
     return new Response(JSON.stringify({ reply }), {
       status: 200,
