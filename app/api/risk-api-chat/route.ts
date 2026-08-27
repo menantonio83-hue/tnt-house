@@ -26,6 +26,8 @@
 // widget, not billing-critical, so the same lightweight approach is
 // appropriate rather than building a server-side counter.
 
+import { alertAdmin } from '../../../lib/telegram-alert';
+
 export const runtime = 'edge';
 
 const SYSTEM_PROMPT = `You are the AI assistant for TNT House's Risk-Data API (https://tnt-audit.com/risk-api) — a JSON API that gives AI trading agents a safety score, insider-cluster detection, and market fundamentals for any Solana token.
@@ -69,6 +71,7 @@ export async function POST(request: Request) {
 
     if (!groqRes.ok) {
       const errText = await groqRes.text();
+      await alertAdmin('groq-chat-risk-api', `${groqRes.status} — ${errText}`);
       return new Response(JSON.stringify({ error: 'Groq error: ' + errText }), {
         status: 500,
         headers: { 'Content-Type': 'application/json' },

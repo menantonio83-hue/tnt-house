@@ -5,7 +5,11 @@
 // Aug 16, 2026 — console.groq.com/docs/deprecations). Every request
 // had been failing with a 500 "model does not exist" error since then.
 // Migrated to openai/gpt-oss-20b, Groq's own recommended replacement.
-// Same fix applied to app/api/risk-api-chat/route.ts.
+// Same fix applied to app/api/risk-api-chat/route.ts. Also wired up
+// alertAdmin() on the error path so a repeat of this class of failure
+// pings the admin Telegram chat instead of going unnoticed for days.
+
+import { alertAdmin } from '../../../lib/telegram-alert';
 
 export const runtime = 'edge';
 
@@ -49,6 +53,7 @@ export async function POST(request) {
 
     if (!groqRes.ok) {
       var errText = await groqRes.text();
+      await alertAdmin('groq-chat-main-site', groqRes.status + ' — ' + errText);
       return new Response(JSON.stringify({ error: 'Groq error: ' + errText }), {
         status: 500,
         headers: { 'Content-Type': 'application/json' },
