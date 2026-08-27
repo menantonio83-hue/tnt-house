@@ -49,6 +49,7 @@
 // appropriate rather than building a server-side counter.
 
 import { alertAdmin } from '../../../lib/telegram-alert';
+import { checkDeepSeekBalanceIfDue } from '../../../lib/deepseek-balance';
 
 export const runtime = 'edge';
 
@@ -122,6 +123,8 @@ export async function POST(request: Request) {
       // the same way the deprecated-model issue did.
       await alertAdmin('deepseek-chat-risk-api-empty-content', JSON.stringify(data).slice(0, 500));
     }
+
+    void checkDeepSeekBalanceIfDue(); // fire-and-forget, cooldown-throttled — see lib/deepseek-balance.ts
 
     return new Response(JSON.stringify({ reply }), {
       status: 200,

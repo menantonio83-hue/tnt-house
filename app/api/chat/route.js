@@ -21,6 +21,7 @@
 // pings the admin Telegram chat instead of going unnoticed for days.
 
 import { alertAdmin } from '../../../lib/telegram-alert';
+import { checkDeepSeekBalanceIfDue } from '../../../lib/deepseek-balance';
 
 export const runtime = 'edge';
 
@@ -79,6 +80,8 @@ export async function POST(request) {
     if (reply === 'Не смог получить ответ. Попробуй ещё раз.') {
       await alertAdmin('deepseek-chat-main-site-empty-content', JSON.stringify(data).slice(0, 500));
     }
+
+    checkDeepSeekBalanceIfDue(); // fire-and-forget, cooldown-throttled — see lib/deepseek-balance.ts
 
     return new Response(JSON.stringify({ reply: reply }), {
       status: 200,
