@@ -217,6 +217,7 @@ export interface RiskApiTranslations {
   x402Feature2: string;
   x402Feature3: string;
   x402HowToLabel: string;
+  x402PythonLabel: string;
   x402HowToIntro: string;
   x402Step1: string;
   x402Step2: string;
@@ -368,6 +369,13 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'Changelog',
     changelogNote: 'No mailing list or webhooks yet for update announcements — this page and the X / Telegram links in the footer are the way to stay current.',
     changelogEntries: [
+      {
+        version: 'v1.19',
+        date: '2026-08-29',
+        changes: [
+          "Docs: added a runnable Python example for the x402 endpoint (openlibx402-client + solders) alongside the existing curl example -- shows a bot/agent developer the full 402 -> pay -> retry flow in ~10 lines instead of just the raw HTTP mechanics.",
+        ],
+      },
       {
         version: 'v1.18',
         date: '2026-08-29',
@@ -523,6 +531,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     x402Feature2: 'USDC on Solana, settled per call via the x402 protocol',
     x402Feature3: 'Built for autonomous agents that pay their own way',
     x402HowToLabel: 'x402 protocol',
+    x402PythonLabel: 'Python (bot/agent client, handles the 402 flow automatically)',
     x402HowToIntro:
       'x402 turns a 402 Payment Required into a working payment flow: call the endpoint with no auth, get a signed payment challenge back, pay it, retry with the receipt.',
     x402Step1: 'GET the endpoint with a mint — no Authorization header needed.',
@@ -666,6 +675,13 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'Registro de cambios',
     changelogNote: 'Todavía no hay lista de correo ni webhooks para anunciar novedades — esta página y los enlaces de X / Telegram del pie son la forma de mantenerte al día.',
     changelogEntries: [
+      {
+        version: 'v1.19',
+        date: '2026-08-29',
+        changes: [
+          "Documentación: se añadió un ejemplo funcional en Python para el endpoint x402 (openlibx402-client + solders) junto al ejemplo curl existente -- muestra a un desarrollador de bots/agentes el flujo completo 402 -> pago -> reintento en ~10 líneas en vez de solo la mecánica HTTP.",
+        ],
+      },
       {
         version: 'v1.18',
         date: '2026-08-29',
@@ -821,6 +837,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     x402Feature2: 'USDC en Solana, liquidado por llamada vía el protocolo x402',
     x402Feature3: 'Pensado para agentes autónomos que pagan por sí mismos',
     x402HowToLabel: 'protocolo x402',
+    x402PythonLabel: 'Python (cliente para bots/agentes, gestiona el flujo 402 automáticamente)',
     x402HowToIntro:
       'x402 convierte un 402 Payment Required en un flujo de pago funcional: llamas al endpoint sin autenticación, recibes un reto de pago firmado, lo pagas y reintentas con el recibo.',
     x402Step1: 'Haz GET al endpoint con un mint — no necesitas cabecera Authorization.',
@@ -964,6 +981,13 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'Journal des modifications',
     changelogNote: 'Pas encore de liste de diffusion ni de webhooks pour les annonces — cette page et les liens X / Telegram en pied de page sont le moyen de rester à jour.',
     changelogEntries: [
+      {
+        version: 'v1.19',
+        date: '2026-08-29',
+        changes: [
+          "Docs : ajout d'un exemple Python fonctionnel pour l'endpoint x402 (openlibx402-client + solders) en plus de l'exemple curl existant -- montre à un développeur de bot/agent le flux complet 402 -> paiement -> nouvelle tentative en ~10 lignes au lieu de la seule mécanique HTTP.",
+        ],
+      },
       {
         version: 'v1.18',
         date: '2026-08-29',
@@ -1119,6 +1143,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     x402Feature2: 'USDC sur Solana, réglé par appel via le protocole x402',
     x402Feature3: 'Conçu pour les agents autonomes qui paient eux-mêmes',
     x402HowToLabel: 'protocole x402',
+    x402PythonLabel: 'Python (client bot/agent, gère le flux 402 automatiquement)',
     x402HowToIntro:
       "x402 transforme un 402 Payment Required en un vrai flux de paiement : appelez l'endpoint sans authentification, recevez un défi de paiement signé, payez-le, puis réessayez avec le reçu.",
     x402Step1: "Faites un GET sur l'endpoint avec un mint — pas besoin d'en-tête Authorization.",
@@ -1262,6 +1287,13 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'Ιστορικό αλλαγών',
     changelogNote: 'Δεν υπάρχει ακόμα mailing list ή webhooks για ανακοινώσεις ενημερώσεων — αυτή η σελίδα και οι σύνδεσμοι X / Telegram στο footer είναι ο τρόπος να μένεις ενήμερος.',
     changelogEntries: [
+      {
+        version: 'v1.19',
+        date: '2026-08-29',
+        changes: [
+          "Docs: προστέθηκε ένα λειτουργικό παράδειγμα Python για το endpoint x402 (openlibx402-client + solders) δίπλα στο υπάρχον παράδειγμα curl -- δείχνει σε έναν προγραμματιστή bot/agent την πλήρη ροή 402 -> πληρωμή -> επανάληψη σε ~10 γραμμές αντί μόνο τον ωμό μηχανισμό HTTP.",
+        ],
+      },
       {
         version: 'v1.18',
         date: '2026-08-29',
@@ -1417,6 +1449,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     x402Feature2: 'USDC στη Solana, εκκαθάριση ανά κλήση μέσω του πρωτοκόλλου x402',
     x402Feature3: 'Φτιαγμένο για αυτόνομους agents που πληρώνουν μόνοι τους',
     x402HowToLabel: 'πρωτόκολλο x402',
+    x402PythonLabel: 'Python (client για bot/agent, χειρίζεται τη ροή 402 αυτόματα)',
     x402HowToIntro:
       'Το x402 μετατρέπει ένα 402 Payment Required σε λειτουργική ροή πληρωμής: καλείς το endpoint χωρίς αυθεντικοποίηση, παίρνεις πίσω μια υπογεγραμμένη πρόκληση πληρωμής, την πληρώνεις, ξαναδοκιμάζεις με την απόδειξη.',
     x402Step1: 'Κάνε GET στο endpoint με ένα mint — δεν χρειάζεται header Authorization.',
@@ -1560,6 +1593,13 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'История изменений',
     changelogNote: 'Пока нет рассылки или вебхуков для анонсов обновлений — следить за актуальным состоянием можно по этой странице и ссылкам на X / Telegram в подвале.',
     changelogEntries: [
+      {
+        version: 'v1.19',
+        date: '2026-08-29',
+        changes: [
+          "Доки: добавлен рабочий пример на Python для x402-эндпоинта (openlibx402-client + solders) рядом с существующим curl-примером -- показывает разработчику бота/агента полный флоу 402 -> оплата -> повтор запроса в ~10 строках, а не только сырую HTTP-механику.",
+        ],
+      },
       {
         version: 'v1.18',
         date: '2026-08-29',
@@ -1715,6 +1755,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     x402Feature2: 'USDC в сети Solana, расчёт за звонок через протокол x402',
     x402Feature3: 'Для автономных агентов, которые платят сами за себя',
     x402HowToLabel: 'протокол x402',
+    x402PythonLabel: 'Python (клиент для бота/агента, сам проходит весь флоу 402)',
     x402HowToIntro:
       'x402 превращает 402 Payment Required в рабочий платёжный флоу: дёргаешь эндпоинт без авторизации, получаешь подписанный платёжный челлендж, оплачиваешь его, повторяешь запрос с квитанцией.',
     x402Step1: 'Делаешь GET на эндпоинт с mint — заголовок Authorization не нужен.',
@@ -1858,6 +1899,13 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'Changelog',
     changelogNote: "Non c'è ancora una mailing list o webhook per gli annunci di aggiornamento — questa pagina e i link X / Telegram nel footer sono il modo per restare aggiornati.",
     changelogEntries: [
+      {
+        version: 'v1.19',
+        date: '2026-08-29',
+        changes: [
+          "Docs: aggiunto un esempio Python funzionante per l'endpoint x402 (openlibx402-client + solders) accanto all'esempio curl esistente -- mostra a uno sviluppatore di bot/agent l'intero flusso 402 -> pagamento -> nuovo tentativo in ~10 righe invece della sola meccanica HTTP grezza.",
+        ],
+      },
       {
         version: 'v1.18',
         date: '2026-08-29',
@@ -2013,6 +2061,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     x402Feature2: 'USDC su Solana, regolato per chiamata tramite il protocollo x402',
     x402Feature3: 'Pensato per agenti autonomi che pagano da soli',
     x402HowToLabel: 'protocollo x402',
+    x402PythonLabel: 'Python (client per bot/agent, gestisce automaticamente il flusso 402)',
     x402HowToIntro:
       "x402 trasforma un 402 Payment Required in un flusso di pagamento funzionante: chiami l'endpoint senza autenticazione, ricevi una sfida di pagamento firmata, la paghi, riprovi con la ricevuta.",
     x402Step1: "Fai una GET sull'endpoint con un mint — non serve l'header Authorization.",
@@ -2156,6 +2205,13 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: '更新日志',
     changelogNote: '目前还没有邮件列表或 webhook 用于更新通知——请通过本页面以及页脚的 X / Telegram 链接来获取最新动态。',
     changelogEntries: [
+      {
+        version: 'v1.19',
+        date: '2026-08-29',
+        changes: [
+          "文档：为 x402 端点新增了一个可运行的 Python 示例（openlibx402-client + solders），与现有的 curl 示例并列 —— 用约 10 行代码向 bot/agent 开发者展示完整的 402 -> 付款 -> 重试流程，而不只是原始的 HTTP 机制。",
+        ],
+      },
       {
         version: 'v1.18',
         date: '2026-08-29',
@@ -2311,6 +2367,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     x402Feature2: 'Solana 上的 USDC，通过 x402 协议按次结算',
     x402Feature3: '专为自主支付的自动化 agent 设计',
     x402HowToLabel: 'x402 协议',
+    x402PythonLabel: 'Python（bot/agent 客户端，自动处理 402 流程）',
     x402HowToIntro:
       'x402 把 402 Payment Required 变成一套可用的支付流程：无需鉴权即可调用接口，返回一个已签名的支付挑战，完成支付后携带凭证重试。',
     x402Step1: '用 mint 参数 GET 该接口 —— 不需要 Authorization 请求头。',

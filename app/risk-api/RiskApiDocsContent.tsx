@@ -475,6 +475,30 @@ curl "https://tnt-audit.com/api/v1/token-risk/x402?mint=<MINT_ADDRESS>" \\
   -H "X-PAYMENT: <base64 signed payment>"`}
                 </pre>
               </div>
+              <div className="border-t border-emerald-500/10 pt-3">
+                <div className="text-[10px] text-slate-500 mb-2">{t.x402PythonLabel}</div>
+                <pre className="text-[11px] sm:text-xs text-emerald-400 overflow-x-auto leading-relaxed">
+{`pip install openlibx402-client solders
+
+from openlibx402_client import X402AutoClient
+from solders.keypair import Keypair
+import base58, os
+
+# Load your Solana wallet's private key from an env var -- never hardcode it.
+# The wallet needs a small USDC balance on Solana mainnet ($0.02+ per call).
+private_key = base58.b58decode(os.environ["SOLANA_PRIVATE_KEY_B58"])
+keypair = Keypair.from_bytes(private_key)
+
+# X402AutoClient handles the whole 402 -> pay -> retry flow automatically --
+# this one call does everything the curl example above does by hand.
+client = X402AutoClient(wallet_keypair=keypair)
+response = await client.fetch(
+    "https://tnt-audit.com/api/v1/token-risk/x402?mint=<MINT_ADDRESS>"
+)
+data = response.json()
+print(data["safety_score"], data["insider_clusters"])`}
+                </pre>
+              </div>
               <p className="text-[11px] text-slate-500 leading-relaxed border-t border-emerald-500/10 pt-3">{t.x402HowToNote}</p>
             </div>
           </div>
