@@ -307,9 +307,9 @@ X-RateLimit-Reset: 2026-07-24T00:00:00.000Z
   "limit": 15,
   "used": 16,
   "reset_at": "2026-07-24T00:00:00.000Z",
-  "overage_rate_usd": 0.04,
+  "overage_rate_usd": 0.02,
   "upgrade_url": "https://tnt-audit.com/risk-api#billing",
-  "note": "Top up call credits or subscribe on the upgrade_url page — overage is billed at $0.04/call once you have a balance."
+  "note": "Top up call credits or subscribe on the upgrade_url page — overage is billed at $0.02/call once you have a balance."
 }`}
             </pre>
           </div>
@@ -420,7 +420,7 @@ X-RateLimit-Reset: 2026-07-24T00:00:00.000Z
             </div>
             <div className="border border-emerald-500/30 rounded-lg p-5 bg-slate-900/40">
               <div className="text-[11px] font-bold text-emerald-400 tracking-widest mb-1">{t.tierPayPerCall}</div>
-              <div className="text-2xl font-black mb-3">$0.04<span className="text-sm text-slate-400">/call</span></div>
+              <div className="text-2xl font-black mb-3">$0.02<span className="text-sm text-slate-400">/call</span></div>
               <ul className="space-y-2 text-xs text-slate-400">
                 <li>{t.payPerCallFeature1}</li>
                 <li>{t.payPerCallFeature2}</li>

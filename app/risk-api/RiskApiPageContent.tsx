@@ -571,7 +571,7 @@ export default function RiskApiPageContent({ requestsServed }: { requestsServed:
             decision 2026-08-28: hiding pay-per-call and x402 behind a docs
             link felt like withholding options, not simplifying — a new
             user weighing a first $45 subscription against an unfamiliar
-            product specifically wants the $0.04/call trial-first option
+            product specifically wants the $0.02/call trial-first option
             visible here, not one click away). Card markup/copy mirrors
             RiskApiDocsContent.tsx's grid exactly (same t.* i18n keys,
             already existed there) — docs keeps the extra x402 curl/HTTP
@@ -598,7 +598,7 @@ export default function RiskApiPageContent({ requestsServed }: { requestsServed:
             </div>
             <div className="border border-emerald-500/30 rounded-lg p-5 bg-slate-900/40">
               <div className="text-[11px] font-bold text-emerald-400 tracking-widest mb-1">{t.tierPayPerCall}</div>
-              <div className="text-2xl font-black mb-3">$0.04<span className="text-sm text-slate-400">/call</span></div>
+              <div className="text-2xl font-black mb-3">$0.02<span className="text-sm text-slate-400">/call</span></div>
               <ul className="space-y-2 text-xs text-slate-400">
                 <li className="flex items-center gap-2">
                   <CheckCircle2 size={13} className="text-emerald-400 shrink-0" /> {t.payPerCallFeature1}

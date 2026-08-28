@@ -369,6 +369,13 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogNote: 'No mailing list or webhooks yet for update announcements — this page and the X / Telegram links in the footer are the way to stay current.',
     changelogEntries: [
       {
+        version: 'v1.18',
+        date: '2026-08-29',
+        changes: [
+          "Pay-per-call (unsubscribed PAYG) overage rate: \$0.04 -> \$0.02/call -- lowers the friction of a first trial for a new user who isn't ready to commit to the \$45 subscription yet. As a result PAYG and x402 are now the same rate; x402's pitch was rewritten from \"cheaper than PAYG\" to \"no account or key needed\" -- the accurate differentiator.",
+        ],
+      },
+      {
         version: 'v1.17',
         date: '2026-08-28',
         changes: [
@@ -522,7 +529,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     x402Step2: 'You get back HTTP 402 with a PAYMENT-REQUIRED header — a signed challenge for $0.02 in USDC on Solana.',
     x402Step3: 'Sign and settle the payment with any x402-compatible client (or wallet/agent SDK), then retry the same request with an X-PAYMENT header carrying the signed payment.',
     x402HowToNote:
-      'A lower per-call rate than the standard pay-per-call tier ($0.02 vs $0.04) — no account needed, for agents that would rather transact per-call than hold a stored key. Listed on x402scan.com.',
+      'Same $0.02/call rate as the standard pay-per-call tier, but no account or stored key needed — for agents that would rather settle per-request than hold a key. Listed on x402scan.com.',
     pricingNote: 'Paid in $MRDT / SOL / USDC via Solana Pay — same payment flow as the rest of TNT House. Solana Pay can\'t auto-charge, so the subscription is a manual 30-day top-up, not a recurring subscription in the traditional sense.',
     manageBillingTitle: 'Manage billing',
     getKeyTitle: 'Get your API key',
@@ -659,6 +666,13 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'Registro de cambios',
     changelogNote: 'Todavía no hay lista de correo ni webhooks para anunciar novedades — esta página y los enlaces de X / Telegram del pie son la forma de mantenerte al día.',
     changelogEntries: [
+      {
+        version: 'v1.18',
+        date: '2026-08-29',
+        changes: [
+          "Tarifa de exceso pay-per-call (PAYG sin suscripción): \$0.04 -> \$0.02/llamada -- reduce la fricción de una primera prueba para un usuario nuevo que aún no está listo para la suscripción de \$45. Como resultado, PAYG y x402 tienen ahora la misma tarifa; el mensaje de x402 se reescribió de \"más barato que PAYG\" a \"sin cuenta ni key necesaria\" -- el diferenciador real.",
+        ],
+      },
       {
         version: 'v1.17',
         date: '2026-08-28',
@@ -813,7 +827,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     x402Step2: 'Recibes un HTTP 402 con una cabecera PAYMENT-REQUIRED — un reto firmado por $0.02 en USDC en Solana.',
     x402Step3: 'Firma y liquida el pago con cualquier cliente compatible con x402 (o SDK de wallet/agente), luego reintenta la misma petición con una cabecera X-PAYMENT que lleve el pago firmado.',
     x402HowToNote:
-      'Una tarifa por llamada más baja que el nivel de pago por llamada estándar ($0.02 frente a $0.04) — sin necesidad de cuenta, para agentes que prefieren pagar por llamada en vez de guardar una key. Listado en x402scan.com.',
+      'La misma tarifa de $0.02/llamada que el nivel estándar de pago por llamada, pero sin necesidad de cuenta ni de guardar una key — para agentes que prefieren liquidar por petición. Listado en x402scan.com.',
     pricingNote: 'Se paga en $MRDT / SOL / USDC vía Solana Pay — el mismo flujo de pago que el resto de TNT House. Solana Pay no puede cobrar automáticamente, así que la suscripción es una recarga manual de 30 días, no una suscripción recurrente en el sentido tradicional.',
     manageBillingTitle: 'Gestionar facturación',
     getKeyTitle: 'Obtén tu API key',
@@ -950,6 +964,13 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'Journal des modifications',
     changelogNote: 'Pas encore de liste de diffusion ni de webhooks pour les annonces — cette page et les liens X / Telegram en pied de page sont le moyen de rester à jour.',
     changelogEntries: [
+      {
+        version: 'v1.18',
+        date: '2026-08-29',
+        changes: [
+          "Tarif de dépassement pay-per-call (PAYG sans abonnement) : 0,04 \$ -> 0,02 \$/appel -- réduit la friction d'un premier essai pour un nouvel utilisateur pas encore prêt pour l'abonnement à 45 \$. Résultat : PAYG et x402 ont désormais le même tarif ; le message de x402 est passé de \"moins cher que PAYG\" à \"sans compte ni clé nécessaire\" -- le véritable argument différenciant.",
+        ],
+      },
       {
         version: 'v1.17',
         date: '2026-08-28',
@@ -1104,7 +1125,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     x402Step2: 'Vous recevez un HTTP 402 avec un en-tête PAYMENT-REQUIRED — un défi signé pour 0,02 $ en USDC sur Solana.',
     x402Step3: "Signez et réglez le paiement avec n'importe quel client compatible x402 (ou SDK wallet/agent), puis réessayez la même requête avec un en-tête X-PAYMENT contenant le paiement signé.",
     x402HowToNote:
-      'Un tarif par appel plus bas que le niveau paiement à l\'appel standard (0,02 $ contre 0,04 $) — sans compte nécessaire, pour les agents qui préfèrent payer à l\'appel plutôt que stocker une clé. Référencé sur x402scan.com.',
+      'Le même tarif de 0,02 $/appel que le niveau paiement à l\'appel standard, mais sans compte ni clé à stocker — pour les agents qui préfèrent régler par requête. Référencé sur x402scan.com.',
     pricingNote: 'Payable en $MRDT / SOL / USDC via Solana Pay — le même flux de paiement que le reste de TNT House. Solana Pay ne peut pas prélever automatiquement, donc l\'abonnement est une recharge manuelle de 30 jours, pas un abonnement récurrent au sens traditionnel.',
     manageBillingTitle: 'Gérer la facturation',
     getKeyTitle: 'Obtenez votre clé API',
@@ -1241,6 +1262,13 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'Ιστορικό αλλαγών',
     changelogNote: 'Δεν υπάρχει ακόμα mailing list ή webhooks για ανακοινώσεις ενημερώσεων — αυτή η σελίδα και οι σύνδεσμοι X / Telegram στο footer είναι ο τρόπος να μένεις ενήμερος.',
     changelogEntries: [
+      {
+        version: 'v1.18',
+        date: '2026-08-29',
+        changes: [
+          "Τιμή υπέρβασης pay-per-call (PAYG χωρίς συνδρομή): \$0.04 -> \$0.02/κλήση -- μειώνει την τριβή μιας πρώτης δοκιμής για έναν νέο χρήστη που δεν είναι ακόμα έτοιμος για τη συνδρομή των \$45. Ως αποτέλεσμα, PAYG και x402 έχουν πλέον την ίδια τιμή· το μήνυμα του x402 άλλαξε από \"φθηνότερο από το PAYG\" σε \"χωρίς λογαριασμό ή key\" -- το πραγματικό διαφοροποιητικό στοιχείο.",
+        ],
+      },
       {
         version: 'v1.17',
         date: '2026-08-28',
@@ -1395,7 +1423,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     x402Step2: 'Παίρνεις πίσω HTTP 402 με header PAYMENT-REQUIRED — μια υπογεγραμμένη πρόκληση για $0.02 σε USDC στη Solana.',
     x402Step3: 'Υπόγραψε και εκκαθάρισε την πληρωμή με οποιονδήποτε client συμβατό με x402 (ή SDK wallet/agent), μετά ξαναδοκίμασε το ίδιο αίτημα με header X-PAYMENT που φέρει την υπογεγραμμένη πληρωμή.',
     x402HowToNote:
-      'Χαμηλότερη τιμή ανά κλήση από το βασικό επίπεδο πληρωμής ανά κλήση ($0.02 έναντι $0.04) — χωρίς λογαριασμό, για agents που προτιμούν να πληρώνουν ανά κλήση αντί να κρατούν αποθηκευμένο key. Καταχωρημένο στο x402scan.com.',
+      'Ίδια τιμή $0.02/κλήση με το βασικό επίπεδο πληρωμής ανά κλήση, αλλά χωρίς λογαριασμό ή αποθηκευμένο key — για agents που προτιμούν να πληρώνουν ανά αίτημα. Καταχωρημένο στο x402scan.com.',
     pricingNote: 'Πληρωμή σε $MRDT / SOL / USDC μέσω Solana Pay — ίδια ροή πληρωμής με το υπόλοιπο TNT House. Το Solana Pay δεν μπορεί να χρεώσει αυτόματα, οπότε η συνδρομή είναι μια χειροκίνητη ανανέωση 30 ημερών, όχι επαναλαμβανόμενη συνδρομή με την παραδοσιακή έννοια.',
     manageBillingTitle: 'Διαχείριση χρέωσης',
     getKeyTitle: 'Πάρε το API key σου',
@@ -1532,6 +1560,13 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'История изменений',
     changelogNote: 'Пока нет рассылки или вебхуков для анонсов обновлений — следить за актуальным состоянием можно по этой странице и ссылкам на X / Telegram в подвале.',
     changelogEntries: [
+      {
+        version: 'v1.18',
+        date: '2026-08-29',
+        changes: [
+          "Ставка overage для pay-per-call (PAYG без подписки): \$0.04 -> \$0.02/запрос -- снижает порог входа для первой пробы новому пользователю, который ещё не готов сразу на подписку за \$45. В результате PAYG и x402 теперь по одной ставке; посыл x402 переписан с \"дешевле, чем PAYG\" на \"без аккаунта и ключа\" -- это и есть реальное отличие.",
+        ],
+      },
       {
         version: 'v1.17',
         date: '2026-08-28',
@@ -1686,7 +1721,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     x402Step2: 'В ответ приходит HTTP 402 с заголовком PAYMENT-REQUIRED — подписанный челлендж на $0.02 в USDC на Solana.',
     x402Step3: 'Подписываешь и оплачиваешь через любой x402-совместимый клиент (или wallet/agent SDK), затем повторяешь тот же запрос с заголовком X-PAYMENT, содержащим подписанный платёж.',
     x402HowToNote:
-      'Ставка ниже, чем в обычном pay-per-call тарифе ($0.02 против $0.04) — без аккаунта, для агентов, которым удобнее платить за звонок, чем хранить ключ. Указан на x402scan.com.',
+      'Та же ставка $0.02/запрос, что и в обычном pay-per-call тарифе, но без аккаунта и без хранения ключа — для агентов, которым удобнее платить за каждый запрос. Указан на x402scan.com.',
     pricingNote: 'Оплата в $MRDT / SOL / USDC через Solana Pay — тот же флоу, что и на остальном TNT House. Solana Pay не умеет автосписание, поэтому подписка — это ручное пополнение на 30 дней, а не рекуррентная подписка в привычном смысле.',
     manageBillingTitle: 'Управление биллингом',
     getKeyTitle: 'Получи свой API-ключ',
@@ -1823,6 +1858,13 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'Changelog',
     changelogNote: "Non c'è ancora una mailing list o webhook per gli annunci di aggiornamento — questa pagina e i link X / Telegram nel footer sono il modo per restare aggiornati.",
     changelogEntries: [
+      {
+        version: 'v1.18',
+        date: '2026-08-29',
+        changes: [
+          "Tariffa di eccedenza pay-per-call (PAYG senza abbonamento): \$0.04 -> \$0.02/chiamata -- riduce l'attrito di una prima prova per un nuovo utente non ancora pronto per l'abbonamento da \$45. Di conseguenza PAYG e x402 hanno ora la stessa tariffa; il messaggio di x402 è stato riscritto da \"più economico di PAYG\" a \"senza account o key\" -- il vero elemento distintivo.",
+        ],
+      },
       {
         version: 'v1.17',
         date: '2026-08-28',
@@ -1977,7 +2019,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     x402Step2: "Ricevi un HTTP 402 con un header PAYMENT-REQUIRED — una sfida firmata per $0.02 in USDC su Solana.",
     x402Step3: "Firma e salda il pagamento con qualsiasi client compatibile x402 (o SDK wallet/agent), poi riprova la stessa richiesta con un header X-PAYMENT contenente il pagamento firmato.",
     x402HowToNote:
-      "Una tariffa per chiamata più bassa rispetto al livello pagamento a chiamata standard ($0.02 contro $0.04) — senza necessità di account, per agenti che preferiscono pagare a chiamata invece di conservare una key. Elencato su x402scan.com.",
+      "Stessa tariffa di $0.02/chiamata del livello pagamento a chiamata standard, ma senza bisogno di account o di conservare una key — per agenti che preferiscono pagare per richiesta. Elencato su x402scan.com.",
     pricingNote: 'Pagabile in $MRDT / SOL / USDC via Solana Pay — lo stesso flusso di pagamento del resto di TNT House. Solana Pay non può addebitare automaticamente, quindi l\'abbonamento è una ricarica manuale di 30 giorni, non un abbonamento ricorrente in senso tradizionale.',
     manageBillingTitle: 'Gestisci la fatturazione',
     getKeyTitle: 'Ottieni la tua API key',
@@ -2114,6 +2156,13 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: '更新日志',
     changelogNote: '目前还没有邮件列表或 webhook 用于更新通知——请通过本页面以及页脚的 X / Telegram 链接来获取最新动态。',
     changelogEntries: [
+      {
+        version: 'v1.18',
+        date: '2026-08-29',
+        changes: [
+          "按次付费（未订阅 PAYG）超额费率：\$0.04 -> \$0.02/次 —— 降低新用户在尚未准备好 \$45 订阅前进行首次试用的门槛。结果 PAYG 与 x402 费率现已相同；x402 的宣传语从\"比 PAYG 便宜\"改写为\"无需账户或密钥\" —— 这才是真正的差异点。",
+        ],
+      },
       {
         version: 'v1.17',
         date: '2026-08-28',
@@ -2268,7 +2317,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     x402Step2: '你会收到 HTTP 402，响应头带有 PAYMENT-REQUIRED —— 一个价值 $0.02 USDC（Solana 链上）的已签名支付挑战。',
     x402Step3: '用任意兼容 x402 的客户端（或钱包/agent SDK）签名并完成支付，然后携带含已签名支付信息的 X-PAYMENT 请求头重试同一请求。',
     x402HowToNote:
-      '比标准按次付费套餐更低的单次费率（$0.02 对比 $0.04）—— 无需账户，适合那些更愿意按次付款而不是保存密钥的 agent。已收录在 x402scan.com。',
+      '与标准按次付费套餐相同的 $0.02/次费率，但无需账户或保存密钥 —— 适合那些更愿意按请求结算的 agent。已收录在 x402scan.com。',
     pricingNote: '通过 Solana Pay 以 $MRDT / SOL / USDC 支付 —— 与 TNT House 其他部分相同的支付流程。Solana Pay 无法自动扣款，因此订阅本质上是每 30 天手动充值一次，而非传统意义上的自动续订。',
     manageBillingTitle: '管理账单',
     getKeyTitle: '获取你的 API 密钥',
