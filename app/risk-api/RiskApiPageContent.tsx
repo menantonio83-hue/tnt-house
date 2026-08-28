@@ -13,7 +13,9 @@
 //
 // v1.10 price cut (4-model consensus: self + Kimi + DeepSeek + Gemini,
 // see lib/billing-pricing.ts v8.5 for the full reasoning): pay-per-call
-// $0.07 -> $0.04, subscription $49 -> $45, x402 $0.07 -> $0.02. Updated
+// $0.07 -> $0.04, subscription $49 -> $45, x402 $0.07 -> $0.02.
+// v8.5 (2026-08-28): subscription quota 1000 -> 5000 calls, subscribed
+// overage $0.02 -> $0.015/call — see lib/billing-pricing.ts. Updated
 // both pricing-card numbers and the 402 example JSON's
 // overage_rate_usd/note to match — those were hardcoded display values,
 // not pulled from the actual constants, so they needed a manual edit

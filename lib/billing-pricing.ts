@@ -1,5 +1,23 @@
-// Version 8.4 — lib/billing-pricing.ts
+// Version 8.5 — lib/billing-pricing.ts
 //
+// v8.5 price change (2026-08-28): subscription quota 1000 -> 5000
+// calls/30 days, subscribed overage $0.02 -> $0.015/call. Driven by
+// competitor research (self + Kimi consensus): RugCheck and GoPlus are
+// free at the source; the closest paid wrapper (token-rugcheck) sells
+// the same underlying data via x402 at $0.02/call. The old $45/1000
+// ($0.045/call effective) was priced ABOVE that competitor's rate for
+// a commodity feature (raw score/honeypot/LP) we don't have exclusivity
+// on. New $45/5000 ($0.009/call effective) undercuts it by more than
+// half, while insider-cluster detection (our actual moat, absent from
+// both RugCheck and GoPlus) remains the real reason to pay at all.
+// OVERAGE_RATE_FREE_USD ($0.04 PAYG, unsubscribed) and x402's separate
+// $0.02/call rate (app/api/v1/token-risk/x402/route.ts's
+// PRICE_USDC_ATOMIC) are explicitly UNCHANGED — this was a deliberate
+// scope decision, not an oversight: x402 stays as-is until there are
+// paying subscribers to justify a second pricing experiment (Kimi:
+// "at 0 conversions, one button, not two — choice paralysis").
+//
+// --- (v8.4 history) ---
 // v8.4: added WEBHOOK_SUBSCRIPTION_LIMITS — app/api/v1/webhooks/subscribe
 // caps how many ACTIVE subscriptions one key can hold at once. Kept
 // here alongside the other tier-based numbers rather than a new file,
@@ -40,35 +58,29 @@
 // to price this currency at all. No hardcoded fallback constant exists
 // anywhere in this file anymore.
 //
-// Pricing model (per project brief, confirmed after consulting three
-// other AIs on the approach):
+// Pricing model (v8.5, per competitor-research review — self + Kimi):
 //   - Free:          15 req/day, full functionality, no card
 //   - Pay-per-call:  $0.04/call over the free limit (rate drops to
-//                    $0.02/call once subscribed — see below)
-//   - Subscription:  $45 one-time payment = 1000 calls / 30 days from
+//                    $0.015/call once subscribed — see below)
+//   - Subscription:  $45 one-time payment = 5000 calls / 30 days from
 //                     payment date (Solana Pay has no auto-recurring
 //                     billing, so "subscription" means manual renewal,
 //                     not auto-charge)
 //
-// v8.5 price cut (2026-08-13): $0.07 -> $0.04 pay-per-call, $0.03 -> $0.02
-// subscribed overage, $49 -> $45 subscription — brought in line with
-// market comparables (Harvey Intel $0.01/call, token-rugcheck $0.02/call
-// via x402) after a 4-model consensus review (self + Kimi + DeepSeek +
-// Gemini). $45/1000 = $0.045/call for the included block, deliberately
-// kept ABOVE the new $0.04 PAYG rate — this was the one point all
-// models agreed mattered: if the subscription's included-call rate
-// drops below PAYG, there's no coherent reason to prepay $45 instead
-// of just paying per call, and the subscription stops making sense as
-// a product. The subscription's real value only kicks in past the
-// included 1000 calls, where overage ($0.02) undercuts PAYG ($0.04) by
-// half — i.e. it's priced for genuinely heavy users, not casual ones.
+// Note: $45/5000 = $0.009/call effective for the included block, now
+// BELOW the $0.04 PAYG rate — a deliberate reversal of the old v8.4
+// logic (which kept the included rate above PAYG). That old logic
+// assumed PAYG was the anchor to price against; the real anchor is the
+// external competitor market (RugCheck/GoPlus free at the source,
+// token-rugcheck's x402 wrapper at $0.02/call for the same commodity
+// data). $0.009/call undercuts that by more than half. This only works
+// because our actual moat — insider-cluster detection — isn't
+// replicated by RugCheck or GoPlus at all, so the subscription is
+// still selling something PAYG-at-$0.04 users don't get elsewhere,
+// not just a cheaper version of the same commodity checks.
 // x402's separate, lower rate ($0.02 — see
-// app/api/v1/token-risk/x402/route.ts's PRICE_USDC_ATOMIC) is a
-// deliberate exception to the "don't go too low" instinct that shaped
-// the PAYG number: x402 buyers are autonomous agents comparing prices
-// programmatically against a hard budget ceiling, not a human on the
-// pricing page inferring quality from cost, so the two channels can
-// (and should) diverge.
+// app/api/v1/token-risk/x402/route.ts's PRICE_USDC_ATOMIC) is
+// deliberately UNCHANGED — see v8.5 header note above.
 //
 // Reuses the SAME recipient wallet, MRDT/USDC mints, and price source
 // (DexScreener via lib/helius-client.js's getDexScreenerData — already
@@ -92,10 +104,10 @@ export type InvoiceKind = 'subscription' | 'topup';
 
 export const FREE_DAILY_LIMIT = 15;
 export const SUBSCRIPTION_USD = 45;
-export const SUBSCRIPTION_MONTHLY_QUOTA = 1000;
+export const SUBSCRIPTION_MONTHLY_QUOTA = 5000;
 export const SUBSCRIPTION_CYCLE_DAYS = 30;
-export const OVERAGE_RATE_FREE_USD = 0.04; // per call, free tier over the daily cap
-export const OVERAGE_RATE_SUBSCRIBED_USD = 0.02; // per call, subscribed and over monthly quota
+export const OVERAGE_RATE_FREE_USD = 0.04; // per call, free tier over the daily cap — unchanged, see v8.5 note above
+export const OVERAGE_RATE_SUBSCRIBED_USD = 0.015; // per call, subscribed and over monthly quota
 export const MIN_TOPUP_USD = 5;
 export const MAX_TOPUP_USD = 500;
 export const PENDING_INVOICE_TTL_MINUTES = 45;
