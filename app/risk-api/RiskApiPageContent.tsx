@@ -567,15 +567,20 @@ export default function RiskApiPageContent({ requestsServed }: { requestsServed:
           </div>
         </section>
 
-        {/* Pricing — simplified to 2 tiers on the landing page (was 4 +
-            billing panel). Full grid (pay-per-call, subscription, x402
-            breakdown) plus live billing now live at /risk-api/docs#pricing
-            and /risk-api/docs#billing — see RiskApiDocsContent.tsx. */}
+        {/* Pricing — all 4 tiers on the landing page (product-owner
+            decision 2026-08-28: hiding pay-per-call and x402 behind a docs
+            link felt like withholding options, not simplifying — a new
+            user weighing a first $45 subscription against an unfamiliar
+            product specifically wants the $0.04/call trial-first option
+            visible here, not one click away). Card markup/copy mirrors
+            RiskApiDocsContent.tsx's grid exactly (same t.* i18n keys,
+            already existed there) — docs keeps the extra x402 curl/HTTP
+            402 walkthrough below its grid for the deeper technical read. */}
         <section id="pricing" className="pb-14 scroll-mt-20">
           <h2 className="text-xl sm:text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400 mb-6">
             {t.pricingTitle}
           </h2>
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="border border-purple-500/30 rounded-lg p-5 bg-slate-900/40">
               <div className="text-[11px] font-bold text-purple-400 tracking-widest mb-1">{t.tierFree}</div>
               <div className="text-2xl font-black mb-3">{t.tierFreeAmount}</div>
@@ -592,7 +597,22 @@ export default function RiskApiPageContent({ requestsServed }: { requestsServed:
               </ul>
             </div>
             <div className="border border-emerald-500/30 rounded-lg p-5 bg-slate-900/40">
-              <div className="text-[11px] font-bold text-emerald-400 tracking-widest mb-1">{t.tierSubscription}</div>
+              <div className="text-[11px] font-bold text-emerald-400 tracking-widest mb-1">{t.tierPayPerCall}</div>
+              <div className="text-2xl font-black mb-3">$0.04<span className="text-sm text-slate-400">/call</span></div>
+              <ul className="space-y-2 text-xs text-slate-400">
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 size={13} className="text-emerald-400 shrink-0" /> {t.payPerCallFeature1}
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 size={13} className="text-emerald-400 shrink-0" /> {t.payPerCallFeature2}
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 size={13} className="text-emerald-400 shrink-0" /> {t.payPerCallFeature3}
+                </li>
+              </ul>
+            </div>
+            <div className="border border-purple-500/30 rounded-lg p-5 bg-slate-900/40">
+              <div className="text-[11px] font-bold text-purple-400 tracking-widest mb-1">{t.tierSubscription}</div>
               <div className="text-2xl font-black mb-3">$45<span className="text-sm text-slate-400">/30 days</span></div>
               <ul className="space-y-2 text-xs text-slate-400">
                 <li className="flex items-center gap-2">
@@ -606,8 +626,24 @@ export default function RiskApiPageContent({ requestsServed }: { requestsServed:
                 </li>
               </ul>
             </div>
+            <div className="border border-emerald-500/30 rounded-lg p-5 bg-slate-900/40">
+              <div className="text-[11px] font-bold text-emerald-400 tracking-widest mb-1">{t.tierX402}</div>
+              <div className="text-2xl font-black mb-3">$0.02<span className="text-sm text-slate-400">/call</span></div>
+              <ul className="space-y-2 text-xs text-slate-400">
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 size={13} className="text-emerald-400 shrink-0" /> {t.x402Feature1}
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 size={13} className="text-emerald-400 shrink-0" /> {t.x402Feature2}
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 size={13} className="text-emerald-400 shrink-0" /> {t.x402Feature3}
+                </li>
+              </ul>
+            </div>
           </div>
           <p className="text-[11px] text-slate-500 mt-4">{t.pricingNote}</p>
+
           <a
             href="/risk-api/docs#pricing"
             className="inline-flex items-center gap-1.5 text-xs font-bold text-purple-300 hover:text-white transition mt-3"
