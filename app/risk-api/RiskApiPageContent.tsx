@@ -117,10 +117,11 @@
 'use client';
 
 import { useState } from 'react';
-import { Bot, Shield, Terminal, Database, Lock, Zap, CheckCircle2, Puzzle, MessageCircle, Users, ShieldCheck } from 'lucide-react';
+import { Bot, Shield, Terminal, Database, Lock, Zap, CheckCircle2, Puzzle, MessageCircle, Users, ShieldCheck, CreditCard } from 'lucide-react';
 import CopyButton from './CopyButton';
 import RiskApiSignupForm from './RiskApiSignupForm';
 import TryItWidget from './TryItWidget';
+import BillingPanel from './BillingPanel';
 import LangSwitcher from './LangSwitcher';
 import ChatWidget from './ChatWidget';
 import InsiderClusterGraph from './InsiderClusterGraph';
@@ -614,7 +615,7 @@ export default function RiskApiPageContent({ requestsServed }: { requestsServed:
         </section>
 
         {/* Signup */}
-        <section id="get-key" className="pb-20 scroll-mt-20">
+        <section id="get-key" className="pb-14 scroll-mt-20">
           <div className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 p-5 sm:p-8 backdrop-blur-md">
             <div className="flex items-center gap-2 text-lg font-black mb-1">
               <Lock size={16} className="text-emerald-400" />
@@ -623,6 +624,21 @@ export default function RiskApiPageContent({ requestsServed }: { requestsServed:
             <p className="text-xs text-slate-400 mb-5">{t.getKeySub}</p>
             <RiskApiSignupForm />
           </div>
+        </section>
+
+        {/* Billing — moved here from /risk-api/docs per product-owner
+            decision 2026-08-27, right under the free-key signup so an
+            existing user with a key doesn't have to hunt for it in the
+            docs. Also fixes a mismatch: lib/rate-limit.ts's 402
+            upgrade_url has always pointed to /risk-api#billing (this
+            exact anchor), which was a broken/wrong link while the panel
+            lived at /risk-api/docs#billing instead. */}
+        <section id="billing" className="pb-20 scroll-mt-20">
+          <div className="flex items-center gap-2 text-lg font-black mb-1">
+            <CreditCard size={16} className="text-emerald-400" />
+            {t.manageBillingTitle}
+          </div>
+          <BillingPanel />
         </section>
 
         <footer className="border-t border-purple-500/20 py-8 text-center space-y-4">

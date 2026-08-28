@@ -20,7 +20,6 @@
 import { useState } from 'react';
 import { Terminal, Database, CreditCard, ArrowLeft } from 'lucide-react';
 import CopyButton from './CopyButton';
-import BillingPanel from './BillingPanel';
 import LangSwitcher from './LangSwitcher';
 import { useRiskApiLang } from './LangContext';
 
@@ -481,13 +480,22 @@ curl "https://tnt-audit.com/api/v1/token-risk/x402?mint=<MINT_ADDRESS>" \\
           </div>
         </section>
 
-        {/* Billing */}
-        <section id="billing" className="pb-20 scroll-mt-20">
-          <h2 className="text-xl sm:text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400 mb-6 flex items-center gap-2">
-            <CreditCard size={20} className="text-emerald-400" />
-            {t.manageBillingTitle}
-          </h2>
-          <BillingPanel />
+        {/* Billing management itself now lives on the landing page
+            (/risk-api#billing), right under the "Get your API key"
+            signup section — moved there per product-owner decision
+            2026-08-27, since it's also where lib/rate-limit.ts's
+            upgrade_url already pointed (a mismatch this move fixes:
+            the 402 response's upgrade_url said /risk-api#billing while
+            the actual BillingPanel had been living at
+            /risk-api/docs#billing since the landing/docs split). */}
+        <section className="pb-20">
+          <a
+            href="/risk-api#billing"
+            className="inline-flex items-center gap-2 text-sm font-bold text-purple-300 hover:text-white transition"
+          >
+            <CreditCard size={16} className="text-emerald-400" />
+            {t.manageBillingTitle} →
+          </a>
         </section>
 
         <footer className="border-t border-purple-500/20 py-8 text-center space-y-4">
