@@ -116,7 +116,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { Bot, Shield, Terminal, Database, Lock, Zap, CheckCircle2, Puzzle, MessageCircle, Users, ShieldCheck, CreditCard } from 'lucide-react';
 import CopyButton from './CopyButton';
 import RiskApiSignupForm from './RiskApiSignupForm';
@@ -622,7 +622,9 @@ export default function RiskApiPageContent({ requestsServed }: { requestsServed:
               {t.getKeyTitle}
             </div>
             <p className="text-xs text-slate-400 mb-5">{t.getKeySub}</p>
-            <RiskApiSignupForm />
+            <Suspense fallback={null}>
+              <RiskApiSignupForm />
+            </Suspense>
           </div>
         </section>
 

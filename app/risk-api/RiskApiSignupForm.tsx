@@ -1,3 +1,14 @@
+// Version 5.7 — app/risk-api/RiskApiSignupForm.tsx
+//
+// v5.7: reads a `?ref=<code>` query param off the URL (via
+// useSearchParams) and sends it along as `ref` in the signup POST body
+// — referral-partner tracking for revenue-share arrangements (see
+// app/api/v1/signup/route.ts v7.0, which whitelists known codes
+// server-side; this component just passes through whatever's in the
+// URL, unvalidated — the server is the source of truth on what's a
+// real partner). Absent from the URL, `ref` is simply omitted from the
+// request body, same as before this version.
+//
 // Version 5.6 — app/risk-api/RiskApiSignupForm.tsx
 //
 // v5.6: sends `lang` in the signup POST body — see lib/send-email.ts
@@ -24,6 +35,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Loader2, KeyRound, AlertTriangle } from 'lucide-react';
 import CopyButton from './CopyButton';
 import { useRiskApiLang } from './LangContext';
@@ -37,6 +49,8 @@ interface IssuedKey {
 
 export default function RiskApiSignupForm() {
   const { t, lang } = useRiskApiLang();
+  const searchParams = useSearchParams();
+  const ref = searchParams.get('ref') || undefined;
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<Status>('idle');
   const [errorMsg, setErrorMsg] = useState('');
@@ -51,7 +65,7 @@ export default function RiskApiSignupForm() {
       const res = await fetch('/api/v1/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, lang }),
+        body: JSON.stringify({ email, lang, ref }),
       });
       const data = await res.json();
 
