@@ -22,6 +22,7 @@ import { Terminal, Database, CreditCard, ArrowLeft } from 'lucide-react';
 import CopyButton from './CopyButton';
 import LangSwitcher from './LangSwitcher';
 import { useRiskApiLang } from './LangContext';
+import ChatWidget from './ChatWidget';
 
 const CURL_EXAMPLE = `curl "https://tnt-audit.com/api/v1/token-risk?mint=<MINT_ADDRESS>" \\
   -H "Authorization: Bearer tnt_sk_your_key_here"`;
@@ -529,6 +530,7 @@ print(data["safety_score"], data["insider_clusters"])`}
           </a>
         </footer>
       </main>
+      <ChatWidget />
     </div>
   );
 }
