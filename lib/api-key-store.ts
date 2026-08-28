@@ -1,3 +1,10 @@
+// Version 7.4 — lib/api-key-store.ts
+//
+// v7.4: added referred_by (nullable text) — referral-partner tracking
+// for revenue-share arrangements (see app/api/v1/signup/route.ts's own
+// header for the whitelist + why). Not derived from anything else in
+// this file; just threaded through insertApiKey()'s new optional param.
+//
 // Version 7.3 — lib/api-key-store.ts
 //
 // v7.3: added billing fields to ApiKeyRecord (credit_balance_usd,
@@ -31,6 +38,9 @@
 //   alter table api_keys add column subscription_expires_at timestamptz;
 //   alter table api_keys add column subscription_cycle_calls_used int not null default 0;
 //
+//   -- added for referral tracking:
+//   alter table api_keys add column referred_by text;
+//
 // Note: full per-request usage LOGGING (which mint, when, by whom) is
 // Stage 4 scope. This module only tracks enough to know a key is alive
 // (last_used_at, a running request_count) — not a substitute for the
@@ -56,6 +66,7 @@ export interface ApiKeyRecord {
   credit_balance_usd: number;
   subscription_expires_at: string | null;
   subscription_cycle_calls_used: number;
+  referred_by: string | null;
 }
 
 export async function insertApiKey(
@@ -63,10 +74,11 @@ export async function insertApiKey(
   keyPrefix: string,
   ownerLabel: string,
   tier: ApiKeyTier = 'free',
+  referredBy?: string | null,
 ): Promise<ApiKeyRecord | null> {
   const { data, error } = await supabase
     .from(TABLE)
-    .insert({ key_hash: keyHash, key_prefix: keyPrefix, owner_label: ownerLabel, tier })
+    .insert({ key_hash: keyHash, key_prefix: keyPrefix, owner_label: ownerLabel, tier, referred_by: referredBy ?? null })
     .select()
     .single();
 

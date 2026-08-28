@@ -1,3 +1,13 @@
+// Version 7.0 — app/api/v1/signup/route.ts
+//
+// v7.0: accepts an optional `ref` field for referral-partner tracking
+// (revenue-share arrangements, e.g. lumo — see conversation 2026-08-28).
+// Whitelisted against KNOWN_REFERRAL_CODES rather than trusted as
+// free text: an unrecognized code is silently dropped (referred_by
+// stays null) instead of erroring the whole signup, since a bad/typo'd
+// ref shouldn't block someone from getting their key. Add new partners
+// here as they're onboarded — no schema change needed, just this list.
+//
 // Version 6.9 — app/api/v1/signup/route.ts
 //
 // v6.9: accepts an optional `lang` field in the request body and
@@ -62,11 +72,19 @@ export const dynamic = 'force-dynamic';
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const VALID_LANGS: LangCode[] = ['en', 'es', 'fr', 'el', 'ru', 'it', 'zh'];
 
+// Known referral partners for revenue-share arrangements. Whitelisted
+// on purpose — this drives real payouts, so it must never accept
+// arbitrary client-supplied text. Add a new entry here (lowercase) when
+// onboarding a new partner; nothing else needs to change.
+const KNOWN_REFERRAL_CODES = ['lumo'];
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => ({}));
     const rawEmail = typeof body.email === 'string' ? body.email.trim() : '';
     const lang = VALID_LANGS.includes(body.lang) ? (body.lang as LangCode) : undefined;
+    const rawRef = typeof body.ref === 'string' ? body.ref.trim().toLowerCase() : '';
+    const ref = KNOWN_REFERRAL_CODES.includes(rawRef) ? rawRef : null;
 
     if (!rawEmail || !EMAIL_REGEX.test(rawEmail) || rawEmail.length > 200) {
       return NextResponse.json({ error: 'Enter a valid email address' }, { status: 400 });
@@ -98,7 +116,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { rawKey, keyHash, keyPrefix } = generateApiKey();
-    const record = await insertApiKey(keyHash, keyPrefix, email, 'free');
+    const record = await insertApiKey(keyHash, keyPrefix, email, 'free', ref);
 
     if (!record) {
       return NextResponse.json({ error: 'Failed to create API key, please try again' }, { status: 500 });
