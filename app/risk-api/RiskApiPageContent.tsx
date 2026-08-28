@@ -380,7 +380,7 @@ export default function RiskApiPageContent({ requestsServed }: { requestsServed:
             <button
               type="button"
               onClick={() => window.dispatchEvent(new Event('open-risk-api-chat'))}
-              className="flex items-center justify-center gap-1.5 text-center bg-gradient-to-r from-fuchsia-500 to-pink-500 hover:from-fuchsia-400 hover:to-pink-400 text-white font-bold px-4 py-3 rounded text-sm transition shadow-[0_0_15px_rgba(217,70,239,0.35)]"
+              className="flex items-center justify-center gap-1.5 text-center bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white font-bold px-4 py-3 rounded text-sm transition shadow-[0_0_15px_rgba(6,182,212,0.35)]"
             >
               <MessageCircle size={15} />
               {t.btnSiteAssistant}
