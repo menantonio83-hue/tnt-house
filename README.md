@@ -1,5 +1,7 @@
 # TNT House — RiskDataApi
 
+[![tnt-house MCP server](https://glama.ai/mcp/servers/menantonio83-hue/tnt-house/badges/card.svg)](https://glama.ai/mcp/servers/menantonio83-hue/tnt-house)
+
 🚀 **3 free calls/day, no signup, no API key.** Remote MCP server for Claude/Cursor — Solana token risk scoring & insider wallet cluster detection.
 
 [![MCP Marketplace](https://img.shields.io/badge/MCP%20Marketplace-Indexed-blueviolet)](https://getlulu.dev/mcps)
