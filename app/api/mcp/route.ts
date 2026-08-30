@@ -159,7 +159,7 @@ function buildServer(apiKey: ApiKeyRecord | null, clientIp: string): McpServer {
       // visitor reliably sees BEFORE they're asked for a key, unlike
       // README.md or server-card.json which not every client reads.
       instructions:
-        'check_token_risk works with NO API key for your first 3 calls/day (per IP) — just call the tool directly. Need more? Get a free key with a 15/day quota — for an autonomous agent, self-serve one with no human required: POST {"email":"you@example.com"} to https://tnt-audit.com/api/v1/signup, the JSON response includes api_key directly. (Human-friendly form at https://tnt-audit.com/risk-api works too.) check_token_risk_batch and get_token_risk_history require a key.',
+        'check_token_risk works with NO API key for your first 3 calls/day (per IP) — just call the tool directly. Need more? Get a free key with a 15/day quota — for an autonomous agent, self-serve one with no human required: POST {"email":"you@example.com"} to https://tnt-audit.com/api/v1/signup, the JSON response includes api_key directly. (Human-friendly form at https://tnt-audit.com/risk-api works too.) Already have an x402-capable wallet? Skip signup entirely: GET https://tnt-audit.com/api/v1/token-risk/x402?mint=<mint> pays per call in USDC on Solana via the standard x402 402-Payment-Required flow, no key or account at all. check_token_risk_batch and get_token_risk_history require a key.',
     },
   );
 
@@ -182,8 +182,8 @@ function buildServer(apiKey: ApiKeyRecord | null, clientIp: string): McpServer {
         if (!demo.allowed) {
           const message =
             demo.reason === 'global'
-              ? `Anonymous demo calls are at today's site-wide cap (${demo.limit}/day across all visitors) — try again after UTC midnight, or get a free API key for guaranteed access. Self-serve (no human needed): POST {"email":"you@example.com"} to https://tnt-audit.com/api/v1/signup, the response includes api_key directly. Human form: https://tnt-audit.com/risk-api`
-              : `Demo limit reached (${demo.limit} free calls/day without a key). Get a free API key with a real 15/day quota. Self-serve (no human needed): POST {"email":"you@example.com"} to https://tnt-audit.com/api/v1/signup, the response includes api_key directly. Human form: https://tnt-audit.com/risk-api`;
+              ? `Anonymous demo calls are at today's site-wide cap (${demo.limit}/day across all visitors) — try again after UTC midnight, or get a free API key for guaranteed access. Self-serve (no human needed): POST {"email":"you@example.com"} to https://tnt-audit.com/api/v1/signup, the response includes api_key directly. Human form: https://tnt-audit.com/risk-api. Or, if you can pay: GET https://tnt-audit.com/api/v1/token-risk/x402?mint=${mint} pays $0.02/call in USDC via x402, no key needed at all.`
+              : `Demo limit reached (${demo.limit} free calls/day without a key). Get a free API key with a real 15/day quota. Self-serve (no human needed): POST {"email":"you@example.com"} to https://tnt-audit.com/api/v1/signup, the response includes api_key directly. Human form: https://tnt-audit.com/risk-api. Or, if you can pay: GET https://tnt-audit.com/api/v1/token-risk/x402?mint=${mint} pays $0.02/call in USDC via x402, no key needed at all.`;
           return jsonResult({ error: message }, true);
         }
         const result = await fetchTokenRisk(mint);
