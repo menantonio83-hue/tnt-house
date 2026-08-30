@@ -189,6 +189,35 @@ const DEX_DATA_FALLBACK = {
   ageDays: null as number | null,
 };
 
+// v1.7 — human-readable sentence for the `explanation` field, for
+// callers (especially AI agents) that want a ready-to-use reason
+// string instead of parsing dominant_cap codes themselves. Same code
+// list as app/risk-api/TryItWidget.tsx's formatDominantCap (kept as a
+// literal duplicate, not a shared import — that one is client-side UI
+// copy, this is the API's own response shape).
+function explainDominantCap(reason: string | null | undefined): string | undefined {
+  if (!reason) return undefined;
+  const sentences: Record<string, string> = {
+    rugged_confirmed: 'Score capped because RugCheck has this token confirmed as a rug.',
+    permanent_delegate: 'Score capped because the token has a permanent delegate enabled, letting a third party move holder funds.',
+    hidden_owner: 'Score capped because a hidden owner or proxy contract was detected.',
+    high_tax: 'Score capped because the transfer tax exceeds 10%.',
+    low_liquidity: 'Score capped because liquidity is under $500.',
+    top10_gt_90: 'Score capped because the top 10 holders control more than 90% of supply.',
+    dev_wallet_gt_30: 'Score capped because the dev wallet holds more than 30% of supply.',
+    nonstandard_token_program: 'Score capped because the token uses a non-standard token program.',
+    top10_gt_80: 'Score capped because the top 10 holders control more than 80% of supply.',
+    dev_wallet_gt_15: 'Score capped because the dev wallet holds more than 15% of supply.',
+    moderate_tax: 'Score capped because the transfer tax exceeds 3%.',
+    holders_lt_20: 'Score capped because the token has fewer than 20 holders.',
+    dev_wallet_gt_5: 'Score capped because the dev wallet holds more than 5% of supply.',
+    age_lt_1d: 'Score capped because the token is under 1 day old.',
+    age_lt_7d_thin_holders: 'Score capped because the token is under 7 days old with few holders.',
+    age_lt_7d: 'Score capped because the token is under 7 days old.',
+  };
+  return sentences[reason] ?? `Score capped by: ${reason}`;
+}
+
 // Flat interface with nullable fields, NOT a discriminated union — same
 // reason as RateLimitResult in lib/rate-limit.ts and ApiKeyRecord in
 // lib/api-auth.ts: this repo's tsconfig has "strict": false, under which
@@ -223,6 +252,11 @@ export interface TokenRiskResult {
   // array / null dominant_cap when no cap fired at all.
   caps_triggered?: Array<{ reason: string; cap: number }>;
   dominant_cap?: string | null;
+  // v1.7 — ready-to-use sentence explaining dominant_cap, so a caller
+  // doesn't have to maintain its own code->text mapping. Present only
+  // when a cap actually fired (mirrors dominant_cap's null-when-no-cap
+  // behavior); see explainDominantCap above for the code->sentence table.
+  explanation?: string;
   cluster_analysis?: 'complete' | 'pending';
   insider_clusters?: InsiderCluster[];
   mint_authority?: { revoked: boolean; address: string | null };
@@ -637,6 +671,7 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
       contract_risk_capped: contractRiskCapped,
       caps_triggered: capsTriggered,
       dominant_cap: dominantCap,
+      explanation: explainDominantCap(dominantCap),
       cluster_analysis: clusterAnalysis,
       insider_clusters: insiderClusters,
       mint_authority: {
