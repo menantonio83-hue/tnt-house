@@ -159,7 +159,7 @@ function buildServer(apiKey: ApiKeyRecord | null, clientIp: string): McpServer {
       // visitor reliably sees BEFORE they're asked for a key, unlike
       // README.md or server-card.json which not every client reads.
       instructions:
-        'check_token_risk works with NO API key for your first 3 calls/day (per IP) — just call the tool directly. Need more? Get a free key with a 15/day quota at https://tnt-audit.com/risk-api. check_token_risk_batch and get_token_risk_history require a key.',
+        'check_token_risk works with NO API key for your first 3 calls/day (per IP) — just call the tool directly. Need more? Get a free key with a 15/day quota — for an autonomous agent, self-serve one with no human required: POST {"email":"you@example.com"} to https://tnt-audit.com/api/v1/signup, the JSON response includes api_key directly. (Human-friendly form at https://tnt-audit.com/risk-api works too.) check_token_risk_batch and get_token_risk_history require a key.',
     },
   );
 
@@ -182,8 +182,8 @@ function buildServer(apiKey: ApiKeyRecord | null, clientIp: string): McpServer {
         if (!demo.allowed) {
           const message =
             demo.reason === 'global'
-              ? `Anonymous demo calls are at today's site-wide cap (${demo.limit}/day across all visitors) — try again after UTC midnight, or get a free API key for guaranteed access at https://tnt-audit.com/risk-api`
-              : `Demo limit reached (${demo.limit} free calls/day without a key). Get a free API key with a real 15/day quota at https://tnt-audit.com/risk-api`;
+              ? `Anonymous demo calls are at today's site-wide cap (${demo.limit}/day across all visitors) — try again after UTC midnight, or get a free API key for guaranteed access. Self-serve (no human needed): POST {"email":"you@example.com"} to https://tnt-audit.com/api/v1/signup, the response includes api_key directly. Human form: https://tnt-audit.com/risk-api`
+              : `Demo limit reached (${demo.limit} free calls/day without a key). Get a free API key with a real 15/day quota. Self-serve (no human needed): POST {"email":"you@example.com"} to https://tnt-audit.com/api/v1/signup, the response includes api_key directly. Human form: https://tnt-audit.com/risk-api`;
           return jsonResult({ error: message }, true);
         }
         const result = await fetchTokenRisk(mint);
@@ -204,7 +204,7 @@ function buildServer(apiKey: ApiKeyRecord | null, clientIp: string): McpServer {
             _demo: {
               used: demo.used,
               limit: demo.limit,
-              note: `Anonymous demo call ${demo.used}/${demo.limit} today. Get a free key for a real 15/day quota: https://tnt-audit.com/risk-api`,
+              note: `Anonymous demo call ${demo.used}/${demo.limit} today. Get a free key for a real 15/day quota — self-serve (no human needed): POST {"email":"you@example.com"} to https://tnt-audit.com/api/v1/signup, response includes api_key directly. Human form: https://tnt-audit.com/risk-api`,
             },
           },
           !result.ok,
@@ -250,7 +250,7 @@ function buildServer(apiKey: ApiKeyRecord | null, clientIp: string): McpServer {
     },
     async ({ mints }) => {
       if (!apiKey) {
-        return jsonResult({ error: 'Unauthorized — provide an Authorization: Bearer <api_key> header. Get a free key at https://tnt-audit.com/risk-api' }, true);
+        return jsonResult({ error: 'Unauthorized — provide an Authorization: Bearer <api_key> header. Self-serve a free key (no human needed): POST {"email":"you@example.com"} to https://tnt-audit.com/api/v1/signup, response includes api_key directly. Human form: https://tnt-audit.com/risk-api' }, true);
       }
       const startedAt = Date.now();
       const rateLimit = await enforceRateLimitBatch(apiKey, mints.length, {});
@@ -301,7 +301,7 @@ function buildServer(apiKey: ApiKeyRecord | null, clientIp: string): McpServer {
     },
     async ({ mint, days }) => {
       if (!apiKey) {
-        return jsonResult({ error: 'Unauthorized — provide an Authorization: Bearer <api_key> header. Get a free key at https://tnt-audit.com/risk-api' }, true);
+        return jsonResult({ error: 'Unauthorized — provide an Authorization: Bearer <api_key> header. Self-serve a free key (no human needed): POST {"email":"you@example.com"} to https://tnt-audit.com/api/v1/signup, response includes api_key directly. Human form: https://tnt-audit.com/risk-api' }, true);
       }
       const startedAt = Date.now();
       const rows = await getMintRiskHistory(mint, days ?? 30);
