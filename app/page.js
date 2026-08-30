@@ -129,9 +129,9 @@ const TRANSLATIONS = {
     fieldCA: 'Token CA (Solana)',
     fieldCAPH: 'Enter contract address...',
     fieldTier: 'Select tier',
-    tierBasic: 'Verified Badge + Listing',
-    tierFast: 'Priority Listing + Push',
-    tierVIP: 'VIP Featured + Banner',
+    tierBasic: 'Badge + Listing (this site) + Telegram',
+    tierFast: 'Listing (this site) + Telegram + X',
+    tierVIP: 'VIP + Banner + Telegram + X',
     banner1Day: 'Banner 1 day',
     banner2Days: 'Banner 2 days',
     banner6Days: 'Banner 6 days',
@@ -171,7 +171,7 @@ const TRANSLATIONS = {
     slotAvailIn: 'Slot available in',
     investorTitle: 'Investor Information',
     investorSub:
-      'All payments accepted in $MRDT / SOL / USDC via Solana Pay. After payment, token appears in table automatically.',
+      'All payments accepted in $MRDT / SOL / USDC via Solana Pay. After payment, your token appears automatically in the table on THIS site (tnt-audit.com) — not on DexScreener or any exchange.',
     pricingTitle: 'CURRENT PRICING:',
     first10: '🎁 First 10 tokens',
     free: 'FREE',
@@ -269,9 +269,9 @@ const TRANSLATIONS = {
     fieldCA: 'CA del Token (Solana)',
     fieldCAPH: 'Ingresa la dirección...',
     fieldTier: 'Selecciona plan',
-    tierBasic: 'Insignia + Listado',
-    tierFast: 'Listado Prioritario + Push',
-    tierVIP: 'VIP Destacado + Banner',
+    tierBasic: 'Insignia + Listado (este sitio) + Telegram',
+    tierFast: 'Listado (este sitio) + Telegram + X',
+    tierVIP: 'VIP + Banner + Telegram + X',
     banner1Day: 'Banner 1 día',
     banner2Days: 'Banner 2 días',
     banner6Days: 'Banner 6 días',
@@ -310,7 +310,7 @@ const TRANSLATIONS = {
     btnSending: 'ENVIANDO...',
     slotAvailIn: 'Lugar disponible en',
     investorTitle: 'Información para Inversores',
-    investorSub: 'Todos los pagos se aceptan en $MRDT / SOL / USDC vía Solana Pay.',
+    investorSub: 'Todos los pagos se aceptan en $MRDT / SOL / USDC vía Solana Pay. Tras el pago, tu token aparece en la tabla de ESTE sitio (tnt-audit.com) — no en DexScreener ni en ningún exchange.',
     pricingTitle: 'PRECIOS ACTUALES:',
     first10: '🎁 Primeros 10 tokens',
     free: 'GRATIS',
@@ -405,9 +405,9 @@ const TRANSLATIONS = {
     fieldCA: 'CA du Token (Solana)',
     fieldCAPH: 'Entrez adresse...',
     fieldTier: 'Choisir le plan',
-    tierBasic: 'Badge Vérifié + Listing',
-    tierFast: 'Listing Prioritaire + Push',
-    tierVIP: 'VIP en Vedette + Bannière',
+    tierBasic: 'Badge + Listing (ce site) + Telegram',
+    tierFast: 'Listing (ce site) + Telegram + X',
+    tierVIP: 'VIP + Bannière + Telegram + X',
     banner1Day: 'Bannière 1 jour',
     banner2Days: 'Bannière 2 jours',
     banner6Days: 'Bannière 6 jours',
@@ -446,7 +446,7 @@ const TRANSLATIONS = {
     btnSending: 'ENVOI...',
     slotAvailIn: 'Emplacement disponible dans',
     investorTitle: 'Informations Investisseurs',
-    investorSub: 'Tous les paiements sont acceptés en $MRDT / SOL / USDC via Solana Pay.',
+    investorSub: 'Tous les paiements sont acceptés en $MRDT / SOL / USDC via Solana Pay. Après paiement, votre token apparaît dans le tableau de CE site (tnt-audit.com) — pas sur DexScreener ni sur une bourse.',
     pricingTitle: 'TARIFS ACTUELS:',
     first10: '🎁 10 premiers tokens',
     free: 'GRATUIT',
@@ -541,9 +541,9 @@ const TRANSLATIONS = {
     fieldCA: 'CA Token (Solana)',
     fieldCAPH: 'Εισαγωγή διεύθυνσης...',
     fieldTier: 'Επιλογή πλάνου',
-    tierBasic: 'Επαληθευμένο Badge + Καταχώρηση',
-    tierFast: 'Καταχώρηση Προτεραιότητας + Push',
-    tierVIP: 'VIP Προβολή + Banner',
+    tierBasic: 'Badge + Καταχώρηση (αυτό το site) + Telegram',
+    tierFast: 'Καταχώρηση (αυτό το site) + Telegram + X',
+    tierVIP: 'VIP + Banner + Telegram + X',
     banner1Day: 'Banner 1 ημέρα',
     banner2Days: 'Banner 2 ημέρες',
     banner6Days: 'Banner 6 ημέρες',
@@ -582,7 +582,7 @@ const TRANSLATIONS = {
     btnSending: 'ΑΠΟΣΤΟΛΗ...',
     slotAvailIn: 'Θέση διαθέσιμη σε',
     investorTitle: 'Πληροφορίες Επενδυτών',
-    investorSub: 'Όλες οι πληρωμές γίνονται σε $MRDT / SOL / USDC μέσω Solana Pay.',
+    investorSub: 'Όλες οι πληρωμές γίνονται σε $MRDT / SOL / USDC μέσω Solana Pay. Μετά την πληρωμή, το token εμφανίζεται στον πίνακα ΑΥΤΟΥ του site (tnt-audit.com) — όχι στο DexScreener ή σε exchange.',
     pricingTitle: 'ΤΡΕΧΟΥΣΕΣ ΤΙΜΕΣ:',
     first10: '🎁 Πρώτα 10 tokens',
     free: 'ΔΩΡΕΑΝ',
@@ -677,9 +677,9 @@ const TRANSLATIONS = {
     fieldCA: 'CA Токена (Solana)',
     fieldCAPH: 'Введи адрес контракта...',
     fieldTier: 'Выбери тариф',
-    tierBasic: 'Бейдж + Листинг',
-    tierFast: 'Приоритетный Листинг + Push',
-    tierVIP: 'VIP Витрина + Баннер',
+    tierBasic: 'Бейдж + Листинг (таблица на этом сайте) + ТГ',
+    tierFast: 'Листинг (таблица на этом сайте) + ТГ + Х',
+    tierVIP: 'VIP + Баннер (в начале сайта) + ТГ + Х',
     banner1Day: 'Баннер на 1 день',
     banner2Days: 'Баннер на 2 дня',
     banner6Days: 'Баннер на 6 дней',
@@ -719,7 +719,7 @@ const TRANSLATIONS = {
     slotAvailIn: 'Место освободится через',
     investorTitle: 'Информация для инвесторов',
     investorSub:
-      'Все платежи принимаются в $MRDT / SOL / USDC через Solana Pay. После оплаты токен появится в таблице автоматически.',
+      'Все платежи принимаются в $MRDT / SOL / USDC через Solana Pay. После оплаты токен появится в таблице на ЭТОМ сайте (tnt-audit.com) — не на DexScreener и не на бирже.',
     pricingTitle: 'ТЕКУЩИЕ ТАРИФЫ:',
     first10: '🎁 Первые 10 токенов',
     free: 'БЕСПЛАТНО',
@@ -814,9 +814,9 @@ const TRANSLATIONS = {
     fieldCA: 'CA del Token (Solana)',
     fieldCAPH: "Inserisci l'indirizzo del contratto...",
     fieldTier: 'Scegli il piano',
-    tierBasic: 'Badge Verificato + Listing',
-    tierFast: 'Listing Prioritario + Push',
-    tierVIP: 'VIP in Evidenza + Banner',
+    tierBasic: 'Badge + Listing (questo sito) + Telegram',
+    tierFast: 'Listing (questo sito) + Telegram + X',
+    tierVIP: 'VIP + Banner + Telegram + X',
     banner1Day: 'Banner 1 giorno',
     banner2Days: 'Banner 2 giorni',
     banner6Days: 'Banner 6 giorni',
@@ -856,7 +856,7 @@ const TRANSLATIONS = {
     slotAvailIn: 'Posto disponibile tra',
     investorTitle: 'Informazioni per investitori',
     investorSub:
-      'Tutti i pagamenti sono accettati in $MRDT / SOL / USDC tramite Solana Pay. Dopo il pagamento il token appare automaticamente in tabella.',
+      'Tutti i pagamenti sono accettati in $MRDT / SOL / USDC tramite Solana Pay. Dopo il pagamento, il token appare nella tabella di QUESTO sito (tnt-audit.com) — non su DexScreener o un exchange.',
     pricingTitle: 'TARIFFE ATTUALI:',
     first10: '🎁 Primi 10 token',
     free: 'GRATIS',
@@ -951,9 +951,9 @@ const TRANSLATIONS = {
     fieldCA: '代币CA地址 (Solana)',
     fieldCAPH: '输入合约地址...',
     fieldTier: '选择套餐',
-    tierBasic: '认证徽章+上线',
-    tierFast: '优先上线+推送',
-    tierVIP: 'VIP精选+横幅',
+    tierBasic: '徽章 + 上线（本站表格）+ 电报',
+    tierFast: '上线（本站表格）+ 电报 + X',
+    tierVIP: 'VIP + 横幅 + 电报 + X',
     banner1Day: '横幅 1天',
     banner2Days: '横幅 2天',
     banner6Days: '横幅 6天',
@@ -993,7 +993,7 @@ const TRANSLATIONS = {
     slotAvailIn: '名额将在以下时间后释放',
     investorTitle: '投资者信息',
     investorSub:
-      '所有付款均可通过 Solana Pay 使用 $MRDT / SOL / USDC 支付。付款后代币将自动出现在表格中。',
+      '所有付款均可通过 Solana Pay 使用 $MRDT / SOL / USDC 支付。付款后代币将出现在本站(tnt-audit.com)的表格中——不是在 DexScreener 或任何交易所上。',
     pricingTitle: '当前价格：',
     first10: '🎁 前10个代币',
     free: '免费',
@@ -3299,6 +3299,23 @@ export default function TntHouse() {
             // call below queries it by ca.
             await saveTokenToSupabase(auditData);
             postAuditToTelegram(auditData);
+
+            // FEAT v1.114: Priority/VIP tiers now include an X post (see
+            // tierFast/tierVIP copy) but there's no automated X posting in
+            // this codebase — fire a private admin Telegram reminder so a
+            // purchased X promo doesn't get silently forgotten. Fire-and-
+            // forget: never blocks the buyer's own success flow below.
+            if (auditData.tier === 'fast' || auditData.tier === 'vip') {
+              fetch('/api/notify-x-promo', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  ca: auditData.ca,
+                  tier: auditData.tier,
+                  tokenName: auditData.symbol || auditData.name || '',
+                }),
+              }).catch(function () { /* best-effort only */ });
+            }
 
             // FEAT v1.102: same one-click merge as the free-audit path —
             // no separate manual "Check Insider Clusters" press needed.
