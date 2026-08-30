@@ -249,7 +249,10 @@ export async function GET(request: NextRequest) {
     if (!mint) {
       return respond(
         NextResponse.json(
-          { error: 'Missing required parameter: mint (or ca)' },
+          {
+            error: 'Missing required parameter: mint (or ca)',
+            example: 'GET /api/v1/token-risk?mint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+          },
           { status: 400, headers: responseHeaders },
         ),
         { error: 'missing_mint' },
