@@ -4044,17 +4044,17 @@ export default function TntHouse() {
                         <option value="basic">
                           {t.tierBasic} — {freeSlots > 0
                             ? t.free + ' — ' + freeSlots + ' ' + t.slotsLeft
-                            : '~$10 $MRDT/SOL/USDC'}
+                            : '~$3 $MRDT/SOL/USDC'}
                         </option>
                         <option value="fast">
                           {t.tierFast} — {freeSlots > 0
                             ? t.free + ' — ' + freeSlots + ' ' + t.slotsLeft
-                            : '~$25 $MRDT/SOL/USDC'}
+                            : '~$9 $MRDT/SOL/USDC'}
                         </option>
                         <option value="vip">
                           {t.tierVIP} — {freeSlots > 0
                             ? t.free + ' — ' + freeSlots + ' ' + t.slotsLeft
-                            : '~$75 $MRDT/SOL/USDC'}
+                            : '~$29 $MRDT/SOL/USDC'}
                         </option>
                       </select>
                     </div>
