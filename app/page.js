@@ -1783,7 +1783,8 @@ export default function TntHouse() {
   // from invoiceUsd (the official listed price shown for SOL/USDC and
   // as the "≈ $X USD" reference line). Discount: $7->$5, $18->$15, $75->$70.
   var getMrdtDiscountedUsd = function (tier) {
-    return tier === 'fast' ? 15 : tier === 'vip' ? 70 : 5;
+    // v1.111: repriced Verified/Priority/VIP $5/$15/$70 -> $3/$9/$29.
+    return tier === 'fast' ? 9 : tier === 'vip' ? 29 : 3;
   };
 
   var getAmountForTier = function (tier) {
@@ -1800,7 +1801,8 @@ export default function TntHouse() {
   };
 
   var getAmountForBanner = function (days) {
-    var usd = days === '2' ? 35 : days === '6' ? 100 : 20;
+    // v1.111: repriced Banner 1/2/6 days $20/$35/$100 -> $5/$9/$19.
+    var usd = days === '2' ? 9 : days === '6' ? 19 : 5;
     var price = getSafePrice();
     return Math.round(usd / price);
   };
@@ -2289,7 +2291,8 @@ export default function TntHouse() {
       return;
     }
     var tierName = selectedTier === 'fast' ? 'Fast' : selectedTier === 'vip' ? 'VIP' : 'Basic';
-    var usd = selectedTier === 'fast' ? 18 : selectedTier === 'vip' ? 75 : 7;
+    // v1.111: repriced Verified/Priority/VIP $7/$18/$75 -> $3/$9/$29 (single price, no MRDT discount split anymore).
+    var usd = selectedTier === 'fast' ? 9 : selectedTier === 'vip' ? 29 : 3;
     setInvoiceAmount(mrdtAmount);
     setInvoiceUsd(usd);
     setInvoiceLabel('TNT House ' + tierName + ' Audit - ' + formData.projectName);
@@ -3096,7 +3099,8 @@ export default function TntHouse() {
       setBannerError('Price error, try later.');
       return;
     }
-    var usd = bannerFormData.days === '2' ? 35 : bannerFormData.days === '6' ? 100 : 20;
+    // v1.111: repriced Banner 1/2/6 days $20/$35/$100 -> $5/$9/$19.
+    var usd = bannerFormData.days === '2' ? 9 : bannerFormData.days === '6' ? 19 : 5;
     setBannerInvoiceAmount(mrdtAmount);
     setBannerInvoiceUsd(usd);
     setBannerError('');
@@ -4692,12 +4696,12 @@ export default function TntHouse() {
                 <div className="grid grid-cols-1 gap-2 text-xs font-mono">
                   {[
                     [t.first10, t.free],
-                    ['Verified Badge + Listing', '~$5 $MRDT · ~$7 SOL/USDC'],
-                    ['Priority Listing + Push', '~$15 $MRDT · ~$18 SOL/USDC'],
-                    ['VIP Featured + Banner', '~$70 $MRDT · ~$75 SOL/USDC'],
-                    ['Banner 1 day', '~$20 $MRDT/SOL/USDC'],
-                    ['Banner 2 days', '~$35 $MRDT/SOL/USDC'],
-                    ['Banner 6 days', '~$100 $MRDT/SOL/USDC'],
+                    ['Verified Badge + Listing', '~$3 $MRDT/SOL/USDC'],
+                    ['Priority Listing + Push', '~$9 $MRDT/SOL/USDC'],
+                    ['VIP Featured + Banner', '~$29 $MRDT/SOL/USDC'],
+                    ['Banner 1 day', '~$5 $MRDT/SOL/USDC'],
+                    ['Banner 2 days', '~$9 $MRDT/SOL/USDC'],
+                    ['Banner 6 days', '~$19 $MRDT/SOL/USDC'],
                   ].map(function (row, i) {
                     var rowCls =
                       'flex justify-between p-2.5 border rounded-lg ' +
