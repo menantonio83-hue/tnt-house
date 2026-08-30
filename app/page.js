@@ -3952,7 +3952,7 @@ export default function TntHouse() {
                   )}
                 </div>
                 <p className="text-slate-400 text-xs mb-4">
-                  {freeSlots > 0 ? '🎁 ' + t.formFreeLeft : t.formPaid}
+                  {freeSlots > 0 ? '🛡️ ' + t.formFreeLeft : t.formPaid}
                 </p>
                 <form onSubmit={handleFormSubmit} className="space-y-4">
                   {/* FEAT v1.95: CA-first flow — this is the ONLY field
