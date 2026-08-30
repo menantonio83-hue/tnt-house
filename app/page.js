@@ -1558,6 +1558,50 @@ export default function TntHouse() {
   // counter to show 10 fresh free slots again for continued outreach,
   // same pattern as the earlier 10 -> 20 -> 30 -> 40 -> 50 bumps.
   var FREE_TOTAL = 60;
+  // FEAT v1.113: "Quick Check" — a SEPARATE, standalone product from the
+  // Listing flow above (FREE_TOTAL=60 is a lifetime cap on free LISTING
+  // slots; this is a per-visitor 3/24h lookup that never lists anything).
+  // Backed by app/api/quick-check (lib/quick-check-limit.ts). Shown
+  // inline on the homepage — instead of only on /quick-check — so a
+  // visitor sees the "3 free checks today" counter without navigating
+  // away first.
+  var [qcCa, setQcCa] = useState('');
+  var [qcLoading, setQcLoading] = useState(false);
+  var [qcResult, setQcResult] = useState(null);
+  var [qcError, setQcError] = useState(null);
+  var [qcPaywall, setQcPaywall] = useState(null);
+  var [qcQuota, setQcQuota] = useState(null);
+  useEffect(function () {
+    fetch('/api/quick-check', { method: 'POST' })
+      .then(function (r) { return r.json(); })
+      .then(function (data) { setQcQuota(data); })
+      .catch(function () {});
+  }, []);
+  var handleQuickCheck = async function (e) {
+    e.preventDefault();
+    if (!qcCa.trim()) return;
+    setQcLoading(true);
+    setQcError(null);
+    setQcResult(null);
+    setQcPaywall(null);
+    try {
+      var res = await fetch('/api/quick-check?ca=' + encodeURIComponent(qcCa.trim()));
+      var data = await res.json();
+      if (res.status === 402) {
+        setQcPaywall(data);
+        setQcQuota(data);
+      } else if (!res.ok) {
+        setQcError(data.error || 'Something went wrong');
+      } else {
+        setQcResult(data.auditResult);
+        setQcQuota(data.quota);
+      }
+    } catch (err) {
+      setQcError('Network error, try again');
+    } finally {
+      setQcLoading(false);
+    }
+  };
   // FEAT v1.90: separate free-banner giveaway counter, independent from
   // BANNER_SLOTS (which is concurrent display capacity, not a giveaway).
   var [freeBanners, setFreeBanners] = useState(5);
@@ -3726,12 +3770,72 @@ export default function TntHouse() {
           </div>
         </section>
 
+        {/* ═══ QUICK CHECK — separate product from Listing below, 3 free/24h ═══ */}
+        <section className="max-w-7xl mx-auto px-6 pt-8">
+          <div className="max-w-2xl mx-auto">
+            <div className="border-2 border-emerald-500/40 rounded-lg bg-slate-900/40 p-6 backdrop-blur-md">
+              <div className="flex items-start justify-between mb-2">
+                <h3 className="text-lg font-black text-emerald-400">⚡ QUICK CHECK</h3>
+                {qcQuota && (
+                  <div className="bg-emerald-500/20 border border-emerald-500/40 rounded-lg px-2 py-1 text-center">
+                    <div className="text-emerald-400 font-black text-sm">
+                      {Math.max(0, (qcQuota.freeLimit || 3) - (qcQuota.usedFreeToday || 0))}/{qcQuota.freeLimit || 3}
+                    </div>
+                    <div className="text-[9px] text-emerald-500">free today</div>
+                  </div>
+                )}
+              </div>
+              <p className="text-slate-400 text-xs mb-4">
+                Just checking before you buy — no listing, no submission. 3 free checks every 24h, then $1/$4/$10 credit packs.
+              </p>
+              <form onSubmit={handleQuickCheck} className="flex gap-2">
+                <input
+                  type="text"
+                  value={qcCa}
+                  onChange={function (e) { setQcCa(e.target.value); }}
+                  placeholder="Enter contract address..."
+                  className="flex-1 bg-slate-950 border border-emerald-500/30 rounded-lg px-3 py-2 text-sm text-white"
+                />
+                <button
+                  type="submit"
+                  disabled={qcLoading}
+                  className="bg-emerald-600 hover:bg-emerald-500 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50 whitespace-nowrap"
+                >
+                  {qcLoading ? 'Scanning...' : 'Check'}
+                </button>
+              </form>
+
+              {qcError && <div className="text-red-400 text-xs mt-3">{qcError}</div>}
+
+              {qcResult && (
+                <div className="mt-4 bg-slate-950 border border-emerald-500/30 rounded-lg p-3 text-xs space-y-1">
+                  <div className="text-2xl font-black text-emerald-400">{qcResult.securityScore}/100</div>
+                  <div>Mint authority revoked: {String(qcResult.mintAuthRevoked ?? '—')}</div>
+                  <div>Freeze authority revoked: {String(qcResult.freezeAuthRevoked ?? '—')}</div>
+                  <div>Holder risk: {qcResult.holderRisk && qcResult.holderRisk.riskLevel ? qcResult.holderRisk.riskLevel : '—'}</div>
+                </div>
+              )}
+
+              {qcPaywall && (
+                <div className="mt-4 bg-slate-950 border border-amber-500/40 rounded-lg p-3 text-xs">
+                  <div className="font-bold text-amber-400 mb-1">You've used your {qcPaywall.freeLimit} free checks today.</div>
+                  <div className="text-slate-400 mb-2">Keep checking — no subscription, just credits.</div>
+                  <a href="/quick-check#buy-credits" className="inline-block bg-purple-600 hover:bg-purple-500 rounded-lg px-3 py-1.5 font-bold">
+                    Buy credits — 5 for $1 / 25 for $4 / 100 for $10 →
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+
         {/* ═══ ORDER FORMS + PRICING ═══ */}
         <section className="max-w-7xl mx-auto px-6 py-8">
           <div className="max-w-2xl mx-auto">
               <div id="auditFormSection" className="border-2 border-purple-500/30 rounded-lg bg-slate-900/40 p-6 backdrop-blur-md">
                 <div className="flex items-start justify-between mb-2">
                   <h3 className="text-lg font-black text-purple-400">{t.formTitle}</h3>
+
                   {freeSlots > 0 ? (
                     <div className="bg-emerald-500/20 border border-emerald-500/40 rounded-lg px-2 py-1 text-center">
                       <div className="text-emerald-400 font-black text-sm">
