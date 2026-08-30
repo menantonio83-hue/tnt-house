@@ -4849,17 +4849,17 @@ export default function TntHouse() {
                         <option value="1">
                           {t.dur1} - {freeBanners > 0
                             ? t.free + ' — ' + freeBanners + ' ' + t.bannersLeft
-                            : '~$20 $MRDT/SOL/USDC'}
+                            : '~$5 $MRDT/SOL/USDC'}
                         </option>
                         <option value="2">
                           {t.dur2} - {freeBanners > 0
                             ? t.free + ' — ' + freeBanners + ' ' + t.bannersLeft
-                            : '~$35 $MRDT/SOL/USDC'}
+                            : '~$9 $MRDT/SOL/USDC'}
                         </option>
                         <option value="6">
                           {t.dur6} - {freeBanners > 0
                             ? t.free + ' — ' + freeBanners + ' ' + t.bannersLeft
-                            : '~$100 $MRDT/SOL/USDC'}
+                            : '~$19 $MRDT/SOL/USDC'}
                         </option>
                       </select>
                       )}
