@@ -112,6 +112,15 @@ const TRANSLATIONS = {
     tableTitle: 'VERIFIED TOKENS TABLE',
     tableClick: 'Tap a token to see its info',
     scanning: 'Scanning...',
+    qcTitle: '⚡ QUICK CHECK',
+    qcDesc: 'Just checking before you buy — no listing, no submission. 3 free checks every 24h, then $1/$4/$10 credit packs.',
+    qcPlaceholder: 'Enter contract address...',
+    qcButton: 'Check',
+    qcScanning: 'Scanning...',
+    qcFreeToday: 'free today',
+    qcPaywallUsed: "You've used your 3 free checks today.",
+    qcPaywallDesc: 'Keep checking — no subscription, just credits.',
+    qcBuyCredits: 'Buy credits — 5 for $1 / 25 for $4 / 100 for $10 →',
     formTitle: 'CHECK TOKEN',
     formFreeLeft: 'free slots left! Fill the form — audit starts immediately.',
     formPaid: 'Fill the form — choose wallet — pay via Solana Pay — token appears in table.',
@@ -240,6 +249,15 @@ const TRANSLATIONS = {
     tableTitle: 'TABLA DE TOKENS VERIFICADOS',
     tableClick: 'Toca un token para ver su información',
     scanning: 'Escaneando...',
+    qcTitle: '⚡ VERIFICACIÓN RÁPIDA',
+    qcDesc: 'Solo estás comprobando antes de comprar — sin listado, sin envío. 3 verificaciones gratis cada 24h, luego paquetes de $1/$4/$10.',
+    qcPlaceholder: 'Ingresa la dirección del contrato...',
+    qcButton: 'Verificar',
+    qcScanning: 'Escaneando...',
+    qcFreeToday: 'gratis hoy',
+    qcPaywallUsed: 'Has usado tus 3 verificaciones gratis de hoy.',
+    qcPaywallDesc: 'Sigue verificando — sin suscripción, solo créditos.',
+    qcBuyCredits: 'Comprar créditos — 5 por $1 / 25 por $4 / 100 por $10 →',
     formTitle: 'VERIFICAR TOKEN',
     formFreeLeft: 'lugares gratis! Llena el formulario.',
     formPaid: 'Llena el formulario — elige billetera — paga — el token aparece en la tabla.',
@@ -364,6 +382,15 @@ const TRANSLATIONS = {
     tableTitle: 'TABLE DES TOKENS VÉRIFIÉS',
     tableClick: 'Touchez un token pour voir ses infos',
     scanning: 'Analyse...',
+    qcTitle: '⚡ VÉRIFICATION RAPIDE',
+    qcDesc: "Juste une vérification avant d'acheter — pas de listing, pas de soumission. 3 vérifications gratuites toutes les 24h, puis des packs à $1/$4/$10.",
+    qcPlaceholder: "Entrez l'adresse du contrat...",
+    qcButton: 'Vérifier',
+    qcScanning: 'Analyse...',
+    qcFreeToday: "gratuit aujourd'hui",
+    qcPaywallUsed: "Vous avez utilisé vos 3 vérifications gratuites aujourd'hui.",
+    qcPaywallDesc: 'Continuez à vérifier — sans abonnement, juste des crédits.',
+    qcBuyCredits: 'Acheter des crédits — 5 pour $1 / 25 pour $4 / 100 pour $10 →',
     formTitle: 'VÉRIFIER LE TOKEN',
     formFreeLeft: 'places gratuites! Remplissez le formulaire.',
     formPaid: 'Remplissez — choisissez un portefeuille — payez — le token apparaît.',
@@ -488,6 +515,15 @@ const TRANSLATIONS = {
     tableTitle: 'ΠΙΝΑΚΑΣ ΕΛΕΓΜΕΝΩΝ TOKENS',
     tableClick: 'Πάτα σε ένα token για να δεις πληροφορίες',
     scanning: 'Σάρωση...',
+    qcTitle: '⚡ ΓΡΗΓΟΡΟΣ ΕΛΕΓΧΟΣ',
+    qcDesc: 'Απλός έλεγχος πριν αγοράσεις — χωρίς καταχώριση, χωρίς υποβολή. 3 δωρεάν έλεγχοι κάθε 24 ώρες, μετά πακέτα $1/$4/$10.',
+    qcPlaceholder: 'Εισάγετε τη διεύθυνση συμβολαίου...',
+    qcButton: 'Έλεγχος',
+    qcScanning: 'Σάρωση...',
+    qcFreeToday: 'δωρεάν σήμερα',
+    qcPaywallUsed: 'Χρησιμοποίησες τους 3 δωρεάν ελέγχους σου σήμερα.',
+    qcPaywallDesc: 'Συνέχισε να ελέγχεις — χωρίς συνδρομή, μόνο πιστώσεις.',
+    qcBuyCredits: 'Αγορά πιστώσεων — 5 για $1 / 25 για $4 / 100 για $10 →',
     formTitle: 'ΕΛΕΓΞΤΕ ΤΟ TOKEN',
     formFreeLeft: 'δωρεάν θέσεις! Συμπλήρωσε τη φόρμα.',
     formPaid: 'Συμπλήρωσε — επίλεξε πορτοφόλι — πλήρωσε.',
@@ -612,6 +648,15 @@ const TRANSLATIONS = {
     tableTitle: 'ТАБЛИЦА ПРОВЕРЕННЫХ ТОКЕНОВ',
     tableClick: 'Нажми на токен, чтобы узнать информацию',
     scanning: 'Сканирование...',
+    qcTitle: '⚡ БЫСТРАЯ ПРОВЕРКА',
+    qcDesc: 'Просто проверка перед покупкой — без листинга, без заявки. 3 бесплатные проверки каждые 24ч, потом пакеты $1/$4/$10.',
+    qcPlaceholder: 'Введи адрес контракта...',
+    qcButton: 'Проверить',
+    qcScanning: 'Сканирование...',
+    qcFreeToday: 'бесплатно сегодня',
+    qcPaywallUsed: 'Ты использовал свои 3 бесплатные проверки на сегодня.',
+    qcPaywallDesc: 'Продолжай проверять — без подписки, просто кредиты.',
+    qcBuyCredits: 'Купить кредиты — 5 за $1 / 25 за $4 / 100 за $10 →',
     formTitle: 'ПРОВЕРИТЬ ТОКЕН',
     formFreeLeft: 'бесплатных мест! Заполни форму — аудит запустится сразу.',
     formPaid: 'Заполни форму — выбери кошелёк — оплати — токен появится в таблице.',
@@ -737,6 +782,15 @@ const TRANSLATIONS = {
     tableTitle: 'TABELLA TOKEN VERIFICATI',
     tableClick: 'Tocca un token per vedere le info',
     scanning: 'Scansione...',
+    qcTitle: '⚡ VERIFICA RAPIDA',
+    qcDesc: 'Solo un controllo prima di comprare — nessun listing, nessuna richiesta. 3 verifiche gratuite ogni 24h, poi pacchetti da $1/$4/$10.',
+    qcPlaceholder: 'Inserisci indirizzo del contratto...',
+    qcButton: 'Verifica',
+    qcScanning: 'Scansione...',
+    qcFreeToday: 'gratis oggi',
+    qcPaywallUsed: 'Hai usato le tue 3 verifiche gratuite di oggi.',
+    qcPaywallDesc: 'Continua a verificare — nessun abbonamento, solo crediti.',
+    qcBuyCredits: 'Compra crediti — 5 per $1 / 25 per $4 / 100 per $10 →',
     formTitle: 'VERIFICA TOKEN',
     formFreeLeft: "posti gratuiti rimasti! Compila il modulo — l'audit parte subito.",
     formPaid: 'Compila il modulo — scegli il wallet — paga — il token appare in tabella.',
@@ -862,6 +916,15 @@ const TRANSLATIONS = {
     tableTitle: '已验证代币表',
     tableClick: '点击代币查看详情',
     scanning: '扫描中...',
+    qcTitle: '⚡ 快速检测',
+    qcDesc: '购买前先查一下——不上架，不提交。每24小时3次免费检测，之后是 $1/$4/$10 的额度包。',
+    qcPlaceholder: '输入合约地址...',
+    qcButton: '检测',
+    qcScanning: '扫描中...',
+    qcFreeToday: '今日免费',
+    qcPaywallUsed: '你今天的3次免费检测已用完。',
+    qcPaywallDesc: '继续检测——无需订阅，只需额度。',
+    qcBuyCredits: '购买额度 — 5次 $1 / 25次 $4 / 100次 $10 →',
     formTitle: '检测代币',
     formFreeLeft: '个免费名额！填写表单——审计立即开始。',
     formPaid: '填写表单——选择钱包——支付——代币出现在表格中。',
@@ -3775,25 +3838,25 @@ export default function TntHouse() {
           <div className="max-w-2xl mx-auto">
             <div className="border-2 border-emerald-500/40 rounded-lg bg-slate-900/40 p-6 backdrop-blur-md">
               <div className="flex items-start justify-between mb-2">
-                <h3 className="text-lg font-black text-emerald-400">⚡ QUICK CHECK</h3>
+                <h3 className="text-lg font-black text-emerald-400">{t.qcTitle}</h3>
                 {qcQuota && (
                   <div className="bg-emerald-500/20 border border-emerald-500/40 rounded-lg px-2 py-1 text-center">
                     <div className="text-emerald-400 font-black text-sm">
                       {Math.max(0, (qcQuota.freeLimit || 3) - (qcQuota.usedFreeToday || 0))}/{qcQuota.freeLimit || 3}
                     </div>
-                    <div className="text-[9px] text-emerald-500">free today</div>
+                    <div className="text-[9px] text-emerald-500">{t.qcFreeToday}</div>
                   </div>
                 )}
               </div>
               <p className="text-slate-400 text-xs mb-4">
-                Just checking before you buy — no listing, no submission. 3 free checks every 24h, then $1/$4/$10 credit packs.
+                {t.qcDesc}
               </p>
               <form onSubmit={handleQuickCheck} className="flex gap-2">
                 <input
                   type="text"
                   value={qcCa}
                   onChange={function (e) { setQcCa(e.target.value); }}
-                  placeholder="Enter contract address..."
+                  placeholder={t.qcPlaceholder}
                   className="flex-1 bg-slate-950 border border-emerald-500/30 rounded-lg px-3 py-2 text-sm text-white"
                 />
                 <button
@@ -3801,7 +3864,7 @@ export default function TntHouse() {
                   disabled={qcLoading}
                   className="bg-emerald-600 hover:bg-emerald-500 rounded-lg px-4 py-2 text-sm font-bold disabled:opacity-50 whitespace-nowrap"
                 >
-                  {qcLoading ? 'Scanning...' : 'Check'}
+                  {qcLoading ? t.qcScanning : t.qcButton}
                 </button>
               </form>
 
@@ -3818,10 +3881,10 @@ export default function TntHouse() {
 
               {qcPaywall && (
                 <div className="mt-4 bg-slate-950 border border-amber-500/40 rounded-lg p-3 text-xs">
-                  <div className="font-bold text-amber-400 mb-1">You've used your {qcPaywall.freeLimit} free checks today.</div>
-                  <div className="text-slate-400 mb-2">Keep checking — no subscription, just credits.</div>
+                  <div className="font-bold text-amber-400 mb-1">{t.qcPaywallUsed}</div>
+                  <div className="text-slate-400 mb-2">{t.qcPaywallDesc}</div>
                   <a href="/quick-check#buy-credits" className="inline-block bg-purple-600 hover:bg-purple-500 rounded-lg px-3 py-1.5 font-bold">
-                    Buy credits — 5 for $1 / 25 for $4 / 100 for $10 →
+                    {t.qcBuyCredits}
                   </a>
                 </div>
               )}
