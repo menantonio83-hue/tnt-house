@@ -122,7 +122,7 @@ const TRANSLATIONS = {
     qcPaywallDesc: 'Keep checking — no subscription, just credits.',
     qcBuyCredits: 'Buy credits — 5 for $1 / 25 for $4 / 100 for $10 →',
     formTitle: 'CHECK TOKEN + PROMOTE',
-    formFreeLeft: 'free slots left: audit + table listing + Telegram post. Fill the form — starts immediately.',
+    formFreeLeft: "Audit + listing on this site's table + Telegram + X.",
     formPaid: 'Pick a tier (Verified/Priority/VIP) — audit + table listing + Telegram; Priority/VIP also add an X post. Pay — token appears automatically.',
     fieldProject: 'Token Name',
     fieldProjectPH: 'Your token...',
@@ -262,7 +262,7 @@ const TRANSLATIONS = {
     qcPaywallDesc: 'Sigue verificando — sin suscripción, solo créditos.',
     qcBuyCredits: 'Comprar créditos — 5 por $1 / 25 por $4 / 100 por $10 →',
     formTitle: 'VERIFICAR TOKEN + PROMOCIÓN',
-    formFreeLeft: 'lugares gratis: auditoría + listado en la tabla + post en Telegram. Llena el formulario — empieza al instante.',
+    formFreeLeft: 'Auditoría + listado en la tabla de este sitio + Telegram + X.',
     formPaid: 'Elige un plan (Verified/Priority/VIP) — auditoría + tabla + Telegram; Priority/VIP añaden un post en X. Paga — el token aparece automáticamente.',
     fieldProject: 'Nombre del token',
     fieldProjectPH: 'Tu token...',
@@ -398,7 +398,7 @@ const TRANSLATIONS = {
     qcPaywallDesc: 'Continuez à vérifier — sans abonnement, juste des crédits.',
     qcBuyCredits: 'Acheter des crédits — 5 pour $1 / 25 pour $4 / 100 pour $10 →',
     formTitle: 'VÉRIFIER LE TOKEN + PROMOTION',
-    formFreeLeft: 'places gratuites : audit + listing dans le tableau + post Telegram. Remplissez le formulaire — ça démarre tout de suite.',
+    formFreeLeft: 'Audit + listing dans le tableau de ce site + Telegram + X.',
     formPaid: 'Choisissez un plan (Verified/Priority/VIP) — audit + tableau + Telegram; Priority/VIP ajoutent un post X. Payez — le token apparaît automatiquement.',
     fieldProject: 'Nom du token',
     fieldProjectPH: 'Votre token...',
@@ -534,7 +534,7 @@ const TRANSLATIONS = {
     qcPaywallDesc: 'Συνέχισε να ελέγχεις — χωρίς συνδρομή, μόνο πιστώσεις.',
     qcBuyCredits: 'Αγορά πιστώσεων — 5 για $1 / 25 για $4 / 100 για $10 →',
     formTitle: 'ΕΛΕΓΞΤΕ ΤΟ TOKEN + ΠΡΟΩΘΗΣΗ',
-    formFreeLeft: 'δωρεάν θέσεις: έλεγχος + καταχώρηση στον πίνακα + ανάρτηση στο Telegram. Συμπλήρωσε τη φόρμα — ξεκινά αμέσως.',
+    formFreeLeft: 'Έλεγχος + καταχώρηση στον πίνακα αυτού του site + Telegram + X.',
     formPaid: 'Διάλεξε πακέτο (Verified/Priority/VIP) — έλεγχος + πίνακας + Telegram· το Priority/VIP προσθέτει ανάρτηση στο X. Πλήρωσε — το token εμφανίζεται αυτόματα.',
     fieldProject: 'Όνομα Token',
     fieldProjectPH: 'Το token σου...',
@@ -670,7 +670,7 @@ const TRANSLATIONS = {
     qcPaywallDesc: 'Продолжай проверять — без подписки, просто кредиты.',
     qcBuyCredits: 'Купить кредиты — 5 за $1 / 25 за $4 / 100 за $10 →',
     formTitle: 'ПРОВЕРИТЬ ТОКЕН + РЕКЛАМА',
-    formFreeLeft: 'бесплатных мест: аудит + место в таблице + пост в Telegram. Заполни форму — старт сразу.',
+    formFreeLeft: 'Аудит + размещение на нашем сайте в таблице + ТГ + Х.',
     formPaid: 'Выбери тариф (Verified/Priority/VIP) — аудит + таблица + Telegram; Priority/VIP добавляют пост в Х. Оплати — токен появится автоматически.',
     fieldProject: 'Название токена',
     fieldProjectPH: 'Твой токен...',
@@ -807,7 +807,7 @@ const TRANSLATIONS = {
     qcPaywallDesc: 'Continua a verificare — nessun abbonamento, solo crediti.',
     qcBuyCredits: 'Compra crediti — 5 per $1 / 25 per $4 / 100 per $10 →',
     formTitle: 'VERIFICA TOKEN + PROMOZIONE',
-    formFreeLeft: 'posti gratuiti: audit + inserimento in tabella + post su Telegram. Compila il modulo — parte subito.',
+    formFreeLeft: 'Audit + inserimento nella tabella di questo sito + Telegram + X.',
     formPaid: 'Scegli un piano (Verified/Priority/VIP) — audit + tabella + Telegram; Priority/VIP aggiungono un post su X. Paga — il token appare automaticamente.',
     fieldProject: 'Nome del token',
     fieldProjectPH: 'Il tuo token...',
@@ -944,7 +944,7 @@ const TRANSLATIONS = {
     qcPaywallDesc: '继续检测——无需订阅，只需额度。',
     qcBuyCredits: '购买额度 — 5次 $1 / 25次 $4 / 100次 $10 →',
     formTitle: '检测代币 + 推广',
-    formFreeLeft: '个免费名额：检测 + 上表格 + 电报推送。填写表单——立即开始。',
+    formFreeLeft: '检测 + 上本站表格 + 电报 + X。',
     formPaid: '选择套餐（Verified/Priority/VIP）——检测+表格+电报，Priority/VIP 还包含 X 推广。付款后代币自动上架。',
     fieldProject: '代币名称',
     fieldProjectPH: '你的代币...',
@@ -3952,7 +3952,7 @@ export default function TntHouse() {
                   )}
                 </div>
                 <p className="text-slate-400 text-xs mb-4">
-                  {freeSlots > 0 ? '🎁 ' + freeSlots + ' ' + t.formFreeLeft : t.formPaid}
+                  {freeSlots > 0 ? '🎁 ' + t.formFreeLeft : t.formPaid}
                 </p>
                 <form onSubmit={handleFormSubmit} className="space-y-4">
                   {/* FEAT v1.95: CA-first flow — this is the ONLY field
