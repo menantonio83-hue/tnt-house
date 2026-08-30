@@ -25,7 +25,7 @@ This repository also hosts a remote **Model Context Protocol (MCP) server** expo
    - **Browser, zero setup** — open [a live example](https://tnt-audit.com/api/v1/token-risk?mint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v) directly, no install, no signup.
    - **Glama's MCP Inspector** — go to [glama.ai/mcp/inspector](https://glama.ai/mcp/inspector) and paste `https://tnt-audit.com/api/mcp` as the server URL.
 2. **Want more?** — get a free API key in seconds at [tnt-audit.com/risk-api](https://www.tnt-audit.com/risk-api) (email only, no card). A free key raises your limit to **15 calls/day**.
-3. **Need higher volume?** — on the same page, paste your key into the pricing section and pay per-call ($0.04), by subscription ($45/1000 calls), or via x402 (autonomous agents, no key at all, $0.02/call).
+3. **Need higher volume?** — on the same page, paste your key into the pricing section and pay per-call ($0.02), by subscription ($45/5000 calls), or via x402 (autonomous agents, no key at all, $0.02/call).
 
 ## Tech Stack
 - Next.js 14 (App Router) + React 18 + TypeScript
