@@ -3918,9 +3918,9 @@ export default function TntHouse() {
               {qcResult && (
                 <div className="mt-4 bg-slate-950 border border-emerald-500/30 rounded-lg p-3 text-xs space-y-1">
                   <div className="text-2xl font-black text-emerald-400">{qcResult.securityScore}/100</div>
-                  <div>Mint authority revoked: {String(qcResult.mintAuthRevoked ?? '—')}</div>
-                  <div>Freeze authority revoked: {String(qcResult.freezeAuthRevoked ?? '—')}</div>
-                  <div>Holder risk: {qcResult.holderRisk && qcResult.holderRisk.riskLevel ? qcResult.holderRisk.riskLevel : '—'}</div>
+                  <div>Mint authority revoked: {String(qcResult.checks?.mintAuthority?.revoked ?? '—')}</div>
+                  <div>Freeze authority revoked: {String(qcResult.checks?.freezeAuthority?.revoked ?? '—')}</div>
+                  <div>Holder risk: {qcResult.checks?.holderDistribution?.riskLevel || '—'}</div>
                 </div>
               )}
 
