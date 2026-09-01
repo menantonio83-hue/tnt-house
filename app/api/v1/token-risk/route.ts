@@ -1,3 +1,21 @@
+// Version 1.13 — app/api/v1/token-risk/route.ts
+//
+// v1.13: rewrites the demo-exhausted 401 body. The old copy ("Demo
+// limit reached... Get a free API key with a real 15/day quota") read
+// like a bouncer kicking someone out, and "real 15/day quota" implied
+// the demo response was somehow fake/limited — it isn't: the demo path
+// (see v1.12 below) already returns the FULL result object, including
+// insider_clusters and honeypot_risk, identical to an authenticated
+// call. The only real difference is call volume (3/day vs 15/day) and
+// whether the quota is shared with every other anonymous visitor
+// (100/day global pool) or exclusively yours. The new body sells that
+// actual difference instead of a vague "get a key" — and never claims
+// the demo data itself is limited, since it isn't. Two distinct
+// messages (per-IP vs. global cap) kept, since the fix in each case is
+// different (get a key vs. wait for UTC midnight or get a key anyway).
+// No change to limits themselves (still 3/day per IP, 100/day global,
+// 15/day with a free key) — copy only.
+//
 // Version 1.12 — app/api/v1/token-risk/route.ts
 //
 // v1.12: adds a zero-key anonymous demo path, mirroring app/api/mcp/
@@ -232,12 +250,26 @@ export async function GET(request: NextRequest) {
       const clientIp = extractClientIp(request);
       const demo = await checkDemoLimit(clientIp);
       if (!demo.allowed) {
-        const message =
+        // v1.13: honest, value-forward copy — see version note above.
+        // Sells volume + a guaranteed (non-shared) quota, since that's
+        // the actual difference a free key buys. Never implies the demo
+        // JSON itself was incomplete (it wasn't).
+        const body =
           demo.reason === 'global'
-            ? `Anonymous demo calls are at today's site-wide cap (${demo.limit}/day across all visitors) — try again after UTC midnight, or get a free API key for guaranteed access at https://tnt-audit.com/risk-api`
-            : `Demo limit reached (${demo.limit} free calls/day without a key). Get a free API key with a real 15/day quota at https://tnt-audit.com/risk-api`;
+            ? {
+                error: `Anonymous demo calls hit today's site-wide cap (${demo.limit}/day across all visitors) 🫡`,
+                next: "Try again after UTC midnight — or grab a free key now for a quota that's yours alone, not shared with every other visitor.",
+                url: 'https://tnt-audit.com/risk-api',
+                agents_note: 'Building a bot? x402 pay-per-call skips the key entirely — $0.02/call, no signup.',
+              }
+            : {
+                error: `You've burned through your ${demo.limit} free checks today 🫡`,
+                next: 'Free key = 5x more (15/day), and it\'s your own guaranteed quota — not shared with other visitors.',
+                url: 'https://tnt-audit.com/risk-api',
+                agents_note: 'Building a bot? x402 pay-per-call skips the key entirely — $0.02/call, no signup.',
+              };
         return respond(
-          NextResponse.json({ error: message }, { status: 401, headers: CORS_HEADERS }),
+          NextResponse.json(body, { status: 401, headers: CORS_HEADERS }),
           { error: 'demo_limit_exceeded' },
         );
       }
