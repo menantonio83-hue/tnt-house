@@ -1,3 +1,23 @@
+// Version 1.6 — app/api/mcp/route.ts
+//
+// v1.6: replaces the v1.2 anonymous check_token_risk path (which shared
+// lib/demo-limit.ts's counter with the WEBSITE's no-email trial, 3/IP
+// plus a 100/day GLOBAL pool shared across every anonymous visitor on
+// either surface) with a dedicated, independent counter —
+// lib/mcp-anon-limit.ts, 5 successful calls/day, bucketed on
+// hash(IP + User-Agent) so a directory's shared infra IP (Glama etc.)
+// doesn't exhaust one pool for every visitor going through it. Decided
+// explicitly: the website's 3/day trial, a real key's 15/day, and this
+// MCP-anonymous 5/day must never share a counter. Only a call where
+// fetchTokenRisk() actually succeeds burns the quota — an invalid mint
+// or upstream failure doesn't cost the visitor one of their 5.
+// check_token_risk_batch remains fully key/x402-only for anonymous
+// callers (unchanged), now with an explicit short error instead of the
+// generic Unauthorized message. get_token_risk_history is now allowed
+// with no key at all — it's already free/uncounted for a real key (pure
+// read from stored history, no live upstream call), so there's no
+// reason to gate it behind auth just for an anonymous caller.
+//
 // Version 1.3 — app/api/mcp/route.ts
 //
 // v1.3: demo error message now distinguishes which limit blocked the
@@ -94,7 +114,7 @@ import { enforceRateLimit, enforceRateLimitBatch } from '@/lib/rate-limit';
 import { fetchTokenRisk } from '@/lib/token-risk-core';
 import { getMintRiskHistory } from '@/lib/mint-risk-history-store';
 import { logApiRequest } from '@/lib/request-logger';
-import { checkDemoLimit } from '@/lib/demo-limit';
+import { peekMcpAnonUsage, recordMcpAnonSuccess } from '@/lib/mcp-anon-limit';
 import type { ApiKeyRecord } from '@/lib/api-key-store';
 
 export const dynamic = 'force-dynamic';
@@ -112,11 +132,15 @@ const MAX_BATCH_SIZE = 25;
 // clients can discover this server before a person has an API key.
 const PUBLIC_METHODS = new Set(['initialize', 'notifications/initialized', 'ping', 'tools/list']);
 
-// The ONLY tool an unauthenticated "tools/call" is allowed to reach —
-// see v1.2 note above. Deliberately not batch or history: batch can
-// burn up to MAX_BATCH_SIZE upstream calls in one shot, and history
-// has no natural per-call cost signal to rate-limit against.
-const DEMO_ELIGIBLE_TOOL = 'check_token_risk';
+// Tools an unauthenticated "tools/call" is allowed to reach.
+// check_token_risk: gated by its own dedicated 5/day quota
+// (lib/mcp-anon-limit.ts) inside the tool handler itself.
+// get_token_risk_history: no quota at all — already free/uncounted for
+// a real key (pure read from stored history), so there's no cost reason
+// to gate an anonymous caller either.
+// Deliberately NOT check_token_risk_batch: it can burn up to
+// MAX_BATCH_SIZE upstream calls in one shot — key or x402 only.
+const ANON_ALLOWED_TOOLS = new Set(['check_token_risk', 'get_token_risk_history']);
 
 function jsonResult(data: unknown, isError = false) {
   return { content: [{ type: 'text' as const, text: JSON.stringify(data) }], isError };
@@ -135,12 +159,18 @@ function extractClientIp(request: NextRequest): string {
   return 'unknown';
 }
 
+// Folded into the anonymous-MCP bucket key alongside IP — see
+// lib/mcp-anon-limit.ts header for why (shared directory infra IPs).
+function extractUserAgent(request: NextRequest): string {
+  return request.headers.get('user-agent') ?? 'unknown';
+}
+
 // A server instance built with no ApiKeyRecord — reached for
 // PUBLIC_METHODS (initialize/tools list/ping) AND, as of v1.2, for an
 // unauthenticated "tools/call" of check_token_risk specifically (the
 // demo path). clientIp is only meaningful in that second case; it's
 // unused by every other tool.
-function buildServer(apiKey: ApiKeyRecord | null, clientIp: string): McpServer {
+function buildServer(apiKey: ApiKeyRecord | null, clientIp: string, userAgent: string): McpServer {
   const server = new McpServer(
     { name: 'tnt-house-risk-data-api', version: '1.0.0' },
     {
@@ -159,7 +189,7 @@ function buildServer(apiKey: ApiKeyRecord | null, clientIp: string): McpServer {
       // visitor reliably sees BEFORE they're asked for a key, unlike
       // README.md or server-card.json which not every client reads.
       instructions:
-        'check_token_risk works with NO API key for your first 3 calls/day (per IP) — just call the tool directly. Need more? Get a free key with a 15/day quota — for an autonomous agent, self-serve one with no human required: POST {"email":"you@example.com"} to https://tnt-audit.com/api/v1/signup, the JSON response includes api_key directly. (Human-friendly form at https://tnt-audit.com/risk-api works too.) Already have an x402-capable wallet? Skip signup entirely: GET https://tnt-audit.com/api/v1/token-risk/x402?mint=<mint> pays per call in USDC on Solana via the standard x402 402-Payment-Required flow, no key or account at all. check_token_risk_batch and get_token_risk_history require a key.',
+        'check_token_risk works with NO API key for your first 5 calls/day (no signup) — just call the tool directly. get_token_risk_history is also free/unmetered, key or no key. Need more check_token_risk calls? Get a free key with a 15/day quota — for an autonomous agent, self-serve one with no human required: POST {"email":"you@example.com"} to https://tnt-audit.com/api/v1/signup, the JSON response includes api_key directly. (Human-friendly form at https://tnt-audit.com/risk-api works too.) Already have an x402-capable wallet? Skip signup entirely: GET https://tnt-audit.com/api/v1/token-risk/x402?mint=<mint> pays per call in USDC on Solana via the standard x402 402-Payment-Required flow, no key or account at all. check_token_risk_batch requires a key or x402 — no anonymous batch calls.',
     },
   );
 
@@ -168,25 +198,28 @@ function buildServer(apiKey: ApiKeyRecord | null, clientIp: string): McpServer {
     {
       title: 'Check Solana token risk',
       description:
-        'Returns a 0-100 safety score, on-chain insider wallet clusters (wallets sharing a first funder), mint/freeze authority status, holder concentration, and live price/liquidity/volume for a single Solana token mint. Use before recommending or executing a trade on any Solana token. First 3 calls/day work with no API key.',
+        'Returns a 0-100 safety score, on-chain insider wallet clusters (wallets sharing a first funder), mint/freeze authority status, holder concentration, and live price/liquidity/volume for a single Solana token mint. Use before recommending or executing a trade on any Solana token. 5 free MCP calls/day, no signup. Then email key or x402.',
       inputSchema: { mint: z.string().describe('The Solana token mint address to check') },
     },
     async ({ mint }) => {
-      // v1.2: no key — try the small anonymous demo allowance instead
-      // of an immediate Unauthorized, so a first-time visitor testing
-      // straight from a directory's inspector gets ONE real response
-      // with zero setup.
+      // v1.6: dedicated anonymous-MCP quota (lib/mcp-anon-limit.ts) —
+      // completely separate from the website's no-email trial and from
+      // a real key's 15/day. Peek BEFORE calling upstream, so a visitor
+      // who's already out of quota never triggers a real
+      // Helius/DexScreener call. Only recorded as used if the call
+      // actually succeeds — an invalid mint / upstream failure doesn't
+      // cost one of the 5.
       if (!apiKey) {
         const startedAt = Date.now();
-        const demo = await checkDemoLimit(clientIp);
-        if (!demo.allowed) {
-          const message =
-            demo.reason === 'global'
-              ? `Anonymous demo calls are at today's site-wide cap (${demo.limit}/day across all visitors) — try again after UTC midnight, or get a free API key for guaranteed access. Self-serve (no human needed): POST {"email":"you@example.com"} to https://tnt-audit.com/api/v1/signup, the response includes api_key directly. Human form: https://tnt-audit.com/risk-api. Or, if you can pay: GET https://tnt-audit.com/api/v1/token-risk/x402?mint=${mint} pays $0.02/call in USDC via x402, no key needed at all.`
-              : `Demo limit reached (${demo.limit} free calls/day without a key). Get a free API key with a real 15/day quota. Self-serve (no human needed): POST {"email":"you@example.com"} to https://tnt-audit.com/api/v1/signup, the response includes api_key directly. Human form: https://tnt-audit.com/risk-api. Or, if you can pay: GET https://tnt-audit.com/api/v1/token-risk/x402?mint=${mint} pays $0.02/call in USDC via x402, no key needed at all.`;
+        const usage = await peekMcpAnonUsage(clientIp, userAgent);
+        if (usage.used >= usage.limit) {
+          const message = `Anonymous MCP quota used (${usage.used}/${usage.limit} today). Get a free email key (15/day) at https://www.tnt-audit.com/risk-api or pay per call via x402 GET /api/v1/token-risk/x402 ($0.02).`;
           return jsonResult({ error: message }, true);
         }
         const result = await fetchTokenRisk(mint);
+        if (result.ok) {
+          waitUntil(recordMcpAnonSuccess(clientIp, userAgent));
+        }
         waitUntil(
           logApiRequest({
             keyId: null,
@@ -198,13 +231,14 @@ function buildServer(apiKey: ApiKeyRecord | null, clientIp: string): McpServer {
             error: result.ok ? null : result.error ?? 'unknown_error',
           }),
         );
+        const usedNow = result.ok ? usage.used + 1 : usage.used;
         return jsonResult(
           {
             ...result,
-            _demo: {
-              used: demo.used,
-              limit: demo.limit,
-              note: `Anonymous demo call ${demo.used}/${demo.limit} today. Get a free key for a real 15/day quota — self-serve (no human needed): POST {"email":"you@example.com"} to https://tnt-audit.com/api/v1/signup, response includes api_key directly. Human form: https://tnt-audit.com/risk-api`,
+            _mcp_anon: {
+              used: usedNow,
+              limit: usage.limit,
+              note: `Anonymous MCP call ${usedNow}/${usage.limit} today, no signup. Get a free key for 15/day — self-serve (no human needed): POST {"email":"you@example.com"} to https://tnt-audit.com/api/v1/signup, response includes api_key directly. Human form: https://tnt-audit.com/risk-api`,
             },
           },
           !result.ok,
@@ -250,7 +284,10 @@ function buildServer(apiKey: ApiKeyRecord | null, clientIp: string): McpServer {
     },
     async ({ mints }) => {
       if (!apiKey) {
-        return jsonResult({ error: 'Unauthorized — provide an Authorization: Bearer <api_key> header. Self-serve a free key (no human needed): POST {"email":"you@example.com"} to https://tnt-audit.com/api/v1/signup, response includes api_key directly. Human form: https://tnt-audit.com/risk-api' }, true);
+        return jsonResult(
+          { error: 'Batch needs an API key or x402 — anonymous batch calls are not supported. Free key (15/day): https://www.tnt-audit.com/risk-api. x402: GET /api/v1/token-risk/x402 ($0.02/call).' },
+          true,
+        );
       }
       const startedAt = Date.now();
       const rateLimit = await enforceRateLimitBatch(apiKey, mints.length, {});
@@ -293,21 +330,23 @@ function buildServer(apiKey: ApiKeyRecord | null, clientIp: string): McpServer {
     {
       title: 'Get historical risk trend for a Solana token',
       description:
-        'Returns hourly historical data points (safety_score, insider_cluster_count, holder_count, price, liquidity, volume) for a mint over the last N days (max 90). Does not count against the free/subscription call quota — pure read from stored history, no live upstream call.',
+        'Returns hourly historical data points (safety_score, insider_cluster_count, holder_count, price, liquidity, volume) for a mint over the last N days (max 90). Free and unmetered — no quota, works with or without an API key — pure read from stored history, no live upstream call.',
       inputSchema: {
         mint: z.string().describe('The Solana token mint address'),
         days: z.number().min(1).max(90).optional().describe('How many days of history to return (default 30, max 90)'),
       },
     },
     async ({ mint, days }) => {
-      if (!apiKey) {
-        return jsonResult({ error: 'Unauthorized — provide an Authorization: Bearer <api_key> header. Self-serve a free key (no human needed): POST {"email":"you@example.com"} to https://tnt-audit.com/api/v1/signup, response includes api_key directly. Human form: https://tnt-audit.com/risk-api' }, true);
-      }
+      // v1.6: no longer gated behind an API key — this was already
+      // free/uncounted for a real key (pure read from stored history,
+      // no live upstream call), so there's no cost reason to 401 an
+      // anonymous caller here. keyId is null for anonymous reads, same
+      // as the check_token_risk anonymous path.
       const startedAt = Date.now();
       const rows = await getMintRiskHistory(mint, days ?? 30);
       waitUntil(
         logApiRequest({
-          keyId: apiKey.id,
+          keyId: apiKey?.id ?? null,
           mint,
           statusCode: rows === null ? 502 : 200,
           responseTimeMs: Date.now() - startedAt,
@@ -356,18 +395,19 @@ export async function POST(request: NextRequest) {
   }
 
   const isPublic = method !== undefined && PUBLIC_METHODS.has(method);
-  const isDemoEligibleCall = method === 'tools/call' && toolName === DEMO_ELIGIBLE_TOOL;
+  const isAnonAllowedCall = method === 'tools/call' && toolName !== undefined && ANON_ALLOWED_TOOLS.has(toolName);
 
   let apiKey: ApiKeyRecord | null = null;
   if (!isPublic) {
     const auth = await requireApiKey(request, {});
     if (!auth.ok || !auth.key) {
-      // v1.2: a missing/invalid key on tools/call no longer hard-blocks
-      // here IF this specific call is the demo-eligible tool — let it
-      // through with apiKey = null, and the tool handler's own
-      // checkDemoLimit() decides. Every other unauthenticated
-      // tools/call (batch, history) still 401s here exactly as before.
-      if (!isDemoEligibleCall) {
+      // v1.6: a missing/invalid key on tools/call no longer hard-blocks
+      // here IF this specific call is one of ANON_ALLOWED_TOOLS — let
+      // it through with apiKey = null; check_token_risk enforces its
+      // own dedicated 5/day quota inside the handler, and
+      // get_token_risk_history has no quota at all. batch still 401s
+      // here exactly as before.
+      if (!isAnonAllowedCall) {
         return auth.response ?? NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       }
     } else {
@@ -375,7 +415,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const server = buildServer(apiKey, extractClientIp(request));
+  const server = buildServer(apiKey, extractClientIp(request), extractUserAgent(request));
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined });
   await server.connect(transport);
   return transport.handleRequest(request);
