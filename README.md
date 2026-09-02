@@ -17,7 +17,7 @@ This repository hosts a remote **Model Context Protocol (MCP) server** exposing 
 
 ## Getting Started (3 steps)
 
-1. **Try it now, no signup** — no API key needed for your first **3 calls/day** (per IP). Three ways, pick whichever is easiest:
+1. **Try it now, no signup** — no API key needed for your first **5 MCP calls/day** (no signup at all). Three ways, pick whichever is easiest:
    - **⚡ Glama's MCP Inspector (fastest, zero setup, real MCP call)** — go to [glama.ai/mcp/inspector](https://glama.ai/mcp/inspector), paste `https://tnt-audit.com/api/mcp` as the server URL, and call `check_token_risk` right in your browser — no install needed.
    - **Claude Desktop / Cursor** — paste this into your MCP config, no key required:
      ```json
