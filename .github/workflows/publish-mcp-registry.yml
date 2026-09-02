@@ -9,7 +9,7 @@ on:
 
 permissions:
   id-token: write
-  contents: write
+  contents: read
 
 jobs:
   publish:
@@ -24,29 +24,12 @@ jobs:
           chmod +x mcp-publisher
 
       - name: Authenticate to MCP Registry (GitHub OIDC)
-        run: |
-          {
-            echo "=== mcp-publisher version ==="
-            ./mcp-publisher --version || true
-            echo "=== login output ==="
-            ./mcp-publisher login github-oidc
-          } > ci-debug-log.txt 2>&1
-        continue-on-error: true
+        run: ./mcp-publisher login github-oidc
 
       - name: Publish to MCP Registry
         run: |
-          {
-            echo "=== publish output ==="
-            ./mcp-publisher publish ./server.json
-            echo "=== exit code: $? ==="
-          } >> ci-debug-log.txt 2>&1
-        continue-on-error: true
-
-      - name: Commit debug log
-        run: |
-          git config user.name "ci-debug-bot"
-          git config user.email "ci-debug-bot@users.noreply.github.com"
-          git checkout -B ci-debug
-          git add ci-debug-log.txt
-          git commit -m "ci: debug log for MCP Registry publish attempt" || echo "nothing to commit"
-          git push --force origin ci-debug
+          set -o pipefail
+          echo '### mcp-publisher publish output' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          ./mcp-publisher publish ./server.json 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
