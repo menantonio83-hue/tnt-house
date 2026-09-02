@@ -41,7 +41,7 @@ This repository hosts a remote **Model Context Protocol (MCP) server** exposing 
 - Helius (Solana RPC) + RugCheck + DexScreener (market/risk data)
 - Vercel (hosting, cron via QStash)
 
-## MCP Server — Risk-Data API
+## MCP Server — RiskDataApi
 
 This repository includes a remote **[Model Context Protocol](https://modelcontextprotocol.io) (MCP) server**, built with the official **[`@modelcontextprotocol/sdk`](https://www.npmjs.com/package/@modelcontextprotocol/sdk)** (TypeScript), exposing Solana token risk data as tools for AI agents.
 
@@ -75,4 +75,4 @@ Open [http://localhost:3000](http://localhost:3000)
 
 Vercel-ready. Connected to this repo's `main` branch for auto-deploys.
 
-**Links:** [X @RiskDataApiSol](https://x.com/RiskDataApiSol) | [Risk-Data API](https://www.tnt-audit.com/risk-api) | [Telegram](https://t.me/tnt_house2026)
+**Links:** [X @RiskDataApiSol](https://x.com/RiskDataApiSol) | [RiskDataApi](https://www.tnt-audit.com/risk-api) | [Telegram](https://t.me/tnt_house2026)
