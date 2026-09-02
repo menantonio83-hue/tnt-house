@@ -1,4 +1,4 @@
-# TNT House Risk-Data API — MCP Server
+# RiskDataApi — MCP Server
 
 A remote **[Model Context Protocol](https://modelcontextprotocol.io) (MCP)** server exposing Solana token risk data as tools for AI agents (Claude, Cursor, and any other MCP-compatible client).
 
@@ -30,7 +30,7 @@ Returns hourly historical data points (safety score, insider cluster count, hold
 
 ## Why this exists
 
-This server underlies the same risk-scoring engine as [TNT House](https://www.tnt-audit.com)'s token audit product, exposed here specifically for AI trading agents and agentic frameworks that speak MCP — so a bot can call `check_token_risk` before executing a trade, instead of scraping a dashboard or hand-rolling an HTTP client against the REST API.
+RiskDataApi runs the same risk-scoring engine used by [TNT House](https://www.tnt-audit.com)'s token safety checker, exposed here specifically for AI trading agents and agentic frameworks that speak MCP — so a bot can call `check_token_risk` before executing a trade, instead of scraping a dashboard or hand-rolling an HTTP client against the REST API.
 
 ## REST API
 
