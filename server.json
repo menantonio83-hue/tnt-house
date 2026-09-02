@@ -1,0 +1,17 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.menantonio83-hue/tnt-house-risk-data-api",
+  "description": "RiskDataApi — Solana token risk scoring for AI agents. Safety score, insider clusters, honeypot, LP lock. MCP at https://tnt-audit.com/api/mcp. x402 $0.02/call or free email key 15/day.",
+  "version": "1.0.1",
+  "websiteUrl": "https://www.tnt-audit.com/risk-api",
+  "repository": {
+    "url": "https://github.com/menantonio83-hue/tnt-house",
+    "source": "github"
+  },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://tnt-audit.com/api/mcp"
+    }
+  ]
+}
