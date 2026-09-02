@@ -1,0 +1,37 @@
+name: Publish to MCP Registry
+
+# Runs whenever server.json changes on main, or manually via the Actions tab.
+# Authenticates via GitHub OIDC (github-oidc) — no stored secrets, no local
+# CLI needed. Ownership of the io.github.menantonio83-hue namespace is proven
+# automatically by this workflow running inside this GitHub org/repo.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "server.json"
+  workflow_dispatch: {}
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install mcp-publisher CLI
+        run: |
+          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
+          chmod +x mcp-publisher
+
+      - name: Validate server.json
+        run: ./mcp-publisher validate ./server.json
+
+      - name: Authenticate to MCP Registry (GitHub OIDC)
+        run: ./mcp-publisher login github-oidc
+
+      - name: Publish to MCP Registry
+        run: ./mcp-publisher publish ./server.json
