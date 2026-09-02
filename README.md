@@ -2,13 +2,18 @@
 
 [![tnt-house MCP server](https://glama.ai/mcp/servers/menantonio83-hue/tnt-house/badges/card.svg)](https://glama.ai/mcp/servers/menantonio83-hue/tnt-house)
 
-🚀 **3 free calls/day, no signup, no API key.** Remote MCP server for Claude/Cursor — Solana token risk scoring & insider wallet cluster detection.
-
 [![MCP Marketplace](https://img.shields.io/badge/MCP%20Marketplace-Indexed-blueviolet)](https://getlulu.dev/mcps)
 
-TNT House ([tnt-audit.com/risk-api](https://www.tnt-audit.com/risk-api)) is an AI-powered Solana token audit and listing platform: safety scoring, insider wallet cluster detection, mint/freeze authority checks, honeypot and LP-lock detection.
+RiskDataApi is a Solana token-risk API for trading bots and AI agents. One call returns a safety score (0–100), insider wallet clusters (shared first-funder), honeypot risk, and LP lock.
 
-This repository also hosts a remote **Model Context Protocol (MCP) server** exposing that same engine as the **Risk-Data API** — Solana token risk scoring and insider wallet cluster detection for AI agents (Claude, Cursor, and any other MCP-compatible client). See the [MCP Server section](#mcp-server--risk-data-api) below.
+- **Website (humans):** 3 manual checks/day, no email, no key — [tnt-audit.com/risk-api](https://www.tnt-audit.com/risk-api)
+- **API key (bots):** email signup, 15 calls/day, no card
+- **Agents:** x402 $0.02 USDC/call, no key — `GET /api/v1/token-risk/x402`
+- **Subscription:** $45 / 30 days / 5000 calls, then $0.015/call
+- **MCP:** [https://tnt-audit.com/api/mcp](https://tnt-audit.com/api/mcp)
+- **Docs:** [https://www.tnt-audit.com/risk-api/docs](https://www.tnt-audit.com/risk-api/docs)
+
+This repository hosts a remote **Model Context Protocol (MCP) server** exposing the RiskDataApi engine as tools for AI agents (Claude, Cursor, and any other MCP-compatible client). See the [MCP Server section](#mcp-server--risk-data-api) below.
 
 ## Getting Started (3 steps)
 
