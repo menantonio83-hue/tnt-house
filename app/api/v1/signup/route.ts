@@ -76,7 +76,7 @@ const VALID_LANGS: LangCode[] = ['en', 'es', 'fr', 'el', 'ru', 'it', 'zh'];
 // on purpose — this drives real payouts, so it must never accept
 // arbitrary client-supplied text. Add a new entry here (lowercase) when
 // onboarding a new partner; nothing else needs to change.
-const KNOWN_REFERRAL_CODES = ['lumo'];
+const KNOWN_REFERRAL_CODES = ['lumo', 'demo_public'];
 
 export async function POST(request: NextRequest) {
   try {
