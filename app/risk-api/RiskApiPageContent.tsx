@@ -150,6 +150,7 @@ import BillingPanel from './BillingPanel';
 import LangSwitcher from './LangSwitcher';
 import ChatWidget from './ChatWidget';
 import InsiderClusterGraph from './InsiderClusterGraph';
+import DemoPublicKeyWidget from './DemoPublicKeyWidget';
 import { useRiskApiLang } from './LangContext';
 
 const CURL_EXAMPLE = `curl "https://tnt-audit.com/api/v1/token-risk?mint=<MINT_ADDRESS>" \\
@@ -317,7 +318,7 @@ const EXAMPLE_RESPONSE = {
   checked_at: '2026-07-18T12:00:00.000Z',
 };
 
-export default function RiskApiPageContent({ requestsServed }: { requestsServed: number | null }) {
+export default function RiskApiPageContent({ requestsServed, demoKey }: { requestsServed: number | null; demoKey: string | null }) {
   const { t } = useRiskApiLang();
   const [codeTab, setCodeTab] = useState<CodeTab>('curl');
   const [activeIntegration, setActiveIntegration] = useState<IntegrationId | null>(null);
@@ -412,6 +413,14 @@ export default function RiskApiPageContent({ requestsServed }: { requestsServed:
             </p>
           )}
         </section>
+
+        {/* v1.14: public demo key live counter — a time-boxed
+            experiment, sits right before the regular 3/day trial so a
+            visitor sees the "shared, dying" key first, as a hook, then
+            the normal always-available options right after. Renders
+            nothing once demoKey is null (experiment not configured/
+            already over) — see DemoPublicKeyWidget.tsx's own header. */}
+        <DemoPublicKeyWidget demoKey={demoKey} />
 
         {/* Anon trial widget — no signup, 3 free checks via browser fingerprint.
             id="try-it" is the target of the hero's primary CTA (v1.7) — this

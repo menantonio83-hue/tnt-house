@@ -85,10 +85,16 @@ async function getRequestsServedCount(): Promise<number | null> {
 
 export default async function RiskApiPage() {
   const requestsServed = await getRequestsServedCount();
+  // Deliberately public — this is the whole point of the demo key
+  // experiment (see lib/demo-public-key-limit.ts). Read server-side
+  // and passed down so it can render in the live-counter widget;
+  // null (renders nothing) once the env var is unset again after the
+  // experiment concludes.
+  const demoKey = process.env.DEMO_PUBLIC_KEY ?? null;
 
   return (
     <LangProvider>
-      <RiskApiPageContent requestsServed={requestsServed} />
+      <RiskApiPageContent requestsServed={requestsServed} demoKey={demoKey} />
     </LangProvider>
   );
 }
