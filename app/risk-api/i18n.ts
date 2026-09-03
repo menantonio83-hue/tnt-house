@@ -1,3 +1,11 @@
+// Version 1.10 — app/risk-api/i18n.ts
+//
+// v1.10: demoPublicKeyTitle/Remaining/Copy/Note/Dead x 7 languages —
+// the public-demo-key experiment's live counter widget
+// (DemoPublicKeyWidget.tsx). See lib/demo-public-key-limit.ts for the
+// full design; {remaining} and {total} are replaced client-side, same
+// convention as statsLine's {n}.
+//
 // Version 1.9 — app/risk-api/i18n.ts
 //
 // v1.9: mcpFreeTierNote key x 7 languages. Context: the new dedicated
@@ -146,6 +154,11 @@ export interface RiskApiTranslations {
   integrationsTitle: string;
   integrationsHint: string;
   mcpFreeTierNote: string;
+  demoPublicKeyTitle: string;
+  demoPublicKeyRemaining: string;
+  demoPublicKeyCopy: string;
+  demoPublicKeyNote: string;
+  demoPublicKeyDead: string;
   step1Title: string;
   step1Desc: string;
   step2Title: string;
@@ -328,6 +341,11 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     integrationsTitle: 'Connect your bot or agent',
     integrationsHint: 'Tap a platform to get a ready-to-copy snippet.',
     mcpFreeTierNote: '5 free MCP calls/day, no signup — built for bots & AI agents. Then a free key (15/day) or x402 pay-per-call.',
+    demoPublicKeyTitle: 'Public Demo Key — Live Experiment',
+    demoPublicKeyRemaining: '{remaining}/{total} calls left. Shared by everyone. Dies forever when it hits 0.',
+    demoPublicKeyCopy: 'Copy key',
+    demoPublicKeyNote: 'No signup — paste it straight into your bot right now. When it dies, get your own free key below.',
+    demoPublicKeyDead: '💀 Public demo key is dead — all calls used, permanently. Get your own free key (15/day, no card) below.',
     step1Title: 'Get a key',
     step1Desc: 'Enter your email below. No credit card, no approval wait — the key is issued instantly.',
     step2Title: 'Call the endpoint',
@@ -635,6 +653,11 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     integrationsTitle: 'Conecta tu bot o agente',
     integrationsHint: 'Toca una plataforma para obtener un snippet listo para copiar.',
     mcpFreeTierNote: '5 llamadas MCP gratis al día, sin registro — pensado para bots y agentes de IA. Después, una clave gratuita (15/día) o x402 por llamada.',
+    demoPublicKeyTitle: 'Clave demo pública — Experimento en vivo',
+    demoPublicKeyRemaining: 'Quedan {remaining}/{total} llamadas. Compartida por todos. Muere para siempre al llegar a 0.',
+    demoPublicKeyCopy: 'Copiar clave',
+    demoPublicKeyNote: 'Sin registro — pégala directamente en tu bot ahora mismo. Cuando muera, consigue tu propia clave gratis abajo.',
+    demoPublicKeyDead: '💀 La clave demo pública ha muerto — todas las llamadas usadas, para siempre. Consigue tu propia clave gratis (15/día, sin tarjeta) abajo.',
     step1Title: 'Obtén una key',
     step1Desc: 'Introduce tu email abajo. Sin tarjeta de crédito, sin esperar aprobación — la key se emite al instante.',
     step2Title: 'Llama al endpoint',
@@ -942,6 +965,11 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     integrationsTitle: 'Connectez votre bot ou agent',
     integrationsHint: 'Touchez une plateforme pour obtenir un extrait prêt à copier.',
     mcpFreeTierNote: '5 appels MCP gratuits par jour, sans inscription — conçu pour les bots et agents IA. Ensuite, une clé gratuite (15/jour) ou x402 par appel.',
+    demoPublicKeyTitle: 'Clé démo publique — Expérience en direct',
+    demoPublicKeyRemaining: 'Il reste {remaining}/{total} appels. Partagée par tout le monde. Meurt pour toujours à 0.',
+    demoPublicKeyCopy: 'Copier la clé',
+    demoPublicKeyNote: "Sans inscription — collez-la directement dans votre bot maintenant. Une fois morte, obtenez votre propre clé gratuite ci-dessous.",
+    demoPublicKeyDead: '💀 La clé démo publique est morte — tous les appels utilisés, définitivement. Obtenez votre propre clé gratuite (15/jour, sans carte) ci-dessous.',
     step1Title: 'Obtenez une clé',
     step1Desc: 'Entrez votre email ci-dessous. Pas de carte bancaire, pas d\'attente d\'approbation — la clé est émise instantanément.',
     step2Title: 'Appelez l\'endpoint',
@@ -1249,6 +1277,11 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     integrationsTitle: 'Σύνδεσε το bot ή τον agent σου',
     integrationsHint: 'Πάτησε μια πλατφόρμα για ένα έτοιμο προς αντιγραφή snippet.',
     mcpFreeTierNote: '5 δωρεάν κλήσεις MCP την ημέρα, χωρίς εγγραφή — φτιαγμένο για bots και AI agents. Μετά, δωρεάν κλειδί (15/ημέρα) ή x402 ανά κλήση.',
+    demoPublicKeyTitle: 'Δημόσιο demo κλειδί — Ζωντανό πείραμα',
+    demoPublicKeyRemaining: 'Απομένουν {remaining}/{total} κλήσεις. Κοινόχρηστο από όλους. Πεθαίνει οριστικά στο 0.',
+    demoPublicKeyCopy: 'Αντιγραφή κλειδιού',
+    demoPublicKeyNote: 'Χωρίς εγγραφή — επικόλλησέ το κατευθείαν στο bot σου τώρα. Όταν πεθάνει, πάρε το δικό σου δωρεάν κλειδί παρακάτω.',
+    demoPublicKeyDead: '💀 Το δημόσιο demo κλειδί πέθανε — όλες οι κλήσεις χρησιμοποιήθηκαν, οριστικά. Πάρε το δικό σου δωρεάν κλειδί (15/ημέρα, χωρίς κάρτα) παρακάτω.',
     step1Title: 'Πάρε ένα key',
     step1Desc: 'Βάλε το email σου παρακάτω. Χωρίς πιστωτική κάρτα, χωρίς αναμονή έγκρισης — το key εκδίδεται άμεσα.',
     step2Title: 'Κάλεσε το endpoint',
@@ -1556,6 +1589,11 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     integrationsTitle: 'Подключи своего бота или агента',
     integrationsHint: 'Нажми на платформу, чтобы получить готовый сниппет для копирования.',
     mcpFreeTierNote: '5 бесплатных MCP-вызовов в день, без регистрации — для ботов и ИИ-агентов. Дальше — бесплатный ключ (15/день) или x402 за вызов.',
+    demoPublicKeyTitle: 'Публичный демо-ключ — Живой эксперимент',
+    demoPublicKeyRemaining: 'Осталось {remaining}/{total} вызовов. Общий для всех. Умирает навсегда на нуле.',
+    demoPublicKeyCopy: 'Скопировать ключ',
+    demoPublicKeyNote: 'Без регистрации — вставь прямо в своего бота прямо сейчас. Когда умрёт — получи свой бесплатный ключ ниже.',
+    demoPublicKeyDead: '💀 Публичный демо-ключ умер — все вызовы использованы, навсегда. Получи свой бесплатный ключ (15/день, без карты) ниже.',
     step1Title: 'Получи ключ',
     step1Desc: 'Введи email ниже. Без карты, без ожидания одобрения — ключ выдаётся мгновенно.',
     step2Title: 'Дёрни эндпоинт',
@@ -1863,6 +1901,11 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     integrationsTitle: 'Collega il tuo bot o agente',
     integrationsHint: 'Tocca una piattaforma per ottenere uno snippet pronto da copiare.',
     mcpFreeTierNote: '5 chiamate MCP gratuite al giorno, senza registrazione — pensato per bot e agenti AI. Poi, una chiave gratuita (15/giorno) o x402 a chiamata.',
+    demoPublicKeyTitle: 'Chiave demo pubblica — Esperimento live',
+    demoPublicKeyRemaining: 'Rimangono {remaining}/{total} chiamate. Condivisa da tutti. Muore per sempre a 0.',
+    demoPublicKeyCopy: 'Copia chiave',
+    demoPublicKeyNote: 'Senza registrazione — incollala subito nel tuo bot. Quando muore, prendi la tua chiave gratuita qui sotto.',
+    demoPublicKeyDead: '💀 La chiave demo pubblica è morta — tutte le chiamate usate, per sempre. Prendi la tua chiave gratuita (15/giorno, senza carta) qui sotto.',
     step1Title: 'Ottieni una key',
     step1Desc: 'Inserisci la tua email qui sotto. Nessuna carta di credito, nessuna attesa di approvazione — la key viene rilasciata immediatamente.',
     step2Title: 'Chiama l\'endpoint',
@@ -2170,6 +2213,11 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     integrationsTitle: '连接你的机器人或智能体',
     integrationsHint: '点击一个平台，获取可直接复制的代码片段。',
     mcpFreeTierNote: '每天5次免费MCP调用，无需注册 — 专为机器人和AI智能体打造。之后可使用免费密钥（15次/天）或按次付费的x402。',
+    demoPublicKeyTitle: '公共演示密钥 — 实时实验',
+    demoPublicKeyRemaining: '剩余 {remaining}/{total} 次调用。所有人共享。归零后永久失效。',
+    demoPublicKeyCopy: '复制密钥',
+    demoPublicKeyNote: '无需注册 — 现在就直接粘贴到你的机器人里。失效后，在下方获取你自己的免费密钥。',
+    demoPublicKeyDead: '💀 公共演示密钥已失效 — 所有调用次数已用完，永久性的。在下方获取你自己的免费密钥（15次/天，无需信用卡）。',
     step1Title: '获取密钥',
     step1Desc: '在下方输入邮箱。无需信用卡，无需等待审批 —— 密钥即时发放。',
     step2Title: '调用接口',
