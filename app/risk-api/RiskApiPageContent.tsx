@@ -1,3 +1,12 @@
+// v1.12: CLAUDE_MCP_CONFIG used to show
+// "Authorization: Bearer tnt_sk_your_key_here" as if a key were
+// required just to connect — outdated since app/api/mcp/route.ts v1.6
+// added a dedicated 5/day anonymous quota (no key needed at all for a
+// first try). Simplified to the bare-minimum config that actually works
+// with zero setup, matching the README's own example; the key/x402
+// upgrade paths are covered by the new mcpFreeTierNote line just above
+// the snippet instead of being baked into the "required" config.
+//
 // Version 1.11 — app/risk-api/RiskApiPageContent.tsx
 //
 // v1.11: hero CTA order fixed. The only button used to be btnGetKey
@@ -225,11 +234,7 @@ const CLAUDE_MCP_CONFIG = `{
   "mcpServers": {
     "tnt-risk-data-api": {
       "command": "npx",
-      "args": [
-        "-y", "mcp-remote",
-        "https://tnt-audit.com/api/mcp",
-        "--header", "Authorization: Bearer tnt_sk_your_key_here"
-      ]
+      "args": ["-y", "mcp-remote", "https://tnt-audit.com/api/mcp"]
     }
   }
 }`;
@@ -504,7 +509,8 @@ export default function RiskApiPageContent({ requestsServed }: { requestsServed:
           <h2 className="text-xl sm:text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400 mb-1.5">
             {t.integrationsTitle}
           </h2>
-          <p className="text-xs text-slate-400 mb-5">{t.integrationsHint}</p>
+          <p className="text-xs text-slate-400 mb-1.5">{t.integrationsHint}</p>
+          <p className="text-xs text-emerald-400 font-semibold mb-5">{t.mcpFreeTierNote}</p>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {INTEGRATIONS.map((integration) => (

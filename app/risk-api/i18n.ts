@@ -1,3 +1,14 @@
+// Version 1.9 — app/risk-api/i18n.ts
+//
+// v1.9: mcpFreeTierNote key x 7 languages. Context: the new dedicated
+// 5/day anonymous MCP quota (lib/mcp-anon-limit.ts, app/api/mcp/route.ts
+// v1.6) shipped with zero mention of it anywhere on the site — a
+// visitor had no way to learn it exists short of reading the MCP
+// server's own `instructions` field inside a client like Claude
+// Desktop. Rendered next to the integrations cards
+// (RiskApiPageContent.tsx) and in the docs page's rate-limiting section
+// (RiskApiDocsContent.tsx), both per product owner's explicit request.
+//
 // Version 1.8 — app/risk-api/i18n.ts
 //
 // v1.8: new btnTryFree key x 7 languages. Context: the hero's only CTA
@@ -134,6 +145,7 @@ export interface RiskApiTranslations {
   howItWorksTitle: string;
   integrationsTitle: string;
   integrationsHint: string;
+  mcpFreeTierNote: string;
   step1Title: string;
   step1Desc: string;
   step2Title: string;
@@ -315,6 +327,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     howItWorksTitle: 'How it works',
     integrationsTitle: 'Connect your bot or agent',
     integrationsHint: 'Tap a platform to get a ready-to-copy snippet.',
+    mcpFreeTierNote: '5 free MCP calls/day, no signup — built for bots & AI agents. Then a free key (15/day) or x402 pay-per-call.',
     step1Title: 'Get a key',
     step1Desc: 'Enter your email below. No credit card, no approval wait — the key is issued instantly.',
     step2Title: 'Call the endpoint',
@@ -621,6 +634,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     howItWorksTitle: 'Cómo funciona',
     integrationsTitle: 'Conecta tu bot o agente',
     integrationsHint: 'Toca una plataforma para obtener un snippet listo para copiar.',
+    mcpFreeTierNote: '5 llamadas MCP gratis al día, sin registro — pensado para bots y agentes de IA. Después, una clave gratuita (15/día) o x402 por llamada.',
     step1Title: 'Obtén una key',
     step1Desc: 'Introduce tu email abajo. Sin tarjeta de crédito, sin esperar aprobación — la key se emite al instante.',
     step2Title: 'Llama al endpoint',
@@ -927,6 +941,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     howItWorksTitle: 'Comment ça marche',
     integrationsTitle: 'Connectez votre bot ou agent',
     integrationsHint: 'Touchez une plateforme pour obtenir un extrait prêt à copier.',
+    mcpFreeTierNote: '5 appels MCP gratuits par jour, sans inscription — conçu pour les bots et agents IA. Ensuite, une clé gratuite (15/jour) ou x402 par appel.',
     step1Title: 'Obtenez une clé',
     step1Desc: 'Entrez votre email ci-dessous. Pas de carte bancaire, pas d\'attente d\'approbation — la clé est émise instantanément.',
     step2Title: 'Appelez l\'endpoint',
@@ -1233,6 +1248,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     howItWorksTitle: 'Πώς λειτουργεί',
     integrationsTitle: 'Σύνδεσε το bot ή τον agent σου',
     integrationsHint: 'Πάτησε μια πλατφόρμα για ένα έτοιμο προς αντιγραφή snippet.',
+    mcpFreeTierNote: '5 δωρεάν κλήσεις MCP την ημέρα, χωρίς εγγραφή — φτιαγμένο για bots και AI agents. Μετά, δωρεάν κλειδί (15/ημέρα) ή x402 ανά κλήση.',
     step1Title: 'Πάρε ένα key',
     step1Desc: 'Βάλε το email σου παρακάτω. Χωρίς πιστωτική κάρτα, χωρίς αναμονή έγκρισης — το key εκδίδεται άμεσα.',
     step2Title: 'Κάλεσε το endpoint',
@@ -1539,6 +1555,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     howItWorksTitle: 'Как это работает',
     integrationsTitle: 'Подключи своего бота или агента',
     integrationsHint: 'Нажми на платформу, чтобы получить готовый сниппет для копирования.',
+    mcpFreeTierNote: '5 бесплатных MCP-вызовов в день, без регистрации — для ботов и ИИ-агентов. Дальше — бесплатный ключ (15/день) или x402 за вызов.',
     step1Title: 'Получи ключ',
     step1Desc: 'Введи email ниже. Без карты, без ожидания одобрения — ключ выдаётся мгновенно.',
     step2Title: 'Дёрни эндпоинт',
@@ -1845,6 +1862,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     howItWorksTitle: 'Come funziona',
     integrationsTitle: 'Collega il tuo bot o agente',
     integrationsHint: 'Tocca una piattaforma per ottenere uno snippet pronto da copiare.',
+    mcpFreeTierNote: '5 chiamate MCP gratuite al giorno, senza registrazione — pensato per bot e agenti AI. Poi, una chiave gratuita (15/giorno) o x402 a chiamata.',
     step1Title: 'Ottieni una key',
     step1Desc: 'Inserisci la tua email qui sotto. Nessuna carta di credito, nessuna attesa di approvazione — la key viene rilasciata immediatamente.',
     step2Title: 'Chiama l\'endpoint',
@@ -2151,6 +2169,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     howItWorksTitle: '工作原理',
     integrationsTitle: '连接你的机器人或智能体',
     integrationsHint: '点击一个平台，获取可直接复制的代码片段。',
+    mcpFreeTierNote: '每天5次免费MCP调用，无需注册 — 专为机器人和AI智能体打造。之后可使用免费密钥（15次/天）或按次付费的x402。',
     step1Title: '获取密钥',
     step1Desc: '在下方输入邮箱。无需信用卡，无需等待审批 —— 密钥即时发放。',
     step2Title: '调用接口',
