@@ -1,3 +1,10 @@
+// Version 1.1 — app/risk-api/RiskApiDocsContent.tsx
+//
+// v1.1: added the mcpFreeTierNote callout to the Rate Limiting section
+// — this page previously only documented the REST/keyed rate-limit
+// tiers (headers, 402 response), with no mention that MCP callers get
+// their own separate 5/day no-key allowance. See i18n.ts v1.9.
+//
 // Version 1.0 — app/risk-api/RiskApiDocsContent.tsx
 //
 // New file, split out of RiskApiPageContent.tsx (which was v1.11, 758
@@ -274,9 +281,13 @@ export default function RiskApiDocsContent() {
           <h2 className="text-xl sm:text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400 mb-4">
             {t.rateLimitingTitle}
           </h2>
-          <p className="text-xs sm:text-sm text-slate-400 leading-relaxed mb-6">
+          <p className="text-xs sm:text-sm text-slate-400 leading-relaxed mb-4">
             {t.rateLimitingIntro}
           </p>
+
+          <div className="border border-emerald-500/20 rounded-lg bg-emerald-500/5 p-3.5 mb-6">
+            <p className="text-xs text-emerald-400 font-semibold leading-relaxed">{t.mcpFreeTierNote}</p>
+          </div>
 
           <div className="border border-purple-500/20 rounded-lg overflow-hidden divide-y divide-purple-500/10 mb-6">
             {[
