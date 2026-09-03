@@ -1,3 +1,22 @@
+// Version 1.14 — app/api/v1/token-risk/route.ts
+//
+// v1.14: one hardcoded, publicly-announced demo API key — a time-boxed
+// growth experiment, NOT a new permanent tier (existing 3/day site
+// trial, 15/day personal key, and x402 are all unchanged). Full design
+// rationale lives in lib/demo-public-key-limit.ts's header: 300 calls
+// total for the key's whole lifetime (never resets — dies permanently
+// once spent), a 5-call-per-identity (IP+UA) cap so one caller can't
+// claim a big slice of the shared pool, and a global 1-request/3s pace
+// lock so a single fast script can't burn the entire budget before
+// anyone else gets a chance. Checked FIRST in this route, before
+// requireApiKey() — deliberately never touches the api_keys table, so
+// it has no path to batch/history/billing/webhooks/admin routes at
+// all (those don't check for it; an unrecognized token there just
+// fails normal auth). Every response (success and every exhaustion
+// reason) carries the same two channels: a human-readable `demo` JSON
+// field and X-RiskApi-Demo-* / X-RiskApi-Upgrade-Url / X-RiskApi-X402-Url
+// headers for strict-schema bot/agent callers that only read headers.
+//
 // Version 1.13 — app/api/v1/token-risk/route.ts
 //
 // v1.13: rewrites the demo-exhausted 401 body. The old copy ("Demo
@@ -148,6 +167,23 @@ import { enforceRateLimit } from '@/lib/rate-limit';
 import { logApiRequest } from '@/lib/request-logger';
 import { fetchTokenRisk } from '@/lib/token-risk-core';
 import { checkDemoLimit } from '@/lib/demo-limit';
+import { consumeDemoPublicKey, DEMO_TOTAL_LIMIT } from '@/lib/demo-public-key-limit';
+
+// v1.14: one hardcoded, publicly-announced demo API key — a time-boxed
+// growth experiment (Бро + multi-AI consensus, 2026-09-03), NOT a new
+// permanent tier. See lib/demo-public-key-limit.ts's header for the
+// full design. Read from env so the actual secret value never lives in
+// source control — set DEMO_PUBLIC_KEY in Vercel, then that exact
+// string is what gets published/announced publicly.
+const DEMO_PUBLIC_KEY = process.env.DEMO_PUBLIC_KEY;
+
+// The one real api_keys row created for this experiment (owner_label
+// 'PUBLIC_DEMO_EXPERIMENT_2026-09') — exists ONLY so api_request_log
+// rows for demo-public-key calls have real FK-valid attribution for
+// analytics. Never looked up by hash, never touches requireApiKey() or
+// enforceRateLimit() — this key's actual access control is entirely
+// lib/demo-public-key-limit.ts's own Redis-backed logic above.
+const DEMO_PUBLIC_KEY_ID = '4ac70156-e443-4533-a4db-a14a913b3150';
 
 // Background job itself can take up to 60s (same budget as the existing
 // cluster-check feature) — waitUntil() (inside lib/token-risk-core.ts)
@@ -176,6 +212,41 @@ function extractClientIp(request: NextRequest): string {
   const forwardedFor = request.headers.get('x-forwarded-for');
   if (forwardedFor) return forwardedFor.split(',')[0].trim();
   return 'unknown';
+}
+
+// Folded into the demo-public-key identity bucket alongside IP — see
+// lib/demo-public-key-limit.ts header for why (spreads the shared 300
+// across many distinct tries instead of one caller claiming a slice).
+function extractUserAgent(request: NextRequest): string {
+  return request.headers.get('user-agent') ?? 'unknown';
+}
+
+// v1.14: shared by every demo-public-key response — success AND every
+// exhaustion reason all carry the same two channels, per explicit
+// product decision: a human reading the JSON body sees `demo.message`,
+// a bot/agent that only reads headers (never the ad-hoc JSON field —
+// see lib/demo-public-key-limit.ts's design note on why headers matter
+// for strict-schema callers) sees the same info in
+// X-RiskApi-Demo-Remaining etc. Both present on every single call, not
+// just the final exhausted one.
+function demoPublicHeaders(remaining: number): Record<string, string> {
+  return {
+    'X-RiskApi-Demo-Remaining': String(remaining),
+    'X-RiskApi-Demo-Total': String(DEMO_TOTAL_LIMIT),
+    'X-RiskApi-Upgrade-Url': 'https://tnt-audit.com/api/demo-cta?to=risk-api',
+    'X-RiskApi-X402-Url': 'https://tnt-audit.com/api/v1/token-risk/x402',
+  };
+}
+
+function demoPublicField(remaining: number) {
+  return {
+    is_demo_key: true,
+    calls_remaining: remaining,
+    calls_total: DEMO_TOTAL_LIMIT,
+    message: `Public demo key — ${remaining}/${DEMO_TOTAL_LIMIT} left, shared by everyone. Like it? Get your own free key (15/day, no card): https://tnt-audit.com/api/demo-cta?to=risk-api`,
+    get_your_own_key: 'https://tnt-audit.com/api/demo-cta?to=risk-api',
+    x402: { endpoint: '/api/v1/token-risk/x402', price_usd: 0.02, docs: 'https://tnt-audit.com/api/demo-cta?to=x402-docs' },
+  };
 }
 
 export async function OPTIONS() {
@@ -210,6 +281,151 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    // v1.14: demo-public-key check FIRST, before requireApiKey() even
+    // runs — this key deliberately never touches the api_keys table at
+    // all, so there is zero risk of it accidentally working against
+    // batch/history/billing/webhooks/admin routes (those never import
+    // or check for it — an unrecognized Bearer token there just fails
+    // their normal requireApiKey() call like any other invalid key,
+    // which is the desired lockout). Only wired into this one
+    // single-mint endpoint, on purpose.
+    const rawAuthHeader = request.headers.get('authorization') || '';
+    const bearerMatch = rawAuthHeader.match(/^Bearer\s+(.+)$/i);
+    const rawBearerToken = bearerMatch ? bearerMatch[1].trim() : null;
+
+    if (DEMO_PUBLIC_KEY && rawBearerToken === DEMO_PUBLIC_KEY) {
+      // v1.14 analytics: tag every logged row in this branch (success
+      // AND every rejection reason — paced/exhausted/error alike) with
+      // the one real api_keys row created for this experiment
+      // (owner_label 'PUBLIC_DEMO_EXPERIMENT_2026-09'). Never used for
+      // auth or rate-limiting (this branch never calls requireApiKey()
+      // or enforceRateLimit() — see lib/demo-public-key-limit.ts for
+      // the actual enforcement), purely so the existing
+      // api_request_log table gives a complete, zero-new-schema
+      // post-mortem: total attempts, success/paced/exhausted counts,
+      // every mint tried, timestamps, response times — just
+      // `select * from api_request_log where key_id = '<this id>'`.
+      keyId = DEMO_PUBLIC_KEY_ID;
+
+      const { searchParams: demoParams } = new URL(request.url);
+      mint = demoParams.get('mint') || demoParams.get('ca');
+
+      if (!mint) {
+        return respond(
+          NextResponse.json(
+            {
+              error: 'Missing required parameter: mint (or ca)',
+              example: 'GET /api/v1/token-risk?mint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+            },
+            { status: 400, headers: CORS_HEADERS },
+          ),
+          { error: 'missing_mint' },
+        );
+      }
+
+      const decision = await consumeDemoPublicKey(extractClientIp(request), extractUserAgent(request));
+
+      if (!decision.allowed) {
+        if (decision.reason === 'paced') {
+          return respond(
+            NextResponse.json(
+              {
+                error: 'Public demo key is busy right now (max 1 request every 3s, shared by everyone) — wait a moment and retry.',
+              },
+              { status: 429, headers: { ...CORS_HEADERS, ...demoPublicHeaders(decision.globalRemaining) } },
+            ),
+            { error: 'demo_public_paced' },
+          );
+        }
+        if (decision.reason === 'identity_exhausted') {
+          return respond(
+            NextResponse.json(
+              {
+                error:
+                  "You've used your 5 free demo calls from this browser/IP. The public demo key is shared — get your own free key for a guaranteed 15/day quota, or use x402 pay-per-call (no key needed).",
+                demo: demoPublicField(decision.globalRemaining),
+              },
+              { status: 402, headers: { ...CORS_HEADERS, ...demoPublicHeaders(decision.globalRemaining) } },
+            ),
+            { error: 'demo_public_identity_exhausted' },
+          );
+        }
+        if (decision.reason === 'global_exhausted') {
+          return respond(
+            NextResponse.json(
+              {
+                error: `💀 Public demo is dead — all ${DEMO_TOTAL_LIMIT} calls used. It's not coming back. Get your own free key (15/day, no card): https://tnt-audit.com/risk-api`,
+                demo: demoPublicField(0),
+              },
+              { status: 402, headers: { ...CORS_HEADERS, ...demoPublicHeaders(0) } },
+            ),
+            { error: 'demo_public_global_exhausted' },
+          );
+        }
+        // infra_error — fail closed, same reasoning as the limiter's own file header.
+        return respond(
+          NextResponse.json(
+            { error: 'Demo key temporarily unavailable, try again shortly.' },
+            { status: 503, headers: CORS_HEADERS },
+          ),
+          { error: 'demo_public_infra_error' },
+        );
+      }
+
+      const demoResult = await fetchTokenRisk(mint);
+      const demoHeaders = { ...CORS_HEADERS, ...demoPublicHeaders(decision.globalRemaining) };
+
+      if (!demoResult.ok) {
+        return respond(
+          NextResponse.json(
+            { error: demoResult.error ?? 'Unknown error', ...(demoResult.details ? { details: demoResult.details } : {}) },
+            { status: demoResult.status ?? 502, headers: demoHeaders },
+          ),
+          { error: demoResult.error ?? 'unknown_error' },
+        );
+      }
+
+      return respond(
+        NextResponse.json(
+          {
+            mint: demoResult.mint,
+            safety_score: demoResult.safety_score,
+            maturity_capped: demoResult.maturity_capped,
+            market_health_capped: demoResult.market_health_capped,
+            contract_risk_capped: demoResult.contract_risk_capped,
+            rugged_capped: demoResult.rugged_capped,
+            caps_triggered: demoResult.caps_triggered,
+            dominant_cap: demoResult.dominant_cap,
+            cluster_analysis: demoResult.cluster_analysis,
+            insider_clusters: demoResult.insider_clusters,
+            insider_holder_count: demoResult.insider_holder_count,
+            mint_authority: demoResult.mint_authority,
+            freeze_authority: demoResult.freeze_authority,
+            contract_renounced: demoResult.contract_renounced,
+            honeypot_risk: demoResult.honeypot_risk,
+            lp_locked: demoResult.lp_locked,
+            rugged: demoResult.rugged,
+            jup_verified: demoResult.jup_verified,
+            deployer_address: demoResult.deployer_address,
+            hidden_owner: demoResult.hidden_owner,
+            permanent_delegate: demoResult.permanent_delegate,
+            buy_tax_percent: demoResult.buy_tax_percent,
+            sell_tax_percent: demoResult.sell_tax_percent,
+            dev_wallet_percent: demoResult.dev_wallet_percent,
+            token_program: demoResult.token_program,
+            vesting_locks: demoResult.vesting_locks,
+            holder_distribution: demoResult.holder_distribution,
+            market: demoResult.market,
+            note: demoResult.note,
+            checked_at: demoResult.checked_at,
+            demo: demoPublicField(decision.globalRemaining),
+          },
+          { headers: demoHeaders },
+        ),
+        { safetyScore: demoResult.safety_score, clusterAnalysis: demoResult.cluster_analysis },
+      );
+    }
+
     // 0. Auth first — before spending a single RPC call on an unpaid request.
     const auth = await requireApiKey(request, CORS_HEADERS);
 
