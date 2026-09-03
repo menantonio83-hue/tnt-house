@@ -1,3 +1,17 @@
+// Version 1.13 — app/risk-api/RiskApiPageContent.tsx
+//
+// v1.13: reordered sections per product owner's explicit request — the
+// connect-and-pricing info was scattered (TryItWidget right after hero,
+// then value cards + JSON demo + How-it-works in between, THEN the MCP
+// integrations section, THEN the pricing grid even further down). Now
+// all "how do I actually use this" content is one continuous block
+// right after the hero: TryItWidget (3/day, manual) → Integrations
+// (5/day MCP, for bots) → Pricing grid (key/pay-per-call/subscription/
+// x402 summary, links to docs for full instructions). Generic
+// marketing/demo content (value cards, JSON preview, How it works)
+// moved to after this block instead of interrupting it. No content
+// was rewritten — this is a pure reorder of existing JSX blocks.
+
 // v1.12: CLAUDE_MCP_CONFIG used to show
 // "Authorization: Bearer tnt_sk_your_key_here" as if a key were
 // required just to connect — outdated since app/api/mcp/route.ts v1.6
@@ -406,6 +420,140 @@ export default function RiskApiPageContent({ requestsServed }: { requestsServed:
           <TryItWidget />
         </section>
 
+        {/* Integrations — cards, not prose. Per Kimi's audit: "Where are
+            the buttons? Where's Add to ChatGPT, Add to Claude, Install
+            ElizaOS plugin?" Click a card, snippet expands below it. */}
+        <section className="pb-14">
+          <h2 className="text-xl sm:text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400 mb-1.5">
+            {t.integrationsTitle}
+          </h2>
+          <p className="text-xs text-slate-400 mb-1.5">{t.integrationsHint}</p>
+          <p className="text-xs text-emerald-400 font-semibold mb-5">{t.mcpFreeTierNote}</p>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {INTEGRATIONS.map((integration) => (
+              <button
+                key={integration.id}
+                onClick={() => setActiveIntegration(activeIntegration === integration.id ? null : integration.id)}
+                className={
+                  'flex flex-col items-center justify-center gap-2 rounded-lg border p-4 text-center transition ' +
+                  (activeIntegration === integration.id
+                    ? 'border-emerald-400 bg-emerald-500/10'
+                    : 'border-purple-500/30 bg-slate-900/40 hover:border-purple-400')
+                }
+              >
+                <Puzzle size={18} className={activeIntegration === integration.id ? 'text-emerald-400' : 'text-purple-400'} />
+                <span className="text-xs font-bold text-white">{integration.label}</span>
+              </button>
+            ))}
+          </div>
+
+          {activeIntegration && (
+            <div className="mt-4 bg-slate-950 border-2 border-emerald-500/30 rounded-lg shadow-[0_0_20px_rgba(16,185,129,0.1)] overflow-hidden">
+              <div className="flex items-center justify-between border-b border-emerald-500/20 px-4 py-2.5">
+                <span className="text-[11px] text-slate-500">
+                  {INTEGRATIONS.find((i) => i.id === activeIntegration)?.snippetLabel}
+                </span>
+              </div>
+              <div className="p-4 flex items-start justify-between gap-2">
+                <pre className="text-[11px] sm:text-xs text-emerald-400 overflow-x-auto flex-1 leading-relaxed whitespace-pre-wrap">
+                  {INTEGRATIONS.find((i) => i.id === activeIntegration)?.snippet}
+                </pre>
+                <CopyButton
+                  text={INTEGRATIONS.find((i) => i.id === activeIntegration)?.snippet ?? ''}
+                  label={t.copyLabel}
+                />
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* Pricing — all 4 tiers on the landing page (product-owner
+            decision 2026-08-28: hiding pay-per-call and x402 behind a docs
+            link felt like withholding options, not simplifying — a new
+            user weighing a first $45 subscription against an unfamiliar
+            product specifically wants the $0.02/call trial-first option
+            visible here, not one click away). Card markup/copy mirrors
+            RiskApiDocsContent.tsx's grid exactly (same t.* i18n keys,
+            already existed there) — docs keeps the extra x402 curl/HTTP
+            402 walkthrough below its grid for the deeper technical read. */}
+        <section id="pricing" className="pb-14 scroll-mt-20">
+          <h2 className="text-xl sm:text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400 mb-6">
+            {t.pricingTitle}
+          </h2>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="border border-purple-500/30 rounded-lg p-5 bg-slate-900/40">
+              <div className="text-[11px] font-bold text-purple-400 tracking-widest mb-1">{t.tierFree}</div>
+              <div className="text-2xl font-black mb-3">{t.tierFreeAmount}</div>
+              <ul className="space-y-2 text-xs text-slate-400">
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 size={13} className="text-emerald-400 shrink-0" /> {t.freeFeature1}
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 size={13} className="text-emerald-400 shrink-0" /> {t.freeFeature2}
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 size={13} className="text-emerald-400 shrink-0" /> {t.freeFeature3}
+                </li>
+              </ul>
+            </div>
+            <div className="border border-emerald-500/30 rounded-lg p-5 bg-slate-900/40">
+              <div className="text-[11px] font-bold text-emerald-400 tracking-widest mb-1">{t.tierPayPerCall}</div>
+              <div className="text-2xl font-black mb-3">$0.02<span className="text-sm text-slate-400">/call</span></div>
+              <ul className="space-y-2 text-xs text-slate-400">
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 size={13} className="text-emerald-400 shrink-0" /> {t.payPerCallFeature1}
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 size={13} className="text-emerald-400 shrink-0" /> {t.payPerCallFeature2}
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 size={13} className="text-emerald-400 shrink-0" /> {t.payPerCallFeature3}
+                </li>
+              </ul>
+            </div>
+            <div className="border border-purple-500/30 rounded-lg p-5 bg-slate-900/40">
+              <div className="text-[11px] font-bold text-purple-400 tracking-widest mb-1">{t.tierSubscription}</div>
+              <div className="text-2xl font-black mb-3">$45<span className="text-sm text-slate-400">/30 days</span></div>
+              <ul className="space-y-2 text-xs text-slate-400">
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 size={13} className="text-emerald-400 shrink-0" /> {t.subFeature1}
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 size={13} className="text-emerald-400 shrink-0" /> {t.subFeature2}
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 size={13} className="text-emerald-400 shrink-0" /> {t.subFeature3}
+                </li>
+              </ul>
+            </div>
+            <div className="border border-emerald-500/30 rounded-lg p-5 bg-slate-900/40">
+              <div className="text-[11px] font-bold text-emerald-400 tracking-widest mb-1">{t.tierX402}</div>
+              <div className="text-2xl font-black mb-3">$0.02<span className="text-sm text-slate-400">/call</span></div>
+              <ul className="space-y-2 text-xs text-slate-400">
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 size={13} className="text-emerald-400 shrink-0" /> {t.x402Feature1}
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 size={13} className="text-emerald-400 shrink-0" /> {t.x402Feature2}
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 size={13} className="text-emerald-400 shrink-0" /> {t.x402Feature3}
+                </li>
+              </ul>
+            </div>
+          </div>
+          <p className="text-[11px] text-slate-500 mt-4">{t.pricingNote}</p>
+
+          <a
+            href="/risk-api/docs#pricing"
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-purple-300 hover:text-white transition mt-3"
+          >
+            {t.btnReadDocs} →
+          </a>
+        </section>
+
+
         {/* 3 value cards — plain-language "what this gets you", added per
             Kimi's audit (2026-08-27): the JSON demo shows the fields, but
             nothing translated them into "why this matters" before this.
@@ -502,53 +650,6 @@ export default function RiskApiPageContent({ requestsServed }: { requestsServed:
           </div>
         </section>
 
-        {/* Integrations — cards, not prose. Per Kimi's audit: "Where are
-            the buttons? Where's Add to ChatGPT, Add to Claude, Install
-            ElizaOS plugin?" Click a card, snippet expands below it. */}
-        <section className="pb-14">
-          <h2 className="text-xl sm:text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400 mb-1.5">
-            {t.integrationsTitle}
-          </h2>
-          <p className="text-xs text-slate-400 mb-1.5">{t.integrationsHint}</p>
-          <p className="text-xs text-emerald-400 font-semibold mb-5">{t.mcpFreeTierNote}</p>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {INTEGRATIONS.map((integration) => (
-              <button
-                key={integration.id}
-                onClick={() => setActiveIntegration(activeIntegration === integration.id ? null : integration.id)}
-                className={
-                  'flex flex-col items-center justify-center gap-2 rounded-lg border p-4 text-center transition ' +
-                  (activeIntegration === integration.id
-                    ? 'border-emerald-400 bg-emerald-500/10'
-                    : 'border-purple-500/30 bg-slate-900/40 hover:border-purple-400')
-                }
-              >
-                <Puzzle size={18} className={activeIntegration === integration.id ? 'text-emerald-400' : 'text-purple-400'} />
-                <span className="text-xs font-bold text-white">{integration.label}</span>
-              </button>
-            ))}
-          </div>
-
-          {activeIntegration && (
-            <div className="mt-4 bg-slate-950 border-2 border-emerald-500/30 rounded-lg shadow-[0_0_20px_rgba(16,185,129,0.1)] overflow-hidden">
-              <div className="flex items-center justify-between border-b border-emerald-500/20 px-4 py-2.5">
-                <span className="text-[11px] text-slate-500">
-                  {INTEGRATIONS.find((i) => i.id === activeIntegration)?.snippetLabel}
-                </span>
-              </div>
-              <div className="p-4 flex items-start justify-between gap-2">
-                <pre className="text-[11px] sm:text-xs text-emerald-400 overflow-x-auto flex-1 leading-relaxed whitespace-pre-wrap">
-                  {INTEGRATIONS.find((i) => i.id === activeIntegration)?.snippet}
-                </pre>
-                <CopyButton
-                  text={INTEGRATIONS.find((i) => i.id === activeIntegration)?.snippet ?? ''}
-                  label={t.copyLabel}
-                />
-              </div>
-            </div>
-          )}
-        </section>
 
         {/* How it works — a real 3-step sequence, so numbering earns its place */}
         <section className="pb-14">
@@ -573,90 +674,6 @@ export default function RiskApiPageContent({ requestsServed }: { requestsServed:
           </div>
         </section>
 
-        {/* Pricing — all 4 tiers on the landing page (product-owner
-            decision 2026-08-28: hiding pay-per-call and x402 behind a docs
-            link felt like withholding options, not simplifying — a new
-            user weighing a first $45 subscription against an unfamiliar
-            product specifically wants the $0.02/call trial-first option
-            visible here, not one click away). Card markup/copy mirrors
-            RiskApiDocsContent.tsx's grid exactly (same t.* i18n keys,
-            already existed there) — docs keeps the extra x402 curl/HTTP
-            402 walkthrough below its grid for the deeper technical read. */}
-        <section id="pricing" className="pb-14 scroll-mt-20">
-          <h2 className="text-xl sm:text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400 mb-6">
-            {t.pricingTitle}
-          </h2>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="border border-purple-500/30 rounded-lg p-5 bg-slate-900/40">
-              <div className="text-[11px] font-bold text-purple-400 tracking-widest mb-1">{t.tierFree}</div>
-              <div className="text-2xl font-black mb-3">{t.tierFreeAmount}</div>
-              <ul className="space-y-2 text-xs text-slate-400">
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 size={13} className="text-emerald-400 shrink-0" /> {t.freeFeature1}
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 size={13} className="text-emerald-400 shrink-0" /> {t.freeFeature2}
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 size={13} className="text-emerald-400 shrink-0" /> {t.freeFeature3}
-                </li>
-              </ul>
-            </div>
-            <div className="border border-emerald-500/30 rounded-lg p-5 bg-slate-900/40">
-              <div className="text-[11px] font-bold text-emerald-400 tracking-widest mb-1">{t.tierPayPerCall}</div>
-              <div className="text-2xl font-black mb-3">$0.02<span className="text-sm text-slate-400">/call</span></div>
-              <ul className="space-y-2 text-xs text-slate-400">
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 size={13} className="text-emerald-400 shrink-0" /> {t.payPerCallFeature1}
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 size={13} className="text-emerald-400 shrink-0" /> {t.payPerCallFeature2}
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 size={13} className="text-emerald-400 shrink-0" /> {t.payPerCallFeature3}
-                </li>
-              </ul>
-            </div>
-            <div className="border border-purple-500/30 rounded-lg p-5 bg-slate-900/40">
-              <div className="text-[11px] font-bold text-purple-400 tracking-widest mb-1">{t.tierSubscription}</div>
-              <div className="text-2xl font-black mb-3">$45<span className="text-sm text-slate-400">/30 days</span></div>
-              <ul className="space-y-2 text-xs text-slate-400">
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 size={13} className="text-emerald-400 shrink-0" /> {t.subFeature1}
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 size={13} className="text-emerald-400 shrink-0" /> {t.subFeature2}
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 size={13} className="text-emerald-400 shrink-0" /> {t.subFeature3}
-                </li>
-              </ul>
-            </div>
-            <div className="border border-emerald-500/30 rounded-lg p-5 bg-slate-900/40">
-              <div className="text-[11px] font-bold text-emerald-400 tracking-widest mb-1">{t.tierX402}</div>
-              <div className="text-2xl font-black mb-3">$0.02<span className="text-sm text-slate-400">/call</span></div>
-              <ul className="space-y-2 text-xs text-slate-400">
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 size={13} className="text-emerald-400 shrink-0" /> {t.x402Feature1}
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 size={13} className="text-emerald-400 shrink-0" /> {t.x402Feature2}
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 size={13} className="text-emerald-400 shrink-0" /> {t.x402Feature3}
-                </li>
-              </ul>
-            </div>
-          </div>
-          <p className="text-[11px] text-slate-500 mt-4">{t.pricingNote}</p>
-
-          <a
-            href="/risk-api/docs#pricing"
-            className="inline-flex items-center gap-1.5 text-xs font-bold text-purple-300 hover:text-white transition mt-3"
-          >
-            {t.btnReadDocs} →
-          </a>
-        </section>
 
         {/* Signup */}
         <section id="get-key" className="pb-14 scroll-mt-20">
