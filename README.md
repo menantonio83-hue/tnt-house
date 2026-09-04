@@ -4,9 +4,9 @@
 
 [![MCP Marketplace](https://img.shields.io/badge/MCP%20Marketplace-Indexed-blueviolet)](https://getlulu.dev/mcps)
 
-Solana token risk for bots. safety_score, first-funder clusters, honeypot, LP lock.
-MCP: 5 calls/day, no key. URL: https://www.tnt-audit.com/api/mcp
-Paste into Glama Inspector / Claude / Cursor. No signup.
+Solana token risk. safety_score, first-funder clusters, honeypot, LP lock.
+Humans: 3 free checks/day, no signup — [tnt-audit.com/risk-api](https://www.tnt-audit.com/risk-api)
+Bots: 5 free MCP calls/day, no key — https://www.tnt-audit.com/api/mcp (paste into Glama Inspector / Claude / Cursor)
 
 - **Website (humans):** 3 manual checks/day, no email, no key — [tnt-audit.com/risk-api](https://www.tnt-audit.com/risk-api)
 - **API key (bots):** email signup, 15 calls/day, no card
