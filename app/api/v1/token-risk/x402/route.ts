@@ -1,3 +1,12 @@
+// Version 1.10 — app/api/v1/token-risk/x402/route.ts
+//
+// v1.10: pending-grace fix (see lib/x402/pending-grace.ts's header for
+// the full story) — a mint stuck in cluster_analysis: 'pending' no
+// longer charges again on repeat polls within a short window after
+// the first paid call. mint is now parsed BEFORE the payment
+// challenge (used to happen after) so the grace check can run before
+// deciding whether to demand payment at all.
+//
 // Version 1.9 — app/api/v1/token-risk/x402/route.ts
 //
 // v1.9: per-stage latency instrumentation (Бро, 2026-09-02). A vendor
@@ -21,6 +30,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchTokenRisk } from '@/lib/token-risk-core';
+import { hasPendingGrace, grantPendingGrace } from '@/lib/x402/pending-grace';
+import { waitUntil } from '@vercel/functions';
 import {
   buildPaymentRequiredBody,
   verifyPayment,
@@ -64,6 +75,70 @@ export async function OPTIONS() {
 
 export async function GET(request: NextRequest) {
   const t0 = Date.now(); // v1.9: request start, before anything else
+
+  // v1.10: mint parsed FIRST — needed before the payment challenge so
+  // the pending-grace check can run before we decide whether to
+  // demand payment at all.
+  const { searchParams } = new URL(request.url);
+  const mint = searchParams.get('mint') || searchParams.get('ca');
+
+  if (!mint) {
+    return NextResponse.json(
+      { error: 'Missing required parameter: mint (or ca)' },
+      { status: 400, headers: CORS_HEADERS },
+    );
+  }
+
+  // v1.10: free re-poll while this mint's cluster analysis is still
+  // computing from an earlier PAID call — see
+  // lib/x402/pending-grace.ts for the full reasoning. Skips the
+  // payment challenge entirely; no X-PAYMENT header required.
+  if (await hasPendingGrace(mint)) {
+    const graceResult = await fetchTokenRisk(mint);
+    if (!graceResult.ok) {
+      return NextResponse.json(
+        { error: graceResult.error ?? 'Unknown error', ...(graceResult.details ? { details: graceResult.details } : {}) },
+        { status: graceResult.status ?? 502, headers: CORS_HEADERS },
+      );
+    }
+    return NextResponse.json(
+      {
+        mint: graceResult.mint,
+        safety_score: graceResult.safety_score,
+        maturity_capped: graceResult.maturity_capped,
+        market_health_capped: graceResult.market_health_capped,
+        contract_risk_capped: graceResult.contract_risk_capped,
+        rugged_capped: graceResult.rugged_capped,
+        caps_triggered: graceResult.caps_triggered,
+        dominant_cap: graceResult.dominant_cap,
+        cluster_analysis: graceResult.cluster_analysis,
+        insider_clusters: graceResult.insider_clusters,
+        insider_holder_count: graceResult.insider_holder_count,
+        mint_authority: graceResult.mint_authority,
+        freeze_authority: graceResult.freeze_authority,
+        contract_renounced: graceResult.contract_renounced,
+        honeypot_risk: graceResult.honeypot_risk,
+        lp_locked: graceResult.lp_locked,
+        rugged: graceResult.rugged,
+        jup_verified: graceResult.jup_verified,
+        deployer_address: graceResult.deployer_address,
+        hidden_owner: graceResult.hidden_owner,
+        permanent_delegate: graceResult.permanent_delegate,
+        buy_tax_percent: graceResult.buy_tax_percent,
+        sell_tax_percent: graceResult.sell_tax_percent,
+        dev_wallet_percent: graceResult.dev_wallet_percent,
+        token_program: graceResult.token_program,
+        vesting_locks: graceResult.vesting_locks,
+        holder_distribution: graceResult.holder_distribution,
+        market: graceResult.market,
+        note: graceResult.note,
+        checked_at: graceResult.checked_at,
+        pending_grace: true,
+      },
+      { headers: CORS_HEADERS },
+    );
+  }
+
   const paymentHeader =
     request.headers.get('X-PAYMENT') || request.headers.get('PAYMENT-SIGNATURE');
 
@@ -105,16 +180,6 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const { searchParams } = new URL(request.url);
-    const mint = searchParams.get('mint') || searchParams.get('ca');
-
-    if (!mint) {
-      return NextResponse.json(
-        { error: 'Missing required parameter: mint (or ca)' },
-        { status: 400, headers: CORS_HEADERS },
-      );
-    }
-
     let result;
     const tScoreStart = Date.now();
     try {
@@ -144,6 +209,14 @@ export async function GET(request: NextRequest) {
         ...challenge,
         error: settlement.errorReason ?? 'Payment settlement failed',
       });
+    }
+
+    // v1.10: this call just paid to kick off (or check) this mint's
+    // analysis — if it's still 'pending', open a short free-repoll
+    // window so a poll-until-complete loop doesn't 402 again. See
+    // lib/x402/pending-grace.ts.
+    if (result.cluster_analysis === 'pending') {
+      waitUntil(grantPendingGrace(mint));
     }
 
     const totalMs = Date.now() - t0;
