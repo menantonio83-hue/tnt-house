@@ -1,10 +1,12 @@
-# RiskDataApi
+# RiskDataApi — Solana token risk, 5 MCP calls free
 
 [![tnt-house MCP server](https://glama.ai/mcp/servers/menantonio83-hue/tnt-house/badges/card.svg)](https://glama.ai/mcp/servers/menantonio83-hue/tnt-house)
 
 [![MCP Marketplace](https://img.shields.io/badge/MCP%20Marketplace-Indexed-blueviolet)](https://getlulu.dev/mcps)
 
-RiskDataApi is a Solana token-risk API for trading bots and AI agents. One call returns a safety score (0–100), insider wallet clusters (shared first-funder), honeypot risk, and LP lock.
+Solana token risk. safety_score, first-funder clusters, honeypot, LP lock.
+Humans: 3 free checks/day, no signup — [tnt-audit.com/risk-api](https://www.tnt-audit.com/risk-api)
+Bots: 5 free MCP calls/day, no key — https://www.tnt-audit.com/api/mcp (paste into Glama Inspector / Claude / Cursor)
 
 - **Website (humans):** 3 manual checks/day, no email, no key — [tnt-audit.com/risk-api](https://www.tnt-audit.com/risk-api)
 - **API key (bots):** email signup, 15 calls/day, no card
