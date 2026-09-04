@@ -2,14 +2,14 @@
   "serverInfo": {
     "name": "tnt-house-risk-data-api",
     "version": "1.2.0",
-    "description": "Solana token safety scanner for AI trading agents \u2014 18-point on-chain check in one call: on-chain-provable insider wallet cluster detection (shared first-funder tracing), mint/freeze authority, honeypot risk, LP lock, holder concentration, hidden owner, permanent delegate, buy/sell tax, and more. 3 free checks/day, no signup, no API key \u2014 15 free/day with an email key at tnt-audit.com/risk-api."
+    "description": "RiskDataApi \u2014 Solana token risk, 5 MCP calls free. Returns safety_score, first-funder insider clusters, honeypot risk, LP lock, mint/freeze authority in one call. No signup for the first 5 calls/day \u2014 15/day with a free email key at tnt-audit.com/risk-api."
   },
   "authentication": {
     "required": false,
     "schemes": [
       "bearer"
     ],
-    "notes": "Bearer token is optional. Without one, calls are limited to 3/day per IP (100/day global cap) as an anonymous trial. With a free API key from tnt-audit.com/risk-api, the limit rises to 15/day."
+    "notes": "Bearer token is optional. Without one, calls are limited to 5/day per IP (100/day global cap) as an anonymous trial. With a free API key from tnt-audit.com/risk-api, the limit rises to 15/day."
   },
   "tools": [
     {
