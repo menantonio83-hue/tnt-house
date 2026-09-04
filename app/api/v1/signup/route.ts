@@ -1,3 +1,14 @@
+// Version 7.1 — app/api/v1/signup/route.ts
+//
+// v7.1: added IP + global daily rate limiting on the signup attempt
+// itself (lib/signup-limit.ts) — this endpoint deliberately has no
+// email verification (self-serve, no human required), which meant the
+// only thing stopping a script from minting many free keys/minute with
+// fake emails was the per-email dedup check below, which does nothing
+// against an attacker who controls the email string. Checked before
+// any Supabase work. Does not touch the no-verification signup design
+// itself, the per-email dedup logic, or the email-delivery flow.
+//
 // Version 7.0 — app/api/v1/signup/route.ts
 //
 // v7.0: accepts an optional `ref` field for referral-partner tracking
@@ -65,12 +76,21 @@ import { generateApiKey } from '@/lib/api-key';
 import { insertApiKey } from '@/lib/api-key-store';
 import { FREE_DAILY_LIMIT } from '@/lib/billing-pricing';
 import { sendApiKeyEmail } from '@/lib/send-email';
+import { checkSignupLimit } from '@/lib/signup-limit';
 import type { LangCode } from '@/app/risk-api/i18n';
 
 export const dynamic = 'force-dynamic';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const VALID_LANGS: LangCode[] = ['en', 'es', 'fr', 'el', 'ru', 'it', 'zh'];
+
+// Same pattern as app/api/v1/token-risk/route.ts's route-local helper —
+// a two-line concern not worth a shared module.
+function extractClientIp(request: NextRequest): string {
+  const forwardedFor = request.headers.get('x-forwarded-for');
+  if (forwardedFor) return forwardedFor.split(',')[0].trim();
+  return 'unknown';
+}
 
 // Known referral partners for revenue-share arrangements. Whitelisted
 // on purpose — this drives real payouts, so it must never accept
@@ -88,6 +108,21 @@ export async function POST(request: NextRequest) {
 
     if (!rawEmail || !EMAIL_REGEX.test(rawEmail) || rawEmail.length > 200) {
       return NextResponse.json({ error: 'Enter a valid email address' }, { status: 400 });
+    }
+
+    // v7.1: IP + global daily cap on signups themselves — closes a real
+    // abuse path (see lib/signup-limit.ts header): this endpoint has no
+    // email verification by design, so nothing else stopped a script
+    // from minting many keys/minute with fake emails. Checked before
+    // any Supabase work, right after cheap format validation.
+    const clientIp = extractClientIp(request);
+    const signupLimit = await checkSignupLimit(clientIp);
+    if (!signupLimit.allowed) {
+      const message =
+        signupLimit.reason === 'global'
+          ? `Free-key signups are at capacity for today (${signupLimit.used}/${signupLimit.limit} issued globally) — try again after UTC midnight.`
+          : `Too many signups from this IP today (${signupLimit.used}/${signupLimit.limit}) — try again after UTC midnight, or use x402 (no signup at all): GET /api/v1/token-risk/x402.`;
+      return NextResponse.json({ error: message }, { status: 429 });
     }
 
     const email = rawEmail.toLowerCase();
