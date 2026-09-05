@@ -1682,7 +1682,8 @@ export default function TntHouse() {
         setQcPaywall(data);
         setQcQuota(data);
       } else if (!res.ok) {
-        setQcError(data.error || 'Something went wrong');
+        // data.message carries the "your check was NOT used" refund notice.
+        setQcError(data.message || data.error || 'Something went wrong');
       } else {
         setQcResult(data.auditResult);
         setQcQuota(data.quota);

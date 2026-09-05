@@ -75,7 +75,8 @@ export default function QuickCheckPage() {
         setPaywall(data);
         setQuota(data);
       } else if (!res.ok) {
-        setError(data.error || 'Something went wrong');
+        // data.message carries the "your check was NOT used" refund notice.
+        setError(data.message || data.error || 'Something went wrong');
       } else {
         setResult(data.auditResult);
         setQuota(data.quota);

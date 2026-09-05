@@ -1,4 +1,4 @@
-// Version 1.0 — lib/quick-check-limit.ts
+// Version 1.1 — lib/quick-check-limit.ts
 //
 // Rate limit + paid credits for the new "Quick Check" product: a
 // standalone token-safety lookup, separate from the existing
@@ -173,6 +173,35 @@ export async function consumeQuickCheck(identity: string): Promise<QuickCheckDec
       console.error('[quick-check-limit] Redis error spending credit:', (e as Error).message);
       return false;
     }
+  }
+}
+
+// Returns a slot or credit that was consumed for a request which then failed
+// for a reason outside the user's control — specifically a Solana RPC outage,
+// where performFullAudit now hard-fails instead of fabricating a score (see
+// lib/helius-client.js). The slot is consumed before the audit runs, so
+// without this the user would lose a check to our own infrastructure.
+//
+// Best-effort by design: a failed refund must never break the error response
+// the user is already receiving.
+//
+// The GLOBAL daily counter is deliberately NOT refunded — it exists to cap
+// upstream RPC cost, and a failed call (three attempts with backoff) still
+// consumed that cost.
+export async function refundQuickCheck(
+  identity: string,
+  source: QuickCheckDecision['source'],
+): Promise<void> {
+  if (!redis) return;
+
+  try {
+    if (source === 'free') {
+      await redis.decr(`quick-check:free:${identity}:${todayUtc()}`);
+    } else if (source === 'credit') {
+      await redis.incr(`quick-check:credits:${identity}`);
+    }
+  } catch (e) {
+    console.error(`[quick-check-limit] Refund failed for ${identity}:`, (e as Error).message);
   }
 }
 
