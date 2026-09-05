@@ -48,7 +48,7 @@ This repository includes a remote **[Model Context Protocol](https://modelcontex
 - **Source:** [`app/api/mcp/route.ts`](./app/api/mcp/route.ts)
 - **Docs:** [`app/api/mcp/README.md`](./app/api/mcp/README.md)
 - **Endpoint:** `https://tnt-audit.com/api/mcp` (Streamable HTTP transport)
-- **Auth:** `Authorization: Bearer <api_key>` — free key at [tnt-audit.com/risk-api](https://www.tnt-audit.com/risk-api)
+- **Auth:** optional — first 5 calls/day need no `Authorization` header at all. Beyond that: `Authorization: Bearer <api_key>` — free key at [tnt-audit.com/risk-api](https://www.tnt-audit.com/risk-api)
 
 ### Tools
 
