@@ -4,15 +4,13 @@
 
 [![MCP Marketplace](https://img.shields.io/badge/MCP%20Marketplace-Indexed-blueviolet)](https://getlulu.dev/mcps)
 
-Solana token risk. safety_score, first-funder clusters, honeypot, LP lock.
-Humans: 3 free checks/day, no signup — [tnt-audit.com/risk-api](https://www.tnt-audit.com/risk-api)
-Bots: 5 free MCP calls/day, no key — https://www.tnt-audit.com/api/mcp (paste into Glama Inspector / Claude / Cursor)
+RiskDataApi is the risk layer for Solana trading bots and AI agents. One call on a mint returns a safety score (0–100), insider clusters (wallets that share a first funder), honeypot, and LP lock. Scanners count wallets. We trace who funded them.
 
-- **Website (humans):** 3 manual checks/day, no email, no key — [tnt-audit.com/risk-api](https://www.tnt-audit.com/risk-api)
-- **API key (bots):** email signup, 15 calls/day, no card
-- **Agents:** x402 $0.02 USDC/call, no key — `GET /api/v1/token-risk/x402`
-- **Subscription:** $45 / 30 days / 5000 calls, then $0.015/call
-- **MCP:** [https://tnt-audit.com/api/mcp](https://tnt-audit.com/api/mcp)
+Connect with no key. MCP: https://www.tnt-audit.com/api/mcp
+Paste that URL into Glama Inspector, Claude, or Cursor and call `check_token_risk`. 5 calls/day, no email.
+
+After that: email key 15/day, x402 at $0.02/call with no account, or a $45/5000-call subscription for volume. Humans on the site get 3 free checks with no signup at [tnt-audit.com/risk-api](https://www.tnt-audit.com/risk-api).
+
 - **Docs:** [https://www.tnt-audit.com/risk-api/docs](https://www.tnt-audit.com/risk-api/docs)
 
 This repository hosts a remote **Model Context Protocol (MCP) server** exposing the RiskDataApi engine as tools for AI agents (Claude, Cursor, and any other MCP-compatible client). See the [MCP Server section](#mcp-server--risk-data-api) below.
@@ -33,8 +31,8 @@ This repository hosts a remote **Model Context Protocol (MCP) server** exposing 
      }
      ```
    - **Browser, raw REST preview** — open [a live example](https://tnt-audit.com/api/v1/token-risk?mint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v) directly, no install, no signup. ⚠️ *This is a REST preview of the underlying data, not the MCP tool itself — for the real MCP tool, use the Inspector above.*
-2. **Want more?** — get a free API key in seconds at [tnt-audit.com/risk-api](https://www.tnt-audit.com/risk-api) (email only, no card). A free key raises your limit to **15 calls/day**.
-3. **Need higher volume?** — on the same page, paste your key into the pricing section and pay per-call ($0.02), by subscription ($45/5000 calls), or via x402 (autonomous agents, no key at all, $0.02/call).
+2. **Want more?** — get a free API key in seconds at [tnt-audit.com/risk-api](https://www.tnt-audit.com/risk-api) (email only, no card).
+3. **Need higher volume?** — on the same page, paste your key into the pricing section to pay per-call, by subscription, or via x402 (autonomous agents, no key at all).
 
 ## Tech Stack
 - Next.js 14 (App Router) + React 18 + TypeScript
