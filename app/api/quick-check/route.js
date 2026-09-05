@@ -1,4 +1,4 @@
-// Version 1.0 — app/api/quick-check/route.js
+// Version 1.1 — app/api/quick-check/route.js
 //
 // New, standalone product: "Quick Check" — paste any Solana token CA,
 // get the same audit engine result TNT House already uses, no listing,
@@ -17,7 +17,7 @@
 // RiskDataApi (app/risk-api/*, app/api/v1/*) is untouched by this file.
 
 import { performFullAudit } from '@/lib/helius-client';
-import { consumeQuickCheck, getQuickCheckStatus, CREDIT_PACKAGES } from '@/lib/quick-check-limit';
+import { consumeQuickCheck, refundQuickCheck, getQuickCheckStatus, CREDIT_PACKAGES } from '@/lib/quick-check-limit';
 import { randomUUID } from 'crypto';
 
 const FP_COOKIE = 'tnt_qc_fp';
@@ -78,6 +78,25 @@ export async function GET(request) {
 
     console.log(`🔍 Quick Check for ${ca} (source: ${decision.source})`);
     const auditResult = await performFullAudit(ca);
+
+    // The slot was consumed before the audit ran. If the audit could not run
+    // because of an upstream RPC failure, give it back — the user did nothing
+    // wrong and must not lose a check to our infrastructure. A definitively
+    // invalid mint ('not_found') is a real answer and still costs a slot.
+    if (auditResult.auditAvailable === false && auditResult.failureReason === 'rpc_failure') {
+      await refundQuickCheck(identity, decision.source);
+      const failRes = Response.json(
+        {
+          success: false,
+          ca,
+          error: auditResult.error,
+          message: auditResult.message,
+          slotRefunded: true,
+        },
+        { status: 503 },
+      );
+      return withFingerprintCookie(failRes, fp, isNew);
+    }
 
     const res = Response.json({
       success: true,
