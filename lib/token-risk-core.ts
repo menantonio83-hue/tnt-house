@@ -213,6 +213,8 @@ function explainDominantCap(reason: string | null | undefined): string | undefin
     dev_wallet_gt_5: 'Score capped because the dev wallet holds more than 5% of supply.',
     age_lt_1d: 'Score capped because the token is under 1 day old.',
     age_lt_7d_thin_holders: 'Score capped because the token is under 7 days old with few holders.',
+    wash_volume_gt_liq: 'Score capped because 24h volume far exceeds liquidity on a token that is under a day old with few holders — a wash-trading pattern.',
+    wash_volume_extreme: 'Score capped because 24h volume exceeds 50x the pool liquidity.',
     age_lt_7d: 'Score capped because the token is under 7 days old.',
   };
   return sentences[reason] ?? `Score capped by: ${reason}`;
@@ -247,6 +249,8 @@ export interface TokenRiskResult {
   // permanent_delegate/hidden_owner/token_program/tax tier actually
   // pulled the score down.
   contract_risk_capped?: boolean;
+  // v1.8 — true when the wash-trading tier pulled the score down.
+  wash_trading_capped?: boolean;
   // v1.5 — every cap condition that fired this call, and the single
   // tightest one (the actual reason the score is what it is). Empty
   // array / null dominant_cap when no cap fired at all.
@@ -321,186 +325,32 @@ async function runBackgroundClusterDetection(mint: string): Promise<void> {
 
 // API-specific safety score. Weights sum to 100:
 // foundation 25 + holders 20 + liquidity 15 + volume 15 + insider 25
-export function computeApiSafetyScore(
-  mintAuthorityRevoked: boolean,
-  freezeAuthorityRevoked: boolean,
-  holderRisk: { riskLevel: string },
-  dexData: { liquidity: number | null; volume24h: number | null },
-  clusters: InsiderCluster[],
-  clusterAnalysis: 'complete' | 'pending',
-): number {
-  let foundation = 0;
-  if (mintAuthorityRevoked) foundation += 15;
-  if (freezeAuthorityRevoked) foundation += 10;
+// v1.8: the score formula no longer lives here. It moved to
+// lib/scoring.ts as the single source of truth, because this exact class
+// of bug has now been caught twice — v1.3 (below) fixed it by porting the
+// caps "verbatim" into a second copy, and that copy drifted again. See
+// lib/scoring.ts's header. These re-exports keep every existing importer
+// of computeApiSafetyScore / applyScoreCaps / ScoreCapResult working
+// unchanged; only the definition site moved.
+// Imported (not just re-exported) because this file calls them directly
+// below — a bare `export ... from` creates no local binding.
+import {
+  computeSafetyScoreBase,
+  applyScoreCaps,
+  classifyHolderRisk,
+  computeFullScore,
+  type ScoreCapResult,
+  type HolderRiskLevel,
+} from '@/lib/scoring';
 
-  let holderScore = 0;
-  if (holderRisk.riskLevel === 'LOW') holderScore = 20;
-  else if (holderRisk.riskLevel === 'MEDIUM') holderScore = 10;
-  else if (holderRisk.riskLevel === 'HIGH') holderScore = 3;
-  // CRITICAL / ERROR -> 0
-
-  const liquidityScore =
-    dexData.liquidity && dexData.liquidity > 10000 ? 15 : dexData.liquidity && dexData.liquidity > 1000 ? 8 : 0;
-
-  const volumeScore =
-    dexData.volume24h && dexData.volume24h > 5000 ? 15 : dexData.volume24h && dexData.volume24h > 500 ? 8 : 0;
-
-  let insiderScore: number;
-  if (clusterAnalysis === 'pending') {
-    insiderScore = 12;
-  } else {
-    const clusteredWallets = clusters.reduce((sum, c) => sum + c.wallets.length, 0);
-    const penalty = clusters.length * 8 + clusteredWallets * 3;
-    insiderScore = Math.max(0, 25 - penalty);
-  }
-
-  const total = foundation + holderScore + liquidityScore + volumeScore + insiderScore;
-  return Math.min(100, Math.max(0, Math.round(total)));
-}
-
-// Ported from app/page.js's maturityCap (v1.121) + marketHealthCap
-// (v1.124) — see this file's v1.3 header note for why. Deliberately
-// the EXACT same thresholds and CAP (not subtract) reasoning as the
-// site: a token that's both young AND thin-holder isn't double-
-// punished, it just gets whichever single cap is lowest. Applied on
-// top of computeApiSafetyScore's output, never inside it, same
-// separation the site keeps between its base audit score and these
-// caps.
-export interface ScoreCapResult {
-  score: number;
-  maturityCapped: boolean;
-  marketHealthCapped: boolean;
-  ruggedCapped: boolean;
-  contractRiskCapped: boolean;
-  capsTriggered: Array<{ reason: string; cap: number }>;
-  dominantCap: string | null;
-}
-
-export function applyScoreCaps(
-  baseScore: number,
-  dexData: { liquidity: number | null; ageDays: number | null },
-  holderRisk: { top10Percent: number; holderCount: number },
-  rugged: boolean | null,
-  contractSignals: {
-    hiddenOwner: boolean | null;
-    permanentDelegate: boolean | null;
-    tokenProgram: 'standard' | 'nonstandard' | null;
-    buyTaxPercent: number | null;
-    sellTaxPercent: number | null;
-    devWalletPercent: number | null;
-  },
-): ScoreCapResult {
-  let maturityCap = 100;
-  if (dexData.ageDays !== null && dexData.ageDays < 1) {
-    maturityCap = 55;
-  } else if (dexData.ageDays !== null && dexData.ageDays < 7 && holderRisk.holderCount < 50) {
-    maturityCap = 65;
-  } else if (dexData.ageDays !== null && dexData.ageDays < 7) {
-    maturityCap = 75;
-  }
-  const maturityCapped = maturityCap < 100 && baseScore > maturityCap;
-  const afterMaturity = Math.min(baseScore, maturityCap);
-
-  // v1.5: dev_wallet_percent is a distinct concentration axis from
-  // top10Percent — see this file's v1.5 header note.
-  const devWalletPercent = contractSignals.devWalletPercent;
-  let marketHealthCap = 100;
-  if (dexData.liquidity !== null && dexData.liquidity < 500) {
-    marketHealthCap = 25;
-  } else if (holderRisk.top10Percent > 90) {
-    marketHealthCap = Math.min(marketHealthCap, 30);
-  } else if (devWalletPercent !== null && devWalletPercent > 30) {
-    marketHealthCap = Math.min(marketHealthCap, 30);
-  } else if (holderRisk.top10Percent > 80) {
-    marketHealthCap = Math.min(marketHealthCap, 50);
-  } else if (devWalletPercent !== null && devWalletPercent > 15) {
-    marketHealthCap = Math.min(marketHealthCap, 50);
-  } else if (holderRisk.holderCount < 20) {
-    marketHealthCap = Math.min(marketHealthCap, 60);
-  } else if (devWalletPercent !== null && devWalletPercent > 5) {
-    marketHealthCap = Math.min(marketHealthCap, 75);
-  }
-  const marketHealthCapped = marketHealthCap < 100 && afterMaturity > marketHealthCap;
-  const afterMarketHealth = Math.min(afterMaturity, marketHealthCap);
-
-  // v1.5: new contractRiskCap tier — structural/contract-level red
-  // flags, one severity notch below confirmed-rugged. See this file's
-  // v1.5 header for the exact numbers and the 3-model consensus behind
-  // them.
-  const { hiddenOwner, permanentDelegate, tokenProgram, buyTaxPercent, sellTaxPercent } = contractSignals;
-  const taxPercent =
-    buyTaxPercent !== null && sellTaxPercent !== null
-      ? Math.max(buyTaxPercent, sellTaxPercent)
-      : buyTaxPercent ?? sellTaxPercent;
-
-  let contractRiskCap = 100;
-  if (permanentDelegate === true) {
-    contractRiskCap = Math.min(contractRiskCap, 10);
-  }
-  if (hiddenOwner === true) {
-    contractRiskCap = Math.min(contractRiskCap, 30);
-  }
-  if (taxPercent !== null && taxPercent > 10) {
-    contractRiskCap = Math.min(contractRiskCap, 30);
-  }
-  if (tokenProgram === 'nonstandard') {
-    contractRiskCap = Math.min(contractRiskCap, 50);
-  }
-  if (taxPercent !== null && taxPercent > 3) {
-    contractRiskCap = Math.min(contractRiskCap, 65);
-  }
-  const contractRiskCapped = contractRiskCap < 100 && afterMarketHealth > contractRiskCap;
-  const afterContractRisk = Math.min(afterMarketHealth, contractRiskCap);
-
-  // v1.4: RugCheck's OWN confirmed-rugged flag — not a heuristic on
-  // our side, their tracked ground truth. No clean mint/freeze/
-  // liquidity combination should override an already-confirmed rug.
-  const RUGGED_CAP = 5;
-  const ruggedCapped = rugged === true && afterContractRisk > RUGGED_CAP;
-  const finalScore = rugged === true ? Math.min(afterContractRisk, RUGGED_CAP) : afterContractRisk;
-
-  // Diagnostics: every condition that actually fired this call, plus
-  // the single tightest (lowest-cap) one — lets a caller see WHY a
-  // score is low without reverse-engineering the tier math themselves.
-  const capsTriggered: Array<{ reason: string; cap: number }> = [];
-  if (rugged === true) capsTriggered.push({ reason: 'rugged_confirmed', cap: RUGGED_CAP });
-  if (permanentDelegate === true) capsTriggered.push({ reason: 'permanent_delegate', cap: 10 });
-  if (hiddenOwner === true) capsTriggered.push({ reason: 'hidden_owner', cap: 30 });
-  if (taxPercent !== null && taxPercent > 10) capsTriggered.push({ reason: 'high_tax', cap: 30 });
-  if (dexData.liquidity !== null && dexData.liquidity < 500)
-    capsTriggered.push({ reason: 'low_liquidity', cap: 25 });
-  if (holderRisk.top10Percent > 90) capsTriggered.push({ reason: 'top10_gt_90', cap: 30 });
-  if (devWalletPercent !== null && devWalletPercent > 30)
-    capsTriggered.push({ reason: 'dev_wallet_gt_30', cap: 30 });
-  if (tokenProgram === 'nonstandard') capsTriggered.push({ reason: 'nonstandard_token_program', cap: 50 });
-  if (holderRisk.top10Percent > 80) capsTriggered.push({ reason: 'top10_gt_80', cap: 50 });
-  if (devWalletPercent !== null && devWalletPercent > 15)
-    capsTriggered.push({ reason: 'dev_wallet_gt_15', cap: 50 });
-  if (taxPercent !== null && taxPercent > 3) capsTriggered.push({ reason: 'moderate_tax', cap: 65 });
-  if (holderRisk.holderCount < 20) capsTriggered.push({ reason: 'holders_lt_20', cap: 60 });
-  if (devWalletPercent !== null && devWalletPercent > 5)
-    capsTriggered.push({ reason: 'dev_wallet_gt_5', cap: 75 });
-  if (dexData.ageDays !== null && dexData.ageDays < 1) capsTriggered.push({ reason: 'age_lt_1d', cap: 55 });
-  else if (dexData.ageDays !== null && dexData.ageDays < 7 && holderRisk.holderCount < 50)
-    capsTriggered.push({ reason: 'age_lt_7d_thin_holders', cap: 65 });
-  else if (dexData.ageDays !== null && dexData.ageDays < 7)
-    capsTriggered.push({ reason: 'age_lt_7d', cap: 75 });
-
-  const dominantCap =
-    capsTriggered.length > 0
-      ? capsTriggered.reduce((tightest, c) => (c.cap < tightest.cap ? c : tightest)).reason
-      : null;
-
-  return {
-    score: finalScore,
-    maturityCapped,
-    marketHealthCapped,
-    ruggedCapped,
-    contractRiskCapped,
-    capsTriggered,
-    dominantCap,
-  };
-}
+export {
+  computeSafetyScoreBase as computeApiSafetyScore,
+  applyScoreCaps,
+  classifyHolderRisk,
+  computeFullScore,
+  type ScoreCapResult,
+  type HolderRiskLevel,
+};
 
 // Validates + fetches + scores a single mint. Never throws — every
 // failure path (bad address, upstream fetch failure, unexpected
@@ -614,7 +464,7 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
       waitUntil(runBackgroundClusterDetection(mint));
     }
 
-    const rawSafetyScore = computeApiSafetyScore(
+    const rawSafetyScore = computeSafetyScoreBase(
       mintAuthorityRevoked,
       freezeAuthorityRevoked,
       holderRiskForScoring,
@@ -629,6 +479,7 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
       marketHealthCapped,
       ruggedCapped,
       contractRiskCapped,
+      washTradingCapped,
       capsTriggered,
       dominantCap,
     } = applyScoreCaps(rawSafetyScore, dexData, holderRiskForScoring, rugCheckData.rugged, {
@@ -669,6 +520,10 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
       market_health_capped: marketHealthCapped,
       rugged_capped: ruggedCapped,
       contract_risk_capped: contractRiskCapped,
+      // v1.8 — new tier, same "did a cap actually pull the score down"
+      // semantics as the flags above. Additive field: existing consumers
+      // are unaffected.
+      wash_trading_capped: washTradingCapped,
       caps_triggered: capsTriggered,
       dominant_cap: dominantCap,
       explanation: explainDominantCap(dominantCap),

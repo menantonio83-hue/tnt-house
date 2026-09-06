@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { computeFullScore, classifyHolderRisk } from '@/lib/scoring';
 import {
   Shield,
   Send,
@@ -2488,6 +2489,7 @@ export default function TntHouse() {
         headers: { Accept: 'application/json' },
       });
       var ownHolderData = null;
+      var largestHolderPercent = null;
       try {
         var ownHolderRes = await fetch('/api/widget/token-risk?address=' + encodeURIComponent(ca));
         if (ownHolderRes.ok) {
@@ -2518,6 +2520,14 @@ export default function TntHouse() {
         var holderCount = null;
         if (ownHolderData && typeof ownHolderData.top10Percent === 'number') {
           top10Percent = Math.round(ownHolderData.top10Percent * 10) / 10;
+          // v1.125: keep the largest-holder figure too. classifyHolderRisk
+          // (lib/scoring.ts) keys CRITICAL/HIGH off it, and without it a
+          // token whose single top wallet holds 75% would only classify as
+          // MEDIUM on the strength of top10 alone.
+          largestHolderPercent =
+            typeof ownHolderData.largestHolderPercent === 'number'
+              ? ownHolderData.largestHolderPercent
+              : null;
           holderCount =
             typeof ownHolderData.holderCount === 'number' ? ownHolderData.holderCount : null;
         } else if (Array.isArray(rugData.topHolders) && rugData.topHolders.length > 0) {
@@ -2615,7 +2625,16 @@ export default function TntHouse() {
         var permanentDelegate = hasPermanentDelegate ? 'Yes 🚨' : 'No ✓';
 
         auditResult = {
-          score: normalizedScore,
+          // v1.125: `score` is assigned AFTER dexData is fetched, by the
+          // canonical scorer in lib/scoring.ts. It used to be
+          // normalizedScore — RugCheck's own score inverted into ours —
+          // which meant the number we published under the TNT House brand
+          // was really RugCheck's verdict wearing our badge, and it moved
+          // whenever they changed their algorithm. RugCheck stays a
+          // provider of FACTS below (authorities, honeypot, LP lock, tax,
+          // dev balance); it is no longer the source of the number.
+          score: null,
+          largestHolderPercent: largestHolderPercent,
           mintAuthority: mintRevoked ? 'Revoked ✓' : 'Active ⚠️',
           freezeAuthority: freezeRevoked ? 'Revoked ✓' : 'Active ⚠️',
           isHoneypot: risks.some(function (r) {
@@ -2675,78 +2694,70 @@ export default function TntHouse() {
       }
     } catch (e) {}
 
-    // FIX v1.121: RugCheck's own score (inverted into normalizedScore
-    // above) measures CONTRACT mechanics only — mint/freeze/honeypot/tax/
-    // lp-lock risks it can detect. It has zero concept of "this token is
-    // 40 minutes old with 20 holders" — that's a market-maturity risk, a
-    // completely different axis — so a brand-new, thin-holder token could
-    // show 100/"Ironclad Safe" even though nobody has had time to prove
-    // it isn't a rug. Applying a CAP here (not a subtracted penalty):
-    // caps don't stack unpredictably the way sequential deductions would,
-    // and a token that's both young AND thin-holder isn't double-punished
-    // — it just gets whichever single cap is lowest. Contract-safety
-    // checks above (mint/freeze/honeypot/tax) are untouched.
-    var maturityCap = 100;
-    if (dexData.ageDays !== null && dexData.ageDays < 1) {
-      maturityCap = 55;
-    } else if (
-      dexData.ageDays !== null &&
-      dexData.ageDays < 7 &&
-      typeof auditResult.holderCount === 'number' &&
-      auditResult.holderCount < 50
-    ) {
-      maturityCap = 65;
-    } else if (dexData.ageDays !== null && dexData.ageDays < 7) {
-      maturityCap = 75;
-    }
-    var maturityCapped = maturityCap < 100 && auditResult.score > maturityCap;
-    auditResult.score = Math.min(auditResult.score, maturityCap);
-    auditResult.maturityCapped = maturityCapped;
+    // v1.125: the entire scoring step — additive base AND every cap tier —
+    // now comes from lib/scoring.ts, the single source of truth shared with
+    // the Risk-Data API and Quick Check.
+    //
+    // This block previously held its own copy of maturityCap and
+    // marketHealthCap. lib/token-risk-core.ts v1.3 copied those caps
+    // "verbatim" into the API to fix an earlier same-mint-two-scores bug;
+    // the copy drifted, and by Sept 2026 one mint scored 0 here, 30 via
+    // the API and ~70 via Quick Check. Copying a formula does not keep it
+    // in sync, so there is now exactly one definition and three importers.
+    var holderRiskForScoring = {
+      riskLevel: classifyHolderRisk(
+        typeof auditResult.largestHolderPercent === 'number'
+          ? auditResult.largestHolderPercent
+          : 0,
+        typeof auditResult.top10Percent === 'number' ? auditResult.top10Percent : 0,
+      ),
+      top10Percent: typeof auditResult.top10Percent === 'number' ? auditResult.top10Percent : 0,
+      holderCount: typeof auditResult.holderCount === 'number' ? auditResult.holderCount : 0,
+    };
 
-    // FIX v1.124: maturityCap above only fires for tokens under 7 days
-    // old — a proxy for "unproven", not a direct check. A token can be
-    // 40+ days old and still have near-zero liquidity and 99%+ top-10
-    // concentration (dead market, or a cabal that never sold), and the
-    // age gate simply doesn't see it — RugCheck's own score only grades
-    // CONTRACT mechanics, so all-green contract flags + old-enough-to-
-    // skip-the-age-cap could still show 100/100 on an unsellable token.
-    // Separate, age-independent cap on the two metrics that actually
-    // mean "you may not be able to exit this position": liquidity and
-    // holder concentration. Same "cap, don't subtract" reasoning as
-    // maturityCap above — this is deliberately the tighter of two caps
-    // when both would apply, not a second penalty stacked on top.
-    var marketHealthCap = 100;
-    if (dexData.liquidity !== null && dexData.liquidity < 500) {
-      marketHealthCap = 25;
-    } else if (
-      auditResult.top10Percent !== null &&
-      typeof auditResult.top10Percent === 'number' &&
-      auditResult.top10Percent > 90
-    ) {
-      marketHealthCap = Math.min(marketHealthCap, 30);
-    } else if (
-      auditResult.top10Percent !== null &&
-      typeof auditResult.top10Percent === 'number' &&
-      auditResult.top10Percent > 80
-    ) {
-      marketHealthCap = Math.min(marketHealthCap, 50);
-    } else if (
-      typeof auditResult.holderCount === 'number' &&
-      auditResult.holderCount < 20
-    ) {
-      marketHealthCap = Math.min(marketHealthCap, 60);
-    }
-    var marketHealthCapped = marketHealthCap < 100 && auditResult.score > marketHealthCap;
-    auditResult.score = Math.min(auditResult.score, marketHealthCap);
-    auditResult.marketHealthCapped = marketHealthCapped;
+    var scoreResult = computeFullScore({
+      mintAuthorityRevoked: auditResult.mintAuthority === 'Revoked \u2713',
+      freezeAuthorityRevoked: auditResult.freezeAuthority === 'Revoked \u2713',
+      holderRisk: holderRiskForScoring,
+      dexData: dexData,
+      // The listing flow traces clusters separately, after this function
+      // returns (see the /api/cluster-check call in the caller). Passing
+      // 'pending' rather than an empty 'complete' avoids claiming we found
+      // no clusters when we simply have not looked yet.
+      clusters: [],
+      clusterAnalysis: 'pending',
+      rugged: null,
+      contractSignals: {
+        hiddenOwner: auditResult.hiddenOwner === 'Yes \u26a0\ufe0f' ? true : null,
+        permanentDelegate: auditResult.permanentDelegate === 'Yes \ud83d\udea8' ? true : null,
+        tokenProgram:
+          auditResult.standardProgram === true
+            ? 'standard'
+            : auditResult.standardProgram === false
+              ? 'nonstandard'
+              : null,
+        buyTaxPercent:
+          typeof auditResult.buyTaxPercent === 'number' ? auditResult.buyTaxPercent : null,
+        sellTaxPercent:
+          typeof auditResult.sellTaxPercent === 'number' ? auditResult.sellTaxPercent : null,
+        devWalletPercent:
+          typeof auditResult.creatorBalancePercent === 'number'
+            ? auditResult.creatorBalancePercent
+            : null,
+      },
+    });
 
-    // Wash-trading signal: 24h volume far exceeding pool liquidity (bots
-    // or self-trading inflating "activity") is a real, distinct red flag
-    // — kept as its own explicit boolean rather than folded into the
-    // score, so the UI can show WHY the token looks suspicious, not just
-    // a lower number with no explanation.
-    auditResult.washTradingRisk =
-      dexData.liquidity > 0 && dexData.volume24h / dexData.liquidity > 20;
+    auditResult.score = scoreResult.score;
+    auditResult.maturityCapped = scoreResult.maturityCapped;
+    auditResult.marketHealthCapped = scoreResult.marketHealthCapped;
+    auditResult.capsTriggered = scoreResult.capsTriggered;
+    auditResult.dominantCap = scoreResult.dominantCap;
+
+    // Wash trading is now a CAP, not just a banner flag. The boolean is
+    // kept so the existing UI warning still renders, but it is derived
+    // from the scorer's decision rather than computed separately here —
+    // the banner and the number can no longer disagree.
+    auditResult.washTradingRisk = scoreResult.washTradingCapped;
 
     var tokenData = {
       name: projectName.toUpperCase(),
