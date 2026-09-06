@@ -1,4 +1,4 @@
-// Version 1.1 — lib/scoring.ts
+// Version 1.2 — lib/scoring.ts
 //
 // SINGLE SOURCE OF TRUTH for the TNT House safety score.
 //
@@ -131,9 +131,23 @@ export interface ScoreCapResult {
   ruggedCapped: boolean;
   contractRiskCapped: boolean;
   washTradingCapped: boolean;
+  retroCapped: boolean;
   capsTriggered: Array<{ reason: string; cap: number }>;
   dominantCap: string | null;
 }
+
+// v1.2: ceiling for scores produced without the two deepest checks —
+// insider-cluster tracing and RugCheck's confirmed-rugged flag. Both are
+// absent in the retroactive rescore (scripts/rescore-v2.ts), which works
+// from stored facts only. That matters asymmetrically: 'pending' cluster
+// analysis contributes +12 to the base, and a null rugged flag means the
+// rugged_confirmed cap (5) can never fire — so a row can land in the green
+// >=75 band on the strength of checks that were never run. Users download a
+// green badge from that number. Retroactively LOWERING a score is merely
+// unpleasant; retroactively promoting an unverified token to green is
+// harmful, so the two are not symmetric and the ceiling only applies here.
+// 74 = top of the amber band. Clears itself on the next live audit.
+const RETRO_UNVERIFIED_CAP = 74;
 
 export function applyScoreCaps(
   baseScore: number,
@@ -148,6 +162,7 @@ export function applyScoreCaps(
     sellTaxPercent: number | null;
     devWalletPercent: number | null;
   },
+  options?: { retroUnverified?: boolean },
 ): ScoreCapResult {
   let maturityCap = 100;
   if (dexData.ageDays !== null && dexData.ageDays < 1) {
@@ -219,12 +234,22 @@ export function applyScoreCaps(
   // a heuristic of ours. No clean combination should override it.
   const RUGGED_CAP = 5;
   const ruggedCapped = rugged === true && afterContractRisk > RUGGED_CAP;
-  const finalScore = rugged === true ? Math.min(afterContractRisk, RUGGED_CAP) : afterContractRisk;
+  const afterRugged =
+    rugged === true ? Math.min(afterContractRisk, RUGGED_CAP) : afterContractRisk;
+
+  // Opt-in, off by default: live scoring paths are unaffected.
+  const retroUnverified = options?.retroUnverified === true;
+  const retroCapped = retroUnverified && afterRugged > RETRO_UNVERIFIED_CAP;
+  const finalScore = retroUnverified
+    ? Math.min(afterRugged, RETRO_UNVERIFIED_CAP)
+    : afterRugged;
 
   // Diagnostics: every condition that fired, plus the tightest one — so a
   // caller can see WHY a score is low without reverse-engineering tiers.
   const capsTriggered: Array<{ reason: string; cap: number }> = [];
   if (rugged === true) capsTriggered.push({ reason: 'rugged_confirmed', cap: RUGGED_CAP });
+  if (retroUnverified)
+    capsTriggered.push({ reason: 'retro_unverified', cap: RETRO_UNVERIFIED_CAP });
   if (permanentDelegate === true) capsTriggered.push({ reason: 'permanent_delegate', cap: 10 });
   if (hiddenOwner === true) capsTriggered.push({ reason: 'hidden_owner', cap: 30 });
   if (taxPercent !== null && taxPercent > 10) capsTriggered.push({ reason: 'high_tax', cap: 30 });
@@ -265,6 +290,7 @@ export function applyScoreCaps(
     ruggedCapped,
     contractRiskCapped,
     washTradingCapped,
+    retroCapped,
     capsTriggered,
     dominantCap,
   };
@@ -289,6 +315,7 @@ export function computeFullScore(
       sellTaxPercent: number | null;
       devWalletPercent: number | null;
     };
+    retroUnverified?: boolean;
   },
 ): ScoreCapResult {
   const base = computeSafetyScoreBase(
@@ -305,5 +332,6 @@ export function computeFullScore(
     inputs.holderRisk,
     inputs.rugged,
     inputs.contractSignals,
+    { retroUnverified: inputs.retroUnverified === true },
   );
 }

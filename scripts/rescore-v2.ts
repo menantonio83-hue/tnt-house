@@ -1,4 +1,4 @@
-// Version 1.2 — scripts/rescore-v2.ts
+// Version 1.3 — scripts/rescore-v2.ts
 //
 // One-off retroactive rescore of listed_tokens under the V2 formula
 // (lib/scoring.ts). 65 rows, so this is a script, not a migration: it runs
@@ -165,6 +165,10 @@ async function main() {
       clusters: [],
       clusterAnalysis: 'pending',
       rugged: null,
+      // No cluster tracing and no RugCheck call here — see the
+      // retro_unverified note in lib/scoring.ts. Caps the result at 74 so a
+      // row cannot reach the green band on checks that were never run.
+      retroUnverified: true,
       contractSignals: {
         hiddenOwner: isYes(row.hidden_owner),
         permanentDelegate: isYes(row.permanent_delegate),
