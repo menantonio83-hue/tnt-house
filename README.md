@@ -1,10 +1,10 @@
-# RiskDataApi — Solana token risk, 5 MCP calls free
+# RiskDataApi — scanners count wallets, we trace who funded them
 
 [![tnt-house MCP server](https://glama.ai/mcp/servers/menantonio83-hue/tnt-house/badges/card.svg)](https://glama.ai/mcp/servers/menantonio83-hue/tnt-house)
 
 [![MCP Marketplace](https://img.shields.io/badge/MCP%20Marketplace-Indexed-blueviolet)](https://getlulu.dev/mcps)
 
-RiskDataApi is the risk layer for Solana trading bots and AI agents. One call on a mint returns a safety score (0–100), insider clusters (wallets that share a first funder), honeypot, and LP lock. Scanners count wallets. We trace who funded them.
+One call returns the wallets that share a first funder — the cluster a scanner shows you as 20 unrelated holders. Plus safety score 0–100, honeypot and LP lock.
 
 Connect with no key. MCP: https://www.tnt-audit.com/api/mcp
 Paste that URL into Glama Inspector, Claude, or Cursor and call `check_token_risk`. 5 calls/day, no email.
