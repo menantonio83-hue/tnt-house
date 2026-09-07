@@ -1067,25 +1067,19 @@ const TRANSLATIONS = {
 };
 
 // --- Supabase helpers ---
-// Post a newly-audited token to the Telegram group via /api/sendTelegram.
+// Ask the server to announce a newly-audited token in the public Telegram
+// channel. Sends only the mint address; the server supplies every fact.
 // Best-effort: failures are logged but never block the audit flow.
 async function postAuditToTelegram(token) {
   try {
     var res = await fetch('/api/sendTelegram', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        tokenName: token.name,
-        symbol: token.symbol,
-        ca: token.ca,
-        mintAuthority: token.mintAuthority || 'Unknown',
-        freezeAuthority: token.freezeAuthority || 'Unknown',
-        top10Percent: token.top10Percent != null ? token.top10Percent : 'N/A',
-        liquidityUSD: typeof token.liquidity === 'number' ? token.liquidity : 0,
-        lpLocked:
-          token.lpLockedPercent != null ? token.lpLockedPercent + '% locked' : 'Unknown',
-        dexUrl: token.dexUrl,
-      }),
+      // v1.2: only the mint address is sent. /api/sendTelegram now reads
+      // the token's row from listed_tokens and builds the announcement from
+      // stored data — the browser can no longer assert any fact that ends up
+      // published in the public Telegram channel.
+      body: JSON.stringify({ ca: token.ca }),
     });
     // FIX v1.1: actually read + log the response instead of firing blind.
     // Previously a failed Telegram post (bad token, bot not in group,
