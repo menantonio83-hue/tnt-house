@@ -1385,24 +1385,33 @@ const BANNER_SLOTS = 3;
 // add_is_free_to_listed_tokens), via an exact count from PostgREST's
 // Content-Range header so it stays accurate even past the 20-row limit
 // used elsewhere for the visible token list.
+// FIX: this used to count listed_tokens.is_free directly from the browser
+// with the publishable key, and its catch block returned 0 on failure.
+// The caller computes FREE_TOTAL - usedCount, so any network blip made
+// the site advertise all 60 free slots as available. 58 are already
+// spent and the cap can never be raised, so a wrong answer here gives
+// away something unrecoverable.
+//
+// Now: server route, which reads the append-only claim ledger under the
+// service role. On ANY failure this returns null — explicitly "unknown",
+// never a number. The caller is responsible for treating null as
+// "assume no free slots", not as zero used.
 async function getFreeAuditsUsedCount() {
   try {
-    var res = await fetch(SUPABASE_URL + '/rest/v1/listed_tokens?select=id&is_free=eq.true', {
-      headers: {
-        apikey: SUPABASE_KEY,
-        Authorization: 'Bearer ' + SUPABASE_KEY,
-        Prefer: 'count=exact',
-      },
-    });
-    var contentRange = res.headers.get('content-range');
-    if (contentRange) {
-      var total = parseInt(contentRange.split('/')[1], 10);
-      if (!isNaN(total)) return total;
+    var res = await fetch('/api/listed-tokens/free-slots');
+    if (!res.ok) {
+      console.error('[free-slots] request failed with status ' + res.status);
+      return null;
     }
-    var data = res.ok ? await res.json() : [];
-    return data.length;
+    var data = await res.json();
+    if (!data || data.ok !== true || typeof data.used !== 'number') {
+      console.error('[free-slots] unusable response shape');
+      return null;
+    }
+    return data.used;
   } catch (e) {
-    return 0;
+    console.error('[free-slots] request error:', e && e.message);
+    return null;
   }
 }
 
@@ -1644,7 +1653,7 @@ export default function TntHouse() {
   // logoUrl, ca } to feed the viral success modal — shown for ANY score,
   // no 90+ threshold. null = modal hidden.
   var [auditSuccessToken, setAuditSuccessToken] = useState(null);
-  var [freeSlots, setFreeSlots] = useState(10);
+  var [freeSlots, setFreeSlots] = useState(0);
   // FEAT v1.112: bumped 50 -> 60. Free slots were fully used up again
   // (50/50 in listed_tokens with is_free=true) — this refreshes the
   // counter to show 10 fresh free slots again for continued outreach,
@@ -2074,11 +2083,17 @@ export default function TntHouse() {
     loadTokensFromSupabase().then(function (data) {
       if (data.length > 0) setListedTokens(data);
     });
-    // FIX v1.90: freeSlots now comes from an accurate is_free=true count
-    // (see getFreeAuditsUsedCount), not from the total listed_tokens row
-    // count — see that function's comment for why the old approach was
-    // wrong (it let paid audits eat into the free giveaway).
+    // freeSlots comes from the server-side claim-ledger count. A null
+    // usedCount means the count could not be established at all — in
+    // that case we show ZERO free slots rather than guessing. Failing
+    // closed costs a visitor a free audit they might have been owed;
+    // failing open costs a slot from a 60-slot lifetime cap that can
+    // never be topped up. The asymmetry is not close.
     getFreeAuditsUsedCount().then(function (usedCount) {
+      if (usedCount === null) {
+        setFreeSlots(0);
+        return;
+      }
       setFreeSlots(Math.max(0, FREE_TOTAL - usedCount));
     });
     // FEAT v1.90: same idea for the new free-banner giveaway.
