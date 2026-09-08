@@ -25,6 +25,11 @@
 // instead of a number that cannot be true.
 import { NextRequest, NextResponse } from 'next/server';
 import { getHolderDistributionRobust } from '@/lib/holder-distribution';
+import {
+  isHolderReadingUnusable,
+  HOLDER_DATA_UNAVAILABLE_ERROR,
+  HOLDER_DATA_UNAVAILABLE_MESSAGE,
+} from '@/lib/holder-data-guard';
 
 export async function GET(request: NextRequest) {
   const address = request.nextUrl.searchParams.get('address');
@@ -35,6 +40,24 @@ export async function GET(request: NextRequest) {
 
   try {
     const data = await getHolderDistributionRobust(address);
+
+    // The impossible-value guard below catches readings that cannot be true
+    // (>100%, NaN). It does NOT catch a FAILED reading: getHolderDistributionRobust
+    // reports failure as riskLevel 'ERROR' with zeroed percentages, and zero is
+    // both finite and <= 100, so it sailed through and this route answered 200
+    // with top10Percent: 0. app/page.js then accepted it as authoritative —
+    // `typeof data.top10Percent === 'number'` is true for 0 — and did not even
+    // fall back to RugCheck. That is how a token with real concentration got
+    // recorded as 0% concentrated. See lib/holder-data-guard.ts.
+    if (isHolderReadingUnusable(data)) {
+      console.error(
+        `[widget/token-risk] ${address}: holder reading unusable (riskLevel=${data.riskLevel}), refusing to forward`,
+      );
+      return NextResponse.json(
+        { error: HOLDER_DATA_UNAVAILABLE_ERROR, message: HOLDER_DATA_UNAVAILABLE_MESSAGE },
+        { status: 502, headers: { 'Cache-Control': 'no-store' } },
+      );
+    }
 
     if (
       !Number.isFinite(data.top10Percent) ||

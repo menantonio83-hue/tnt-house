@@ -141,6 +141,11 @@ import { getClusterCache, markClusterPending, saveClusterResult, markClusterFail
 import { withTimeout } from '@/lib/with-timeout';
 import { upsertMintRiskHistory } from '@/lib/mint-risk-history-store';
 import { getRugCheckRiskData, type RugCheckRiskData } from '@/lib/rugcheck-client';
+import {
+  isHolderReadingUnusable,
+  HOLDER_DATA_UNAVAILABLE_ERROR,
+  HOLDER_DATA_UNAVAILABLE_MESSAGE,
+} from '@/lib/holder-data-guard';
 import { findStreamflowLocks, freelyTradeablePercentOfLock, type VestingLock } from '@/lib/vesting-lock-detector';
 
 // Same budgets as the single-mint route (app/api/v1/token-risk/route.ts) —
@@ -385,6 +390,30 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
         error: 'Could not fetch mint account data',
         details:
           'Either this address is not a valid Solana mint, or the Solana RPC did not respond in time. Try again in a moment.',
+      };
+    }
+
+    // Same rule as the !mintInfo branch above, for the holder read.
+    // getHolderDistributionRobust reports 'ERROR' with zeroed percentages
+    // when every retry failed. Those zeros pass silently through scoring and
+    // DISABLE the concentration caps rather than triggering them, because
+    // zero is below every threshold — so a failed read scores like a
+    // well-distributed token. Refuse instead of scoring on data we do not
+    // have. See lib/holder-data-guard.ts.
+    if (isHolderReadingUnusable(holderRisk)) {
+      console.error(`[token-risk-core] ${mint}: holder reading unusable, refusing to score`);
+      void alertAdmin(
+        'holder-data-unavailable',
+        `Holder distribution could not be read for ${mint} after all retries, so the audit was ` +
+          'refused rather than scored on zeroes. Look for "[holder-distribution] ' +
+          `${mint}: giving up, last reason:" in the logs for the underlying RPC cause.`,
+      );
+      return {
+        ok: false,
+        mint,
+        status: 502,
+        error: HOLDER_DATA_UNAVAILABLE_ERROR,
+        details: HOLDER_DATA_UNAVAILABLE_MESSAGE,
       };
     }
 
