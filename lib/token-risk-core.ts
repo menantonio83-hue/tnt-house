@@ -141,6 +141,7 @@ import { getClusterCache, markClusterPending, saveClusterResult, markClusterFail
 import { withTimeout } from '@/lib/with-timeout';
 import { upsertMintRiskHistory } from '@/lib/mint-risk-history-store';
 import { getRugCheckRiskData, type RugCheckRiskData } from '@/lib/rugcheck-client';
+import { alertAdmin } from '@/lib/telegram-alert';
 import {
   isHolderReadingUnusable,
   HOLDER_DATA_UNAVAILABLE_ERROR,
