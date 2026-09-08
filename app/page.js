@@ -2713,6 +2713,51 @@ export default function TntHouse() {
     // the copy drifted, and by Sept 2026 one mint scored 0 here, 30 via
     // the API and ~70 via Quick Check. Copying a formula does not keep it
     // in sync, so there is now exactly one definition and three importers.
+    // FIX: refuse to score when the holder read produced nothing.
+    //
+    // Both values start as null and are only assigned if either
+    // /api/widget/token-risk or the RugCheck topHolders fallback returned
+    // something usable. If both failed they stay null — and the coercion
+    // below (`typeof x === 'number' ? x : 0`) used to turn that into 0,
+    // which is the worst possible substitution here:
+    //
+    //   classifyHolderRisk(0, 0) returns 'LOW'  -> a full 20/20 for holder
+    //     distribution, the same as a genuinely well-distributed token
+    //   every concentration cap in lib/scoring.ts tests `> 80` / `> 90` /
+    //     `< 20`, so zeroes do not TRIGGER the caps, they DISABLE them
+    //
+    // A failed read therefore scored better than most real tokens. Server
+    // side this is already handled (lib/holder-data-guard.ts); this is the
+    // browser half of the same hole.
+    //
+    // Returning null rather than throwing is deliberate. The free-audit
+    // call site (handleFormSubmit) invokes this function without await and
+    // without .catch(), so a throw would become an unhandled rejection and
+    // leave setIsSending(true) stuck forever with nothing shown to the
+    // user. The paid call site already guards its result with
+    // `if (tokenData)`, so null unwinds cleanly there.
+    if (
+      typeof auditResult.top10Percent !== 'number' ||
+      typeof auditResult.holderCount !== 'number'
+    ) {
+      console.error('[audit] holder distribution unavailable for ' + ca + ', refusing to score');
+      setLogs(function (prev) {
+        return prev
+          .slice(-12)
+          .concat(['[AUDIT] Holder distribution unavailable — cannot score this token.']);
+      });
+      // Phrased as our failure, not a verdict: the token has not been
+      // judged unsafe, we simply could not read it.
+      showToast(
+        'Could not read holder distribution for this token, so no score can be produced. This is a temporary failure on our side — please try again shortly.',
+        'error',
+      );
+      // handleFormSubmit sets this before calling and never clears it, so
+      // clearing it here is what unsticks the form on the free path.
+      setIsSending(false);
+      return null;
+    }
+
     var holderRiskForScoring = {
       riskLevel: classifyHolderRisk(
         typeof auditResult.largestHolderPercent === 'number'
