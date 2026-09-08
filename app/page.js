@@ -2766,12 +2766,30 @@ export default function TntHouse() {
           holderCount =
             typeof ownHolderData.holderCount === 'number' ? ownHolderData.holderCount : null;
         } else if (Array.isArray(rugData.topHolders) && rugData.topHolders.length > 0) {
-          var sumPct = rugData.topHolders.slice(0, 10).reduce(function (acc, h) {
-            return acc + (typeof h.pct === 'number' ? h.pct : 0);
+          var usablePcts = rugData.topHolders
+            .slice(0, 10)
+            .map(function (h) {
+              return h && typeof h.pct === 'number' && isFinite(h.pct) ? h.pct : null;
+            })
+            .filter(function (v) {
+              return v !== null;
+            });
+          // FIX: the old reduce() substituted 0 for every entry with no usable
+          // pct, so a topHolders array where NONE carried a percentage summed
+          // to exactly 0 — and 0 passes the <= 100 guard below and was stored
+          // as a confident "0% concentration". Nothing is derived now unless at
+          // least one real percentage was present.
+          var sumPct = usablePcts.reduce(function (acc, v) {
+            return acc + v;
           }, 0);
-          // Same impossible-value guard as the server-side route —
-          // don't display a RugCheck fallback number that can't be true.
-          top10Percent = sumPct <= 100 ? Math.round(sumPct * 10) / 10 : null;
+          top10Percent =
+            usablePcts.length > 0 && sumPct <= 100 ? Math.round(sumPct * 10) / 10 : null;
+          // FIX: this branch never assigned largestHolderPercent, so it stayed
+          // null and was coerced to 0 before classification — which made
+          // CRITICAL (> 20) and HIGH (> 15) unreachable for every audit that
+          // fell back to RugCheck. The figure was available the whole time; it
+          // just was not read.
+          largestHolderPercent = usablePcts.length > 0 ? Math.max.apply(null, usablePcts) : null;
           if (typeof rugData.totalHolders === 'number') {
             holderCount = rugData.totalHolders;
           } else {
@@ -2964,7 +2982,13 @@ export default function TntHouse() {
     // `if (tokenData)`, so null unwinds cleanly there.
     if (
       typeof auditResult.top10Percent !== 'number' ||
-      typeof auditResult.holderCount !== 'number'
+      typeof auditResult.holderCount !== 'number' ||
+      // Added with the CRITICAL/ERROR split: without the largest-holder
+      // figure classifyHolderRisk now correctly reports ERROR instead of
+      // quietly answering LOW, and computeSafetyScoreBase throws on ERROR.
+      // Refusing here keeps that throw an unreachable invariant rather than
+      // an unhandled rejection on the free-audit path, which has no .catch().
+      typeof auditResult.largestHolderPercent !== 'number'
     ) {
       console.error('[audit] holder distribution unavailable for ' + ca + ', refusing to score');
       setLogs(function (prev) {
@@ -2985,12 +3009,11 @@ export default function TntHouse() {
     }
 
     var holderRiskForScoring = {
-      riskLevel: classifyHolderRisk(
-        typeof auditResult.largestHolderPercent === 'number'
-          ? auditResult.largestHolderPercent
-          : 0,
-        typeof auditResult.top10Percent === 'number' ? auditResult.top10Percent : 0,
-      ),
+      // Passed straight through. The coercion that used to sit here turned
+      // "no reading" into a confident 0, which is what made the two severe
+      // levels unreachable. classifyHolderRisk accepts null now and reports
+      // ERROR for it; the guard above means null cannot reach this line.
+      riskLevel: classifyHolderRisk(auditResult.largestHolderPercent, auditResult.top10Percent),
       top10Percent: typeof auditResult.top10Percent === 'number' ? auditResult.top10Percent : 0,
       holderCount: typeof auditResult.holderCount === 'number' ? auditResult.holderCount : 0,
     };
