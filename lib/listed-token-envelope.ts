@@ -1,4 +1,4 @@
-// Version 1.1 — lib/listed-token-envelope.ts
+// Version 1.2 — lib/listed-token-envelope.ts
 //
 // Signs and verifies the audit payloads that /api/listed-tokens/audit
 // produces and /api/listed-tokens/save consumes.
@@ -27,6 +27,11 @@
 //
 // Keys are compared with timingSafeEqual rather than ===, so a signature
 // cannot be recovered a byte at a time by measuring response times.
+//
+// v1.2: the comparison operands are built with TextEncoder rather than
+// Buffer.from. See the note at the comparison itself — this workspace
+// resolves two copies of @types/node, and passing a Buffer across that
+// boundary failed to typecheck.
 
 import crypto from 'crypto';
 
@@ -146,8 +151,17 @@ export function verifyEnvelope<T>(input: unknown): VerifyResult<T> {
   });
   const expected = computeSignature(secret, body);
 
-  const a = Buffer.from(expected, 'utf8');
-  const b = Buffer.from(env.sig, 'utf8');
+  // TextEncoder is used instead of Buffer.from deliberately. Buffer's type
+  // comes from @types/node, and this workspace resolves two copies of that
+  // package — a Buffer produced against one copy is not assignable to the
+  // ArrayBufferView parameter declared by the other, which is what broke
+  // the build here. Uint8Array is declared by TypeScript's own lib, so
+  // there is only ever one definition of it and the conflict cannot recur.
+  // Byte-for-byte identical at runtime: both encode these hex strings as
+  // UTF-8.
+  const encoder = new TextEncoder();
+  const a = encoder.encode(expected);
+  const b = encoder.encode(env.sig);
   if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
     return fail('signature mismatch');
   }
