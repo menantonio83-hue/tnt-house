@@ -2421,7 +2421,9 @@ export default function TntHouse() {
     }
     if (freeSlots > 0) {
       setIsSending(true);
-      runAuditAndSave(
+      // SWITCHED: the free path now audits and saves entirely server-side.
+      // Rollback is this one identifier — runAuditAndSave is untouched below.
+      runServerAuditAndSave(
         formData.contractAddress,
         formData.projectName,
         true,
@@ -2457,6 +2459,230 @@ export default function TntHouse() {
   };
 
   // Run RugCheck + DexScreener audit
+  // Server-side audit path. Replaces the browser doing its own RugCheck +
+  // DexScreener gathering, its own scoring, and its own write to
+  // listed_tokens with the publishable key.
+  //
+  // Two calls: /api/listed-tokens/audit computes the row with the same
+  // lib/scoring.ts the browser used and returns it inside a signed,
+  // single-use envelope; /api/listed-tokens/save accepts nothing but that
+  // envelope. The browser no longer asserts a score, and is_free is decided
+  // by claim_free_listing_slot() rather than sent as a boolean — which is
+  // what stops free listings going round the claim ledger.
+  //
+  // ROLLBACK: change the single call in handleFormSubmit back to
+  // runAuditAndSave(...). That function and saveTokenToSupabase() are left
+  // untouched below and still work.
+  var runServerAuditAndSave = async function (ca, projectName, isFree, logoImg, tokenSymbol) {
+    setLogs(function (prev) {
+      return prev.slice(-12).concat(['[AUDIT] Running server-side audit for ' + ca + '...']);
+    });
+
+    var auditJson;
+    try {
+      var auditRes = await fetch('/api/listed-tokens/audit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ca: ca }),
+      });
+      auditJson = await auditRes.json();
+    } catch (e) {
+      console.error('[audit] request failed:', e);
+      setLogs(function (prev) {
+        return prev.slice(-12).concat(['[AUDIT] Could not reach the audit service.']);
+      });
+      showToast('Could not reach the audit service. Please try again shortly.', 'error');
+      setIsSending(false);
+      return null;
+    }
+
+    // The server already phrases its refusals for a human reader — the
+    // holder_data_unavailable text says outright that it is our failure and
+    // not a verdict on the token. Show what it said rather than inventing a
+    // generic message on top of it.
+    if (!auditJson || auditJson.ok !== true || !auditJson.envelope || !auditJson.row) {
+      var auditMsg =
+        (auditJson && auditJson.message) ||
+        'The audit could not be completed for this token. Please try again shortly.';
+      console.error('[audit] refused:', auditJson && auditJson.error);
+      setLogs(function (prev) {
+        return prev.slice(-12).concat(['[AUDIT] ' + auditMsg]);
+      });
+      showToast(auditMsg, 'error');
+      setIsSending(false);
+      return null;
+    }
+
+    var row = auditJson.row;
+
+    setLogs(function (prev) {
+      return prev.slice(-12).concat(['[AUDIT] Score ' + row.score + '/100 — saving...']);
+    });
+
+    var saveJson;
+    try {
+      var saveRes = await fetch('/api/listed-tokens/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ envelope: auditJson.envelope }),
+      });
+      saveJson = await saveRes.json();
+    } catch (e) {
+      console.error('[audit] save request failed:', e);
+      setLogs(function (prev) {
+        return prev.slice(-12).concat(['[AUDIT] Could not reach the save service.']);
+      });
+      showToast('The audit finished but could not be saved. Please run it again.', 'error');
+      setIsSending(false);
+      return null;
+    }
+
+    // Distinct from the audit failure above: here the token WAS audited and
+    // the result was refused at the write. An expired or already-used
+    // envelope is the common case and re-running the audit fixes it, so say
+    // that rather than leaving the user staring at a finished-looking form.
+    if (!saveJson || saveJson.ok !== true) {
+      var saveMsg =
+        (saveJson && saveJson.message) ||
+        'The audit finished but could not be saved. Please run it again.';
+      console.error('[audit] save refused:', saveJson && saveJson.error);
+      setLogs(function (prev) {
+        return prev.slice(-12).concat(['[AUDIT] ' + saveMsg]);
+      });
+      showToast(saveMsg, 'error');
+      setIsSending(false);
+      return null;
+    }
+
+    // Mapped from the row the server actually stored, so what the modal and
+    // the table show is what is in the database — not a parallel object
+    // assembled in the browser that might disagree with it.
+    var tokenData = {
+      name: row.name,
+      symbol: row.symbol,
+      ca: row.ca,
+      price: row.price,
+      liquidity: row.liquidity,
+      volume24h: row.volume24h,
+      priceChange24h: row.price_change_24h,
+      score: row.score,
+      verified: true,
+      dexUrl: row.dex_url || 'https://dexscreener.com/solana/' + ca,
+      chain: row.chain || 'solana',
+      mintAuthority: row.mint_authority,
+      freezeAuthority: row.freeze_authority,
+      isHoneypot: row.is_honeypot,
+      top10Percent: row.top10_percent,
+      lpLockedPercent: row.lp_locked_percent,
+      holderCount: row.holder_count,
+      creatorBalancePercent: row.creator_balance_percent,
+      logoUrl: row.logo_url || logoImg || '',
+      buyTaxPercent: row.buy_tax_percent,
+      sellTaxPercent: row.sell_tax_percent,
+      contractRenounced: row.contract_renounced,
+      hiddenOwner: row.hidden_owner,
+      ageDays: row.age_days,
+      standardProgram: row.standard_program,
+      permanentDelegate: row.permanent_delegate,
+      // The audit route returns the stored row, which has no column for the
+      // display-only cap flags the old client path derived from its local
+      // scoreResult. Left null rather than guessed; the score itself already
+      // carries the cap.
+      maturityCapped: null,
+      marketHealthCapped: null,
+      washTradingRisk: null,
+      // Decided by claim_free_listing_slot() inside the signed envelope,
+      // never by this browser.
+      isFree: !!(auditJson.free && auditJson.free.is_free),
+    };
+
+    if (isFree) {
+      postAuditToTelegram(tokenData);
+
+      // FEAT v1.102: this used to require a second, separate manual
+      // button press ("Check Insider Clusters") inside the Blueprint
+      // modal after the fact. Folding it into the main audit flow means
+      // one CA submission produces one complete, final result — no
+      // second click needed. This check is genuinely slow (walks each
+      // top holder's signature history over RPC), so the wait is real,
+      // but that's the trade-off Бро asked for: one longer wait instead
+      // of two separate steps.
+      setLogs(function (prev) {
+        return prev
+          .slice(-12)
+          .concat(['[AUDIT] Checking insider clusters (top holders)...']);
+      });
+      try {
+        var inlineClusterRes = await fetch('/api/cluster-check?ca=' + ca);
+        var inlineClusterData = await inlineClusterRes.json();
+        if (
+          !inlineClusterData.error &&
+          inlineClusterData.clusterCount > 0 &&
+          tokenData.score > 39
+        ) {
+          // The API route already persisted this same cap to Supabase —
+          // mirror it into the in-memory object so the success modal and
+          // the table's local state show the final, post-cluster score
+          // instead of the pre-check one.
+          tokenData.score = 39;
+        }
+      } catch (e) {
+        console.error('Inline cluster-check failed:', e);
+      }
+
+      // FIX v1.122: this used to prepend tokenData unconditionally, so
+      // re-auditing a CA already present in `prev` (loaded earlier from
+      // Supabase or from an earlier audit this session) showed BOTH the
+      // old and new entry side by side in the table — even though
+      // saveTokenToSupabase() above already correctly upserted a single
+      // row in the database. The DB was always right; only this local
+      // list was duplicating. Filtering out any existing row for the
+      // same ca before prepending makes the on-screen list match the DB.
+      setListedTokens(function (prev) {
+        return [tokenData].concat(
+          prev.filter(function (t) {
+            return t.ca !== tokenData.ca;
+          }),
+        );
+      });
+      setFreeSlots(function (prev) {
+        return Math.max(0, prev - 1);
+      });
+      setSubmitted(true);
+      setAuditSuccessToken(tokenData);
+      setFormData({ projectName: '', contractAddress: '', telegram: '', logoImg: '', tokenSymbol: '' });
+      showToast('🎁 Free audit complete! Score: ' + tokenData.score, 'success');
+      setIsSending(false);
+      setTimeout(function () {
+        setSubmitted(false);
+      }, 5000);
+
+      // v1.113: the core problem — people ran a free audit, saw their
+      // token in the table, and left, never noticing the ALSO-free
+      // banner sitting further down the page. Two unrelated free
+      // giveaways with zero connection between them. Same fix pattern
+      // as the VIP-tier nudge: if free banner slots remain, prefill the
+      // form with what we already know and nudge them straight to it —
+      // don't make them discover it themselves.
+      if (freeBanners > 0) {
+        setBannerFormData(function (prev) {
+          return Object.assign({}, prev, {
+            contractAddress: tokenData.ca || '',
+            tokenName: tokenData.symbol || tokenData.name || '',
+          });
+        });
+        setTimeout(function () {
+          showToast('🎁 Your token is free-listed! Free banner ad still available — scroll down 👇', 'success');
+        }, 2500);
+        setTimeout(function () {
+          scrollToBannerForm();
+        }, 4500);
+      }
+    }
+
+    return tokenData;
+  };
+
   var runAuditAndSave = async function (ca, projectName, isFree, logoImg, tokenSymbol) {
     var auditResult = {
       score: 75,
