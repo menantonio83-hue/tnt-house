@@ -1,4 +1,18 @@
-// Version 1.1 — app/api/listed-tokens/complete-paid/route.ts
+// Version 1.2 — app/api/listed-tokens/complete-paid/route.ts
+//
+// v1.2 FIX — WRONG MRDT MINT. v1.1 declared its own copy of the payment
+// constants and the MRDT address in that copy was
+// '2Sc1QpG6...pump', which appears nowhere else in this project. The real
+// mint is '8Q22r9qU...vmBg', used consistently by lib/billing-pricing.ts,
+// lib/billing-verify.ts and app/api/verify-payment/route.js.
+//
+// A payment in MRDT would therefore never have matched: the loop would
+// finish, find nothing, and return payment_not_found to somebody whose
+// money had already left their wallet. SOL and USDC were unaffected, so a
+// SOL test would not have caught it.
+//
+// The constants are now imported rather than restated, so there is no
+// second copy left to drift.
 //
 // PAYMENT PATH. Completes a paid listing entirely on the server.
 //
@@ -53,9 +67,15 @@ export const dynamic = 'force-dynamic';
 // seconds just to get going.
 export const maxDuration = 120;
 
-const RECIPIENT_WALLET = 'Ev6oXBXo6qyoaT5wypJ2Umxch91F7cFvE1SarYLaUn8Z';
-const MRDT_MINT = '2Sc1QpG6VhTVGqPGwvPBNrpxYYhZFTNTQ4WCcteJpump';
-const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+// Imported, not restated. Every other file that needs these takes them
+// from lib/billing-pricing.ts, and the one copy that was written out by
+// hand here had the WRONG MRDT mint — see the v1.2 note above.
+import {
+  WALLET_ADDRESS as RECIPIENT_WALLET,
+  MRDT_CA as MRDT_MINT,
+  USDC_CA as USDC_MINT,
+} from '@/lib/billing-pricing';
+
 const LAMPORTS_PER_SOL = 1_000_000_000;
 
 interface ChainFacts {
