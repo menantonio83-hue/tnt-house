@@ -3619,8 +3619,65 @@ export default function TntHouse() {
           } else if (type === 'audit' && auditData) {
             // FIX v1.100: await so the row exists before the cluster-check
             // call below queries it by ca.
-            await saveTokenToSupabase(auditData);
-            postAuditToTelegram(auditData);
+            // SWITCHED: the listing is now completed on the server by
+            // /api/listed-tokens/complete-paid.
+            //
+            // The previous browser-side version failed on the first real
+            // payment. The audit it kicked off takes tens of seconds — a
+            // holder walk, funder tracing, Helius backing off 429s — and
+            // this flow closes the modal and moves on. The logs show the
+            // page navigating away four seconds in, taking the unfinished
+            // work with it: nothing was listed and nothing was recorded,
+            // because the fallback lived in the same dying context.
+            //
+            // One request now, and it does not matter whether this page
+            // survives it: a serverless function runs to completion even
+            // if the client disconnects, so the listing finishes, or the
+            // payment is recorded in paid_but_unlisted, either way. The
+            // await below is only so a caller that IS still here can be
+            // told what happened. The old one-line client write remains in
+            // saveTokenToSupabase() above for rollback.
+            var completion = null;
+            try {
+              var completeRes = await fetch('/api/listed-tokens/complete-paid', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  ca: auditData.ca,
+                  signature: data.signature,
+                  tier: auditData.tier || null,
+                }),
+              });
+              completion = await completeRes.json();
+            } catch (e) {
+              // The request was sent; only our view of the answer was lost.
+              // The server is still finishing it, so do NOT claim failure.
+              console.error('[listing] lost the completion response:', e);
+            }
+
+            if (completion && completion.ok === true) {
+              // Show what was actually stored rather than the pre-payment
+              // snapshot the browser assembled.
+              if (completion.row) {
+                auditData.score = completion.row.score;
+                auditData.top10Percent = completion.row.top10_percent;
+                auditData.holderCount = completion.row.holder_count;
+                auditData.lpLockedPercent = completion.row.lp_locked_percent;
+                auditData.mintAuthority = completion.row.mint_authority;
+                auditData.freezeAuthority = completion.row.freeze_authority;
+                auditData.isHoneypot = completion.row.is_honeypot;
+              }
+              postAuditToTelegram(auditData);
+            } else if (completion && completion.error === 'listing_failed') {
+              // Announcing here would put a token in the public channel
+              // that is not in the table.
+              showToast(
+                completion.message ||
+                  'Your payment went through, but the listing could not be completed. ' +
+                    'It has been recorded and will be added manually — no need to pay again.',
+                'error',
+              );
+            }
 
             // FEAT v1.114: Priority/VIP tiers now include an X post (see
             // tierFast/tierVIP copy) but there's no automated X posting in
