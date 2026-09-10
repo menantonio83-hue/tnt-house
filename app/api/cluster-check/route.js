@@ -44,18 +44,13 @@ export const maxDuration = 60;
 
 import { NextResponse } from 'next/server';
 import { Connection, PublicKey } from '@solana/web3.js';
-import { createClient } from '@supabase/supabase-js';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 import {
   readClusterCache,
   writeClusterCache,
   allowExpensiveClusterCheck,
   extractClientIp,
 } from '@/lib/cluster-check-cache';
-
-const supabase = createClient(
-  'https://pjtvjslcffuulsqxerpx.supabase.co',
-  'sb_publishable__gmhE8SE_blCu-v90fV2OQ_YmFCkfFU',
-);
 
 const RPC_URL = process.env.HELIUS_RPC_URL || 'https://api.mainnet-beta.solana.com';
 const RUGCHECK_URL = 'https://api.rugcheck.xyz/v1/tokens';
@@ -190,13 +185,28 @@ async function traceClusters(ca) {
 // Supabase to return the actual affected rows, so we can tell real
 // success (rows.length > 0) apart from a silently blocked write
 // (rows.length === 0, no error).
+//
+// FIX v1.8: that write now goes through supabaseAdmin (service role)
+// instead of the publishable key. This route runs on the server, so it
+// never needed the anon key — and it was very likely the reason the
+// `Public update USING true` policy was added to listed_tokens in the
+// first place, since that policy is exactly what made v1.5's silently
+// blocked UPDATE start working. That policy also lets anyone holding the
+// publishable key rewrite any token's score, so it is being closed; this
+// route has to stop depending on it first, or the cluster penalty goes
+// back to silently not applying.
+//
+// The zero-rows check below is KEPT, and still earns its place. Under the
+// service role RLS no longer hides rows, but a zero-row update remains
+// possible for an ordinary reason — no listed_tokens row exists for this
+// ca yet — and that must not be reported as a successful penalty either.
 async function applyClusterScorePenalty(ca, clusterCount) {
   const scoreUpdate = { attempted: false };
   if (clusterCount <= 0) return scoreUpdate;
 
   scoreUpdate.attempted = true;
 
-  const { data: existing, error: selectError } = await supabase
+  const { data: existing, error: selectError } = await supabaseAdmin
     .from('listed_tokens')
     .select('id, score')
     .eq('ca', ca)
@@ -217,7 +227,7 @@ async function applyClusterScorePenalty(ca, clusterCount) {
     return scoreUpdate;
   }
 
-  const { data: updatedRows, error: updateError } = await supabase
+  const { data: updatedRows, error: updateError } = await supabaseAdmin
     .from('listed_tokens')
     .update({ score: 39 })
     .eq('ca', ca)
