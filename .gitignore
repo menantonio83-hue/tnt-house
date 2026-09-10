@@ -25,6 +25,9 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # local env files
+# .env*.local alone does NOT cover a bare .env, and this repository is
+# public — a single `touch .env` with real keys in it would be committed.
+.env
 .env*.local
 
 # vercel
