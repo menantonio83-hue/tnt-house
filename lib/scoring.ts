@@ -40,12 +40,30 @@
 export type HolderRiskLevel = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | 'ERROR';
 
 export function classifyHolderRisk(
-  largestHolderPercent: number,
-  top10Percent: number,
+  largestHolderPercent: number | null,
+  top10Percent: number | null,
 ): HolderRiskLevel {
-  if (largestHolderPercent > 20) return 'CRITICAL';
-  if (largestHolderPercent > 15) return 'HIGH';
-  if (top10Percent > 50) return 'MEDIUM';
+  // A missing largest-holder figure USED TO arrive here already coerced to 0
+  // by the caller, which silently made the two most severe levels
+  // unreachable: CRITICAL keys off > 20 and HIGH off > 15, and zero clears
+  // neither. A token whose single top wallet held 75% came out as MEDIUM at
+  // worst, or LOW if top10 also happened to be missing.
+  //
+  // Absent input is now reported as ERROR — "we could not classify this" —
+  // rather than being answered with the most favourable level. Every caller
+  // already refuses to score an ERROR reading (lib/holder-data-guard.ts).
+  //
+  // Note that 0 remains a valid MEASUREMENT and is handled normally: passing
+  // null is how a caller says it has no reading at all. scripts/rescore-v2.ts
+  // deliberately passes a literal 0 because the column it rescores from never
+  // stored the largest-holder figure, and its own comment explains why that
+  // can only under-state concentration; that behaviour is unchanged.
+  if (!Number.isFinite(largestHolderPercent as number)) return 'ERROR';
+  if (!Number.isFinite(top10Percent as number)) return 'ERROR';
+
+  if ((largestHolderPercent as number) > 20) return 'CRITICAL';
+  if ((largestHolderPercent as number) > 15) return 'HIGH';
+  if ((top10Percent as number) > 50) return 'MEDIUM';
   return 'LOW';
 }
 
@@ -69,11 +87,31 @@ export function computeSafetyScoreBase(
   if (mintAuthorityRevoked) foundation += 15;
   if (freezeAuthorityRevoked) foundation += 10;
 
+  // CRITICAL and ERROR used to share one unwritten `else` and both came out
+  // as 0. They are not the same thing, and collapsing them is what let a
+  // failed read pass for a verdict:
+  //
+  //   CRITICAL - we looked, and concentration is dangerous. 0 is the score.
+  //   ERROR    - we could not look. There is no score to give.
+  //
+  // A number cannot express "unknown", so ERROR must not reach this function
+  // at all. Every surface refuses first (lib/holder-data-guard.ts), which
+  // makes reaching this line a broken invariant rather than a bad token —
+  // hence a throw. It is deliberately loud: the whole class of bug being
+  // fixed here came from unknowns quietly taking on a numeric value.
+  if (holderRisk.riskLevel === 'ERROR') {
+    throw new Error(
+      'computeSafetyScoreBase received a holder reading of ERROR. An unreadable ' +
+        'holder distribution has no score; the caller must refuse before scoring. ' +
+        'See lib/holder-data-guard.ts.',
+    );
+  }
+
   let holderScore = 0;
   if (holderRisk.riskLevel === 'LOW') holderScore = 20;
   else if (holderRisk.riskLevel === 'MEDIUM') holderScore = 10;
   else if (holderRisk.riskLevel === 'HIGH') holderScore = 3;
-  // CRITICAL / ERROR -> 0
+  // CRITICAL -> 0, deliberately: a measured verdict of maximum concentration.
 
   const liquidityScore =
     dexData.liquidity && dexData.liquidity > 10000
