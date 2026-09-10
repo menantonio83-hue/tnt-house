@@ -12,10 +12,6 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@solana/spl-token": "^0.4.6",
-    "@solana/wallet-adapter-base": "^0.9.23",
-    "@solana/wallet-adapter-react": "^0.15.34",
-    "@solana/wallet-adapter-react-ui": "^0.9.36",
-    "@solana/wallet-adapter-wallets": "^0.19.25",
     "@solana/web3.js": "^1.91.7",
     "@streamflow/stream": "^13.3.1",
     "@supabase/supabase-js": "^2.43.0",
