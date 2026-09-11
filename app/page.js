@@ -3758,10 +3758,60 @@ export default function TntHouse() {
             });
             showToast('✅ Payment confirmed! Banner is live for everyone.', 'success');
           } else if (type === 'audit' && auditData) {
-            // FIX v1.100: await so the row exists before the cluster-check
-            // call below queries it by ca.
-            await saveTokenToSupabase(auditData);
-            postAuditToTelegram(auditData);
+            // FIX v1.115: was `await saveTokenToSupabase(auditData);` —
+            // a direct client write with the publishable key, run in
+            // this same JS context. That is exactly why the paid token
+            // Hg5Ja55T... (0.029632 SOL, 2026-09-10) never got listed:
+            // the browser navigated away four seconds into the audit,
+            // destroying this context mid-await, and the write was
+            // never even attempted. A serverless function survives that;
+            // this tab does not.
+            //
+            // /api/listed-tokens/complete-paid now runs the whole thing
+            // — audit, write, free-slot ledger — server-side, keyed by
+            // this order's id (already on auditData since the morning's
+            // orderId fix), and records to paid_but_unlisted if any step
+            // fails. The await below is only for a caller that is still
+            // here to be told what happened; the listing finishes either
+            // way.
+            var completion = null;
+            try {
+              var completeRes = await fetch('/api/listed-tokens/complete-paid', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ orderId: auditData.orderId }),
+              });
+              completion = await completeRes.json();
+            } catch (e) {
+              // The request was sent; only our view of the answer was
+              // lost. The server is still finishing it — do not report
+              // failure on a network read error alone.
+              console.error('[listing] lost the completion response:', e);
+            }
+
+            if (completion && completion.ok === true) {
+              // Show what the server actually stored rather than the
+              // pre-payment snapshot the browser assembled.
+              if (completion.row) {
+                auditData.score = completion.row.score;
+                auditData.top10Percent = completion.row.top10_percent;
+                auditData.holderCount = completion.row.holder_count;
+                auditData.lpLockedPercent = completion.row.lp_locked_percent;
+                auditData.mintAuthority = completion.row.mint_authority;
+                auditData.freezeAuthority = completion.row.freeze_authority;
+                auditData.isHoneypot = completion.row.is_honeypot;
+              }
+              postAuditToTelegram(auditData);
+            } else if (completion && completion.error === 'listing_failed') {
+              // Announcing here would put a token in the public channel
+              // that is not actually in the table.
+              showToast(
+                completion.message ||
+                  'Your payment went through, but the listing could not be completed. ' +
+                    'It has been recorded and will be added manually — no need to pay again.',
+                'error',
+              );
+            }
 
             // FEAT v1.114: Priority/VIP tiers now include an X post (see
             // tierFast/tierVIP copy) but there's no automated X posting in
