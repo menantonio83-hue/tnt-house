@@ -60,15 +60,13 @@ const MAX_HOLDERS_CHECKED = 10;
 const MAX_SIG_PAGES = 3; // 3 * 1000 = up to 3000 signatures back per wallet
 const SIG_PAGE_SIZE = 1000;
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
-};
-
-export async function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
-}
+// CORS v1.1: this route no longer advertises Access-Control-Allow-Origin.
+// It is the insider-cluster trace, called from our own pages, same-origin, and it identifies the
+// caller by IP or browser fingerprint rather than by a key. A wildcard
+// let any other website make ITS visitors spend this quota, with the
+// cost landing on the visitor's identity instead of the attacker's.
+// Kept as one place to add response headers if any are ever needed.
+const RESPONSE_HEADERS = {};
 
 // Walk a wallet's signature history backwards (oldest last) to find its
 // very first transaction signature.
@@ -255,7 +253,7 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const ca = searchParams.get('ca');
     if (!ca) {
-      return NextResponse.json({ error: 'ca param required' }, { status: 400, headers: CORS_HEADERS });
+      return NextResponse.json({ error: 'ca param required' }, { status: 400, headers: RESPONSE_HEADERS });
     }
 
     // 1. Cache first. A hit costs nothing and is never rate limited.
@@ -271,7 +269,7 @@ export async function GET(request) {
           cached: true,
           scoreUpdate,
         },
-        { headers: CORS_HEADERS },
+        { headers: RESPONSE_HEADERS },
       );
     }
 
@@ -283,7 +281,7 @@ export async function GET(request) {
       // of health for a token nobody actually traced.
       return NextResponse.json(
         { error: allowance.message, rateLimited: true, scope: allowance.reason },
-        { status: 429, headers: CORS_HEADERS },
+        { status: 429, headers: RESPONSE_HEADERS },
       );
     }
 
@@ -293,14 +291,14 @@ export async function GET(request) {
     if (traced.upstreamFailed) {
       return NextResponse.json(
         { error: 'Could not fetch holder data for this token' },
-        { status: 502, headers: CORS_HEADERS },
+        { status: 502, headers: RESPONSE_HEADERS },
       );
     }
 
     if (traced.insufficient) {
       return NextResponse.json(
         { clusters: [], checked: traced.checked, note: 'Not enough holder data' },
-        { headers: CORS_HEADERS },
+        { headers: RESPONSE_HEADERS },
       );
     }
 
@@ -323,9 +321,9 @@ export async function GET(request) {
         cached: false,
         scoreUpdate,
       },
-      { headers: CORS_HEADERS },
+      { headers: RESPONSE_HEADERS },
     );
   } catch (e) {
-    return NextResponse.json({ error: e.message }, { status: 500, headers: CORS_HEADERS });
+    return NextResponse.json({ error: e.message }, { status: 500, headers: RESPONSE_HEADERS });
   }
 }

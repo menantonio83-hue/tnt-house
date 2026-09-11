@@ -32,21 +32,19 @@ import { fetchTokenRisk } from '@/lib/token-risk-core';
 export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
-};
+// CORS v1.1: this route no longer advertises Access-Control-Allow-Origin.
+// It is the browser-fingerprint free trial — only app/risk-api/TryItWidget.tsx calls it, same-origin, and it identifies the
+// caller by IP or browser fingerprint rather than by a key. A wildcard
+// let any other website make ITS visitors spend this quota, with the
+// cost landing on the visitor's identity instead of the attacker's.
+// Kept as one place to add response headers if any are ever needed.
+const RESPONSE_HEADERS = {};
 
 // Client sends a SHA-256 hex digest (64 chars) — see TryItWidget.tsx's
 // getFingerprint(). A loose length range (32-128) tolerates a future
 // switch to a different hash algorithm without an immediate backend
 // change, while still rejecting obviously-malformed/empty input.
 const FINGERPRINT_REGEX = /^[a-f0-9]{32,128}$/i;
-
-export async function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -57,14 +55,14 @@ export async function POST(request: NextRequest) {
     if (!fingerprint || !FINGERPRINT_REGEX.test(fingerprint)) {
       return NextResponse.json(
         { error: 'Missing or malformed fingerprint' },
-        { status: 400, headers: CORS_HEADERS },
+        { status: 400, headers: RESPONSE_HEADERS },
       );
     }
 
     if (!mint) {
       return NextResponse.json(
         { error: 'Missing required field: mint' },
-        { status: 400, headers: CORS_HEADERS },
+        { status: 400, headers: RESPONSE_HEADERS },
       );
     }
 
@@ -79,7 +77,7 @@ export async function POST(request: NextRequest) {
       // unauthenticated surface is the wrong place to fail open.
       return NextResponse.json(
         { error: 'Trial service temporarily unavailable, try again shortly' },
-        { status: 503, headers: CORS_HEADERS },
+        { status: 503, headers: RESPONSE_HEADERS },
       );
     }
 
@@ -92,7 +90,7 @@ export async function POST(request: NextRequest) {
           upgrade_url: 'https://tnt-audit.com/risk-api#get-key',
           note: `Get a free API key for ${15} checks/day — no card required, just an email.`,
         },
-        { status: 403, headers: CORS_HEADERS },
+        { status: 403, headers: RESPONSE_HEADERS },
       );
     }
 
@@ -106,7 +104,7 @@ export async function POST(request: NextRequest) {
           trial_calls_used: used,
           trial_calls_remaining: Math.max(0, ANON_TRIAL_LIMIT - used),
         },
-        { status: result.status ?? 502, headers: CORS_HEADERS },
+        { status: result.status ?? 502, headers: RESPONSE_HEADERS },
       );
     }
 
@@ -137,13 +135,13 @@ export async function POST(request: NextRequest) {
         trial_calls_used: used,
         trial_calls_remaining: Math.max(0, ANON_TRIAL_LIMIT - used),
       },
-      { headers: CORS_HEADERS },
+      { headers: RESPONSE_HEADERS },
     );
   } catch (error: any) {
     console.error('[trial/check] error:', error);
     return NextResponse.json(
       { error: 'Internal error', details: error.message },
-      { status: 500, headers: CORS_HEADERS },
+      { status: 500, headers: RESPONSE_HEADERS },
     );
   }
 }

@@ -11,14 +11,13 @@ import { peekDemoPublicKeyStatus, DEMO_TOTAL_LIMIT } from '@/lib/demo-public-key
 
 export const dynamic = 'force-dynamic';
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS',
-};
-
-export async function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
-}
+// CORS v1.1: this route no longer advertises Access-Control-Allow-Origin.
+// It is the demo counter on our own landing page, same-origin, and it identifies the
+// caller by IP or browser fingerprint rather than by a key. A wildcard
+// let any other website make ITS visitors spend this quota, with the
+// cost landing on the visitor's identity instead of the attacker's.
+// Kept as one place to add response headers if any are ever needed.
+const RESPONSE_HEADERS = {};
 
 export async function GET() {
   const { globalUsed, globalRemaining } = await peekDemoPublicKeyStatus();
@@ -29,6 +28,6 @@ export async function GET() {
       calls_total: DEMO_TOTAL_LIMIT,
       alive: globalRemaining > 0,
     },
-    { headers: CORS_HEADERS },
+    { headers: RESPONSE_HEADERS },
   );
 }
