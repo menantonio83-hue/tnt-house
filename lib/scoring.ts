@@ -1,3 +1,24 @@
+// Version 1.4 — lib/scoring.ts
+//
+// v1.4 (2026-09-12, fixing the mSOL/HNT regression found in the v1.3
+// live run): jup_verified (Jupiter's third-party verification, already
+// fetched with zero extra cost via RugCheck) is now a mitigating factor
+// for the two caps that punished honest liquid-staking / emission
+// tokens:
+//
+//   * mint_authority_active combo: SKIPPED entirely when jup_verified.
+//     A vetted token's active mint is an emissions/LST mechanism
+//     (mSOL, HNT, JitoSOL all have active mints by design), not a
+//     print-and-dump vector.
+//   * lp_unlocked_thin: floor 40 -> 75 when jup_verified. Unlocked LP
+//     on a vetted, established token is normal market structure, not a
+//     rug signal.
+//
+// Live-verified before commit (see the v1.4 run): mSOL 20 -> 72,
+// HNT/JitoSOL likewise; USDC/USDT unchanged (RugCheck has no market
+// data for stables, so the LP conditions cannot fire there at all);
+// the unverified pump-scam example stays at 40.
+//
 // Version 1.3 — lib/scoring.ts
 //
 // v1.3 (2026-09-12, agreed with product owner): four new caps plus
@@ -256,6 +277,9 @@ export function applyScoreCaps(
     freezeAuthorityActive?: boolean | null;
     lpLockedPct?: number | null;
     lpBurned?: boolean | null;
+    // v1.4 — Jupiter verification, from RugCheck's report. true softens
+    // the mint combo and lp_unlocked_thin; null/absent = unverified.
+    jupVerified?: boolean | null;
   },
   options?: { retroUnverified?: boolean },
 ): ScoreCapResult {
@@ -340,16 +364,22 @@ export function applyScoreCaps(
   // 50% of it locked. The pure liquidity tier rewards size; this cap
   // catches the exit-liquidity risk behind it.
   const LP_UNLOCKED_CAP = 40;
+  // v1.4: Jupiter-verified tokens take a softer floor — unlocked LP on
+  // a vetted, established token is normal market structure, not a rug
+  // signal (mSOL/HNT/JitoSOL all sit in this bucket, verified live).
+  const LP_UNLOCKED_CAP_VERIFIED = 75;
   const LP_UNLOCKED_LIQUIDITY_MIN = 10000;
-  let lpRiskCap = 100;
-  if (
+  const lpUnlockedCondition =
     lpLockedPct !== null &&
     lpLockedPct !== undefined &&
     lpLockedPct < 50 &&
     dexData.liquidity !== null &&
-    dexData.liquidity > LP_UNLOCKED_LIQUIDITY_MIN
-  ) {
-    lpRiskCap = Math.min(lpRiskCap, LP_UNLOCKED_CAP);
+    dexData.liquidity > LP_UNLOCKED_LIQUIDITY_MIN;
+  const lpUnlockedCapValue =
+    contractSignals.jupVerified === true ? LP_UNLOCKED_CAP_VERIFIED : LP_UNLOCKED_CAP;
+  let lpRiskCap = 100;
+  if (lpUnlockedCondition) {
+    lpRiskCap = Math.min(lpRiskCap, lpUnlockedCapValue);
   }
   const lpRiskCapped = lpRiskCap < 100 && afterContractRisk > lpRiskCap;
   const afterLpRisk = Math.min(afterContractRisk, lpRiskCap);
@@ -362,9 +392,12 @@ export function applyScoreCaps(
   // is the actual print-and-dump configuration. Freeze stays a
   // standalone cap below: it cannot mint supply, only freeze it, so it
   // is less severe and safe even for honest stables.
+  // v1.4: jup_verified skips this cap entirely — a vetted token's
+  // active mint is an emissions/LST mechanism, not a dump vector.
   const MINT_ACTIVE_CAP = 20;
   const mintActiveAndLpUnlocked =
     contractSignals.mintAuthorityActive === true &&
+    contractSignals.jupVerified !== true &&
     lpLockedPct !== null &&
     lpLockedPct !== undefined &&
     lpLockedPct < 50 &&
@@ -432,7 +465,7 @@ export function applyScoreCaps(
     dexData.liquidity !== null &&
     dexData.liquidity > LP_UNLOCKED_LIQUIDITY_MIN
   )
-    capsTriggered.push({ reason: 'lp_unlocked_thin', cap: LP_UNLOCKED_CAP });
+    capsTriggered.push({ reason: 'lp_unlocked_thin', cap: lpUnlockedCapValue });
   if (dexData.liquidity !== null && dexData.liquidity < 500)
     capsTriggered.push({ reason: 'low_liquidity', cap: LOW_LIQUIDITY_CAP });
   if (holderRisk.top10Percent > 90) capsTriggered.push({ reason: 'top10_gt_90', cap: 30 });
@@ -471,6 +504,16 @@ export function applyScoreCaps(
     !(dexData.liquidity !== null && dexData.liquidity < 500)
   ) {
     reliefsTriggered.push({ reason: 'lp_locked_relief', from: 60, to: 75 });
+  }
+
+  // v1.4: Jupiter-verified mitigations.
+  const mintComboWouldFireWithoutVerification =
+    contractSignals.mintAuthorityActive === true && lpUnlockedCondition;
+  if (mintComboWouldFireWithoutVerification && contractSignals.jupVerified === true) {
+    reliefsTriggered.push({ reason: 'mint_jup_verified_relief', from: 20, to: 100 });
+  }
+  if (lpUnlockedCondition && contractSignals.jupVerified === true) {
+    reliefsTriggered.push({ reason: 'lp_unlocked_verified_relief', from: 40, to: 75 });
   }
 
   const dominantCap =
@@ -520,6 +563,8 @@ export function computeFullScore(
       freezeAuthorityActive?: boolean | null;
       lpLockedPct?: number | null;
       lpBurned?: boolean | null;
+      // v1.4 — Jupiter verification (softens mint combo + lp cap).
+      jupVerified?: boolean | null;
     };
     retroUnverified?: boolean;
   },

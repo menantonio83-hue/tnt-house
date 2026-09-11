@@ -547,6 +547,9 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
       freezeAuthorityActive: !freezeAuthorityRevoked,
       lpLockedPct: rugCheckData.lp_locked ? rugCheckData.lp_locked.percent : null,
       lpBurned: rugCheckData.lp_burned ? rugCheckData.lp_burned.burned : null,
+      // v1.10 (scoring v1.4): Jupiter verification mitigates the mint
+      // combo and lp_unlocked_thin (mSOL/HNT/JitoSOL case).
+      jupVerified: rugCheckData.jup_verified,
     });
 
     // History write: fire-and-forget, never awaited, never allowed to
