@@ -1215,107 +1215,18 @@ function TokenAvatar({ token, size }) {
 }
 
 
-async function saveTokenToSupabase(token) {
-  try {
-    // FIX v1.1: check for an existing row with this ca first. Previously
-    // this always did a plain INSERT, so resubmitting/re-auditing the
-    // SAME token (which happens a lot during testing, and can also happen
-    // organically if someone re-submits) created a DUPLICATE row instead
-    // of updating the existing one. The table's SELECT (order by
-    // created_at desc) would then show whichever row is newest, silently
-    // reverting any later changes (like the cluster-check score penalty)
-    // made to the older row. Now: update if a row exists, insert only if
-    // it's genuinely new.
-    var checkRes = await fetch(
-      SUPABASE_URL + '/rest/v1/listed_tokens?select=id&ca=eq.' + encodeURIComponent(token.ca),
-      { headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY } },
-    );
-    var existingRows = checkRes.ok ? await checkRes.json() : [];
-
-    var payload = {
-      name: token.name,
-      symbol: token.symbol,
-      ca: token.ca,
-      price: token.price,
-      liquidity: token.liquidity,
-      volume24h: token.volume24h,
-      price_change_24h: token.priceChange24h,
-      // FIX v1.100: `token.score || 95` saved a FAKE 95 to the database
-      // for any token that genuinely scored 0 — the worst possible score
-      // was being persisted as if it were nearly perfect. This is the
-      // actual value written to listed_tokens.score, so this one mattered
-      // more than the display-only bugs fixed alongside it.
-      score: typeof token.score === 'number' ? token.score : 95,
-      dex_url: token.dexUrl,
-      chain: token.chain || 'solana',
-      mint_authority: token.mintAuthority || '-',
-      freeze_authority: token.freezeAuthority || '-',
-      is_honeypot: token.isHoneypot || '-',
-      top10_percent: token.top10Percent != null ? token.top10Percent : null,
-      lp_locked_percent: token.lpLockedPercent != null ? token.lpLockedPercent : null,
-      holder_count: token.holderCount != null ? token.holderCount : null,
-      creator_balance_percent:
-        token.creatorBalancePercent != null ? token.creatorBalancePercent : null,
-      logo_url: token.logoUrl || null,
-      buy_tax_percent: token.buyTaxPercent != null ? token.buyTaxPercent : null,
-      sell_tax_percent: token.sellTaxPercent != null ? token.sellTaxPercent : null,
-      contract_renounced: token.contractRenounced != null ? token.contractRenounced : null,
-      hidden_owner: token.hiddenOwner || null,
-      age_days: token.ageDays != null ? token.ageDays : null,
-      standard_program: token.standardProgram != null ? token.standardProgram : null,
-      permanent_delegate: token.permanentDelegate || null,
-      // FIX v1.90: this is what getFreeAuditsUsedCount() actually counts.
-      is_free: token.isFree || false,
-      // FIX v1.114: bumped on EVERY save (insert and re-audit alike) —
-      // this is what loadTokensFromSupabase() now sorts "Newest" by,
-      // instead of created_at (which Supabase only sets once, at INSERT,
-      // and a PATCH never touches). Without this, a fully re-audited
-      // token with completely fresh price/score/holders data still sat
-      // frozen at its original position in the table — the monetization
-      // incentive ("pay again -> fresh data AND back on top") only half
-      // worked. created_at itself is left alone as the token's genuine
-      // first-listed date.
-      last_audit_at: new Date().toISOString(),
-    };
-
-    if (existingRows.length > 0) {
-      // Row already exists for this ca — update it (and clean up any
-      // extra duplicate rows from before this fix, keeping the first one).
-      await fetch(
-        SUPABASE_URL + '/rest/v1/listed_tokens?ca=eq.' + encodeURIComponent(token.ca),
-        {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            apikey: SUPABASE_KEY,
-            Authorization: 'Bearer ' + SUPABASE_KEY,
-            Prefer: 'return=minimal',
-          },
-          body: JSON.stringify(payload),
-        },
-      );
-    } else {
-      await fetch(SUPABASE_URL + '/rest/v1/listed_tokens', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          apikey: SUPABASE_KEY,
-          Authorization: 'Bearer ' + SUPABASE_KEY,
-          Prefer: 'return=minimal',
-        },
-        body: JSON.stringify(payload),
-      });
-    }
-  } catch (e) {
-    console.error('Supabase save failed:', e);
-  }
-}
+// v1.126 (H-1 fix): saveTokenToSupabase() removed. The browser no longer
+// writes listed_tokens with the publishable key — every insert/update now
+// happens server-side, under the service role, via
+// /api/listed-tokens/save (free path, signed envelope) or
+// /api/listed-tokens/complete-paid (paid path). The table's write RLS was
+// locked down in migrations/2026-09-11-listed-tokens-lockdown.sql.
 
 async function loadTokensFromSupabase() {
   try {
     // FIX v1.114: sort by last_audit_at (bumped on every re-audit), not
-    // created_at (fixed at first insert forever) — see saveTokenToSupabase
-    // for why. Fall back to created_at is unnecessary: the migration
+    // created_at (fixed at first insert forever) — see the server-side
+    // writer (lib/listed-token-writer.ts). Fall back to created_at is unnecessary: the migration
     // backfilled last_audit_at = created_at for every pre-existing row.
     //
     // FEAT v1.115: limit raised from 20 to 100. The Discover-lane filters
@@ -1539,7 +1450,7 @@ export default function TntHouse() {
   var [showWatchlistOnly, setShowWatchlistOnly] = useState(false);
 
   // v1.115: Discover-lane filters. All fields already exist on every row
-  // in listed_tokens (saved by saveTokenToSupabase on every audit) — this
+  // in listed_tokens (saved by the server-side audit flow on every audit) — this
   // just exposes them as filter controls instead of leaving them unused.
   // 'any' means the filter is off / not applied.
   var [filterMaxAge, setFilterMaxAge] = useState('any'); // 'any' | '1' | '6h' | '24h' | '7'
@@ -2458,8 +2369,9 @@ export default function TntHouse() {
   // what stops free listings going round the claim ledger.
   //
   // ROLLBACK: change the single call in handleFormSubmit back to
-  // runAuditAndSave(...). That function and saveTokenToSupabase() are left
-  // untouched below and still work.
+  // runAuditAndSave(...). That function no longer writes directly — its
+  // free branch delegates straight back here — so rolling back changes
+  // nothing about who writes listed_tokens (always the server).
   var runServerAuditAndSave = async function (ca, projectName, isFree, logoImg, tokenSymbol) {
     setLogs(function (prev) {
       return prev.slice(-12).concat(['[AUDIT] Running server-side audit for ' + ca + '...']);
@@ -2617,7 +2529,7 @@ export default function TntHouse() {
       // re-auditing a CA already present in `prev` (loaded earlier from
       // Supabase or from an earlier audit this session) showed BOTH the
       // old and new entry side by side in the table — even though
-      // saveTokenToSupabase() above already correctly upserted a single
+      // /api/listed-tokens/save above already correctly upserted a single
       // row in the database. The DB was always right; only this local
       // list was duplicating. Filtering out any existing row for the
       // same ca before prepending makes the on-screen list match the DB.
@@ -2667,6 +2579,16 @@ export default function TntHouse() {
   };
 
   var runAuditAndSave = async function (ca, projectName, isFree, logoImg, tokenSymbol) {
+    // v1.126 (H-1 fix): the browser no longer writes listed_tokens
+    // directly. The free path is now unconditionally server-side (audit
+    // -> signed envelope -> save), so this legacy entry point delegates
+    // instead of reconstructing the flow client-side. The paid path
+    // (isFree === false) continues below unchanged — its listing write
+    // happens server-side in /api/listed-tokens/complete-paid.
+    if (isFree) {
+      return runServerAuditAndSave(ca, projectName, isFree, logoImg, tokenSymbol);
+    }
+
     var auditResult = {
       score: 75,
       mintAuthority: 'Unknown',
@@ -3084,95 +3006,16 @@ export default function TntHouse() {
       maturityCapped: auditResult.maturityCapped,
       marketHealthCapped: auditResult.marketHealthCapped,
       washTradingRisk: auditResult.washTradingRisk,
-      // FIX v1.90: this is the field saveTokenToSupabase reads into is_free.
+      // FIX v1.90: kept so the UI object and the server-side row shape agree;
+      // the server writes is_free itself (claim_free_listing_slot).
       isFree: !!isFree,
     };
 
-    if (isFree) {
-      // FIX v1.100: await this so the row definitely exists in Supabase
-      // before the cluster-check call below queries it by ca (that
-      // endpoint SELECTs the existing row and does nothing if it can't
-      // find one).
-      await saveTokenToSupabase(tokenData);
-      postAuditToTelegram(tokenData);
-
-      // FEAT v1.102: this used to require a second, separate manual
-      // button press ("Check Insider Clusters") inside the Blueprint
-      // modal after the fact. Folding it into the main audit flow means
-      // one CA submission produces one complete, final result — no
-      // second click needed. This check is genuinely slow (walks each
-      // top holder's signature history over RPC), so the wait is real,
-      // but that's the trade-off Бро asked for: one longer wait instead
-      // of two separate steps.
-      setLogs(function (prev) {
-        return prev
-          .slice(-12)
-          .concat(['[AUDIT] Checking insider clusters (top holders)...']);
-      });
-      try {
-        var inlineClusterRes = await fetch('/api/cluster-check?ca=' + ca);
-        var inlineClusterData = await inlineClusterRes.json();
-        // FIX v1.123: this used to mirror a server-side score=39 write
-        // that /api/cluster-check no longer performs (route.js v1.8 — see
-        // that file's header). tokenData.score is left as whatever
-        // computeFullScore produced above; inlineClusterData is still
-        // available here if a future change wants to surface cluster
-        // count in the success UI, it just no longer overwrites the score.
-        void inlineClusterData;
-      } catch (e) {
-        console.error('Inline cluster-check failed:', e);
-      }
-
-      // FIX v1.122: this used to prepend tokenData unconditionally, so
-      // re-auditing a CA already present in `prev` (loaded earlier from
-      // Supabase or from an earlier audit this session) showed BOTH the
-      // old and new entry side by side in the table — even though
-      // saveTokenToSupabase() above already correctly upserted a single
-      // row in the database. The DB was always right; only this local
-      // list was duplicating. Filtering out any existing row for the
-      // same ca before prepending makes the on-screen list match the DB.
-      setListedTokens(function (prev) {
-        return [tokenData].concat(
-          prev.filter(function (t) {
-            return t.ca !== tokenData.ca;
-          }),
-        );
-      });
-      setFreeSlots(function (prev) {
-        return Math.max(0, prev - 1);
-      });
-      setSubmitted(true);
-      setAuditSuccessToken(tokenData);
-      setFormData({ projectName: '', contractAddress: '', telegram: '', logoImg: '', tokenSymbol: '' });
-      showToast('🎁 Free audit complete! Score: ' + tokenData.score, 'success');
-      setIsSending(false);
-      setTimeout(function () {
-        setSubmitted(false);
-      }, 5000);
-
-      // v1.113: the core problem — people ran a free audit, saw their
-      // token in the table, and left, never noticing the ALSO-free
-      // banner sitting further down the page. Two unrelated free
-      // giveaways with zero connection between them. Same fix pattern
-      // as the VIP-tier nudge: if free banner slots remain, prefill the
-      // form with what we already know and nudge them straight to it —
-      // don't make them discover it themselves.
-      if (freeBanners > 0) {
-        setBannerFormData(function (prev) {
-          return Object.assign({}, prev, {
-            contractAddress: tokenData.ca || '',
-            tokenName: tokenData.symbol || tokenData.name || '',
-          });
-        });
-        setTimeout(function () {
-          showToast('🎁 Your token is free-listed! Free banner ad still available — scroll down 👇', 'success');
-        }, 2500);
-        setTimeout(function () {
-          scrollToBannerForm();
-        }, 4500);
-      }
-    }
-
+    // v1.126 (H-1 fix): the free path never reaches this point — it is
+    // delegated to runServerAuditAndSave at the top of this function —
+    // and the paid path (isFree === false) writes nothing here either:
+    // its listing write happens server-side in
+    // /api/listed-tokens/complete-paid.
     return tokenData;
   };
 
