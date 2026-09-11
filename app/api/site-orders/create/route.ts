@@ -1,3 +1,17 @@
+// Version 1.3 — app/api/site-orders/create/route.ts
+//
+// v1.3 (2026-09-11): kind: 'banner' now also carries the banner's actual
+// content (tokenName, bannerImg, description, targetLink), validated
+// here and stored on the order. Previously the browser held this
+// content until payment confirmed, then wrote it directly to
+// active_banner with the publishable key — the write itself checked
+// nothing, which combined with that table's then-public RLS meant
+// anyone could overwrite any banner slot without paying at all (see
+// migrations/2026-09-11-banner-lockdown.sql). The content now travels
+// with the order so /api/verify-payment can write it server-side, at
+// the moment a real payment is claimed, the same way it already awards
+// Quick Check credits.
+//
 // Version 1.2 — app/api/site-orders/create/route.ts
 //
 // v1.2 (2026-09-11): adds kind: 'credits' for Quick Check paid credit
@@ -43,7 +57,8 @@
 // thing to get wrong.
 //
 // POST /api/site-orders/create
-//   { kind: 'listing', tier, ca } | { kind: 'banner', days, banner_slot }
+//   { kind: 'listing', tier, ca }
+//   | { kind: 'banner', days, banner_slot, tokenName, bannerImg, description, targetLink }
 //   | { kind: 'credits', packageId }
 //   + currency: 'SOL' | 'USDC' | 'MRDT'
 // 200 { ok: true, orderId, payAmount, displayAmount, currency, expiresAt }
@@ -85,6 +100,18 @@ function isRealSolanaAddress(value: string): boolean {
   try {
     new PublicKey(value);
     return true;
+  } catch {
+    return false;
+  }
+}
+
+// Server-side twin of app/page.js's isValidHttpUrl — same rule (parse as
+// a real URL, accept only http/https), because the client's own check is
+// no longer the authority once the content is stored and used here.
+function isValidHttpUrl(value: string): boolean {
+  try {
+    const u = new URL(value.trim());
+    return u.protocol === 'http:' || u.protocol === 'https:';
   } catch {
     return false;
   }
@@ -138,6 +165,10 @@ export async function POST(request: NextRequest) {
     days?: unknown;
     banner_slot?: unknown;
     packageId?: unknown;
+    tokenName?: unknown;
+    bannerImg?: unknown;
+    description?: unknown;
+    targetLink?: unknown;
     currency?: unknown;
   };
 
@@ -153,6 +184,10 @@ export async function POST(request: NextRequest) {
   let tierLabel: string | null = null;
   let creditIdentity: string | null = null;
   let fpIsNew = false;
+  let bannerTokenName: string | null = null;
+  let bannerImg: string | null = null;
+  let bannerDesc: string | null = null;
+  let bannerTargetLink: string | null = null;
 
   if (kind === 'listing') {
     const price = priceListingUsd(input?.tier);
@@ -181,9 +216,22 @@ export async function POST(request: NextRequest) {
     if (!Number.isInteger(slot) || slot < 1 || slot > BANNER_SLOTS) {
       return NextResponse.json({ ok: false, error: 'invalid_banner_slot' }, { status: 400 });
     }
+    const name = typeof input?.tokenName === 'string' ? input.tokenName.trim() : '';
+    const desc = typeof input?.description === 'string' ? input.description.trim() : '';
+    const link = typeof input?.targetLink === 'string' ? input.targetLink.trim() : '';
+    if (!name || !desc) {
+      return NextResponse.json({ ok: false, error: 'invalid_banner_content' }, { status: 400 });
+    }
+    if (!isValidHttpUrl(link)) {
+      return NextResponse.json({ ok: false, error: 'invalid_target_link' }, { status: 400 });
+    }
     usd = price.usd;
     bannerSlot = slot;
     tierLabel = `${input.days}d`;
+    bannerTokenName = name.toUpperCase();
+    bannerImg = typeof input?.bannerImg === 'string' ? input.bannerImg.trim() : '';
+    bannerDesc = desc;
+    bannerTargetLink = link;
   } else if (kind === 'credits') {
     const packageId = input?.packageId;
     const pkg =
@@ -261,6 +309,10 @@ export async function POST(request: NextRequest) {
         base_amount: base.baseAmount,
         created_ip: ip,
         credit_identity: creditIdentity,
+        banner_token_name: bannerTokenName,
+        banner_img: bannerImg,
+        banner_desc: bannerDesc,
+        banner_target_link: bannerTargetLink,
       })
       .select('id, expires_at')
       .single();

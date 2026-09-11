@@ -1413,70 +1413,45 @@ async function getFreeAuditsUsedCount() {
 // been claimed — it upserts onto fixed slot rows (id 1..BANNER_SLOTS), so
 // each new banner overwrites the previous one instead of accumulating.
 // free_banner_claims is an append-only log just for this count.
+//
+// FIX v1.113: this used to read free_banner_claims directly from the
+// browser with the publishable key, and its catch block returned 0 on
+// failure — the caller computes FREE_BANNER_TOTAL - usedCount, so any
+// network blip made the site advertise every giveaway slot as available.
+// Now a server route under the service role, matching
+// getFreeAuditsUsedCount above: on any failure this returns null,
+// explicitly "unknown", never a number the caller could mistake for zero
+// used.
 async function getFreeBannersUsedCount() {
   try {
-    var res = await fetch(SUPABASE_URL + '/rest/v1/free_banner_claims?select=id', {
-      headers: {
-        apikey: SUPABASE_KEY,
-        Authorization: 'Bearer ' + SUPABASE_KEY,
-        Prefer: 'count=exact',
-      },
-    });
-    var contentRange = res.headers.get('content-range');
-    if (contentRange) {
-      var total = parseInt(contentRange.split('/')[1], 10);
-      if (!isNaN(total)) return total;
+    var res = await fetch('/api/banners/free-slots');
+    if (!res.ok) {
+      console.error('[banners/free-slots] request failed with status ' + res.status);
+      return null;
     }
-    var data = res.ok ? await res.json() : [];
-    return data.length;
+    var data = await res.json();
+    if (!data || data.ok !== true || typeof data.used !== 'number') {
+      console.error('[banners/free-slots] unusable response shape');
+      return null;
+    }
+    return data.used;
   } catch (e) {
-    return 0;
+    console.error('[banners/free-slots] request error:', e && e.message);
+    return null;
   }
 }
 
-async function claimFreeBanner() {
-  try {
-    await fetch(SUPABASE_URL + '/rest/v1/free_banner_claims', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        apikey: SUPABASE_KEY,
-        Authorization: 'Bearer ' + SUPABASE_KEY,
-        Prefer: 'return=minimal',
-      },
-      body: JSON.stringify({}),
-    });
-  } catch (e) {
-    console.error('Free banner claim log failed:', e);
-  }
-}
-
-async function saveBannerToSupabase(banner, slot) {
-  try {
-    await fetch(SUPABASE_URL + '/rest/v1/active_banner', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        apikey: SUPABASE_KEY,
-        Authorization: 'Bearer ' + SUPABASE_KEY,
-        Prefer: 'resolution=merge-duplicates,return=minimal',
-      },
-      body: JSON.stringify({
-        id: slot || 1,
-        token_name: banner.tokenName,
-        banner_img: banner.bannerImg || '',
-        description: banner.desc,
-        // FEAT v1.96: required at the form level, but default to '' here
-        // too so a stray call somewhere never violates the NOT NULL
-        // constraint.
-        target_link: banner.targetLink || '',
-        expires_at: new Date(banner.expiresAt).toISOString(),
-      }),
-    });
-  } catch (e) {
-    console.error('Banner save failed:', e);
-  }
-}
+// FIX v1.113: saveBannerToSupabase() and claimFreeBanner() used to POST
+// directly to Supabase with the publishable key — active_banner's RLS at
+// the time (see migrations/2026-09-11-banner-lockdown.sql) allowed public
+// insert/update with no check at all, so anyone holding that key, which
+// is visible in every page load, could overwrite or delete any banner
+// slot without paying, and without ever touching this site's own UI.
+// Both functions are gone. All three writers of active_banner —
+// the free giveaway, a VIP purchase's bundled credit, and the paid
+// path — now go through /api/banners/claim or, for the paid path,
+// through /api/verify-payment's claimed branch. See handleBannerSubmit
+// and startPaymentVerification below.
 
 // Loads all banner slots (ids 1..BANNER_SLOTS) and returns only the
 // ones that haven't expired yet, each tagged with its slot number so
@@ -1700,13 +1675,23 @@ export default function TntHouse() {
   };
   // FEAT v1.90: separate free-banner giveaway counter, independent from
   // BANNER_SLOTS (which is concurrent display capacity, not a giveaway).
-  var [freeBanners, setFreeBanners] = useState(5);
+  // FIX v1.113: was useState(5) — claiming all 5 free banners were
+  // available before any count had been fetched, the same overclaim bug
+  // freeSlots had before its v1.90 fix. Starts at 0 (safe: "no free
+  // banners") until the server-backed count below sets the real value.
+  var [freeBanners, setFreeBanners] = useState(0);
+  var FREE_BANNER_TOTAL = 5;
   // v1.110: separate from the general free-banner giveaway counter above —
   // this tracks banners earned specifically by paying for the VIP tier
   // ($75 "VIP Featured + Banner"), consumed once per credit in
   // handleBannerSubmit regardless of how many general free slots remain.
   var [vipBannerCredit, setVipBannerCredit] = useState(0);
-  var FREE_BANNER_TOTAL = 5;
+  // FIX v1.113: the id of the VIP listing order this credit came from —
+  // claim_vip_banner_credit() checks eligibility against this order in
+  // site_orders, so the credit can no longer be spent by anyone who
+  // simply calls the claim endpoint with vipBannerCredit > 0 in their own
+  // browser state; it has to name a real, paid, not-yet-claimed VIP order.
+  var [vipBannerOrderId, setVipBannerOrderId] = useState(null);
   var [showPaymentModal, setShowPaymentModal] = useState(false);
   var [showWalletModal, setShowWalletModal] = useState(false);
   var [showInvoiceModal, setShowInvoiceModal] = useState(false);
@@ -2091,7 +2076,15 @@ export default function TntHouse() {
       setFreeSlots(Math.max(0, FREE_TOTAL - usedCount));
     });
     // FEAT v1.90: same idea for the new free-banner giveaway.
+    // FIX v1.113: usedCount can now be null (server route unreachable) —
+    // same fail-closed reasoning as freeSlots above: show zero rather
+    // than letting Math.max(0, TOTAL - null) coerce null to 0 and quietly
+    // claim every giveaway slot is available.
     getFreeBannersUsedCount().then(function (usedCount) {
+      if (usedCount === null) {
+        setFreeBanners(0);
+        return;
+      }
       setFreeBanners(Math.max(0, FREE_BANNER_TOTAL - usedCount));
     });
   }, []);
@@ -3456,7 +3449,15 @@ export default function TntHouse() {
     setShowInvoiceModal(false);
     setIsSending(true);
     var tokenData = await runAuditAndSave(ca, projectName, false, logoImg, tokenSymbol);
-    if (tokenData) tokenData.tier = tierAtPayment;
+    // FIX v1.113: carries the server's order id along so that, if this is
+    // a VIP purchase, the bundled free banner can later be claimed
+    // against THIS specific paid order (see claim_vip_banner_credit) —
+    // not against a client-side counter anyone could call the claim
+    // endpoint against directly.
+    if (tokenData) {
+      tokenData.tier = tierAtPayment;
+      tokenData.orderId = order.orderId;
+    }
     setFormData({ projectName: '', contractAddress: '', telegram: '', logoImg: '', tokenSymbol: '' });
     setSelectedPaymentMethod(null);
     setSelectedWallet(null);
@@ -3484,7 +3485,9 @@ export default function TntHouse() {
     return 1;
   };
 
-  var handleBannerSubmit = function (e) {
+  // FIX v1.113: now async — the free and VIP-credit branches await a
+  // server-verified claim instead of writing straight to local state.
+  var handleBannerSubmit = async function (e) {
     e.preventDefault();
     if (!bannerFormData.tokenName || !bannerFormData.desc) {
       setBannerError('Enter token name and description.');
@@ -3506,6 +3509,14 @@ export default function TntHouse() {
     // a VIP buyer's credit isn't silently consumed by/confused with the
     // unrelated public giveaway counter.
     if (vipBannerCredit > 0) {
+      if (!vipBannerOrderId) {
+        // Credit shows > 0 but the order id that backs it is missing —
+        // should not happen from normal use, but refusing here is
+        // better than calling the claim endpoint with nothing for
+        // claim_vip_banner_credit to check eligibility against.
+        setBannerError('Could not find your VIP purchase. Please refresh and try again.');
+        return;
+      }
       setIsBannerSending(true);
       var vipSlot = pickFreeBannerSlot();
       var vipBanner = {
@@ -3515,11 +3526,40 @@ export default function TntHouse() {
         desc: bannerFormData.desc,
         targetLink: bannerFormData.targetLink,
         // v1.111: VIP-credited banner is fixed at exactly 24h, regardless
-        // of whatever the Duration dropdown happens to show — prevents
-        // picking the $100 "6 days" tier for free off a $75 purchase.
+        // of whatever the Duration dropdown happens to show — enforced
+        // server-side now, in claim_vip_banner_credit, not trusted from
+        // here (this local copy is only for the optimistic UI update
+        // below).
         expiresAt: Date.now() + 86400000,
       };
-      saveBannerToSupabase(vipBanner, vipSlot);
+      var vipClaim;
+      try {
+        var vipRes = await fetch('/api/banners/claim', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            mode: 'vip_credit',
+            orderId: vipBannerOrderId,
+            slot: vipSlot,
+            tokenName: vipBanner.tokenName,
+            bannerImg: vipBanner.bannerImg,
+            description: vipBanner.desc,
+            targetLink: vipBanner.targetLink,
+          }),
+        });
+        vipClaim = await vipRes.json();
+      } catch (e) {
+        vipClaim = { ok: false, error: 'network_error' };
+      }
+      setIsBannerSending(false);
+      if (!vipClaim.ok) {
+        setBannerError(
+          vipClaim.error === 'already_claimed'
+            ? 'This VIP credit was already used.'
+            : 'Could not activate the banner. Please try again.',
+        );
+        return;
+      }
       setActiveBanners(function (prev) {
         return prev
           .filter(function (b) {
@@ -3530,6 +3570,7 @@ export default function TntHouse() {
       setVipBannerCredit(function (prev) {
         return Math.max(0, prev - 1);
       });
+      setVipBannerOrderId(null);
       setBannerSubmitted(true);
       setBannerFormData({
         contractAddress: '',
@@ -3540,7 +3581,6 @@ export default function TntHouse() {
         days: '1',
       });
       showToast('🎁 VIP banner is live!', 'success');
-      setIsBannerSending(false);
       setTimeout(function () {
         setBannerSubmitted(false);
       }, 5000);
@@ -3560,8 +3600,40 @@ export default function TntHouse() {
         targetLink: bannerFormData.targetLink,
         expiresAt: Date.now() + parseInt(bannerFormData.days) * 86400000,
       };
-      saveBannerToSupabase(freeBanner, assignedSlot);
-      claimFreeBanner();
+      var freeClaim;
+      try {
+        var freeRes = await fetch('/api/banners/claim', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            mode: 'free',
+            slot: assignedSlot,
+            tokenName: freeBanner.tokenName,
+            bannerImg: freeBanner.bannerImg,
+            description: freeBanner.desc,
+            targetLink: freeBanner.targetLink,
+            days: bannerFormData.days,
+          }),
+        });
+        freeClaim = await freeRes.json();
+      } catch (e) {
+        freeClaim = { ok: false, error: 'network_error' };
+      }
+      setIsBannerSending(false);
+      if (!freeClaim.ok) {
+        // Server is the source of truth for how many are left — sync the
+        // local counter to it rather than leaving a stale optimistic
+        // number on screen, same reasoning as the exhausted-slot case.
+        if (typeof freeClaim.freeLimit === 'number' && typeof freeClaim.freeUsed === 'number') {
+          setFreeBanners(Math.max(0, freeClaim.freeLimit - freeClaim.freeUsed));
+        }
+        setBannerError(
+          freeClaim.error === 'exhausted'
+            ? 'All free banners have been claimed.'
+            : 'Could not activate the banner. Please try again.',
+        );
+        return;
+      }
       setActiveBanners(function (prev) {
         return prev
           .filter(function (b) {
@@ -3569,9 +3641,7 @@ export default function TntHouse() {
           })
           .concat([freeBanner]);
       });
-      setFreeBanners(function (prev) {
-        return Math.max(0, prev - 1);
-      });
+      setFreeBanners(Math.max(0, freeClaim.freeLimit - freeClaim.freeUsed));
       setBannerSubmitted(true);
       setBannerFormData({
         contractAddress: '',
@@ -3582,7 +3652,6 @@ export default function TntHouse() {
         days: '1',
       });
       showToast('🎁 Free banner is live!', 'success');
-      setIsBannerSending(false);
       setTimeout(function () {
         setBannerSubmitted(false);
       }, 5000);
@@ -3675,7 +3744,11 @@ export default function TntHouse() {
           verifyIntervalRef.current = null;
           setVerifyStatus('success');
           if (type === 'banner' && bannerData) {
-            await saveBannerToSupabase(bannerData, bannerData.slot);
+            // FIX v1.113: no longer writes active_banner from here —
+            // /api/verify-payment already did, inside the atomic claim
+            // that produced this verified:true. This local state update
+            // is purely optimistic UI; the next page load reflects the
+            // server-persisted content via loadBannersFromSupabase.
             setActiveBanners(function (prev) {
               return prev
                 .filter(function (b) {
@@ -3747,6 +3820,7 @@ export default function TntHouse() {
               setVipBannerCredit(function (prev) {
                 return prev + 1;
               });
+              setVipBannerOrderId(auditData.orderId || null);
               setBannerFormData(function (prev) {
                 return Object.assign({}, prev, {
                   contractAddress: auditData.ca || '',
@@ -3827,6 +3901,10 @@ export default function TntHouse() {
       days: bannerFormData.days,
       banner_slot: assignedSlot,
       currency: verifyMethod,
+      tokenName: banner.tokenName,
+      bannerImg: banner.bannerImg,
+      description: banner.desc,
+      targetLink: banner.targetLink,
     });
     if (!order.ok) {
       setBannerError(order.message);
