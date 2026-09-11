@@ -1,5 +1,16 @@
 // app/api/cluster-check/route.js
-// Version 1.9
+// Version 1.10
+//
+// FIX v1.10: funders present in lib/known-cex-funders.ts are excluded
+// from cluster matching. No live free API for Solana CEX wallet labels
+// exists (checked Helius Wallet Identity — paid only; checked Vybe
+// Network labeled-accounts — also paid-tier only despite Vybe having a
+// free plan), so that file starts empty and is grown by hand, address by
+// verified address — see its header for the process. This filter is
+// mostly a backstop for newer/lower-traffic exchange deposit addresses:
+// v1.9 below already excludes any holder whose first transaction
+// couldn't be confirmed, which covers essentially every established CEX
+// hot wallet on its own (they're all old, busy addresses).
 //
 // FIX v1.9: findOldestSignature used to return whatever signature it saw
 // oldest within its page budget (MAX_SIG_PAGES * SIG_PAGE_SIZE = 3000)
@@ -89,6 +100,7 @@ import {
   allowExpensiveClusterCheck,
   extractClientIp,
 } from '@/lib/cluster-check-cache';
+import { KNOWN_CEX_FUNDERS } from '@/lib/known-cex-funders';
 
 const RPC_URL = process.env.HELIUS_RPC_URL || 'https://api.mainnet-beta.solana.com';
 const RUGCHECK_URL = 'https://api.rugcheck.xyz/v1/tokens';
@@ -233,8 +245,15 @@ async function traceClusters(ca) {
   // Only surface funders that funded 2+ of the checked top holders —
   // a single shared funding source across multiple top wallets is the
   // real, on-chain-provable insider/cluster signal.
+  //
+  // v1.10: a funder present in KNOWN_CEX_FUNDERS (lib/known-cex-funders.ts)
+  // is excluded here even if it funded 2+ holders — shared exchange
+  // deposit source, not shared insider control. The list starts empty
+  // and is grown by hand (see that file's header); this filter is a
+  // no-op until entries are added, which is intentional: excluding
+  // nothing is the correct behavior for an address nobody has verified.
   const clusters = Object.entries(funderMap)
-    .filter(([, holders]) => holders.length >= 2)
+    .filter(([funder, holders]) => holders.length >= 2 && !KNOWN_CEX_FUNDERS.has(funder))
     .map(([funder, holders]) => ({ funder, holders }));
 
   return {
