@@ -1,5 +1,32 @@
 // app/api/cluster-check/route.js
-// Version 1.7
+// Version 1.8
+//
+// FIX v1.8: this route used to end every trace by forcibly setting
+// listed_tokens.score to a flat 39 whenever clusterCount > 0 (see removed
+// applyClusterScorePenalty, kept in git history if it's ever needed for
+// reference). That write ran on BOTH fresh traces and cache hits, so it
+// re-applied itself on every single page load of an already-audited
+// token — permanently pinning the number at 39 no matter what
+// lib/scoring.ts (the project's declared single source of truth for the
+// score, per that file's own header) had actually computed.
+//
+// It also could not have been fixed by making the constant smarter,
+// because the bug was architectural, not numerical: this route has no
+// visibility into the caps (maturity, market health, wash trading,
+// contract risk, rugged) that were already applied when the stored score
+// was first computed. Overwriting with ANY number computed here — 39,
+// or a "smarter" recomputed one — risks landing above a cap that should
+// still bind, which is exactly the class of bug lib/scoring.ts's header
+// warns about: a second place computing (or in this case, mutating) a
+// score drifts from the first.
+//
+// So this route no longer writes to listed_tokens.score at all. It only
+// traces and reports clusters. The correct fix — making a fresh audit's
+// score reflect REAL cluster data from the start, instead of the
+// 'pending' placeholder (+12 flat, see lib/scoring.ts) app/page.js
+// currently passes to computeFullScore before this route ever runs — is
+// an ordering change in the audit flow (trace clusters BEFORE scoring,
+// not after) and is tracked as a separate follow-up, not bundled here.
 
 // FIX v1.6: this endpoint walks up to 10 holders' signature history over
 // RPC (up to 3 pages of 1000 sigs each, plus a getParsedTransaction per
@@ -44,7 +71,6 @@ export const maxDuration = 60;
 
 import { NextResponse } from 'next/server';
 import { Connection, PublicKey } from '@solana/web3.js';
-import { supabaseAdmin } from '@/lib/supabase-admin';
 import {
   readClusterCache,
   writeClusterCache,
@@ -169,85 +195,6 @@ async function traceClusters(ca) {
   };
 }
 
-// Persists a penalty score to `listed_tokens` (the table the live UI
-// actually reads — confirmed via direct table inspection) when a real
-// cluster is found.
-//
-// FIX v1.5: v1.4's "success: true" was a false positive. Supabase's
-// update() does NOT return an error when Row Level Security silently
-// filters the target row out of the UPDATE's visibility — it just
-// updates 0 rows and reports success. That's exactly what was
-// happening: SELECT worked (read policy exists), but UPDATE touched
-// nothing (no write policy for this key/role), and the table kept
-// showing the original score. Adding .select() after .update() forces
-// Supabase to return the actual affected rows, so we can tell real
-// success (rows.length > 0) apart from a silently blocked write
-// (rows.length === 0, no error).
-//
-// FIX v1.8: that write now goes through supabaseAdmin (service role)
-// instead of the publishable key. This route runs on the server, so it
-// never needed the anon key — and it was very likely the reason the
-// `Public update USING true` policy was added to listed_tokens in the
-// first place, since that policy is exactly what made v1.5's silently
-// blocked UPDATE start working. That policy also lets anyone holding the
-// publishable key rewrite any token's score, so it is being closed; this
-// route has to stop depending on it first, or the cluster penalty goes
-// back to silently not applying.
-//
-// The zero-rows check below is KEPT, and still earns its place. Under the
-// service role RLS no longer hides rows, but a zero-row update remains
-// possible for an ordinary reason — no listed_tokens row exists for this
-// ca yet — and that must not be reported as a successful penalty either.
-async function applyClusterScorePenalty(ca, clusterCount) {
-  const scoreUpdate = { attempted: false };
-  if (clusterCount <= 0) return scoreUpdate;
-
-  scoreUpdate.attempted = true;
-
-  const { data: existing, error: selectError } = await supabaseAdmin
-    .from('listed_tokens')
-    .select('id, score')
-    .eq('ca', ca)
-    .maybeSingle();
-
-  if (selectError) {
-    scoreUpdate.selectError = selectError.message;
-    console.error('[cluster-check] listed_tokens select failed:', selectError);
-    return scoreUpdate;
-  }
-  if (!existing) {
-    scoreUpdate.note = 'No matching row in listed_tokens for this ca';
-    console.error('[cluster-check] no listed_tokens row for ca:', ca);
-    return scoreUpdate;
-  }
-  if (existing.score <= 39) {
-    scoreUpdate.note = 'Score already <= 39, no update needed';
-    return scoreUpdate;
-  }
-
-  const { data: updatedRows, error: updateError } = await supabaseAdmin
-    .from('listed_tokens')
-    .update({ score: 39 })
-    .eq('ca', ca)
-    .select('id, score');
-
-  if (updateError) {
-    scoreUpdate.updateError = updateError.message;
-    console.error('[cluster-check] listed_tokens update failed:', updateError);
-  } else if (!updatedRows || updatedRows.length === 0) {
-    // This is the RLS-silent-block case: no error, but nothing changed.
-    scoreUpdate.blockedByRLS = true;
-    scoreUpdate.note =
-      'Update returned no error but affected 0 rows — likely blocked by a Row Level Security UPDATE policy on listed_tokens for this key/role.';
-    console.error('[cluster-check] update affected 0 rows (likely RLS):', ca);
-  } else {
-    scoreUpdate.success = true;
-    scoreUpdate.updatedRows = updatedRows;
-  }
-
-  return scoreUpdate;
-}
-
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -260,14 +207,12 @@ export async function GET(request) {
     const cached = await readClusterCache(ca);
 
     if (cached) {
-      const scoreUpdate = await applyClusterScorePenalty(ca, cached.clusterCount);
       return NextResponse.json(
         {
           checked: cached.checked,
           clusters: cached.clusters,
           clusterCount: cached.clusterCount,
           cached: true,
-          scoreUpdate,
         },
         { headers: RESPONSE_HEADERS },
       );
@@ -310,8 +255,6 @@ export async function GET(request) {
       clusterCount: traced.clusterCount,
     });
 
-    const scoreUpdate = await applyClusterScorePenalty(ca, traced.clusterCount);
-
     return NextResponse.json(
       {
         checked: traced.checked,
@@ -319,7 +262,6 @@ export async function GET(request) {
         clusterCount: traced.clusterCount,
         errors: traced.errors.length > 0 ? traced.errors : undefined,
         cached: false,
-        scoreUpdate,
       },
       { headers: RESPONSE_HEADERS },
     );
