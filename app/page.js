@@ -2024,21 +2024,15 @@ export default function TntHouse() {
       var res = await fetch('/api/cluster-check?ca=' + selectedToken.ca);
       var data = await res.json();
       setClusterResult(data);
-      // NEW: /api/cluster-check persists a penalized security_score to the
-      // DB server-side when it finds a real cluster (see route.js v1.2).
-      // Mirror that change into local state right away so the main table's
-      // Score column updates instantly instead of only showing it after a
-      // manual page refresh.
-      if (!data.error && data.clusterCount > 0) {
-        setListedTokens(function (prev) {
-          return prev.map(function (t) {
-            if (t.ca === selectedToken.ca && t.score > 39) {
-              return { ...t, score: 39 };
-            }
-            return t;
-          });
-        });
-      }
+      // FIX v1.123: this used to mirror a server-side score=39 write that
+      // /api/cluster-check no longer performs (route.js v1.8 — see that
+      // file's header for why: the route had no visibility into the caps
+      // already applied to the stored score, so overwriting it here was
+      // never safe). Mirroring a write that no longer happens would leave
+      // local state showing 39 while the DB still has the real score —
+      // exactly the mismatch this comment used to exist to prevent, just
+      // in the other direction. Cluster results still render below via
+      // clusterResult; they just no longer force the table's number.
     } catch (e) {
       setClusterResult({ error: 'Check failed. Try again.' });
     }
@@ -2608,17 +2602,13 @@ export default function TntHouse() {
       try {
         var inlineClusterRes = await fetch('/api/cluster-check?ca=' + ca);
         var inlineClusterData = await inlineClusterRes.json();
-        if (
-          !inlineClusterData.error &&
-          inlineClusterData.clusterCount > 0 &&
-          tokenData.score > 39
-        ) {
-          // The API route already persisted this same cap to Supabase —
-          // mirror it into the in-memory object so the success modal and
-          // the table's local state show the final, post-cluster score
-          // instead of the pre-check one.
-          tokenData.score = 39;
-        }
+        // FIX v1.123: this used to mirror a server-side score=39 write
+        // that /api/cluster-check no longer performs (route.js v1.8 — see
+        // that file's header). tokenData.score is left as whatever
+        // computeFullScore produced above; inlineClusterData is still
+        // available here if a future change wants to surface cluster
+        // count in the success UI, it just no longer overwrites the score.
+        void inlineClusterData;
       } catch (e) {
         console.error('Inline cluster-check failed:', e);
       }
@@ -3122,17 +3112,13 @@ export default function TntHouse() {
       try {
         var inlineClusterRes = await fetch('/api/cluster-check?ca=' + ca);
         var inlineClusterData = await inlineClusterRes.json();
-        if (
-          !inlineClusterData.error &&
-          inlineClusterData.clusterCount > 0 &&
-          tokenData.score > 39
-        ) {
-          // The API route already persisted this same cap to Supabase —
-          // mirror it into the in-memory object so the success modal and
-          // the table's local state show the final, post-cluster score
-          // instead of the pre-check one.
-          tokenData.score = 39;
-        }
+        // FIX v1.123: this used to mirror a server-side score=39 write
+        // that /api/cluster-check no longer performs (route.js v1.8 — see
+        // that file's header). tokenData.score is left as whatever
+        // computeFullScore produced above; inlineClusterData is still
+        // available here if a future change wants to surface cluster
+        // count in the success UI, it just no longer overwrites the score.
+        void inlineClusterData;
       } catch (e) {
         console.error('Inline cluster-check failed:', e);
       }
@@ -3835,13 +3821,13 @@ export default function TntHouse() {
             try {
               var paidClusterRes = await fetch('/api/cluster-check?ca=' + auditData.ca);
               var paidClusterData = await paidClusterRes.json();
-              if (
-                !paidClusterData.error &&
-                paidClusterData.clusterCount > 0 &&
-                auditData.score > 39
-              ) {
-                auditData.score = 39;
-              }
+              // FIX v1.123: same removal as the free-audit flow — this
+              // used to mirror a server-side score=39 write that
+              // /api/cluster-check no longer performs (route.js v1.8).
+              // auditData.score stays whatever the audit pipeline
+              // computed; paidClusterData is kept in scope in case a
+              // future change wants to surface cluster count here.
+              void paidClusterData;
             } catch (e) {
               console.error('Inline cluster-check failed:', e);
             }
