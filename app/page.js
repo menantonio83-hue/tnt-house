@@ -3362,6 +3362,35 @@ export default function TntHouse() {
     return 'solana:' + encodeURIComponent(link);
   };
 
+  // PAYMENT PATH v1.112: the server, not the browser, decides what an order
+  // costs. This posts what is being bought — never a price — and gets back an
+  // order id plus the exact amount to send. That amount is salted to be
+  // unique among pending orders, which is what lets /api/verify-payment tie
+  // one incoming transfer to exactly one order instead of guessing by size.
+  var createSiteOrder = async function (payload) {
+    try {
+      var res = await fetch('/api/site-orders/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      var data = await res.json();
+      if (!res.ok || !data.ok || !data.orderId || !data.payAmount) {
+        return {
+          ok: false,
+          message:
+            data && data.message
+              ? data.message
+              : 'Could not start this order. Please try again in a moment.',
+        };
+      }
+      return { ok: true, orderId: data.orderId, payAmount: data.payAmount };
+    } catch (e) {
+      console.error('[site-orders] create failed:', e && e.message ? e.message : e);
+      return { ok: false, message: 'Network error while starting the order. Please try again.' };
+    }
+  };
+
   var handleConfirmPayment = async function () {
     // FIX v1.37: Double-check amount is valid before launching wallet deeplink
     if (!invoiceAmount || invoiceAmount <= 0) {
@@ -3390,6 +3419,22 @@ export default function TntHouse() {
     // whether this was a VIP purchase (which includes a free banner —
     // see handleBannerSubmit's vipBannerCredit branch).
     var tierAtPayment = selectedTier;
+    // PAYMENT PATH v1.112: open the order on the server BEFORE the wallet.
+    // payAmount is replaced by the server's salted figure — the browser no
+    // longer names its own price, and nothing is charged that the server did
+    // not decide. If the order cannot be opened, nothing is launched at all.
+    var order = await createSiteOrder({
+      kind: 'listing',
+      tier: tierAtPayment,
+      ca: ca,
+      currency: verifyMethod,
+    });
+    if (!order.ok) {
+      showToast(order.message, 'error');
+      setShowInvoiceModal(false);
+      return;
+    }
+    payAmount = order.payAmount;
     // FIX v1.8: RESTORE v1.6. User confirmed the Phantom in-app-browser
     // flow (/pay page, no Blowfish warning) had already worked in a prior
     // test (Payment Confirmed screen, no red block). The phantom.com
@@ -3424,7 +3469,7 @@ export default function TntHouse() {
     // the backend (method param), so neither can block or interfere with
     // the other. Previously both always verified against the MRDT amount,
     // which made SOL payments impossible to confirm.
-    startPaymentVerification('audit', payAmount, null, tokenData, verifyMethod);
+    startPaymentVerification('audit', order.orderId, null, tokenData, verifyMethod);
   };
 
   // Pick the first free slot (1..BANNER_SLOTS) not currently occupied.
@@ -3576,7 +3621,23 @@ export default function TntHouse() {
   // because received SOL (e.g. 0.23) was compared against an MRDT number
   // (e.g. 1538461). Each currency now has its own expected amount and its
   // own verification path that never touches the other.
-  var startPaymentVerification = function (type, expectedAmount, bannerData, auditData, method) {
+  // PAYMENT PATH v1.112: answers the verifier can give that will never
+  // change on a retry. Everything else (no match yet, a transient lookup
+  // failure) is worth polling through.
+  var TERMINAL_VERIFY_REASONS = [
+    'invalid_json',
+    'invalid_order_id',
+    'order_not_found',
+    'order_expired',
+    'signature_already_used',
+  ];
+
+  // PAYMENT PATH v1.112: the second parameter is now the server's orderId,
+  // not an amount. The browser no longer tells the verifier what to look for
+  // — it names the order, and the server reads the amount, the currency and
+  // the clock from its own row. `method` is kept for logging and for the
+  // modal's copy only; it no longer takes any part in verification.
+  var startPaymentVerification = function (type, orderId, bannerData, auditData, method) {
     var startTime = Date.now();
     setVerifyStartTime(startTime);
     setVerifyType(type);
@@ -3595,13 +3656,20 @@ export default function TntHouse() {
         var res = await fetch('/api/verify-payment', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            expectedAmount: expectedAmount,
-            since: startTime,
-            method: method,
-          }),
+          body: JSON.stringify({ orderId: orderId }),
         });
         var data = await res.json();
+        // PAYMENT PATH v1.112: the verifier now answers about one specific
+        // order, so some answers are final. Polling on past an expired,
+        // missing or already-spent order only burns the remaining attempts
+        // behind a spinner that can never resolve.
+        if (!data.verified && TERMINAL_VERIFY_REASONS.indexOf(data.reason) !== -1) {
+          clearInterval(interval);
+          verifyIntervalRef.current = null;
+          setVerifyStatus('failed');
+          console.error('[Verify] Stopped, no retry will help: ' + data.reason);
+          return;
+        }
         if (data.verified) {
           clearInterval(interval);
           verifyIntervalRef.current = null;
@@ -3723,7 +3791,9 @@ export default function TntHouse() {
     };
   }, []);
 
-  var handleBannerConfirmPayment = function () {
+  // PAYMENT PATH v1.112: now async — it opens a server-side order before
+  // launching the wallet, exactly like handleConfirmPayment above.
+  var handleBannerConfirmPayment = async function () {
     // FIX v1.37: Guard against zero/invalid banner amount before launching wallet deeplink
     if (!bannerInvoiceAmount || bannerInvoiceAmount <= 0) {
       setBannerError('Price error. Try later or contact admin.');
@@ -3749,6 +3819,21 @@ export default function TntHouse() {
     var isUsdc = paymentMethod === 'USDC';
     var payAmount = isSol ? getSOLAmountForUsd(bannerUsd) : isUsdc ? bannerUsd : mrdtAmount;
     var verifyMethod = isSol ? 'SOL' : isUsdc ? 'USDC' : 'MRDT';
+    // PAYMENT PATH v1.112: same as the listing path — the server prices the
+    // order and owns the slot it is for. banner_slot travels with the order
+    // so the claim is tied to the slot that was actually bought.
+    var order = await createSiteOrder({
+      kind: 'banner',
+      days: bannerFormData.days,
+      banner_slot: assignedSlot,
+      currency: verifyMethod,
+    });
+    if (!order.ok) {
+      setBannerError(order.message);
+      setShowBannerInvoiceModal(false);
+      return;
+    }
+    payAmount = order.payAmount;
     // FIX v1.8: RESTORE v1.6 — see handleConfirmPayment's v1.8 comment.
     // FIX v1.18: pass selectedBannerWallet through so /pay uses the right
     // provider — same fix as handleConfirmPayment above.
@@ -3777,7 +3862,7 @@ export default function TntHouse() {
     // FIX v0.1.2: build payAmount/method BEFORE calling startPaymentVerification,
     // and pass method through so SOL banner payments verify against the SOL
     // amount on the backend instead of silently comparing against MRDT.
-    startPaymentVerification('banner', payAmount, banner, null, verifyMethod);
+    startPaymentVerification('banner', order.orderId, banner, null, verifyMethod);
   };
 
   // Chat countdown timer for rate limiting
