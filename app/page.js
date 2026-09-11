@@ -2952,6 +2952,22 @@ export default function TntHouse() {
           typeof auditResult.creatorBalancePercent === 'number'
             ? auditResult.creatorBalancePercent
             : null,
+        // v1.3 of lib/scoring.ts: the site path knows the authorities,
+        // the honeypot flag and the LP lock % from its own RugCheck
+        // read — wire them in so the site card and the API agree on one
+        // number (same single-source-of-truth rule). LP burn is not
+        // computed in the browser: null means no relief and no cap.
+        honeypotRisk:
+          auditResult.isHoneypot === 'Yes 🚨'
+            ? true
+            : auditResult.isHoneypot === 'No ✓'
+              ? false
+              : null,
+        mintAuthorityActive: auditResult.mintAuthority !== 'Revoked \u2713',
+        freezeAuthorityActive: auditResult.freezeAuthority !== 'Revoked \u2713',
+        lpLockedPct:
+          typeof auditResult.lpLockedPercent === 'number' ? auditResult.lpLockedPercent : null,
+        lpBurned: null,
       },
     });
 

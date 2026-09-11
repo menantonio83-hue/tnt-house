@@ -1,3 +1,41 @@
+// Version 1.3 — lib/scoring.ts
+//
+// v1.3 (2026-09-12, agreed with product owner): four new caps plus
+// cap-relief, all through the existing cap chain — the base weights are
+// deliberately UNCHANGED (this formula is reused by token-risk-core.ts,
+// helius-client.js and app/page.js, and rebalancing the base risks
+// silently shifting scores in one of them).
+//
+// New caps (all confirmed-fact based, same philosophy as rugged):
+//   honeypot_confirmed     -> 5   (RugCheck honeypot risk, same severity
+//                                  tier as their confirmed-rugged flag)
+//   mint_authority_active  -> 20  (COMBO: active mint AND effectively
+//                                  unlocked LP — locked < 50% with
+//                                  liquidity > $10k. Stables keep their
+//                                  mint by design and RugCheck has no
+//                                  market data for them, so this cannot
+//                                  fire on them; "active mint + unlocked
+//                                  real liquidity" is the print-and-dump
+//                                  configuration this cap targets.)
+//   freeze_authority_active-> 30  (active freeze = funds can be frozen;
+//                                  standalone on purpose — freeze cannot
+//                                  mint new supply, so it is less severe
+//                                  than mint and safe to keep as its own
+//                                  cap even for honest stables)
+//   lp_unlocked_thin       -> 40  (liquidity > $10k but < 50% of LP
+//                                  locked: exit-liquidity exposure)
+//
+// Cap-relief (provable on-chain mitigations loosen specific floors,
+// never the base):
+//   LP burned 100%  -> low_liquidity floor 25 -> 45
+//   LP locked >=80% -> holders_lt_20 floor 60 -> 75
+//   (the 6-month lock-duration requirement from the proposal is deferred:
+//    RugCheck's API exposes locked % but not lock duration — documented,
+//    not silently dropped.)
+//
+// Threshold change: dev_wallet_percent > 5 floor 75 -> 80 (a 6% team
+// wallet is common practice, not a death sentence).
+//
 // Version 1.2 — lib/scoring.ts
 //
 // SINGLE SOURCE OF TRUTH for the TNT House safety score.
@@ -170,6 +208,16 @@ export interface ScoreCapResult {
   contractRiskCapped: boolean;
   washTradingCapped: boolean;
   retroCapped: boolean;
+  // v1.3 — new cap tiers, same "did this tier actually pull the score
+  // down" semantics as the flags above.
+  lpRiskCapped: boolean;
+  mintAuthorityCapped: boolean;
+  freezeAuthorityCapped: boolean;
+  honeypotCapped: boolean;
+  // v1.3 — cap-relief diagnostics: which mitigation loosened which
+  // floor, so a caller can see WHY a floor was raised, not just that
+  // the score is higher than the raw thresholds would allow.
+  reliefsTriggered: Array<{ reason: string; from: number; to: number }>;
   capsTriggered: Array<{ reason: string; cap: number }>;
   dominantCap: string | null;
 }
@@ -199,6 +247,15 @@ export function applyScoreCaps(
     buyTaxPercent: number | null;
     sellTaxPercent: number | null;
     devWalletPercent: number | null;
+    // v1.3 — new cap inputs. All optional and null-means-unchecked,
+    // same honesty rule as everything else: a caller without RugCheck
+    // data (Quick Check, rescore) simply passes null and the cap
+    // cannot fire.
+    honeypotRisk?: boolean | null;
+    mintAuthorityActive?: boolean | null;
+    freezeAuthorityActive?: boolean | null;
+    lpLockedPct?: number | null;
+    lpBurned?: boolean | null;
   },
   options?: { retroUnverified?: boolean },
 ): ScoreCapResult {
@@ -215,9 +272,19 @@ export function applyScoreCaps(
 
   // dev_wallet_percent is a distinct concentration axis from top10Percent.
   const devWalletPercent = contractSignals.devWalletPercent;
+
+  // v1.3: cap-relief inputs. LP burned (LP mint authority revoked) and
+  // LP locked >= 80% are provable on-chain mitigations that loosen two
+  // specific floors — see the v1.3 header note.
+  const lpBurnedRelief = contractSignals.lpBurned === true;
+  const lpLockedPct = contractSignals.lpLockedPct;
+  const lpLockedRelief = lpLockedPct !== null && lpLockedPct !== undefined && lpLockedPct >= 80;
+  const LOW_LIQUIDITY_CAP = lpBurnedRelief ? 45 : 25;
+  const THIN_HOLDERS_CAP = lpLockedRelief ? 75 : 60;
+
   let marketHealthCap = 100;
   if (dexData.liquidity !== null && dexData.liquidity < 500) {
-    marketHealthCap = 25;
+    marketHealthCap = LOW_LIQUIDITY_CAP;
   } else if (holderRisk.top10Percent > 90) {
     marketHealthCap = Math.min(marketHealthCap, 30);
   } else if (devWalletPercent !== null && devWalletPercent > 30) {
@@ -227,9 +294,10 @@ export function applyScoreCaps(
   } else if (devWalletPercent !== null && devWalletPercent > 15) {
     marketHealthCap = Math.min(marketHealthCap, 50);
   } else if (holderRisk.holderCount < 20) {
-    marketHealthCap = Math.min(marketHealthCap, 60);
+    marketHealthCap = Math.min(marketHealthCap, THIN_HOLDERS_CAP);
   } else if (devWalletPercent !== null && devWalletPercent > 5) {
-    marketHealthCap = Math.min(marketHealthCap, 75);
+    // v1.3: 75 -> 80 (6% team wallet is normal practice).
+    marketHealthCap = Math.min(marketHealthCap, 80);
   }
   const marketHealthCapped = marketHealthCap < 100 && afterMaturity > marketHealthCap;
   const afterMarketHealth = Math.min(afterMaturity, marketHealthCap);
@@ -268,12 +336,71 @@ export function applyScoreCaps(
   const contractRiskCapped = contractRiskCap < 100 && afterWash > contractRiskCap;
   const afterContractRisk = Math.min(afterWash, contractRiskCap);
 
+  // v1.3: LP unlock exposure — real liquidity (>$10k) but less than
+  // 50% of it locked. The pure liquidity tier rewards size; this cap
+  // catches the exit-liquidity risk behind it.
+  const LP_UNLOCKED_CAP = 40;
+  const LP_UNLOCKED_LIQUIDITY_MIN = 10000;
+  let lpRiskCap = 100;
+  if (
+    lpLockedPct !== null &&
+    lpLockedPct !== undefined &&
+    lpLockedPct < 50 &&
+    dexData.liquidity !== null &&
+    dexData.liquidity > LP_UNLOCKED_LIQUIDITY_MIN
+  ) {
+    lpRiskCap = Math.min(lpRiskCap, LP_UNLOCKED_CAP);
+  }
+  const lpRiskCapped = lpRiskCap < 100 && afterContractRisk > lpRiskCap;
+  const afterLpRisk = Math.min(afterContractRisk, lpRiskCap);
+
+  // v1.3: authority caps. Mint is a COMBO condition — an active mint
+  // authority caps only when the LP is also effectively unlocked
+  // (lpLockedPct < 50 with liquidity > $10k). Stables keep their mint
+  // active by design and RugCheck reports no market data for them, so
+  // this never fires on them; "active mint + unlocked real liquidity"
+  // is the actual print-and-dump configuration. Freeze stays a
+  // standalone cap below: it cannot mint supply, only freeze it, so it
+  // is less severe and safe even for honest stables.
+  const MINT_ACTIVE_CAP = 20;
+  const mintActiveAndLpUnlocked =
+    contractSignals.mintAuthorityActive === true &&
+    lpLockedPct !== null &&
+    lpLockedPct !== undefined &&
+    lpLockedPct < 50 &&
+    dexData.liquidity !== null &&
+    dexData.liquidity > LP_UNLOCKED_LIQUIDITY_MIN;
+  let mintAuthorityCap = 100;
+  if (mintActiveAndLpUnlocked) {
+    mintAuthorityCap = Math.min(mintAuthorityCap, MINT_ACTIVE_CAP);
+  }
+  const mintAuthorityCapped = mintAuthorityCap < 100 && afterLpRisk > mintAuthorityCap;
+  const afterMintAuthority = Math.min(afterLpRisk, mintAuthorityCap);
+
+  const FREEZE_ACTIVE_CAP = 30;
+  let freezeAuthorityCap = 100;
+  if (contractSignals.freezeAuthorityActive === true) {
+    freezeAuthorityCap = Math.min(freezeAuthorityCap, FREEZE_ACTIVE_CAP);
+  }
+  const freezeAuthorityCapped = freezeAuthorityCap < 100 && afterMintAuthority > freezeAuthorityCap;
+  const afterFreezeAuthority = Math.min(afterMintAuthority, freezeAuthorityCap);
+
+  // v1.3: honeypot confirmed — same severity tier as confirmed-rugged:
+  // both are RugCheck's tracked ground truth, not our heuristic.
+  const HONEYPOT_CAP = 5;
+  let honeypotCap = 100;
+  if (contractSignals.honeypotRisk === true) {
+    honeypotCap = Math.min(honeypotCap, HONEYPOT_CAP);
+  }
+  const honeypotCapped = honeypotCap < 100 && afterFreezeAuthority > honeypotCap;
+  const afterHoneypot = Math.min(afterFreezeAuthority, honeypotCap);
+
   // RugCheck's OWN confirmed-rugged flag — their tracked ground truth, not
   // a heuristic of ours. No clean combination should override it.
   const RUGGED_CAP = 5;
-  const ruggedCapped = rugged === true && afterContractRisk > RUGGED_CAP;
+  const ruggedCapped = rugged === true && afterHoneypot > RUGGED_CAP;
   const afterRugged =
-    rugged === true ? Math.min(afterContractRisk, RUGGED_CAP) : afterContractRisk;
+    rugged === true ? Math.min(afterHoneypot, RUGGED_CAP) : afterHoneypot;
 
   // Opt-in, off by default: live scoring paths are unaffected.
   const retroUnverified = options?.retroUnverified === true;
@@ -291,8 +418,23 @@ export function applyScoreCaps(
   if (permanentDelegate === true) capsTriggered.push({ reason: 'permanent_delegate', cap: 10 });
   if (hiddenOwner === true) capsTriggered.push({ reason: 'hidden_owner', cap: 30 });
   if (taxPercent !== null && taxPercent > 10) capsTriggered.push({ reason: 'high_tax', cap: 30 });
+  // v1.3: new tiers, same diagnostics convention.
+  if (contractSignals.honeypotRisk === true)
+    capsTriggered.push({ reason: 'honeypot_confirmed', cap: HONEYPOT_CAP });
+  if (mintActiveAndLpUnlocked)
+    capsTriggered.push({ reason: 'mint_authority_active', cap: MINT_ACTIVE_CAP });
+  if (contractSignals.freezeAuthorityActive === true)
+    capsTriggered.push({ reason: 'freeze_authority_active', cap: FREEZE_ACTIVE_CAP });
+  if (
+    lpLockedPct !== null &&
+    lpLockedPct !== undefined &&
+    lpLockedPct < 50 &&
+    dexData.liquidity !== null &&
+    dexData.liquidity > LP_UNLOCKED_LIQUIDITY_MIN
+  )
+    capsTriggered.push({ reason: 'lp_unlocked_thin', cap: LP_UNLOCKED_CAP });
   if (dexData.liquidity !== null && dexData.liquidity < 500)
-    capsTriggered.push({ reason: 'low_liquidity', cap: 25 });
+    capsTriggered.push({ reason: 'low_liquidity', cap: LOW_LIQUIDITY_CAP });
   if (holderRisk.top10Percent > 90) capsTriggered.push({ reason: 'top10_gt_90', cap: 30 });
   if (devWalletPercent !== null && devWalletPercent > 30)
     capsTriggered.push({ reason: 'dev_wallet_gt_30', cap: 30 });
@@ -306,15 +448,30 @@ export function applyScoreCaps(
   if (devWalletPercent !== null && devWalletPercent > 15)
     capsTriggered.push({ reason: 'dev_wallet_gt_15', cap: 50 });
   if (taxPercent !== null && taxPercent > 3) capsTriggered.push({ reason: 'moderate_tax', cap: 65 });
-  if (holderRisk.holderCount < 20) capsTriggered.push({ reason: 'holders_lt_20', cap: 60 });
+  if (holderRisk.holderCount < 20) capsTriggered.push({ reason: 'holders_lt_20', cap: THIN_HOLDERS_CAP });
   if (devWalletPercent !== null && devWalletPercent > 5)
-    capsTriggered.push({ reason: 'dev_wallet_gt_5', cap: 75 });
+    capsTriggered.push({ reason: 'dev_wallet_gt_5', cap: 80 });
   if (dexData.ageDays !== null && dexData.ageDays < 1)
     capsTriggered.push({ reason: 'age_lt_1d', cap: 55 });
   else if (dexData.ageDays !== null && dexData.ageDays < 7 && holderRisk.holderCount < 50)
     capsTriggered.push({ reason: 'age_lt_7d_thin_holders', cap: 65 });
   else if (dexData.ageDays !== null && dexData.ageDays < 7)
     capsTriggered.push({ reason: 'age_lt_7d', cap: 75 });
+
+  // v1.3: relief diagnostics — only recorded when the mitigation
+  // actually loosened a floor that fired (mirrors the else-if chain
+  // above, so a relief never shows for a branch that didn't bind).
+  const reliefsTriggered: Array<{ reason: string; from: number; to: number }> = [];
+  if (lpBurnedRelief && dexData.liquidity !== null && dexData.liquidity < 500) {
+    reliefsTriggered.push({ reason: 'lp_burned_relief', from: 25, to: 45 });
+  }
+  if (
+    lpLockedRelief &&
+    holderRisk.holderCount < 20 &&
+    !(dexData.liquidity !== null && dexData.liquidity < 500)
+  ) {
+    reliefsTriggered.push({ reason: 'lp_locked_relief', from: 60, to: 75 });
+  }
 
   const dominantCap =
     capsTriggered.length > 0
@@ -329,6 +486,11 @@ export function applyScoreCaps(
     contractRiskCapped,
     washTradingCapped,
     retroCapped,
+    lpRiskCapped,
+    mintAuthorityCapped,
+    freezeAuthorityCapped,
+    honeypotCapped,
+    reliefsTriggered,
     capsTriggered,
     dominantCap,
   };
@@ -352,6 +514,12 @@ export function computeFullScore(
       buyTaxPercent: number | null;
       sellTaxPercent: number | null;
       devWalletPercent: number | null;
+      // v1.3 — new cap inputs (optional, null-means-unchecked).
+      honeypotRisk?: boolean | null;
+      mintAuthorityActive?: boolean | null;
+      freezeAuthorityActive?: boolean | null;
+      lpLockedPct?: number | null;
+      lpBurned?: boolean | null;
     };
     retroUnverified?: boolean;
   },

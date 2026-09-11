@@ -1,3 +1,16 @@
+// Version 1.4 — lib/rugcheck-client.ts
+//
+// v1.4: lp_burned — computed by checking the LP mint's authority on
+// Solana directly (mintAuthority === null on an LP token mint means
+// the LP is burned/irrevocable). RugCheck's API exposes lpLockedPct per
+// market but does NOT expose a burn percentage, so the only honest way
+// to answer "is the LP burned" is the on-chain fact itself. Cost: one
+// getParsedAccountInfo call per audit, only for mints that have market
+// data at all, and only against the single highest-liquidity market
+// (the one whose LP matters). null = couldn't check (no market data,
+// RPC timeout) — same null-means-unchecked rule as every other field;
+// an unknown burn state grants no relief and no penalty.
+//
 // Version 1.3 — lib/rugcheck-client.ts
 //
 // v1.3: six more fields, same "same /report payload, zero extra
@@ -93,7 +106,13 @@
 
 const RUGCHECK_URL = 'https://api.rugcheck.xyz/v1/tokens';
 const RUGCHECK_TIMEOUT_MS = 8000;
+// v1.4: for the on-chain LP-burn check. Public RPC fallback, same as
+// lib/helius-client.js / lib/insider-cluster-detector.ts.
+const SOLANA_RPC_URL = process.env.HELIUS_RPC_URL || 'https://api.mainnet-beta.solana.com';
+const LP_BURN_CHECK_TIMEOUT_MS = 5000;
 
+import { Connection, PublicKey } from '@solana/web3.js';
+import { withTimeout } from './with-timeout';
 import { alertAdmin } from './telegram-alert';
 
 export interface RugCheckRiskData {
@@ -103,6 +122,10 @@ export interface RugCheckRiskData {
   // null = couldn't check (RugCheck failure, or no market/LP data
   // reported for this mint at all — different from "checked, 0% locked").
   lp_locked: { locked: boolean; percent: number } | null;
+  // v1.4 — see header. null = couldn't check (no market/LP mint data,
+  // or the on-chain LP-mint read failed) — never a false-burned or
+  // false-unburned default.
+  lp_burned: { burned: boolean } | null;
   // v1.2 — see header note above for exact provenance of each field.
   deployer_address: string | null;
   rugged: boolean | null;
@@ -120,6 +143,7 @@ export interface RugCheckRiskData {
 const EMPTY_RESULT: RugCheckRiskData = {
   honeypot_risk: null,
   lp_locked: null,
+  lp_burned: null,
   deployer_address: null,
   rugged: null,
   jup_verified: null,
@@ -165,6 +189,43 @@ export async function getRugCheckRiskData(mint: string): Promise<RugCheckRiskDat
         const avg = lpVals.reduce((a, b) => a + b, 0) / lpVals.length;
         const percent = Math.round(avg * 10) / 10;
         lp_locked = { locked: percent > 0, percent };
+      }
+    }
+
+    // v1.4: LP-burn check. RugCheck reports no burn percentage, so the
+    // fact is read on-chain from the highest-liquidity market's LP mint:
+    // mintAuthority === null on the LP token mint = LP burned
+    // (Raydium-style irrevocable burn). One RPC call, only when market
+    // data exists; any failure yields null (no relief, no penalty).
+    let lp_burned: RugCheckRiskData['lp_burned'] = null;
+    if (Array.isArray(data.markets) && data.markets.length > 0) {
+      let bestMarket: any = null;
+      let bestValue = -1;
+      for (const m of data.markets) {
+        if (!m || !m.lp || typeof m.lp.lpMint !== 'string' || m.lp.lpMint.length < 30) continue;
+        const value = (typeof m.lp.baseUSD === 'number' ? m.lp.baseUSD : 0) + (typeof m.lp.quoteUSD === 'number' ? m.lp.quoteUSD : 0);
+        if (value > bestValue) {
+          bestValue = value;
+          bestMarket = m;
+        }
+      }
+
+      if (bestMarket) {
+        try {
+          const connection = new Connection(SOLANA_RPC_URL, 'confirmed');
+          const parsed = await withTimeout(
+            connection.getParsedAccountInfo(new PublicKey(bestMarket.lp.lpMint), 'confirmed'),
+            LP_BURN_CHECK_TIMEOUT_MS,
+            null,
+          );
+          const mintAuthority = (parsed?.value?.data as any)?.parsed?.info?.mintAuthority;
+          if (mintAuthority !== undefined) {
+            lp_burned = { burned: mintAuthority === null };
+          }
+        } catch (err) {
+          // Unknown burn state — no relief, no penalty.
+          lp_burned = null;
+        }
       }
     }
 
@@ -217,6 +278,7 @@ export async function getRugCheckRiskData(mint: string): Promise<RugCheckRiskDat
     return {
       honeypot_risk,
       lp_locked,
+      lp_burned,
       deployer_address,
       rugged,
       jup_verified,

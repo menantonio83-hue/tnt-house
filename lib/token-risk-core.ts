@@ -166,6 +166,7 @@ export const VESTING_LOCK_TIMEOUT_MS = 6000;
 const RUGCHECK_FALLBACK: RugCheckRiskData = {
   honeypot_risk: null,
   lp_locked: null,
+  lp_burned: null,
   deployer_address: null,
   rugged: null,
   jup_verified: null,
@@ -205,6 +206,10 @@ function explainDominantCap(reason: string | null | undefined): string | undefin
   if (!reason) return undefined;
   const sentences: Record<string, string> = {
     rugged_confirmed: 'Score capped because RugCheck has this token confirmed as a rug.',
+    honeypot_confirmed: 'Score capped because RugCheck has confirmed honeypot-shaped risk for this token.',
+    mint_authority_active: 'Score capped because the mint authority is active while the LP is effectively unlocked (print-and-dump configuration).',
+    freeze_authority_active: 'Score capped because the freeze authority is still active and can freeze holder funds.',
+    lp_unlocked_thin: 'Score capped because real liquidity exists but less than half of the LP is locked.',
     permanent_delegate: 'Score capped because the token has a permanent delegate enabled, letting a third party move holder funds.',
     hidden_owner: 'Score capped because a hidden owner or proxy contract was detected.',
     high_tax: 'Score capped because the transfer tax exceeds 10%.',
@@ -257,6 +262,14 @@ export interface TokenRiskResult {
   contract_risk_capped?: boolean;
   // v1.8 — true when the wash-trading tier pulled the score down.
   wash_trading_capped?: boolean;
+  // v1.9 (scoring v1.3) — new cap tiers, same "did this tier actually
+  // pull the score down" semantics.
+  lp_risk_capped?: boolean;
+  mint_authority_capped?: boolean;
+  freeze_authority_capped?: boolean;
+  honeypot_capped?: boolean;
+  // v1.9 (scoring v1.3) — which mitigation loosened which floor.
+  reliefs_triggered?: Array<{ reason: string; from: number; to: number }>;
   // v1.5 — every cap condition that fired this call, and the single
   // tightest one (the actual reason the score is what it is). Empty
   // array / null dominant_cap when no cap fired at all.
@@ -277,6 +290,10 @@ export interface TokenRiskResult {
   // market data reported for this mint), never a false-clean default.
   honeypot_risk?: boolean | null;
   lp_locked?: { locked: boolean; percent: number } | null;
+  // v1.4 of lib/rugcheck-client.ts — LP burn state read on-chain from
+  // the highest-liquidity market's LP mint authority. null = couldn't
+  // check, never a false default.
+  lp_burned?: { burned: boolean } | null;
   // v1.4 — from lib/rugcheck-client.ts v1.2, same RugCheck call as
   // honeypot_risk/lp_locked above, zero extra cost. null follows the
   // same "couldn't check" rule as the other two RugCheck-sourced
@@ -510,6 +527,11 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
       ruggedCapped,
       contractRiskCapped,
       washTradingCapped,
+      lpRiskCapped,
+      mintAuthorityCapped,
+      freezeAuthorityCapped,
+      honeypotCapped,
+      reliefsTriggered,
       capsTriggered,
       dominantCap,
     } = applyScoreCaps(rawSafetyScore, dexData, holderRiskForScoring, rugCheckData.rugged, {
@@ -519,6 +541,12 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
       buyTaxPercent: rugCheckData.buy_tax_percent,
       sellTaxPercent: rugCheckData.sell_tax_percent,
       devWalletPercent: rugCheckData.dev_wallet_percent,
+      // v1.9 (scoring v1.3): new cap inputs.
+      honeypotRisk: rugCheckData.honeypot_risk,
+      mintAuthorityActive: !mintAuthorityRevoked,
+      freezeAuthorityActive: !freezeAuthorityRevoked,
+      lpLockedPct: rugCheckData.lp_locked ? rugCheckData.lp_locked.percent : null,
+      lpBurned: rugCheckData.lp_burned ? rugCheckData.lp_burned.burned : null,
     });
 
     // History write: fire-and-forget, never awaited, never allowed to
@@ -554,6 +582,13 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
       // semantics as the flags above. Additive field: existing consumers
       // are unaffected.
       wash_trading_capped: washTradingCapped,
+      // v1.9 (scoring v1.3) — new tiers + relief diagnostics. Additive
+      // fields: existing consumers are unaffected.
+      lp_risk_capped: lpRiskCapped,
+      mint_authority_capped: mintAuthorityCapped,
+      freeze_authority_capped: freezeAuthorityCapped,
+      honeypot_capped: honeypotCapped,
+      reliefs_triggered: reliefsTriggered,
       caps_triggered: capsTriggered,
       dominant_cap: dominantCap,
       explanation: explainDominantCap(dominantCap),
@@ -569,6 +604,7 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
       },
       honeypot_risk: rugCheckData.honeypot_risk,
       lp_locked: rugCheckData.lp_locked,
+      lp_burned: rugCheckData.lp_burned,
       deployer_address: rugCheckData.deployer_address,
       rugged: rugCheckData.rugged,
       jup_verified: rugCheckData.jup_verified,
