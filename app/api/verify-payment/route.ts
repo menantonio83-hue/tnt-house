@@ -1,3 +1,15 @@
+// Version 1.3 — app/api/verify-payment/route.ts
+//
+// v1.3 (2026-09-11): handles kind === 'banner' orders the same way v1.2
+// handles kind === 'credits' — the actual product effect (here, writing
+// active_banner) happens inside the winning claim, not from a client
+// call after seeing verified:true. Before this, app/page.js wrote the
+// banner itself directly to Supabase with the publishable key once it
+// saw a successful poll; combined with active_banner's then-open RLS
+// (migrations/2026-09-11-banner-lockdown.sql), that write path checked
+// nothing at all — verified:true from a client's own polling loop was
+// never proof of anything the server could rely on for what to persist.
+//
 // Version 1.2 — app/api/verify-payment/route.ts
 //
 // v1.2 (2026-09-11): handles kind === 'credits' orders (Quick Check
@@ -82,10 +94,14 @@ interface SiteOrderRow {
   expires_at: string;
   paid_at: string | null;
   credit_identity: string | null;
+  banner_token_name: string | null;
+  banner_img: string | null;
+  banner_desc: string | null;
+  banner_target_link: string | null;
 }
 
 const ORDER_COLUMNS =
-  'id, kind, ca, banner_slot, tier, currency, pay_amount, status, tx_signature, created_at, expires_at, paid_at, credit_identity';
+  'id, kind, ca, banner_slot, tier, currency, pay_amount, status, tx_signature, created_at, expires_at, paid_at, credit_identity, banner_token_name, banner_img, banner_desc, banner_target_link';
 
 // What the browser is allowed to learn about an order. Deliberately does
 // not include created_ip or credit_identity — the latter is a
@@ -246,6 +262,44 @@ export async function POST(request: NextRequest) {
         );
       }
     }
+
+    if (
+      order.kind === 'banner' &&
+      order.banner_slot &&
+      order.banner_token_name &&
+      order.banner_desc &&
+      order.banner_target_link
+    ) {
+      // tier is written as `${days}d` by site-orders/create (e.g. '6d').
+      // parseInt stops at the first non-digit, so this reads the day
+      // count regardless of that suffix; a missing/malformed tier falls
+      // back to 1 day rather than crashing the response for a payment
+      // that has already, correctly, been marked paid.
+      const days = parseInt(order.tier || '1', 10) || 1;
+      const expiresAt = new Date(Date.now() + days * 86400 * 1000).toISOString();
+      const bannerWrite = await supabaseAdmin.from('active_banner').upsert({
+        id: order.banner_slot,
+        token_name: order.banner_token_name,
+        banner_img: order.banner_img || '',
+        description: order.banner_desc,
+        target_link: order.banner_target_link,
+        expires_at: expiresAt,
+      });
+      if (bannerWrite.error) {
+        // Same shape as the credits failure above: the payment is real
+        // and paid, only the content write failed. Recorded loudly so
+        // it can be replayed manually — order id and slot are both in
+        // site_orders, nothing about which banner was bought is lost.
+        console.error(
+          '[verify-payment] payment claimed but banner write failed — order=%s slot=%s signature=%s error=%s',
+          order.id,
+          order.banner_slot,
+          match.signature,
+          bannerWrite.error.message,
+        );
+      }
+    }
+
     const settled = await loadOrder(order.id);
     return NextResponse.json({
       verified: true,
