@@ -82,7 +82,16 @@ export interface ChatLimitResult {
 
 async function sha256Short(input: string): Promise<string> {
   const bytes = new TextEncoder().encode(input);
-  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  // Copied into a plain ArrayBuffer on purpose. Newer @types/node types
+  // TextEncoder's result as Uint8Array<ArrayBufferLike>, which does not
+  // satisfy BufferSource because ArrayBufferLike also covers
+  // SharedArrayBuffer — the build fails on the stricter toolchain even
+  // though the call is correct at runtime. This is an honest ArrayBuffer
+  // rather than a cast papering over the difference. The input is an IP
+  // plus a User-Agent, so the copy is a few dozen bytes.
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  const digest = await crypto.subtle.digest('SHA-256', buffer);
   return Array.from(new Uint8Array(digest))
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('')
