@@ -1,4 +1,4 @@
-// Version 1.1 — lib/cluster-check-cache.ts
+// Version 1.2 — lib/cluster-check-cache.ts
 //
 // Cache + spend control for /api/cluster-check (the First Funder Trace).
 //
@@ -48,7 +48,12 @@ const MISSES_GLOBAL_PER_DAY = 200;
 
 // Bumped whenever the cached response shape changes, so a deploy can
 // never serve a payload the current code doesn't understand.
-const CACHE_VERSION = 'v1';
+//
+// v1.2: bumped for the new `unconfirmed` field (see CachedTrace) so
+// every cached entry reflects the new signal from the start, rather
+// than mixing pre-v1.9-route entries (no field, silently reads as "none
+// unconfirmed") with post-fix ones for up to 12h.
+const CACHE_VERSION = 'v2';
 
 const ALERT_KEY_DEGRADED = 'cluster-check-redis-degraded';
 
@@ -56,6 +61,11 @@ export interface CachedTrace {
   checked: number;
   clusters: Array<{ funder: string; holders: string[] }>;
   clusterCount: number;
+  // v1.2: holders whose true first transaction could not be confirmed
+  // within the RPC page budget (see findOldestSignature in
+  // app/api/cluster-check/route.js). Optional so cache entries written
+  // before this field existed still parse.
+  unconfirmed?: string[];
 }
 
 export interface MissAllowance {

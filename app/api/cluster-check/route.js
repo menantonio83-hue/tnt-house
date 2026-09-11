@@ -1,5 +1,55 @@
 // app/api/cluster-check/route.js
-// Version 1.7
+// Version 1.10
+//
+// FIX v1.10: funders present in lib/known-cex-funders.ts are excluded
+// from cluster matching. No live free API for Solana CEX wallet labels
+// exists (checked Helius Wallet Identity — paid only; checked Vybe
+// Network labeled-accounts — also paid-tier only despite Vybe having a
+// free plan), so that file starts empty and is grown by hand, address by
+// verified address — see its header for the process. This filter is
+// mostly a backstop for newer/lower-traffic exchange deposit addresses:
+// v1.9 below already excludes any holder whose first transaction
+// couldn't be confirmed, which covers essentially every established CEX
+// hot wallet on its own (they're all old, busy addresses).
+//
+// FIX v1.9: findOldestSignature used to return whatever signature it saw
+// oldest within its page budget (MAX_SIG_PAGES * SIG_PAGE_SIZE = 3000)
+// and the rest of the trace treated that as a confirmed first
+// transaction. For any wallet with deeper history than that — which
+// includes exactly the CEX/bridge hot wallets most likely to fund
+// multiple unrelated top holders — the signature returned was an
+// arbitrary mid-history transaction, and the "funder" read off it was
+// not the wallet's real first funder. Now that case returns
+// { truncated: true }; those holders are excluded from cluster matching
+// entirely and reported separately as `unconfirmed`, rather than
+// silently contributing a wrong funder or a false "no funder found".
+//
+// FIX v1.8: this route used to end every trace by forcibly setting
+// listed_tokens.score to a flat 39 whenever clusterCount > 0 (see removed
+// applyClusterScorePenalty, kept in git history if it's ever needed for
+// reference). That write ran on BOTH fresh traces and cache hits, so it
+// re-applied itself on every single page load of an already-audited
+// token — permanently pinning the number at 39 no matter what
+// lib/scoring.ts (the project's declared single source of truth for the
+// score, per that file's own header) had actually computed.
+//
+// It also could not have been fixed by making the constant smarter,
+// because the bug was architectural, not numerical: this route has no
+// visibility into the caps (maturity, market health, wash trading,
+// contract risk, rugged) that were already applied when the stored score
+// was first computed. Overwriting with ANY number computed here — 39,
+// or a "smarter" recomputed one — risks landing above a cap that should
+// still bind, which is exactly the class of bug lib/scoring.ts's header
+// warns about: a second place computing (or in this case, mutating) a
+// score drifts from the first.
+//
+// So this route no longer writes to listed_tokens.score at all. It only
+// traces and reports clusters. The correct fix — making a fresh audit's
+// score reflect REAL cluster data from the start, instead of the
+// 'pending' placeholder (+12 flat, see lib/scoring.ts) app/page.js
+// currently passes to computeFullScore before this route ever runs — is
+// an ordering change in the audit flow (trace clusters BEFORE scoring,
+// not after) and is tracked as a separate follow-up, not bundled here.
 
 // FIX v1.6: this endpoint walks up to 10 holders' signature history over
 // RPC (up to 3 pages of 1000 sigs each, plus a getParsedTransaction per
@@ -44,13 +94,13 @@ export const maxDuration = 60;
 
 import { NextResponse } from 'next/server';
 import { Connection, PublicKey } from '@solana/web3.js';
-import { supabaseAdmin } from '@/lib/supabase-admin';
 import {
   readClusterCache,
   writeClusterCache,
   allowExpensiveClusterCheck,
   extractClientIp,
 } from '@/lib/cluster-check-cache';
+import { KNOWN_CEX_FUNDERS } from '@/lib/known-cex-funders';
 
 const RPC_URL = process.env.HELIUS_RPC_URL || 'https://api.mainnet-beta.solana.com';
 const RUGCHECK_URL = 'https://api.rugcheck.xyz/v1/tokens';
@@ -70,6 +120,29 @@ const RESPONSE_HEADERS = {};
 
 // Walk a wallet's signature history backwards (oldest last) to find its
 // very first transaction signature.
+//
+// FIX v1.9: this used to return the oldest signature it happened to see
+// within MAX_SIG_PAGES and call that "the first transaction" — no
+// distinction between "genuinely reached the start of history" (last
+// page shorter than SIG_PAGE_SIZE) and "hit the page cap with more
+// history still behind it" (last page exactly SIG_PAGE_SIZE). For any
+// wallet with more than MAX_SIG_PAGES * SIG_PAGE_SIZE (3000) signatures
+// — which includes exactly the CEX/bridge hot wallets this trace most
+// needs to not misjudge — the "oldest" signature returned was an
+// arbitrary transaction from partway through its history, not its real
+// first one. findFunderFromTx then read whatever account happened to
+// fund THAT transaction and reported it as "the funder", which is not a
+// meaningful signal for an old, busy wallet.
+//
+// Now the truncated case is reported honestly instead of silently
+// answered: { truncated: true } tells the caller this wallet's true
+// first funder is unknown, not that it has none. The caller must treat
+// that as "no usable signal" — never as either a confirmed funder or a
+// confirmed absence of one. Page/size budget is intentionally left
+// unchanged: raising it to always reach genuine history would multiply
+// RPC cost precisely on the busiest (most likely CEX) wallets, the
+// opposite of what the rate limiting elsewhere in this file exists to
+// prevent.
 async function findOldestSignature(connection, pubkey) {
   let before = undefined;
   let oldest = null;
@@ -80,10 +153,16 @@ async function findOldestSignature(connection, pubkey) {
     });
     if (sigs.length === 0) break;
     oldest = sigs[sigs.length - 1];
-    if (sigs.length < SIG_PAGE_SIZE) break; // reached the actual start of history
+    if (sigs.length < SIG_PAGE_SIZE) {
+      // Reached the actual start of history — this IS the first tx.
+      return { signature: oldest.signature, truncated: false };
+    }
     before = oldest.signature;
   }
-  return oldest ? oldest.signature : null;
+  // Hit the page cap without ever seeing a short page: there is more
+  // history behind `oldest` that was never fetched. Whatever `oldest`
+  // is, it is not confirmed to be the wallet's first transaction.
+  return { signature: oldest ? oldest.signature : null, truncated: oldest !== null };
 }
 
 // Given a wallet's first transaction, find which OTHER account's SOL
@@ -138,13 +217,22 @@ async function traceClusters(ca) {
   const connection = new Connection(RPC_URL, 'confirmed');
   const funderMap = {}; // funder address -> [holder addresses]
   const errors = [];
+  // v1.9: holders whose true first transaction is unconfirmed (history
+  // deeper than the page budget) — excluded from cluster matching, but
+  // reported separately so a caller can see the trace was incomplete
+  // rather than reading a clean "no cluster" as if it were confirmed.
+  const unconfirmed = [];
 
   for (const holder of topHolders) {
     try {
       const pubkey = new PublicKey(holder);
-      const oldestSig = await findOldestSignature(connection, pubkey);
-      if (!oldestSig) continue;
-      const funder = await findFunderFromTx(connection, holder, oldestSig);
+      const oldest = await findOldestSignature(connection, pubkey);
+      if (oldest.truncated) {
+        unconfirmed.push(holder);
+        continue;
+      }
+      if (!oldest.signature) continue;
+      const funder = await findFunderFromTx(connection, holder, oldest.signature);
       if (funder) {
         if (!funderMap[funder]) funderMap[funder] = [];
         funderMap[funder].push(holder);
@@ -157,95 +245,24 @@ async function traceClusters(ca) {
   // Only surface funders that funded 2+ of the checked top holders —
   // a single shared funding source across multiple top wallets is the
   // real, on-chain-provable insider/cluster signal.
+  //
+  // v1.10: a funder present in KNOWN_CEX_FUNDERS (lib/known-cex-funders.ts)
+  // is excluded here even if it funded 2+ holders — shared exchange
+  // deposit source, not shared insider control. The list starts empty
+  // and is grown by hand (see that file's header); this filter is a
+  // no-op until entries are added, which is intentional: excluding
+  // nothing is the correct behavior for an address nobody has verified.
   const clusters = Object.entries(funderMap)
-    .filter(([, holders]) => holders.length >= 2)
+    .filter(([funder, holders]) => holders.length >= 2 && !KNOWN_CEX_FUNDERS.has(funder))
     .map(([funder, holders]) => ({ funder, holders }));
 
   return {
     checked: topHolders.length,
     clusters,
     clusterCount: clusters.length,
+    unconfirmed: unconfirmed.length > 0 ? unconfirmed : undefined,
     errors,
   };
-}
-
-// Persists a penalty score to `listed_tokens` (the table the live UI
-// actually reads — confirmed via direct table inspection) when a real
-// cluster is found.
-//
-// FIX v1.5: v1.4's "success: true" was a false positive. Supabase's
-// update() does NOT return an error when Row Level Security silently
-// filters the target row out of the UPDATE's visibility — it just
-// updates 0 rows and reports success. That's exactly what was
-// happening: SELECT worked (read policy exists), but UPDATE touched
-// nothing (no write policy for this key/role), and the table kept
-// showing the original score. Adding .select() after .update() forces
-// Supabase to return the actual affected rows, so we can tell real
-// success (rows.length > 0) apart from a silently blocked write
-// (rows.length === 0, no error).
-//
-// FIX v1.8: that write now goes through supabaseAdmin (service role)
-// instead of the publishable key. This route runs on the server, so it
-// never needed the anon key — and it was very likely the reason the
-// `Public update USING true` policy was added to listed_tokens in the
-// first place, since that policy is exactly what made v1.5's silently
-// blocked UPDATE start working. That policy also lets anyone holding the
-// publishable key rewrite any token's score, so it is being closed; this
-// route has to stop depending on it first, or the cluster penalty goes
-// back to silently not applying.
-//
-// The zero-rows check below is KEPT, and still earns its place. Under the
-// service role RLS no longer hides rows, but a zero-row update remains
-// possible for an ordinary reason — no listed_tokens row exists for this
-// ca yet — and that must not be reported as a successful penalty either.
-async function applyClusterScorePenalty(ca, clusterCount) {
-  const scoreUpdate = { attempted: false };
-  if (clusterCount <= 0) return scoreUpdate;
-
-  scoreUpdate.attempted = true;
-
-  const { data: existing, error: selectError } = await supabaseAdmin
-    .from('listed_tokens')
-    .select('id, score')
-    .eq('ca', ca)
-    .maybeSingle();
-
-  if (selectError) {
-    scoreUpdate.selectError = selectError.message;
-    console.error('[cluster-check] listed_tokens select failed:', selectError);
-    return scoreUpdate;
-  }
-  if (!existing) {
-    scoreUpdate.note = 'No matching row in listed_tokens for this ca';
-    console.error('[cluster-check] no listed_tokens row for ca:', ca);
-    return scoreUpdate;
-  }
-  if (existing.score <= 39) {
-    scoreUpdate.note = 'Score already <= 39, no update needed';
-    return scoreUpdate;
-  }
-
-  const { data: updatedRows, error: updateError } = await supabaseAdmin
-    .from('listed_tokens')
-    .update({ score: 39 })
-    .eq('ca', ca)
-    .select('id, score');
-
-  if (updateError) {
-    scoreUpdate.updateError = updateError.message;
-    console.error('[cluster-check] listed_tokens update failed:', updateError);
-  } else if (!updatedRows || updatedRows.length === 0) {
-    // This is the RLS-silent-block case: no error, but nothing changed.
-    scoreUpdate.blockedByRLS = true;
-    scoreUpdate.note =
-      'Update returned no error but affected 0 rows — likely blocked by a Row Level Security UPDATE policy on listed_tokens for this key/role.';
-    console.error('[cluster-check] update affected 0 rows (likely RLS):', ca);
-  } else {
-    scoreUpdate.success = true;
-    scoreUpdate.updatedRows = updatedRows;
-  }
-
-  return scoreUpdate;
 }
 
 export async function GET(request) {
@@ -260,14 +277,13 @@ export async function GET(request) {
     const cached = await readClusterCache(ca);
 
     if (cached) {
-      const scoreUpdate = await applyClusterScorePenalty(ca, cached.clusterCount);
       return NextResponse.json(
         {
           checked: cached.checked,
           clusters: cached.clusters,
           clusterCount: cached.clusterCount,
+          unconfirmed: cached.unconfirmed,
           cached: true,
-          scoreUpdate,
         },
         { headers: RESPONSE_HEADERS },
       );
@@ -308,18 +324,17 @@ export async function GET(request) {
       checked: traced.checked,
       clusters: traced.clusters,
       clusterCount: traced.clusterCount,
+      unconfirmed: traced.unconfirmed,
     });
-
-    const scoreUpdate = await applyClusterScorePenalty(ca, traced.clusterCount);
 
     return NextResponse.json(
       {
         checked: traced.checked,
         clusters: traced.clusters,
         clusterCount: traced.clusterCount,
+        unconfirmed: traced.unconfirmed,
         errors: traced.errors.length > 0 ? traced.errors : undefined,
         cached: false,
-        scoreUpdate,
       },
       { headers: RESPONSE_HEADERS },
     );
