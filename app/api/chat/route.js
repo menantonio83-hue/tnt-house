@@ -1,5 +1,12 @@
-// app/api/chat/route.js
-// Server-side route — DEEPSEEK_API_KEY stays hidden in .env
+// Version 1.3 — app/api/chat/route.js
+//
+// v1.3 (2026-09-11): server-side rate limit and input guard. This route
+// had neither. The only cap on it was a counter in React state, so
+// anyone could POST here in a loop and every request was a paid DeepSeek
+// call on our account. Now 30 messages / 10 minutes per IP+User-Agent,
+// enforced in Redis — the same numbers the widget already showed the
+// visitor — and the incoming history is rebuilt from scratch rather than
+// forwarded as received. See lib/chat-limit.ts for why it fails closed.
 //
 // v1.2 (2026-08-27): switched from Groq (openai/gpt-oss-20b) to
 // DeepSeek (deepseek-v4-flash) per product-owner decision — existing
@@ -22,6 +29,11 @@
 
 import { alertAdmin } from '../../../lib/telegram-alert';
 import { checkDeepSeekBalanceIfDue } from '../../../lib/deepseek-balance';
+import {
+  consumeChatQuota,
+  extractClientIp,
+  sanitizeMessages,
+} from '../../../lib/chat-limit';
 
 export const runtime = 'edge';
 
@@ -44,8 +56,37 @@ const SYSTEM_PROMPT = `Ты — ИИ-Инспектор TNT House, платфо�
 
 export async function POST(request) {
   try {
+    // Quota first — before parsing a body or spending anything upstream.
+    var ip = extractClientIp(request.headers);
+    var userAgent = request.headers.get('user-agent') || 'unknown';
+    var quota = await consumeChatQuota('site', ip, userAgent);
+
+    if (!quota.allowed) {
+      var quotaMessage =
+        quota.reason === 'unavailable'
+          ? 'Chat is temporarily unavailable. Please try again shortly.'
+          : 'Too many messages. Please wait a few minutes before continuing.';
+      return new Response(
+        JSON.stringify({ error: quotaMessage, retry_after_seconds: quota.retryAfterSeconds }),
+        {
+          status: quota.reason === 'unavailable' ? 503 : 429,
+          headers: {
+            'Content-Type': 'application/json',
+            'Retry-After': String(quota.retryAfterSeconds),
+          },
+        },
+      );
+    }
+
     var body = await request.json();
-    var messages = body.messages || [];
+    var sanitized = sanitizeMessages(body.messages || []);
+    if (!sanitized.ok) {
+      return new Response(JSON.stringify({ error: sanitized.error }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    var messages = sanitized.messages;
 
     var dsRes = await fetch('https://api.deepseek.com/chat/completions', {
       method: 'POST',
