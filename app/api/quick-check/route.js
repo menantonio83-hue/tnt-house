@@ -1,3 +1,11 @@
+// Version 1.2 — app/api/quick-check/route.js
+//
+// v1.2 (2026-09-11): abuseIdentity (ip+fp) and creditIdentity (fp alone)
+// are now separate — see lib/quick-check-limit.ts v1.2 for why. The free
+// daily counter still uses ip+fp; paid credits are read/spent by fp
+// alone so a network change (wifi -> cellular) does not orphan a balance
+// someone paid real money for.
+//
 // Version 1.1 — app/api/quick-check/route.js
 //
 // New, standalone product: "Quick Check" — paste any Solana token CA,
@@ -9,7 +17,10 @@
 // Rate limiting: 3 free checks / 24h per identity (IP + a random
 // httpOnly fingerprint cookie set below), then falls back to paid
 // credits if the identity has any (see lib/quick-check-limit.ts and
-// app/api/quick-check/credits/route.js for how credits are purchased).
+// app/api/site-orders/create/route.ts + app/api/verify-payment/route.ts
+// for how credits are purchased — the old, standalone
+// app/api/quick-check/credits/route.js was deleted, see those two files
+// for why).
 //
 // Reuses the existing, already-battle-tested audit engine
 // (performFullAudit from lib/helius-client.js) — same function the
@@ -57,9 +68,10 @@ export async function GET(request) {
 
     const ip = extractClientIp(request);
     const { fp, isNew } = getOrCreateFingerprint(request);
-    const identity = `${ip}:${fp}`;
+    const abuseIdentity = `${ip}:${fp}`;
+    const creditIdentity = fp;
 
-    const decision = await consumeQuickCheck(identity);
+    const decision = await consumeQuickCheck(abuseIdentity, creditIdentity);
 
     if (!decision.allowed) {
       const res = Response.json(
@@ -84,7 +96,7 @@ export async function GET(request) {
     // wrong and must not lose a check to our infrastructure. A definitively
     // invalid mint ('not_found') is a real answer and still costs a slot.
     if (auditResult.auditAvailable === false && auditResult.failureReason === 'rpc_failure') {
-      await refundQuickCheck(identity, decision.source);
+      await refundQuickCheck(abuseIdentity, creditIdentity, decision.source);
       const failRes = Response.json(
         {
           success: false,
@@ -123,8 +135,9 @@ export async function POST(request) {
   try {
     const ip = extractClientIp(request);
     const { fp, isNew } = getOrCreateFingerprint(request);
-    const identity = `${ip}:${fp}`;
-    const status = await getQuickCheckStatus(identity);
+    const abuseIdentity = `${ip}:${fp}`;
+    const creditIdentity = fp;
+    const status = await getQuickCheckStatus(abuseIdentity, creditIdentity);
     const res = Response.json({ ...status, packages: CREDIT_PACKAGES });
     return withFingerprintCookie(res, fp, isNew);
   } catch (error) {
