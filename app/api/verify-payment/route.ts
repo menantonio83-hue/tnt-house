@@ -1,4 +1,14 @@
-// Version 1.1 — app/api/verify-payment/route.ts
+// Version 1.2 — app/api/verify-payment/route.ts
+//
+// v1.2 (2026-09-11): handles kind === 'credits' orders (Quick Check
+// paid packages, see app/api/site-orders/create/route.ts v1.2) by
+// crediting the order's fingerprint identity through addCredits() at
+// the exact moment this request wins the atomic claim — never on a
+// re-poll of an already-paid order, since claim_site_order_payment only
+// returns 'claimed' once per order. This is what closes the replay hole
+// the old, now-deleted app/api/quick-check/credits/route.js had: that
+// endpoint recorded no signature anywhere, so the same transaction could
+// mint credits an unlimited number of times.
 //
 // REPLACES app/api/verify-payment/route.js. That file MUST BE DELETED in
 // the same commit — Next.js refuses to build with two route files in one
@@ -49,6 +59,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { findMatchingPayment } from '@/lib/billing-verify';
+import { addCredits, type CreditPackageId } from '@/lib/quick-check-limit';
 
 export const dynamic = 'force-dynamic';
 
@@ -70,13 +81,15 @@ interface SiteOrderRow {
   created_at: string;
   expires_at: string;
   paid_at: string | null;
+  credit_identity: string | null;
 }
 
 const ORDER_COLUMNS =
-  'id, kind, ca, banner_slot, tier, currency, pay_amount, status, tx_signature, created_at, expires_at, paid_at';
+  'id, kind, ca, banner_slot, tier, currency, pay_amount, status, tx_signature, created_at, expires_at, paid_at, credit_identity';
 
 // What the browser is allowed to learn about an order. Deliberately does
-// not include created_ip.
+// not include created_ip or credit_identity — the latter is a
+// fingerprint value, not something a client response needs to echo.
 function publicOrder(order: SiteOrderRow) {
   return {
     id: order.id,
@@ -210,6 +223,29 @@ export async function POST(request: NextRequest) {
   const outcome = Array.isArray(claim.data) ? claim.data[0]?.outcome : undefined;
 
   if (outcome === 'claimed') {
+    // This request just won the atomic DB transition — claim_site_order_
+    // payment's single gated UPDATE returns 'claimed' at most once per
+    // order, so this branch runs exactly once regardless of how many
+    // concurrent or later polls hit this route for the same order. That
+    // is what makes it the right and only place to award credits: no
+    // re-poll of an already-paid order reaches here.
+    if (order.kind === 'credits' && order.credit_identity && order.tier) {
+      const newBalance = await addCredits(order.credit_identity, order.tier as CreditPackageId);
+      if (newBalance === null) {
+        // The on-chain payment is real and the order is correctly marked
+        // paid — only the Redis write failed. Unlike the old endpoint,
+        // this is now a recorded, debuggable state: order id and
+        // signature are both in site_orders, so a manual credit is
+        // possible. It must never look like the payment itself failed.
+        console.error(
+          '[verify-payment] payment claimed but crediting failed — order=%s identity=%s package=%s signature=%s',
+          order.id,
+          order.credit_identity,
+          order.tier,
+          match.signature,
+        );
+      }
+    }
     const settled = await loadOrder(order.id);
     return NextResponse.json({
       verified: true,

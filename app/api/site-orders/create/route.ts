@@ -1,3 +1,22 @@
+// Version 1.2 — app/api/site-orders/create/route.ts
+//
+// v1.2 (2026-09-11): adds kind: 'credits' for Quick Check paid credit
+// packages, replacing the standalone app/api/quick-check/credits/route.js
+// (deleted). That route took expectedAmount/since/method from the
+// browser with a 5% tolerance and recorded no signature anywhere, so the
+// same on-chain transfer could be replayed to mint unlimited credits.
+// Routing credits through this same order ledger gives them, for free,
+// everything already built for listing/banner: a server-decided price,
+// a salted amount, and a signature that is globally unique across every
+// order kind — a signature spent on one credits order can never pay for
+// another order of any kind.
+//
+// credit_identity is the Quick Check fingerprint cookie value (NOT
+// IP+fingerprint — see lib/quick-check-limit.ts v1.2), read from or
+// minted into the same tnt_qc_fp cookie app/api/quick-check/route.js
+// already sets, so a credits purchase does not require having run a
+// free check first the way the old endpoint did.
+//
 // Version 1.1 — app/api/site-orders/create/route.ts
 //
 // PAYMENT PATH. Creates the server-side record of what is being bought.
@@ -24,7 +43,8 @@
 // thing to get wrong.
 //
 // POST /api/site-orders/create
-//   { kind: 'listing', tier, ca }        | { kind: 'banner', days, banner_slot }
+//   { kind: 'listing', tier, ca } | { kind: 'banner', days, banner_slot }
+//   | { kind: 'credits', packageId }
 //   + currency: 'SOL' | 'USDC' | 'MRDT'
 // 200 { ok: true, orderId, payAmount, displayAmount, currency, expiresAt }
 // 400 { ok: false, error }
@@ -36,6 +56,7 @@ import { PublicKey } from '@solana/web3.js';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { resolveBaseAmount, applySalt, formatPayAmount } from '@/lib/billing-pricing';
 import { priceListingUsd, priceBannerUsd, BANNER_SLOTS } from '@/lib/site-pricing';
+import { CREDIT_PACKAGES, type CreditPackageId } from '@/lib/quick-check-limit';
 
 export const dynamic = 'force-dynamic';
 
@@ -69,6 +90,24 @@ function isRealSolanaAddress(value: string): boolean {
   }
 }
 
+// Same cookie app/api/quick-check/route.js already sets and reads. A
+// credits order needs an identity to credit on payment, and reusing this
+// cookie means "buy credits" no longer requires "have already run a free
+// check" the way the old, now-deleted endpoint did — it mints one here
+// if none exists yet.
+const FP_COOKIE = 'tnt_qc_fp';
+const FP_MAX_AGE = 60 * 60 * 24 * 365; // 1 year — matches quick-check/route.js
+
+function getOrCreateFingerprint(request: NextRequest): { fp: string; isNew: boolean } {
+  const existing = request.cookies.get(FP_COOKIE)?.value;
+  if (existing) return { fp: existing, isNew: false };
+  // Global Web Crypto, not node:crypto's randomUUID export — this repo's
+  // pinned @types/node (12.20.55, predating that export) does not
+  // declare it, and the DOM lib already in tsconfig.json types the
+  // global instead. Available on Vercel's Node runtime without import.
+  return { fp: crypto.randomUUID(), isNew: true };
+}
+
 // Expiring a stale order is what returns its salted amount to the pool.
 // Done opportunistically on each create rather than on a schedule, since
 // this is the only place that cares.
@@ -98,6 +137,7 @@ export async function POST(request: NextRequest) {
     ca?: unknown;
     days?: unknown;
     banner_slot?: unknown;
+    packageId?: unknown;
     currency?: unknown;
   };
 
@@ -111,6 +151,8 @@ export async function POST(request: NextRequest) {
   let ca: string | null = null;
   let bannerSlot: number | null = null;
   let tierLabel: string | null = null;
+  let creditIdentity: string | null = null;
+  let fpIsNew = false;
 
   if (kind === 'listing') {
     const price = priceListingUsd(input?.tier);
@@ -142,6 +184,23 @@ export async function POST(request: NextRequest) {
     usd = price.usd;
     bannerSlot = slot;
     tierLabel = `${input.days}d`;
+  } else if (kind === 'credits') {
+    const packageId = input?.packageId;
+    const pkg =
+      typeof packageId === 'string'
+        ? CREDIT_PACKAGES[packageId as CreditPackageId]
+        : undefined;
+    if (!pkg) {
+      return NextResponse.json(
+        { ok: false, error: 'invalid_package', message: `unknown credit package: ${String(packageId)}` },
+        { status: 400 },
+      );
+    }
+    const { fp, isNew } = getOrCreateFingerprint(request);
+    usd = pkg.usd;
+    tierLabel = packageId as string;
+    creditIdentity = fp;
+    fpIsNew = isNew;
   } else {
     return NextResponse.json({ ok: false, error: 'invalid_kind' }, { status: 400 });
   }
@@ -201,12 +260,13 @@ export async function POST(request: NextRequest) {
         pay_amount: payAmount,
         base_amount: base.baseAmount,
         created_ip: ip,
+        credit_identity: creditIdentity,
       })
       .select('id, expires_at')
       .single();
 
     if (!inserted.error && inserted.data) {
-      return NextResponse.json({
+      const res = NextResponse.json({
         ok: true,
         orderId: inserted.data.id,
         payAmount,
@@ -214,6 +274,16 @@ export async function POST(request: NextRequest) {
         currency,
         expiresAt: inserted.data.expires_at,
       });
+      // Only credits orders carry an identity to persist, and only a
+      // freshly minted one needs setting — an existing cookie already
+      // round-trips on its own.
+      if (kind === 'credits' && fpIsNew && creditIdentity) {
+        res.headers.append(
+          'Set-Cookie',
+          `${FP_COOKIE}=${creditIdentity}; Path=/; Max-Age=${FP_MAX_AGE}; HttpOnly; SameSite=Lax; Secure`,
+        );
+      }
+      return res;
     }
 
     // 23505 on the (currency, pay_amount) partial index means another

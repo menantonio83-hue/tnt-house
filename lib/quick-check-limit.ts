@@ -1,3 +1,43 @@
+// Version 1.2 — lib/quick-check-limit.ts
+//
+// v1.2 (2026-09-11): split "identity" into two separate concepts that
+// v1.1 conflated into one string (`${ip}:${fp}`):
+//
+//   ABUSE IDENTITY (ip + fingerprint) — still governs the free daily
+//   counter and the global daily counter. Losing this on an IP change
+//   costs nothing real; it exists only to make the free tier annoying
+//   to script, and IP is a useful signal for exactly that.
+//
+//   CREDIT IDENTITY (fingerprint alone) — now governs the paid credit
+//   balance. Credits are money the person already spent; tying them to
+//   an IP as well meant a mobile visitor who switched from wifi to
+//   cellular between "buy" and "spend" could lose access to credits
+//   they paid for. The fingerprint cookie is httpOnly with a one-year
+//   Max-Age and does not change with network conditions, which IP does
+//   constantly on mobile.
+//
+// KNOWN LIMITATION, stated rather than hidden: this does not solve
+// credit recovery after a cleared cookie or a new device — there is no
+// account system here, so the fingerprint IS the identity, full stop.
+// What it fixes is the much more common case (network switching), not
+// the rarer deliberate one.
+//
+// MIGRATION NOTE: before this version, credits were purchased AND spent
+// under an ip:fp key. After this deploy, spending happens under an
+// fp-only key. Any real balance that existed under the old ip:fp key
+// becomes unreachable through the app - it is still sitting in Redis
+// under its old key, just no longer read from. Checked before shipping
+// this: the only purchase path (the since-deleted
+// app/api/quick-check/credits/route.js) recorded nothing anywhere
+// checkable from here, and site_orders - the new purchase path - has
+// zero rows, meaning no purchase has gone through that ledger yet.
+// Whether anyone completed a purchase through the OLD endpoint before
+// today cannot be confirmed from this session: Redis is not queryable
+// here, and Vercel's runtime-log retention on this plan does not reach
+// back far enough to check. If a real balance turns out to exist under
+// an old ip:fp key, it needs a one-time manual credit (addCredits with
+// the affected fp) - the old key itself is undamaged, only unreachable.
+//
 // Version 1.1 — lib/quick-check-limit.ts
 //
 // Rate limit + paid credits for the new "Quick Check" product: a
@@ -96,8 +136,11 @@ export interface QuickCheckDecision {
 
 // Call once per incoming request. Consumes either a free slot or one
 // paid credit — never both, never neither if allowed is true.
-export async function consumeQuickCheck(identity: string): Promise<QuickCheckDecision> {
-  const creditsKey = `quick-check:credits:${identity}`;
+export async function consumeQuickCheck(
+  abuseIdentity: string,
+  creditIdentity: string,
+): Promise<QuickCheckDecision> {
+  const creditsKey = `quick-check:credits:${creditIdentity}`;
 
   if (!redis) {
     console.error('[quick-check-limit] Redis not configured, failing closed.');
@@ -105,7 +148,7 @@ export async function consumeQuickCheck(identity: string): Promise<QuickCheckDec
   }
 
   const today = todayUtc();
-  const freeKey = `quick-check:free:${identity}:${today}`;
+  const freeKey = `quick-check:free:${abuseIdentity}:${today}`;
   const globalKey = `quick-check:free:global:${today}`;
 
   const [freeUsed, globalUsed] = await Promise.all([
@@ -123,9 +166,9 @@ export async function consumeQuickCheck(identity: string): Promise<QuickCheckDec
     // Give back the free slot we just consumed for this identity,
     // since the call is being blocked for a reason unrelated to them.
     try { await redis.decr(freeKey); } catch { /* best-effort only */ }
-    const credits = await getCreditsBalance(identity);
+    const credits = await getCreditsBalance();
     if (credits > 0) {
-      const spent = await spendCredit(identity);
+      const spent = await spendCredit();
       if (spent) {
         return { allowed: true, usedFreeToday: Math.max(0, freeUsed - 1), freeLimit: FREE_DAILY_LIMIT, creditsRemaining: credits - 1, source: 'credit' };
       }
@@ -134,14 +177,14 @@ export async function consumeQuickCheck(identity: string): Promise<QuickCheckDec
   }
 
   if (freeUsed <= FREE_DAILY_LIMIT) {
-    const credits = await getCreditsBalance(identity);
+    const credits = await getCreditsBalance();
     return { allowed: true, usedFreeToday: freeUsed, freeLimit: FREE_DAILY_LIMIT, creditsRemaining: credits, source: 'free' };
   }
 
   // Free quota exhausted for today — fall back to paid credits.
-  const credits = await getCreditsBalance(identity);
+  const credits = await getCreditsBalance();
   if (credits > 0) {
-    const spent = await spendCredit(identity);
+    const spent = await spendCredit();
     if (spent) {
       return { allowed: true, usedFreeToday: freeUsed, freeLimit: FREE_DAILY_LIMIT, creditsRemaining: credits - 1, source: 'credit' };
     }
@@ -149,9 +192,9 @@ export async function consumeQuickCheck(identity: string): Promise<QuickCheckDec
 
   return { allowed: false, usedFreeToday: freeUsed, freeLimit: FREE_DAILY_LIMIT, creditsRemaining: credits, source: 'blocked_no_credits' };
 
-  async function getCreditsBalance(id: string): Promise<number> {
+  async function getCreditsBalance(): Promise<number> {
     try {
-      const raw = await redis!.get<number>(creditsKey.replace(identity, id));
+      const raw = await redis!.get<number>(creditsKey);
       return typeof raw === 'number' ? raw : 0;
     } catch (e) {
       console.error('[quick-check-limit] Redis error reading credits:', (e as Error).message);
@@ -159,13 +202,12 @@ export async function consumeQuickCheck(identity: string): Promise<QuickCheckDec
     }
   }
 
-  async function spendCredit(id: string): Promise<boolean> {
+  async function spendCredit(): Promise<boolean> {
     try {
-      const key = creditsKey.replace(identity, id);
-      const remaining = await redis!.decr(key);
+      const remaining = await redis!.decr(creditsKey);
       if (remaining < 0) {
         // Compensate — never let the visible balance go negative.
-        await redis!.incr(key);
+        await redis!.incr(creditsKey);
         return false;
       }
       return true;
@@ -189,30 +231,37 @@ export async function consumeQuickCheck(identity: string): Promise<QuickCheckDec
 // upstream RPC cost, and a failed call (three attempts with backoff) still
 // consumed that cost.
 export async function refundQuickCheck(
-  identity: string,
+  abuseIdentity: string,
+  creditIdentity: string,
   source: QuickCheckDecision['source'],
 ): Promise<void> {
   if (!redis) return;
 
   try {
     if (source === 'free') {
-      await redis.decr(`quick-check:free:${identity}:${todayUtc()}`);
+      await redis.decr(`quick-check:free:${abuseIdentity}:${todayUtc()}`);
     } else if (source === 'credit') {
-      await redis.incr(`quick-check:credits:${identity}`);
+      await redis.incr(`quick-check:credits:${creditIdentity}`);
     }
   } catch (e) {
-    console.error(`[quick-check-limit] Refund failed for ${identity}:`, (e as Error).message);
+    console.error(
+      `[quick-check-limit] Refund failed (abuse=${abuseIdentity}, credit=${creditIdentity}):`,
+      (e as Error).message,
+    );
   }
 }
 
 // Read-only status for rendering the UI (free slots left today, credit
 // balance) WITHOUT consuming anything. Fails open (returns zeros) —
 // display-only, the real enforcement happens in consumeQuickCheck.
-export async function getQuickCheckStatus(identity: string): Promise<{ usedFreeToday: number; freeLimit: number; creditsRemaining: number }> {
+export async function getQuickCheckStatus(
+  abuseIdentity: string,
+  creditIdentity: string,
+): Promise<{ usedFreeToday: number; freeLimit: number; creditsRemaining: number }> {
   if (!redis) return { usedFreeToday: 0, freeLimit: FREE_DAILY_LIMIT, creditsRemaining: 0 };
   const today = todayUtc();
-  const freeKey = `quick-check:free:${identity}:${today}`;
-  const creditsKey = `quick-check:credits:${identity}`;
+  const freeKey = `quick-check:free:${abuseIdentity}:${today}`;
+  const creditsKey = `quick-check:credits:${creditIdentity}`;
   try {
     const [usedRaw, creditsRaw] = await Promise.all([redis.get<number>(freeKey), redis.get<number>(creditsKey)]);
     return {

@@ -1,24 +1,32 @@
 'use client';
 
-// Version 1.0 — app/quick-check/page.js
+// Version 1.1 — app/quick-check/page.js
 //
-// New standalone product: paste any Solana CA, get an instant safety
-// report. Separate from the existing Listing flow — this page never
-// writes to `submissions` / `verified_tokens`, nothing here appears in
-// the public Listing table (app/page.js).
+// v1.1 (2026-09-11): the purchase flow no longer computes its own
+// amount or calls the deleted app/api/quick-check/credits/route.js.
+// That route trusted a browser-supplied expectedAmount with a 5%
+// tolerance and recorded no signature, so the same payment could be
+// replayed to mint credits without limit — and this page fed it that
+// amount from mrdtPrice/solPrice, client-side numbers a fresh page
+// load or a stale price tick could get wrong even honestly.
 //
-// Payment reuses the EXISTING generic wallet-payment page (app/pay/page.js)
-// as-is — that page already handles Phantom/Solflare connect + build +
-// sign for SOL/MRDT/USDC against the same RECIPIENT_WALLET used
-// everywhere else on the site. No new payment UI was built; this page
-// only computes the amount, opens /pay with it, and polls
-// /api/quick-check/credits (which internally reuses the same Helius
-// verification approach as /api/verify-payment) until confirmed.
+// Now: POST /api/site-orders/create { kind: 'credits', packageId,
+// currency } gets back a server-decided, salted payAmount and an
+// orderId; the wallet is opened with THAT amount; polling asks
+// /api/verify-payment for that orderId only, never restating an amount.
+// Same pattern app/page.js already uses for listings and banners.
+//
+// Payment still reuses the EXISTING generic wallet-payment page
+// (app/pay/page.js) as-is — that page already handles Phantom/Solflare
+// connect + build + sign for SOL/MRDT/USDC against the same
+// RECIPIENT_WALLET used everywhere else on the site.
+//
+// Version 1.0 — new standalone product: paste any Solana CA, get an
+// instant safety report. Separate from the existing Listing flow — this
+// page never writes to `submissions` / `verified_tokens`, nothing here
+// appears in the public Listing table (app/page.js).
 
 import { useState, useEffect, useRef } from 'react';
-
-const MRDT_CA = '8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg';
-const SOL_MINT = 'So11111111111111111111111111111111111111112';
 
 const PACKAGES = [
   { id: '5', checks: 5, usd: 1 },
@@ -33,24 +41,11 @@ export default function QuickCheckPage() {
   const [error, setError] = useState(null);
   const [quota, setQuota] = useState(null); // { usedFreeToday, freeLimit, creditsRemaining }
   const [paywall, setPaywall] = useState(null); // set to server 402 payload when blocked
-  const [mrdtPrice, setMrdtPrice] = useState(0.000013);
-  const [solPrice, setSolPrice] = useState(85);
   const [payingPackage, setPayingPackage] = useState(null);
   const [payStatus, setPayStatus] = useState(null); // 'waiting' | 'success' | 'failed'
   const pollRef = useRef(null);
 
-  // Same public Jupiter Price API v3 call app/page.js already uses —
-  // no backend proxy needed, no new dependency.
   useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch(`https://lite-api.jup.ag/price/v3?ids=${MRDT_CA},${SOL_MINT}`);
-        const data = await res.json();
-        if (data?.[MRDT_CA]?.usdPrice) setMrdtPrice(parseFloat(data[MRDT_CA].usdPrice));
-        if (data?.[SOL_MINT]?.usdPrice) setSolPrice(parseFloat(data[SOL_MINT].usdPrice));
-      } catch (e) { /* fall back to defaults above */ }
-    })();
-
     // Load current quota status without consuming a slot.
     (async () => {
       try {
@@ -88,42 +83,73 @@ export default function QuickCheckPage() {
     }
   }
 
-  function amountFor(pkg, method) {
-    if (method === 'USDC') return pkg.usd;
-    if (method === 'SOL') return +(pkg.usd / (solPrice || 85)).toFixed(6);
-    return Math.round(pkg.usd / (mrdtPrice || 0.000013)); // MRDT
-  }
+  // Terminal verifier answers — see app/page.js's TERMINAL_VERIFY_REASONS
+  // for the same list. Polling past one of these can never resolve.
+  const TERMINAL_VERIFY_REASONS = [
+    'invalid_json',
+    'invalid_order_id',
+    'order_not_found',
+    'order_expired',
+    'signature_already_used',
+  ];
 
-  function buyPackage(pkg, method, wallet) {
-    const amount = amountFor(pkg, method);
-    const startTime = Date.now();
-    const label = `Quick Check ${pkg.checks} audits`;
-    const payUrl = `/pay?amount=${amount}&method=${method}&label=${encodeURIComponent(label)}&wallet=${wallet}`;
-    window.open(payUrl, '_blank');
+  async function buyPackage(pkg, method, wallet) {
     setPayingPackage(pkg.id);
     setPayStatus('waiting');
-    pollForCredits(pkg.id, amount, method, startTime);
+
+    let order;
+    try {
+      const res = await fetch('/api/site-orders/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kind: 'credits', packageId: pkg.id, currency: method }),
+      });
+      order = await res.json();
+    } catch (e) {
+      order = { ok: false };
+    }
+
+    if (!order.ok) {
+      setPayStatus('failed');
+      return;
+    }
+
+    const label = `Quick Check ${pkg.checks} audits`;
+    const payUrl = `/pay?amount=${order.payAmount}&method=${method}&label=${encodeURIComponent(label)}&wallet=${wallet}`;
+    window.open(payUrl, '_blank');
+    pollForCredits(order.orderId);
   }
 
-  function pollForCredits(packageId, expectedAmount, method, since) {
+  function pollForCredits(orderId) {
     let attempts = 0;
     const maxAttempts = 30;
     if (pollRef.current) clearInterval(pollRef.current);
     pollRef.current = setInterval(async () => {
       attempts++;
       try {
-        const res = await fetch('/api/quick-check/credits', {
+        const res = await fetch('/api/verify-payment', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ packageId, expectedAmount, since, method }),
+          body: JSON.stringify({ orderId }),
         });
         const data = await res.json();
-        if (data.verified && data.creditsAdded) {
+        if (data.verified) {
           clearInterval(pollRef.current);
           pollRef.current = null;
           setPayStatus('success');
           setPaywall(null);
-          setQuota((q) => ({ ...(q || {}), creditsRemaining: data.newBalance }));
+          // The server does not echo the new balance here — refresh it
+          // the same way the page loads it initially.
+          try {
+            const statusRes = await fetch('/api/quick-check', { method: 'POST' });
+            setQuota(await statusRes.json());
+          } catch (e) { /* non-critical */ }
+          return;
+        }
+        if (!data.verified && TERMINAL_VERIFY_REASONS.indexOf(data.reason) !== -1) {
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+          setPayStatus('failed');
         }
       } catch (e) { /* keep polling */ }
       if (attempts >= maxAttempts) {
