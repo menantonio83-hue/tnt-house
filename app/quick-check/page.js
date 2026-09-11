@@ -1,6 +1,20 @@
 'use client';
 
-// Version 1.1 — app/quick-check/page.js
+// Version 1.2 — app/quick-check/page.js
+//
+// v1.2 (2026-09-12): the tagline claimed "Same audit engine TNT House
+// uses" — false. Quick Check has no RugCheck call and no cluster trace
+// (see lib/helius-client.js's own comment on this), so honeypot,
+// LP-lock, insider-cluster, dev-wallet and tax signals are all absent
+// here, unlike the main site/API/MCP/trial surfaces which all call
+// lib/token-risk-core.ts's fetchTokenRisk(). That's a legitimate
+// speed/cost trade-off — RugCheck + cluster tracing is the slow, paid
+// part of a full audit, and Quick Check exists specifically to be the
+// instant, cheap alternative competitors' free scanners offer. The
+// trade-off itself isn't the problem; claiming parity with the deeper
+// engine while selling this one for credits was. Replaced the tagline
+// and added an explicit "not checked" line next to the score itself,
+// not just at the top of the page.
 //
 // v1.1 (2026-09-11): the purchase flow no longer computes its own
 // amount or calls the deleted app/api/quick-check/credits/route.js.
@@ -164,8 +178,20 @@ export default function QuickCheckPage() {
     <div className="min-h-screen bg-slate-950 text-white px-4 py-10">
       <div className="max-w-xl mx-auto">
         <h1 className="text-2xl font-black text-purple-400 mb-1">⚡ Quick Check</h1>
-        <p className="text-slate-400 text-sm mb-6">
-          Paste any Solana token CA. Same audit engine TNT House uses — no listing, no submission.
+        <p className="text-slate-400 text-sm mb-1">
+          Paste any Solana token CA for an instant scan — no listing, no submission.
+        </p>
+        {/* v1.2: this used to say "Same audit engine TNT House uses" — it
+            isn't. Quick Check has no RugCheck call and no cluster trace
+            (see lib/helius-client.js), so it can't see honeypot, LP-lock,
+            insider clusters, dev-wallet %, or tax — exactly the signals
+            the main engine's caps are built around. That's an honest
+            speed/depth trade-off, not a bug, but claiming engine parity
+            here was actively false, on a page people pay credits on. */}
+        <p className="text-slate-500 text-xs mb-6">
+          Fast scan: mint/freeze authority, liquidity, holder concentration.
+          Doesn't check honeypot, LP lock, insider clusters, or tax — for
+          those, use the full audit on the main site or the Risk-Data API.
         </p>
 
         {quota && (
@@ -201,6 +227,13 @@ export default function QuickCheckPage() {
             <div>Freeze authority revoked: {String(result.freezeAuthRevoked ?? '—')}</div>
             <div>Holder risk: {result.holderRisk?.riskLevel ?? '—'}</div>
             <div>Liquidity: {result.liquidity != null ? `$${result.liquidity}` : '—'}</div>
+            {/* v1.2: this score can't reflect honeypot/LP-lock/cluster
+                risk — see the header note above for why. Repeating it
+                right next to the number, not just at the top of the
+                page, since this is the part someone screenshots. */}
+            <div className="text-slate-500 text-xs pt-1">
+              Fast scan only — not checked: honeypot, LP lock, insider clusters, tax.
+            </div>
           </div>
         )}
 
