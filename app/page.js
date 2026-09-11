@@ -3648,13 +3648,15 @@ export default function TntHouse() {
             // purchased X promo doesn't get silently forgotten. Fire-and-
             // forget: never blocks the buyer's own success flow below.
             if (auditData.tier === 'fast' || auditData.tier === 'vip') {
+              // M-3 fix: the route now accepts ONLY the server-issued
+              // orderId and verifies the paid order itself — the
+              // browser no longer supplies ca/tier/tokenName for the
+              // admin reminder.
               fetch('/api/notify-x-promo', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                  ca: auditData.ca,
-                  tier: auditData.tier,
-                  tokenName: auditData.symbol || auditData.name || '',
+                  orderId: auditData.orderId,
                 }),
               }).catch(function () { /* best-effort only */ });
             }

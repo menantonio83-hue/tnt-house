@@ -1,3 +1,22 @@
+// Version 1.2 — lib/chat-limit.ts
+//
+// v1.2 (M-2 fix): two additional layers on top of the per-identity
+// (IP+UA) bucket, because both the IP and the User-Agent are
+// client-controlled and rotating the UA string per request used to mint
+// a fresh 30/10min bucket indefinitely:
+//
+//   1. Per-IP window cap (CHAT_IP_WINDOW_LIMIT) — keyed by IP ALONE, so
+//      rotating the User-Agent can never escape it: no matter how many
+//      UAs one machine invents, the IP bucket is shared by all of them.
+//   2. Global daily cap per surface (CHAT_GLOBAL_DAILY_LIMIT) — the
+//      backstop for real IP rotation (VPN / mobile NAT / cloud): bounds
+//      the total paid DeepSeek cost of each anonymous chat surface per
+//      day regardless of how many distinct IPs show up.
+//
+// The original IP+UA identity bucket stays (30 messages / 10 minutes),
+// because visitors arriving through shared proxy infrastructure would
+// otherwise exhaust one another's quota — see v1.1 below.
+//
 // Version 1.1 — lib/chat-limit.ts
 //
 // Server-side quota for the two anonymous chat widgets. Until now the
@@ -55,6 +74,11 @@ const redis =
 export const CHAT_WINDOW_MINUTES = 10;
 export const CHAT_WINDOW_LIMIT = 30;
 
+// v1.2: rotation-proof per-IP window cap (keyed by IP alone) and a
+// per-surface global daily ceiling — see the v1.2 header note.
+export const CHAT_IP_WINDOW_LIMIT = 120;
+export const CHAT_GLOBAL_DAILY_LIMIT = 3000;
+
 // Input guards. The routes forwarded body.messages to DeepSeek
 // unbounded: max_tokens caps what comes back, nothing capped what goes
 // up. A single request could carry megabytes of history and we pay for
@@ -77,7 +101,7 @@ export interface ChatLimitResult {
   used: number;
   limit: number;
   retryAfterSeconds: number;
-  reason: 'ok' | 'limit_reached' | 'unavailable';
+  reason: 'ok' | 'limit_reached' | 'ip_limit_reached' | 'global_limit_reached' | 'unavailable';
 }
 
 async function sha256Short(input: string): Promise<string> {
@@ -111,6 +135,14 @@ function secondsLeftInWindow(): number {
   return Math.max(1, WINDOW_SECONDS - elapsed);
 }
 
+// v1.2: seconds until UTC midnight — TTL and retry-after messaging for
+// the global daily counter. Same shape as lib/demo-limit.ts.
+function secondsUntilUtcMidnight(): number {
+  const now = new Date();
+  const next = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0);
+  return Math.max(1, Math.ceil((next - now.getTime()) / 1000));
+}
+
 // Vercel overwrites x-forwarded-for with the real client IP and does not
 // forward externally supplied values, so the first entry is trustworthy.
 // Same helper shape as app/api/site-orders/create/route.ts.
@@ -138,13 +170,46 @@ export async function consumeChatQuota(
     };
   }
 
-  const hash = await sha256Short(`${ip}:${userAgent}`);
-  const key = `chat:${surface}:${hash}:${windowIndex()}`;
+  // v1.2: three buckets — identity (IP+UA), per-IP (UA rotation can't
+  // escape it), and a per-surface global daily ceiling (the backstop
+  // for real IP rotation). All three increment on every call; the
+  // first cap hit blocks the request.
+  const identityHash = await sha256Short(`${ip}:${userAgent}`);
+  const ipHash = await sha256Short(ip);
+  const identityKey = `chat:${surface}:${identityHash}:${windowIndex()}`;
+  const ipKey = `chat:${surface}:ip:${ipHash}:${windowIndex()}`;
+  const globalKey = `chat:${surface}:global:${new Date().toISOString().slice(0, 10)}`;
 
   try {
-    const used = await redis.incr(key);
-    if (used === 1) {
-      await redis.expire(key, KEY_TTL_SECONDS);
+    const [used, ipUsed, globalUsed] = await Promise.all([
+      redis.incr(identityKey),
+      redis.incr(ipKey),
+      redis.incr(globalKey),
+    ]);
+
+    await Promise.all([
+      used === 1 ? redis.expire(identityKey, KEY_TTL_SECONDS) : Promise.resolve(),
+      ipUsed === 1 ? redis.expire(ipKey, KEY_TTL_SECONDS) : Promise.resolve(),
+      globalUsed === 1 ? redis.expire(globalKey, secondsUntilUtcMidnight()) : Promise.resolve(),
+    ]);
+
+    if (globalUsed > CHAT_GLOBAL_DAILY_LIMIT) {
+      return {
+        allowed: false,
+        used: globalUsed,
+        limit: CHAT_GLOBAL_DAILY_LIMIT,
+        retryAfterSeconds: secondsUntilUtcMidnight(),
+        reason: 'global_limit_reached',
+      };
+    }
+    if (ipUsed > CHAT_IP_WINDOW_LIMIT) {
+      return {
+        allowed: false,
+        used: ipUsed,
+        limit: CHAT_IP_WINDOW_LIMIT,
+        retryAfterSeconds,
+        reason: 'ip_limit_reached',
+      };
     }
     if (used > CHAT_WINDOW_LIMIT) {
       return {

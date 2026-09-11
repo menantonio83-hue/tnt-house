@@ -1,3 +1,20 @@
+// Version 1.1 — lib/mcp-anon-limit.ts
+//
+// v1.1 (M-1 fix): two additional layers on top of the per-identity
+// (IP+UA) bucket — both the IP and the User-Agent are client-controlled,
+// and rotating the UA string per call used to mint a fresh 5/day bucket
+// indefinitely:
+//
+//   1. Per-IP daily cap (MCP_ANON_DAILY_LIMIT_PER_IP) — keyed by IP
+//      ALONE, so rotating the User-Agent can never escape it.
+//   2. Global daily cap (MCP_ANON_DAILY_LIMIT_GLOBAL) — the backstop
+//      for real IP rotation (VPN / mobile NAT / cloud instances): bounds
+//      the total anonymous upstream cost for the whole service.
+//
+// The original IP+UA identity bucket stays (5 successful calls/day),
+// because visitors arriving through shared proxy infrastructure (Glama
+// and similar directories) would otherwise exhaust one another's quota.
+//
 // Version 1.0 — lib/mcp-anon-limit.ts
 //
 // Dedicated quota for anonymous MCP tool calls (check_token_risk with no
@@ -18,11 +35,13 @@
 // each individual IP+UA pair a real 5/day ceiling (not unlimited) even
 // when it happens to be Glama's own inspector.
 //
-// Only a SUCCESSFUL check_token_risk call burns the quota — the caller
-// (app/api/mcp/route.ts) checks remaining quota with peekMcpAnonUsage()
-// BEFORE calling fetchTokenRisk(), then only calls recordMcpAnonSuccess()
-// after confirming result.ok. An invalid mint / upstream failure never
-// costs the visitor one of their 5 free calls.
+// Only a SUCCESSFUL check_token_risk call burns the IDENTITY quota — the
+// caller (app/api/mcp/route.ts) checks the full quota stack with
+// checkMcpAnonLimit() BEFORE calling fetchTokenRisk(), then only calls
+// recordMcpAnonSuccess() after confirming result.ok. An invalid mint /
+// upstream failure never costs the visitor one of their 5 identity calls
+// (the per-IP and global attempt counters move regardless, same
+// convention as lib/demo-limit.ts).
 //
 // Key is bucketed by UTC calendar day (so it naturally rotates once a
 // day) with a 48h Redis TTL as a safety margin (self-cleans even if the
@@ -50,14 +69,24 @@ const redis =
 
 const MCP_ANON_DAILY_LIMIT = 5;
 
+// v1.1: rotation-proof per-IP daily cap (keyed by IP alone) and the
+// global daily backstop — see the v1.1 header note.
+const MCP_ANON_DAILY_LIMIT_PER_IP = 20;
+const MCP_ANON_DAILY_LIMIT_GLOBAL = 300;
+
 // Safety-margin TTL, not the reset schedule itself — the key naturally
 // rotates once a day because the date is baked into the key string (see
 // bucketKey below). 48h just guarantees Redis cleans up an old key even
 // if that IP+UA pair never comes back to roll it over naturally.
 const KEY_TTL_SECONDS = 48 * 60 * 60;
 
+// v1.1: shared 16-hex hash for anonymous bucket keys.
+function hashIdentity(input: string): string {
+  return createHash('sha256').update(input).digest('hex').slice(0, 16);
+}
+
 function bucketKey(ip: string, userAgent: string): string {
-  const hash = createHash('sha256').update(`${ip}:${userAgent}`).digest('hex').slice(0, 16);
+  const hash = hashIdentity(`${ip}:${userAgent}`);
   const today = new Date().toISOString().slice(0, 10);
   return `mcp-anon:${hash}:${today}`;
 }
@@ -68,27 +97,62 @@ function secondsUntilUtcMidnight(): number {
   return Math.max(1, Math.ceil((next - now.getTime()) / 1000));
 }
 
-export interface McpAnonUsage {
+export interface McpAnonDecision {
+  allowed: boolean;
   used: number;
   limit: number;
+  // Which counter decided the call: 'identity' (IP+UA successes),
+  // 'per_ip' and 'global' when blocked, 'infra' when Redis is
+  // unavailable (fail closed), 'ok' when allowed.
+  reason: 'ok' | 'identity' | 'per_ip' | 'global' | 'infra';
   resetAt: number; // unix seconds, UTC midnight — messaging only, not the actual Redis TTL
 }
 
-// Read-only check — call BEFORE doing the expensive upstream work, so a
-// visitor who's already out of quota never triggers a real
-// Helius/DexScreener call at all.
-export async function peekMcpAnonUsage(ip: string, userAgent: string): Promise<McpAnonUsage> {
+// v1.1: the single gate for anonymous MCP calls. Checks the identity
+// bucket (IP+UA, read-only — only SUCCESSFUL calls burn it, see
+// recordMcpAnonSuccess), the per-IP bucket and the global bucket (both
+// INCR — attempts count, same "counters increment regardless of what
+// happens after" convention as lib/demo-limit.ts). Call BEFORE doing the
+// expensive upstream work, so a blocked visitor never triggers a real
+// Helius/DexScreener call.
+export async function checkMcpAnonLimit(ip: string, userAgent: string): Promise<McpAnonDecision> {
   const resetAt = Math.floor(Date.now() / 1000) + secondsUntilUtcMidnight();
   if (!redis) {
     console.error('[mcp-anon-limit] Redis not configured, failing closed on anonymous MCP calls.');
-    return { used: MCP_ANON_DAILY_LIMIT, limit: MCP_ANON_DAILY_LIMIT, resetAt };
+    return { allowed: false, used: 0, limit: MCP_ANON_DAILY_LIMIT, reason: 'infra', resetAt };
   }
+
+  const today = new Date().toISOString().slice(0, 10);
+  const perIpKey = `mcp-anon:ip:${hashIdentity(ip)}:${today}`;
+  const globalKey = `mcp-anon:global:${today}`;
+
   try {
-    const raw = await redis.get<number>(bucketKey(ip, userAgent));
-    return { used: raw ?? 0, limit: MCP_ANON_DAILY_LIMIT, resetAt };
+    const [identityRaw, perIpUsed, globalUsed] = await Promise.all([
+      redis.get<number>(bucketKey(ip, userAgent)),
+      redis.incr(perIpKey),
+      redis.incr(globalKey),
+    ]);
+
+    await Promise.all([
+      perIpUsed === 1 ? redis.expire(perIpKey, secondsUntilUtcMidnight()) : Promise.resolve(),
+      globalUsed === 1 ? redis.expire(globalKey, secondsUntilUtcMidnight()) : Promise.resolve(),
+    ]);
+
+    const identityUsed = identityRaw ?? 0;
+
+    if (globalUsed > MCP_ANON_DAILY_LIMIT_GLOBAL) {
+      return { allowed: false, used: globalUsed, limit: MCP_ANON_DAILY_LIMIT_GLOBAL, reason: 'global', resetAt };
+    }
+    if (perIpUsed > MCP_ANON_DAILY_LIMIT_PER_IP) {
+      return { allowed: false, used: perIpUsed, limit: MCP_ANON_DAILY_LIMIT_PER_IP, reason: 'per_ip', resetAt };
+    }
+    if (identityUsed >= MCP_ANON_DAILY_LIMIT) {
+      return { allowed: false, used: identityUsed, limit: MCP_ANON_DAILY_LIMIT, reason: 'identity', resetAt };
+    }
+    return { allowed: true, used: identityUsed, limit: MCP_ANON_DAILY_LIMIT, reason: 'ok', resetAt };
   } catch (e) {
-    console.error('[mcp-anon-limit] Redis error reading usage:', (e as Error).message);
-    return { used: MCP_ANON_DAILY_LIMIT, limit: MCP_ANON_DAILY_LIMIT, resetAt };
+    console.error('[mcp-anon-limit] Redis error checking anonymous MCP quota:', (e as Error).message);
+    return { allowed: false, used: 0, limit: MCP_ANON_DAILY_LIMIT, reason: 'infra', resetAt };
   }
 }
 

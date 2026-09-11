@@ -114,7 +114,7 @@ import { enforceRateLimit, enforceRateLimitBatch } from '@/lib/rate-limit';
 import { fetchTokenRisk } from '@/lib/token-risk-core';
 import { getMintRiskHistory } from '@/lib/mint-risk-history-store';
 import { logApiRequest } from '@/lib/request-logger';
-import { peekMcpAnonUsage, recordMcpAnonSuccess } from '@/lib/mcp-anon-limit';
+import { checkMcpAnonLimit, recordMcpAnonSuccess } from '@/lib/mcp-anon-limit';
 import type { ApiKeyRecord } from '@/lib/api-key-store';
 
 export const dynamic = 'force-dynamic';
@@ -133,8 +133,10 @@ const MAX_BATCH_SIZE = 25;
 const PUBLIC_METHODS = new Set(['initialize', 'notifications/initialized', 'ping', 'tools/list']);
 
 // Tools an unauthenticated "tools/call" is allowed to reach.
-// check_token_risk: gated by its own dedicated 5/day quota
-// (lib/mcp-anon-limit.ts) inside the tool handler itself.
+// check_token_risk: gated by its own dedicated quota stack inside the
+// tool handler (lib/mcp-anon-limit.ts): 5 successful calls/day per
+// identity (IP+UA), a rotation-proof per-IP daily cap, and a global
+// daily backstop.
 // get_token_risk_history: no quota at all — already free/uncounted for
 // a real key (pure read from stored history), so there's no cost reason
 // to gate an anonymous caller either.
@@ -211,9 +213,16 @@ function buildServer(apiKey: ApiKeyRecord | null, clientIp: string, userAgent: s
       // cost one of the 5.
       if (!apiKey) {
         const startedAt = Date.now();
-        const usage = await peekMcpAnonUsage(clientIp, userAgent);
-        if (usage.used >= usage.limit) {
-          const message = `Anonymous MCP quota used (${usage.used}/${usage.limit} today). Get a free email key (15/day) at https://www.tnt-audit.com/risk-api or pay per call via x402 GET /api/v1/token-risk/x402 ($0.02).`;
+        const gate = await checkMcpAnonLimit(clientIp, userAgent);
+        if (!gate.allowed) {
+          const message =
+            gate.reason === 'global'
+              ? `Anonymous MCP calls are at capacity for today (${gate.used}/${gate.limit} globally). Get a free email key (15/day) at https://www.tnt-audit.com/risk-api or pay per call via x402 GET /api/v1/token-risk/x402 ($0.02).`
+              : gate.reason === 'per_ip'
+                ? `Too many anonymous MCP calls from this IP today (${gate.used}/${gate.limit}). Get a free email key (15/day) at https://www.tnt-audit.com/risk-api or pay per call via x402 GET /api/v1/token-risk/x402 ($0.02).`
+                : gate.reason === 'infra'
+                  ? 'Anonymous MCP access is temporarily unavailable. Please try again shortly, or use a free API key (15/day) from https://www.tnt-audit.com/risk-api.'
+                  : `Anonymous MCP quota used (${gate.used}/${gate.limit} today). Get a free email key (15/day) at https://www.tnt-audit.com/risk-api or pay per call via x402 GET /api/v1/token-risk/x402 ($0.02).`;
           return jsonResult({ error: message }, true);
         }
         const result = await fetchTokenRisk(mint);
@@ -231,14 +240,14 @@ function buildServer(apiKey: ApiKeyRecord | null, clientIp: string, userAgent: s
             error: result.ok ? null : result.error ?? 'unknown_error',
           }),
         );
-        const usedNow = result.ok ? usage.used + 1 : usage.used;
+        const usedNow = result.ok ? gate.used + 1 : gate.used;
         return jsonResult(
           {
             ...result,
             _mcp_anon: {
               used: usedNow,
-              limit: usage.limit,
-              note: `Anonymous MCP call ${usedNow}/${usage.limit} today, no signup. Get a free key for 15/day — self-serve (no human needed): POST {"email":"you@example.com"} to https://tnt-audit.com/api/v1/signup, response includes api_key directly. Human form: https://tnt-audit.com/risk-api`,
+              limit: gate.limit,
+              note: `Anonymous MCP call ${usedNow}/${gate.limit} today, no signup. Get a free key for 15/day — self-serve (no human needed): POST {"email":"you@example.com"} to https://tnt-audit.com/api/v1/signup, response includes api_key directly. Human form: https://tnt-audit.com/risk-api`,
             },
           },
           !result.ok,
