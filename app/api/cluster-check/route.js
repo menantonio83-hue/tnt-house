@@ -1,5 +1,17 @@
 // app/api/cluster-check/route.js
-// Version 1.8
+// Version 1.9
+//
+// FIX v1.9: findOldestSignature used to return whatever signature it saw
+// oldest within its page budget (MAX_SIG_PAGES * SIG_PAGE_SIZE = 3000)
+// and the rest of the trace treated that as a confirmed first
+// transaction. For any wallet with deeper history than that — which
+// includes exactly the CEX/bridge hot wallets most likely to fund
+// multiple unrelated top holders — the signature returned was an
+// arbitrary mid-history transaction, and the "funder" read off it was
+// not the wallet's real first funder. Now that case returns
+// { truncated: true }; those holders are excluded from cluster matching
+// entirely and reported separately as `unconfirmed`, rather than
+// silently contributing a wrong funder or a false "no funder found".
 //
 // FIX v1.8: this route used to end every trace by forcibly setting
 // listed_tokens.score to a flat 39 whenever clusterCount > 0 (see removed
@@ -96,6 +108,29 @@ const RESPONSE_HEADERS = {};
 
 // Walk a wallet's signature history backwards (oldest last) to find its
 // very first transaction signature.
+//
+// FIX v1.9: this used to return the oldest signature it happened to see
+// within MAX_SIG_PAGES and call that "the first transaction" — no
+// distinction between "genuinely reached the start of history" (last
+// page shorter than SIG_PAGE_SIZE) and "hit the page cap with more
+// history still behind it" (last page exactly SIG_PAGE_SIZE). For any
+// wallet with more than MAX_SIG_PAGES * SIG_PAGE_SIZE (3000) signatures
+// — which includes exactly the CEX/bridge hot wallets this trace most
+// needs to not misjudge — the "oldest" signature returned was an
+// arbitrary transaction from partway through its history, not its real
+// first one. findFunderFromTx then read whatever account happened to
+// fund THAT transaction and reported it as "the funder", which is not a
+// meaningful signal for an old, busy wallet.
+//
+// Now the truncated case is reported honestly instead of silently
+// answered: { truncated: true } tells the caller this wallet's true
+// first funder is unknown, not that it has none. The caller must treat
+// that as "no usable signal" — never as either a confirmed funder or a
+// confirmed absence of one. Page/size budget is intentionally left
+// unchanged: raising it to always reach genuine history would multiply
+// RPC cost precisely on the busiest (most likely CEX) wallets, the
+// opposite of what the rate limiting elsewhere in this file exists to
+// prevent.
 async function findOldestSignature(connection, pubkey) {
   let before = undefined;
   let oldest = null;
@@ -106,10 +141,16 @@ async function findOldestSignature(connection, pubkey) {
     });
     if (sigs.length === 0) break;
     oldest = sigs[sigs.length - 1];
-    if (sigs.length < SIG_PAGE_SIZE) break; // reached the actual start of history
+    if (sigs.length < SIG_PAGE_SIZE) {
+      // Reached the actual start of history — this IS the first tx.
+      return { signature: oldest.signature, truncated: false };
+    }
     before = oldest.signature;
   }
-  return oldest ? oldest.signature : null;
+  // Hit the page cap without ever seeing a short page: there is more
+  // history behind `oldest` that was never fetched. Whatever `oldest`
+  // is, it is not confirmed to be the wallet's first transaction.
+  return { signature: oldest ? oldest.signature : null, truncated: oldest !== null };
 }
 
 // Given a wallet's first transaction, find which OTHER account's SOL
@@ -164,13 +205,22 @@ async function traceClusters(ca) {
   const connection = new Connection(RPC_URL, 'confirmed');
   const funderMap = {}; // funder address -> [holder addresses]
   const errors = [];
+  // v1.9: holders whose true first transaction is unconfirmed (history
+  // deeper than the page budget) — excluded from cluster matching, but
+  // reported separately so a caller can see the trace was incomplete
+  // rather than reading a clean "no cluster" as if it were confirmed.
+  const unconfirmed = [];
 
   for (const holder of topHolders) {
     try {
       const pubkey = new PublicKey(holder);
-      const oldestSig = await findOldestSignature(connection, pubkey);
-      if (!oldestSig) continue;
-      const funder = await findFunderFromTx(connection, holder, oldestSig);
+      const oldest = await findOldestSignature(connection, pubkey);
+      if (oldest.truncated) {
+        unconfirmed.push(holder);
+        continue;
+      }
+      if (!oldest.signature) continue;
+      const funder = await findFunderFromTx(connection, holder, oldest.signature);
       if (funder) {
         if (!funderMap[funder]) funderMap[funder] = [];
         funderMap[funder].push(holder);
@@ -191,6 +241,7 @@ async function traceClusters(ca) {
     checked: topHolders.length,
     clusters,
     clusterCount: clusters.length,
+    unconfirmed: unconfirmed.length > 0 ? unconfirmed : undefined,
     errors,
   };
 }
@@ -212,6 +263,7 @@ export async function GET(request) {
           checked: cached.checked,
           clusters: cached.clusters,
           clusterCount: cached.clusterCount,
+          unconfirmed: cached.unconfirmed,
           cached: true,
         },
         { headers: RESPONSE_HEADERS },
@@ -253,6 +305,7 @@ export async function GET(request) {
       checked: traced.checked,
       clusters: traced.clusters,
       clusterCount: traced.clusterCount,
+      unconfirmed: traced.unconfirmed,
     });
 
     return NextResponse.json(
@@ -260,6 +313,7 @@ export async function GET(request) {
         checked: traced.checked,
         clusters: traced.clusters,
         clusterCount: traced.clusterCount,
+        unconfirmed: traced.unconfirmed,
         errors: traced.errors.length > 0 ? traced.errors : undefined,
         cached: false,
       },
