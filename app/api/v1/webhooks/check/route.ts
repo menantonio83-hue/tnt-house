@@ -159,7 +159,7 @@ async function handler(_request: NextRequest) {
     });
   } catch (error: any) {
     console.error('[webhooks/check] sweep error:', error);
-    return NextResponse.json({ error: 'Internal error', details: error.message }, { status: 500 });
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   } finally {
     await releaseCheckLock();
   }

@@ -1,3 +1,12 @@
+// Version 1.1 — app/api/widget/token-risk/route.ts
+//
+// v1.1 (M-8 fix): per-IP + global rate limits. Every call to this
+// anonymous endpoint fans out to Helius with retries, so unmetered
+// anonymous traffic could drain the RPC quota the whole site depends
+// on. Fail CLOSED: a Redis blip takes the widget number down (the
+// client falls back to RugCheck-derived values) rather than turning
+// the endpoint into an unmetered proxy.
+//
 // Version 1.0 — app/api/widget/token-risk/route.ts
 //
 // Server-side route for the consumer "Check Token" widget's holder-
@@ -24,6 +33,7 @@
 // the widget gets a clear error and can show "data unavailable"
 // instead of a number that cannot be true.
 import { NextRequest, NextResponse } from 'next/server';
+import { Redis } from '@upstash/redis';
 import { getHolderDistributionRobust } from '@/lib/holder-distribution';
 import {
   isHolderReadingUnusable,
@@ -31,11 +41,74 @@ import {
   HOLDER_DATA_UNAVAILABLE_MESSAGE,
 } from '@/lib/holder-data-guard';
 
+// v1.1: per-IP + global caps — see the v1.1 header note.
+const CALLS_PER_IP_PER_HOUR = 30;
+const CALLS_GLOBAL_PER_DAY = 1500;
+
+const redis =
+  process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN
+    ? new Redis({ url: process.env.KV_REST_API_URL, token: process.env.KV_REST_API_TOKEN })
+    : null;
+
+function extractClientIp(request: NextRequest): string {
+  const forwardedFor = request.headers.get('x-forwarded-for');
+  if (forwardedFor) return forwardedFor.split(',')[0].trim();
+  return 'unknown';
+}
+
+async function withinLimit(
+  ip: string,
+): Promise<{ ok: boolean; reason?: 'per_ip' | 'global' | 'infra' }> {
+  if (!redis) {
+    console.error('[widget/token-risk] Redis not configured, failing closed.');
+    return { ok: false, reason: 'infra' };
+  }
+  try {
+    const hour = new Date().toISOString().slice(0, 13);
+    const day = new Date().toISOString().slice(0, 10);
+    const ipKey = `widget-token-risk:ip:${ip}:${hour}`;
+    const globalKey = `widget-token-risk:global:${day}`;
+
+    const [ipCount, globalCount] = await Promise.all([redis.incr(ipKey), redis.incr(globalKey)]);
+    await Promise.all([
+      ipCount === 1 ? redis.expire(ipKey, 3600) : Promise.resolve(),
+      globalCount === 1 ? redis.expire(globalKey, 86400) : Promise.resolve(),
+    ]);
+
+    if (globalCount > CALLS_GLOBAL_PER_DAY) return { ok: false, reason: 'global' };
+    if (ipCount > CALLS_PER_IP_PER_HOUR) return { ok: false, reason: 'per_ip' };
+    return { ok: true };
+  } catch (e) {
+    console.error('[widget/token-risk] Redis error, failing closed:', (e as Error).message);
+    return { ok: false, reason: 'infra' };
+  }
+}
+
 export async function GET(request: NextRequest) {
   const address = request.nextUrl.searchParams.get('address');
 
   if (!address) {
     return NextResponse.json({ error: 'address query param is required' }, { status: 400 });
+  }
+
+  const limit = await withinLimit(extractClientIp(request));
+  if (!limit.ok) {
+    if (limit.reason === 'infra') {
+      return NextResponse.json(
+        {
+          error: 'holder_distribution_unavailable',
+          message: 'Holder data is temporarily unavailable. Please try again shortly.',
+        },
+        { status: 503, headers: { 'Cache-Control': 'no-store' } },
+      );
+    }
+    return NextResponse.json(
+      {
+        error: 'rate_limited',
+        message: 'Too many holder-data requests from this connection. Please try again later.',
+      },
+      { status: 429, headers: { 'Cache-Control': 'no-store' } },
+    );
   }
 
   try {

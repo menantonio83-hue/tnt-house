@@ -1,3 +1,13 @@
+// Version 1.2 — app/api/banners/claim/route.ts
+//
+// v1.2 (M-10/M-11 fix):
+//  * banner content is now length-capped on every field and bannerImg
+//    must be an http(s) URL or an image data URL — a script can no
+//    longer stuff megabytes of garbage into active_banner.
+//  * the free giveaway is rate-limited per IP and the claim function
+//    now records the claimant's IP (migrations/2026-09-11-free-banner-
+//    ip-lockdown.sql) with a DB-level ONE free banner per IP guarantee.
+//
 // Version 1.1 — app/api/banners/claim/route.ts
 //
 // The only remaining writer of active_banner outside a payment claim.
@@ -31,6 +41,7 @@
 // 502 { ok: false, error: 'claim_failed' }
 
 import { NextRequest, NextResponse } from 'next/server';
+import { Redis } from '@upstash/redis';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { BANNER_SLOTS } from '@/lib/site-pricing';
 
@@ -51,6 +62,68 @@ function isValidHttpUrl(value: string): boolean {
     return u.protocol === 'http:' || u.protocol === 'https:';
   } catch {
     return false;
+  }
+}
+
+// M-10: hard caps on every stored banner field. tokenName/description/
+// targetLink are short display strings; bannerImg is a downscaled JPEG
+// data URL produced by app/page.js's processImageFile (typically
+// <150KB), or an external image URL — never megabytes of raw input.
+const BANNER_TOKEN_NAME_MAX = 50;
+const BANNER_DESC_MAX = 300;
+const BANNER_LINK_MAX = 500;
+const BANNER_IMG_MAX_CHARS = 400_000;
+
+function isValidBannerImage(value: string): boolean {
+  if (value.length > BANNER_IMG_MAX_CHARS) return false;
+  if (/^https?:\/\//i.test(value)) return isValidHttpUrl(value);
+  // Otherwise accept only small image data URLs (the client's
+  // processImageFile output shape).
+  return /^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=]+$/i.test(value);
+}
+
+// M-11: rate limits for the free giveaway path. The DB now enforces
+// one free banner per IP forever (see the migration); these caps stop
+// a script hammering the claim endpoint itself. Fail closed.
+const FREE_CLAIMS_PER_IP_PER_HOUR = 10;
+const FREE_CLAIMS_GLOBAL_PER_DAY = 100;
+
+const redis =
+  process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN
+    ? new Redis({ url: process.env.KV_REST_API_URL, token: process.env.KV_REST_API_TOKEN })
+    : null;
+
+function extractClientIp(request: NextRequest): string {
+  const forwardedFor = request.headers.get('x-forwarded-for');
+  if (forwardedFor) return forwardedFor.split(',')[0].trim();
+  return 'unknown';
+}
+
+async function withinFreeClaimLimit(
+  ip: string,
+): Promise<{ ok: boolean; reason?: 'per_ip' | 'global' | 'infra' }> {
+  if (!redis) {
+    console.error('[banners/claim] Redis not configured, failing closed on free claims.');
+    return { ok: false, reason: 'infra' };
+  }
+  try {
+    const hour = new Date().toISOString().slice(0, 13);
+    const day = new Date().toISOString().slice(0, 10);
+    const ipKey = `banner-free-claim:ip:${ip}:${hour}`;
+    const globalKey = `banner-free-claim:global:${day}`;
+
+    const [ipCount, globalCount] = await Promise.all([redis.incr(ipKey), redis.incr(globalKey)]);
+    await Promise.all([
+      ipCount === 1 ? redis.expire(ipKey, 3600) : Promise.resolve(),
+      globalCount === 1 ? redis.expire(globalKey, 86400) : Promise.resolve(),
+    ]);
+
+    if (globalCount > FREE_CLAIMS_GLOBAL_PER_DAY) return { ok: false, reason: 'global' };
+    if (ipCount > FREE_CLAIMS_PER_IP_PER_HOUR) return { ok: false, reason: 'per_ip' };
+    return { ok: true };
+  } catch (e) {
+    console.error('[banners/claim] Redis error, failing closed:', (e as Error).message);
+    return { ok: false, reason: 'infra' };
   }
 }
 
@@ -78,6 +151,15 @@ function readBannerContent(input: any): BannerContentResult {
   const tokenName = typeof input?.tokenName === 'string' ? input.tokenName.trim() : '';
   const description = typeof input?.description === 'string' ? input.description.trim() : '';
   const targetLink = typeof input?.targetLink === 'string' ? input.targetLink.trim() : '';
+  // M-10: reject over-long content outright rather than silently
+  // truncating (truncation could split a URL or escape sequence).
+  if (
+    tokenName.length > BANNER_TOKEN_NAME_MAX ||
+    description.length > BANNER_DESC_MAX ||
+    targetLink.length > BANNER_LINK_MAX
+  ) {
+    return { ok: false, slot, tokenName: '', bannerImg: '', description: '', targetLink: '', error: 'banner_content_too_long' };
+  }
   if (!tokenName || !description) {
     return { ok: false, slot, tokenName: '', bannerImg: '', description: '', targetLink: '', error: 'invalid_banner_content' };
   }
@@ -85,6 +167,9 @@ function readBannerContent(input: any): BannerContentResult {
     return { ok: false, slot, tokenName: '', bannerImg: '', description: '', targetLink: '', error: 'invalid_target_link' };
   }
   const bannerImg = typeof input?.bannerImg === 'string' ? input.bannerImg.trim() : '';
+  if (bannerImg && !isValidBannerImage(bannerImg)) {
+    return { ok: false, slot, tokenName: '', bannerImg: '', description: '', targetLink: '', error: 'invalid_banner_img' };
+  }
   return { ok: true, slot, tokenName: tokenName.toUpperCase(), bannerImg, description, targetLink, error: null };
 }
 
@@ -108,6 +193,23 @@ export async function POST(request: NextRequest) {
     if (!days) {
       return NextResponse.json({ ok: false, error: 'invalid_duration' }, { status: 400 });
     }
+
+    // M-11: per-IP + global rate gate before any DB work.
+    const ip = extractClientIp(request);
+    const claimLimit = await withinFreeClaimLimit(ip);
+    if (!claimLimit.ok) {
+      if (claimLimit.reason === 'infra') {
+        return NextResponse.json(
+          { ok: false, error: 'claim_unavailable', message: 'Banner claims are temporarily unavailable. Please try again shortly.' },
+          { status: 503 },
+        );
+      }
+      return NextResponse.json(
+        { ok: false, error: 'rate_limited', message: 'Too many banner claims from this connection. Please try again later.' },
+        { status: 429 },
+      );
+    }
+
     const expiresAt = new Date(Date.now() + days * 86400 * 1000).toISOString();
 
     const claim = await supabaseAdmin.rpc('claim_free_banner_slot', {
@@ -117,6 +219,7 @@ export async function POST(request: NextRequest) {
       p_description: content.description,
       p_target_link: content.targetLink,
       p_expires_at: expiresAt,
+      p_claimed_ip: ip,
     });
 
     if (claim.error) {
@@ -131,6 +234,12 @@ export async function POST(request: NextRequest) {
     if (row?.decision === 'exhausted') {
       return NextResponse.json(
         { ok: false, error: 'exhausted', freeUsed: row.free_used, freeLimit: row.free_limit },
+        { status: 409 },
+      );
+    }
+    if (row?.decision === 'already_claimed_by_ip') {
+      return NextResponse.json(
+        { ok: false, error: 'already_claimed_by_ip', message: 'A free banner has already been claimed from this connection.' },
         { status: 409 },
       );
     }

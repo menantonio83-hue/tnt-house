@@ -1,3 +1,14 @@
+// Version 4.0 — lib/rate-limit.ts
+//
+// v4.0 (M-5 fix): the free tier now FAILS CLOSED. The personal daily
+// counter and the shared free pool both used to fail open on an infra
+// error — a Supabase or Redis blip silently stripped metering from the
+// free tier entirely, and two concurrent outages could unmeter it
+// twice over. A free, unmetered surface is the wrong place to fail
+// open: a counter error now returns a 503 telling the caller the free
+// tier is temporarily unavailable (top up/subscribe for guaranteed
+// access). Paying tiers are unaffected by either change.
+//
 // Version 3.9 — lib/rate-limit.ts
 //
 // v3.9: 402 responses from buildLimitReachedResponse() now include
@@ -231,15 +242,25 @@ export async function enforceRateLimit(
   const used = await incrementDailyUsage(key.id, usageDate);
 
   if (used === null) {
+    // v4.0 (M-5): fail CLOSED — see header. The old fail-open made a
+    // Supabase outage silently unmeter the entire free tier.
     return {
-      allowed: true,
-      limit: null,
+      allowed: false,
+      limit: FREE_DAILY_LIMIT,
       used: 0,
       remaining: null,
       resetAt,
       creditBalanceUsd: key.credit_balance_usd,
       usedOverageCredit: false,
-      response: null,
+      response: NextResponse.json(
+        {
+          error: 'Free tier temporarily unavailable — the usage counter could not be read. Please try again shortly, or top up/subscribe for guaranteed access.',
+          limit: FREE_DAILY_LIMIT,
+          reset_at: resetAt,
+          upgrade_url: 'https://tnt-audit.com/risk-api#billing',
+        },
+        { status: 503, headers: extraHeaders },
+      ),
     };
   }
 
@@ -252,6 +273,27 @@ export async function enforceRateLimit(
     const globalPool = await consumeGlobalFreePool(1);
 
     if (!globalPool.allowed && !isFirstCallToday) {
+      if (globalPool.reason === 'infra') {
+        // v4.0 (M-5): fail CLOSED on the pool layer too — see header.
+        return {
+          allowed: false,
+          limit: FREE_DAILY_LIMIT,
+          used,
+          remaining: null,
+          resetAt,
+          creditBalanceUsd: key.credit_balance_usd,
+          usedOverageCredit: false,
+          response: NextResponse.json(
+            {
+              error: 'Free tier temporarily unavailable — the shared free pool could not be checked. Please try again shortly, or top up/subscribe for guaranteed access.',
+              limit: FREE_DAILY_LIMIT,
+              reset_at: resetAt,
+              upgrade_url: 'https://tnt-audit.com/risk-api#billing',
+            },
+            { status: 503, headers: extraHeaders },
+          ),
+        };
+      }
       return {
         allowed: false,
         limit: FREE_DAILY_LIMIT,
@@ -435,15 +477,24 @@ export async function enforceRateLimitBatch(
   const usedAfter = await incrementDailyUsageBy(key.id, usageDate, count);
 
   if (usedAfter === null) {
+    // v4.0 (M-5): fail CLOSED — see header.
     return {
-      allowed: true,
-      limit: null,
+      allowed: false,
+      limit: FREE_DAILY_LIMIT,
       used: 0,
       remaining: null,
       resetAt,
       creditBalanceUsd: key.credit_balance_usd,
       usedOverageCredit: false,
-      response: null,
+      response: NextResponse.json(
+        {
+          error: 'Free tier temporarily unavailable — the usage counter could not be read. Please try again shortly, or top up/subscribe for guaranteed access.',
+          limit: FREE_DAILY_LIMIT,
+          reset_at: resetAt,
+          upgrade_url: 'https://tnt-audit.com/risk-api#billing',
+        },
+        { status: 503, headers: extraHeaders },
+      ),
     };
   }
 
@@ -464,6 +515,27 @@ export async function enforceRateLimitBatch(
   if (withinFreeCount > 0) {
     const globalPool = await consumeGlobalFreePool(withinFreeCount);
     if (!globalPool.allowed) {
+      if (globalPool.reason === 'infra') {
+        // v4.0 (M-5): fail CLOSED on the pool layer too — see header.
+        return {
+          allowed: false,
+          limit: FREE_DAILY_LIMIT,
+          used: usedAfter,
+          remaining: null,
+          resetAt,
+          creditBalanceUsd: key.credit_balance_usd,
+          usedOverageCredit: false,
+          response: NextResponse.json(
+            {
+              error: 'Free tier temporarily unavailable — the shared free pool could not be checked. Please try again shortly, or top up/subscribe for guaranteed access.',
+              limit: FREE_DAILY_LIMIT,
+              reset_at: resetAt,
+              upgrade_url: 'https://tnt-audit.com/risk-api#billing',
+            },
+            { status: 503, headers: extraHeaders },
+          ),
+        };
+      }
       return {
         allowed: false,
         limit: FREE_DAILY_LIMIT,

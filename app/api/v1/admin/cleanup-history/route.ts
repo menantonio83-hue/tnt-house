@@ -20,14 +20,19 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { deleteMintRiskHistoryOlderThan } from '@/lib/mint-risk-history-store';
+import { secureCompare } from '@/lib/secure-compare';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
   const cronSecret = process.env.CRON_SECRET;
+  const bearer =
+    authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice('Bearer '.length).trim() : null;
 
-  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+  // Constant-time comparison — a timing side channel on this check
+  // would let an attacker byte-probe the cron secret.
+  if (!cronSecret || !secureCompare(bearer, cronSecret)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

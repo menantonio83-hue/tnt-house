@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error('[billing/status] error:', error);
     return NextResponse.json(
-      { error: 'Internal error', details: error.message },
+      { error: 'Internal error' },
       { status: 500, headers: CORS_HEADERS },
     );
   }

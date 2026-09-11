@@ -133,7 +133,7 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error('[token-risk/history] API error:', error);
     return respond(
-      NextResponse.json({ error: 'Internal error', details: error.message }, { status: 500, headers: CORS_HEADERS }),
+      NextResponse.json({ error: 'Internal error' }, { status: 500, headers: CORS_HEADERS }),
       error.message,
     );
   }

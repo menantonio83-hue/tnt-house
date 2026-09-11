@@ -21,6 +21,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateApiKey } from '@/lib/api-key';
 import { insertApiKey, type ApiKeyTier } from '@/lib/api-key-store';
+import { secureCompare } from '@/lib/secure-compare';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,7 +30,9 @@ export async function POST(request: NextRequest) {
     const adminSecret = request.headers.get('x-admin-secret');
     const expectedSecret = process.env.RISK_API_ADMIN_SECRET;
 
-    if (!expectedSecret || adminSecret !== expectedSecret) {
+    // Constant-time comparison — a timing side channel on this check
+    // would let an attacker byte-probe the admin secret.
+    if (!expectedSecret || !secureCompare(adminSecret, expectedSecret)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -58,7 +61,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('[admin/keys] error:', error);
     return NextResponse.json(
-      { error: 'Internal error', details: error.message },
+      { error: 'Internal error' },
       { status: 500 },
     );
   }

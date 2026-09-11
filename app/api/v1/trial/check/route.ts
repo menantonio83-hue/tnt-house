@@ -173,7 +173,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('[trial/check] error:', error);
     return NextResponse.json(
-      { error: 'Internal error', details: error.message },
+      { error: 'Internal error' },
       { status: 500, headers: RESPONSE_HEADERS },
     );
   }

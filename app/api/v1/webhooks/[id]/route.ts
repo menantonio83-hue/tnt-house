@@ -48,7 +48,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
   } catch (error: any) {
     console.error('[webhooks/id] DELETE error:', error);
     return NextResponse.json(
-      { error: 'Internal error', details: error.message },
+      { error: 'Internal error' },
       { status: 500, headers: CORS_HEADERS },
     );
   }

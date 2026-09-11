@@ -30,7 +30,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchTokenRisk } from '@/lib/token-risk-core';
-import { hasPendingGrace, grantPendingGrace } from '@/lib/x402/pending-grace';
+import { consumePendingGrace, grantPendingGrace } from '@/lib/x402/pending-grace';
 import { waitUntil } from '@vercel/functions';
 import {
   buildPaymentRequiredBody,
@@ -93,7 +93,10 @@ export async function GET(request: NextRequest) {
   // computing from an earlier PAID call — see
   // lib/x402/pending-grace.ts for the full reasoning. Skips the
   // payment challenge entirely; no X-PAYMENT header required.
-  if (await hasPendingGrace(mint)) {
+  // v1.11 (M-4): each free re-poll consumes the mint's and the day's
+  // grace budgets (5 per mint, 200/day globally) — exhausted budgets
+  // fall through to the normal 402 challenge.
+  if (await consumePendingGrace(mint)) {
     const graceResult = await fetchTokenRisk(mint);
     if (!graceResult.ok) {
       return NextResponse.json(

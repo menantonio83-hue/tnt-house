@@ -21,14 +21,13 @@
 // specific names, not the UPSTASH_REDIS_REST_* ones the code originally
 // and wrongly assumed).
 //
-// FAIL-OPEN if Redis is unreachable — the opposite choice from
-// lib/demo-limit.ts, and deliberately so: demo-limit.ts guards a
-// completely unauthenticated surface (fail-closed is the safe default
-// there), but this guards calls from a key that has ALREADY passed its
-// own personal rate-limit check. An infra hiccup on this cost-control
-// layer should not block an otherwise-legitimate authenticated call —
-// same reasoning lib/webhook-lock.ts already uses for its own
-// fail-open choice.
+// v1.1 (M-5 fix): FAIL-CLOSED if Redis is unreachable. The old
+// fail-open choice was the second half of the hole fixed in
+// lib/rate-limit.ts v4.0: a Redis blip used to strip BOTH cost-control
+// layers off the free tier at once. A free, unmetered surface is the
+// wrong place to fail open — free-tier callers get a 503 "free tier
+// temporarily unavailable" instead, and paying tiers are unaffected
+// (they never touch this pool).
 
 import { Redis } from '@upstash/redis';
 
@@ -54,6 +53,9 @@ export interface GlobalPoolResult {
   allowed: boolean;
   used: number;
   limit: number;
+  // 'infra' distinguishes "Redis is down" (callers fail closed with a
+  // 503) from a genuinely exhausted pool (callers get the 402 upsell).
+  reason: 'ok' | 'capped' | 'infra';
 }
 
 // count defaults to 1 (single-call path, lib/rate-limit.ts
@@ -64,9 +66,9 @@ export interface GlobalPoolResult {
 export async function consumeGlobalFreePool(count = 1): Promise<GlobalPoolResult> {
   if (!redis) {
     console.error(
-      '[free-tier-pool] Redis not configured, failing OPEN (not blocking an already-authenticated free-tier call over a cost-control infra gap).',
+      '[free-tier-pool] Redis not configured, failing CLOSED (v1.1, M-5) — the free tier is unavailable until Redis is reachable.',
     );
-    return { allowed: true, used: 0, limit: GLOBAL_FREE_DAILY_LIMIT };
+    return { allowed: false, used: 0, limit: GLOBAL_FREE_DAILY_LIMIT, reason: 'infra' };
   }
 
   const key = `${POOL_KEY_PREFIX}${new Date().toISOString().slice(0, 10)}`;
@@ -80,9 +82,14 @@ export async function consumeGlobalFreePool(count = 1): Promise<GlobalPoolResult
       // pool would never actually reset at UTC midnight.
       await redis.expire(key, secondsUntilUtcMidnight());
     }
-    return { allowed: used <= GLOBAL_FREE_DAILY_LIMIT, used, limit: GLOBAL_FREE_DAILY_LIMIT };
+    return {
+      allowed: used <= GLOBAL_FREE_DAILY_LIMIT,
+      used,
+      limit: GLOBAL_FREE_DAILY_LIMIT,
+      reason: used > GLOBAL_FREE_DAILY_LIMIT ? 'capped' : 'ok',
+    };
   } catch (e) {
-    console.error('[free-tier-pool] Redis error, failing open:', (e as Error).message);
-    return { allowed: true, used: 0, limit: GLOBAL_FREE_DAILY_LIMIT };
+    console.error('[free-tier-pool] Redis error, failing closed (v1.1, M-5):', (e as Error).message);
+    return { allowed: false, used: 0, limit: GLOBAL_FREE_DAILY_LIMIT, reason: 'infra' };
   }
 }

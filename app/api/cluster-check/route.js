@@ -339,6 +339,6 @@ export async function GET(request) {
       { headers: RESPONSE_HEADERS },
     );
   } catch (e) {
-    return NextResponse.json({ error: e.message }, { status: 500, headers: RESPONSE_HEADERS });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500, headers: RESPONSE_HEADERS });
   }
 }

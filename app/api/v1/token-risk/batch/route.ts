@@ -225,6 +225,6 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('[token-risk/batch] API error:', error);
     logBatch(500, error.message);
-    return NextResponse.json({ error: 'Internal error', details: error.message }, { status: 500, headers: CORS_HEADERS });
+    return NextResponse.json({ error: 'Internal error' }, { status: 500, headers: CORS_HEADERS });
   }
 }

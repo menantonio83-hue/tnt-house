@@ -151,7 +151,7 @@ export async function POST(request: Request) {
     if (!dsRes.ok) {
       const errText = await dsRes.text();
       await alertAdmin('deepseek-chat-risk-api', `${dsRes.status} — ${errText}`);
-      return new Response(JSON.stringify({ error: 'DeepSeek error: ' + errText }), {
+      return new Response(JSON.stringify({ error: 'Chat service unavailable right now. Please try again shortly.' }), {
         status: 500,
         headers: { 'Content-Type': 'application/json' },
       });
@@ -178,7 +178,7 @@ export async function POST(request: Request) {
       headers: { 'Content-Type': 'application/json' },
     });
   } catch (e: any) {
-    return new Response(JSON.stringify({ error: e.message }), {
+    return new Response(JSON.stringify({ error: 'Internal server error' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     });

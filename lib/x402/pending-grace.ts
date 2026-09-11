@@ -1,3 +1,17 @@
+// Version 1.1 — lib/x402/pending-grace.ts
+//
+// v1.1 (M-4 fix): the grace window is no longer an unlimited free
+// ride. The 3-minute mint-scoped window stays (see v1.0 below for why
+// it exists), but every free re-poll now consumes a budget:
+//
+//   * GRACE_CALLS_PER_MINT — max free re-polls per mint per window, so
+//     one paid call funds at most a handful of polls for THAT mint
+//     (which is all a poll-until-complete loop legitimately needs).
+//   * GRACE_GLOBAL_DAILY_LIMIT — hard daily ceiling across ALL mints,
+//     the backstop for the "one paid call, then hammer every mint in
+//     pending state" pattern. Whichever is hit first ends the free ride
+//     and the caller is challenged with a normal 402.
+//
 // Version 1.0 — lib/x402/pending-grace.ts
 //
 // Fixes a real gap surfaced publicly in an X thread (@greenalien_gt /
@@ -34,29 +48,67 @@ const redis =
 
 const GRACE_TTL_SECONDS = 180; // 3 minutes
 
+// v1.1: free re-poll budgets (see header).
+const GRACE_CALLS_PER_MINT = 5;
+const GRACE_GLOBAL_DAILY_LIMIT = 200;
+
 function graceKey(mint: string): string {
   return `x402-pending-grace:${mint}`;
 }
 
+function graceCallsKey(mint: string): string {
+  return `x402-pending-grace:calls:${mint}`;
+}
+
+function graceGlobalKey(): string {
+  return `x402-pending-grace:global:${new Date().toISOString().slice(0, 10)}`;
+}
+
+function secondsUntilUtcMidnight(): number {
+  const now = new Date();
+  const next = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0);
+  return Math.max(1, Math.ceil((next - now.getTime()) / 1000));
+}
+
 // Checked BEFORE the payment challenge — if true, the caller skips
-// verify/settle entirely for this request.
-export async function hasPendingGrace(mint: string): Promise<boolean> {
+// verify/settle entirely for this request. Each true consumes one
+// free re-poll from the mint's and the day's grace budgets (v1.1).
+export async function consumePendingGrace(mint: string): Promise<boolean> {
   if (!redis) return false; // fail closed — no Redis means no free rides
+
   try {
-    const exists = await redis.get(graceKey(mint));
-    return exists !== null;
+    const active = await redis.get(graceKey(mint));
+    if (active === null) return false;
+
+    const globalKey = graceGlobalKey();
+    const [perMint, global] = await Promise.all([
+      redis.incr(graceCallsKey(mint)),
+      redis.incr(globalKey),
+    ]);
+
+    await Promise.all([
+      perMint === 1 ? redis.expire(graceCallsKey(mint), GRACE_TTL_SECONDS) : Promise.resolve(),
+      global === 1 ? redis.expire(globalKey, secondsUntilUtcMidnight()) : Promise.resolve(),
+    ]);
+
+    if (global > GRACE_GLOBAL_DAILY_LIMIT) return false;
+    return perMint <= GRACE_CALLS_PER_MINT;
   } catch (e) {
-    console.error('[x402/pending-grace] Redis error reading grace state:', (e as Error).message);
+    console.error('[x402/pending-grace] Redis error consuming grace:', (e as Error).message);
     return false;
   }
 }
 
 // Called AFTER a successful, PAID call whose result came back pending —
-// opens the free-repoll window for this mint.
+// opens the free-repoll window for this mint and resets its per-mint
+// re-poll budget (v1.1).
 export async function grantPendingGrace(mint: string): Promise<void> {
   if (!redis) return;
   try {
     await redis.set(graceKey(mint), '1', { ex: GRACE_TTL_SECONDS });
+    // Best-effort reset: a NEW paid pending call re-opens the window,
+    // so a fresh budget for the new window is the right semantics.
+    await redis.del(graceCallsKey(mint));
   } catch (e) {
     console.error('[x402/pending-grace] Redis error granting grace:', (e as Error).message);
   }

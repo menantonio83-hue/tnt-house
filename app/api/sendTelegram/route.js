@@ -165,12 +165,12 @@ export async function POST(request) {
       // so misconfigurations like "bot not a group member" or "chat not
       // found" are visible in Vercel logs instead of a vague message.
       console.error('[sendTelegram] Telegram API error:', JSON.stringify(result));
-      return NextResponse.json({ error: result.description }, { status: 500 });
+      return NextResponse.json({ error: 'Telegram send failed' }, { status: 500 });
     }
 
     return NextResponse.json({ ok: true }, { status: 200 });
   } catch (err) {
     console.error('[sendTelegram] fetch error:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

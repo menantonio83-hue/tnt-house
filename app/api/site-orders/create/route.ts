@@ -117,6 +117,19 @@ function isValidHttpUrl(value: string): boolean {
   }
 }
 
+// M-10: hard caps on stored banner content, mirroring
+// app/api/banners/claim/route.ts v1.2.
+const BANNER_TOKEN_NAME_MAX = 50;
+const BANNER_DESC_MAX = 300;
+const BANNER_LINK_MAX = 500;
+const BANNER_IMG_MAX_CHARS = 400_000;
+
+function isValidBannerImage(value: string): boolean {
+  if (value.length > BANNER_IMG_MAX_CHARS) return false;
+  if (/^https?:\/\//i.test(value)) return isValidHttpUrl(value);
+  return /^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+/=]+$/i.test(value);
+}
+
 // Same cookie app/api/quick-check/route.js already sets and reads. A
 // credits order needs an identity to credit on payment, and reusing this
 // cookie means "buy credits" no longer requires "have already run a free
@@ -219,17 +232,28 @@ export async function POST(request: NextRequest) {
     const name = typeof input?.tokenName === 'string' ? input.tokenName.trim() : '';
     const desc = typeof input?.description === 'string' ? input.description.trim() : '';
     const link = typeof input?.targetLink === 'string' ? input.targetLink.trim() : '';
+    if (
+      name.length > BANNER_TOKEN_NAME_MAX ||
+      desc.length > BANNER_DESC_MAX ||
+      link.length > BANNER_LINK_MAX
+    ) {
+      return NextResponse.json({ ok: false, error: 'banner_content_too_long' }, { status: 400 });
+    }
     if (!name || !desc) {
       return NextResponse.json({ ok: false, error: 'invalid_banner_content' }, { status: 400 });
     }
     if (!isValidHttpUrl(link)) {
       return NextResponse.json({ ok: false, error: 'invalid_target_link' }, { status: 400 });
     }
+    const img = typeof input?.bannerImg === 'string' ? input.bannerImg.trim() : '';
+    if (img && !isValidBannerImage(img)) {
+      return NextResponse.json({ ok: false, error: 'invalid_banner_img' }, { status: 400 });
+    }
     usd = price.usd;
     bannerSlot = slot;
     tierLabel = `${input.days}d`;
     bannerTokenName = name.toUpperCase();
-    bannerImg = typeof input?.bannerImg === 'string' ? input.bannerImg.trim() : '';
+    bannerImg = img;
     bannerDesc = desc;
     bannerTargetLink = link;
   } else if (kind === 'credits') {

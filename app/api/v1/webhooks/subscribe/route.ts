@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('[webhooks/subscribe] POST error:', error);
     return NextResponse.json(
-      { error: 'Internal error', details: error.message },
+      { error: 'Internal error' },
       { status: 500, headers: CORS_HEADERS },
     );
   }
@@ -148,7 +148,7 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error('[webhooks/subscribe] GET error:', error);
     return NextResponse.json(
-      { error: 'Internal error', details: error.message },
+      { error: 'Internal error' },
       { status: 500, headers: CORS_HEADERS },
     );
   }

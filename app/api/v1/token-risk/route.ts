@@ -571,7 +571,7 @@ export async function GET(request: NextRequest) {
     console.error('[token-risk] API error:', error);
     return respond(
       NextResponse.json(
-        { error: 'Internal error', details: error.message },
+        { error: 'Internal error' },
         { status: 500, headers: CORS_HEADERS },
       ),
       { error: error.message },

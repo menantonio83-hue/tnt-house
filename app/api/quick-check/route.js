@@ -124,7 +124,7 @@ export async function GET(request) {
     return withFingerprintCookie(res, fp, isNew);
   } catch (error) {
     console.error('GET /api/quick-check Error:', error);
-    return Response.json({ error: error.message }, { status: 500 });
+    return Response.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
@@ -142,6 +142,6 @@ export async function POST(request) {
     return withFingerprintCookie(res, fp, isNew);
   } catch (error) {
     console.error('POST /api/quick-check (status) Error:', error);
-    return Response.json({ error: error.message }, { status: 500 });
+    return Response.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
