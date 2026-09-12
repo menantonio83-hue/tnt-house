@@ -1,20 +1,29 @@
 'use client';
 
-// Version 1.2 — app/quick-check/page.js
+// Version 1.3 — app/quick-check/page.js
+//
+// v1.3 (2026-09-12): the engine behind this page was upgraded
+// (lib/helius-client.js v1.3) — Quick Check now REALLY checks honeypot,
+// LP lock, dev-wallet % and tax (one RugCheck /report call) plus holder
+// concentration through the same robust path as the paid API. The result
+// card shows those signals. The ONLY thing Quick Check still doesn't do
+// is insider-cluster tracing, which stays 'pending' server-side — the
+// tagline and the in-card note below now say exactly that.
 //
 // v1.2 (2026-09-12): the tagline claimed "Same audit engine TNT House
-// uses" — false. Quick Check has no RugCheck call and no cluster trace
-// (see lib/helius-client.js's own comment on this), so honeypot,
-// LP-lock, insider-cluster, dev-wallet and tax signals are all absent
-// here, unlike the main site/API/MCP/trial surfaces which all call
-// lib/token-risk-core.ts's fetchTokenRisk(). That's a legitimate
+// uses" — false at the time. Quick Check had no RugCheck call and no
+// cluster trace (see lib/helius-client.js's own comment on this), so
+// honeypot, LP-lock, insider-cluster, dev-wallet and tax signals were
+// all absent here, unlike the main site/API/MCP/trial surfaces which all
+// call lib/token-risk-core.ts's fetchTokenRisk(). That's a legitimate
 // speed/cost trade-off — RugCheck + cluster tracing is the slow, paid
 // part of a full audit, and Quick Check exists specifically to be the
 // instant, cheap alternative competitors' free scanners offer. The
 // trade-off itself isn't the problem; claiming parity with the deeper
 // engine while selling this one for credits was. Replaced the tagline
 // and added an explicit "not checked" line next to the score itself,
-// not just at the top of the page.
+// not just at the top of the page. (v1.3 narrows that "not checked"
+// list down to insider clusters only.)
 //
 // v1.1 (2026-09-11): the purchase flow no longer computes its own
 // amount or calls the deleted app/api/quick-check/credits/route.js.
@@ -181,16 +190,15 @@ export default function QuickCheckPage() {
         <p className="text-slate-400 text-sm mb-1">
           Paste any Solana token CA for an instant scan — no listing, no submission.
         </p>
-        {/* v1.2: this used to say "Same audit engine TNT House uses" — it
-            isn't. Quick Check has no RugCheck call and no cluster trace
-            (see lib/helius-client.js), so it can't see honeypot, LP-lock,
-            insider clusters, dev-wallet %, or tax — exactly the signals
-            the main engine's caps are built around. That's an honest
-            speed/depth trade-off, not a bug, but claiming engine parity
-            here was actively false, on a page people pay credits on. */}
+        {/* v1.3: engine upgraded (lib/helius-client.js v1.3) — honeypot,
+            LP lock, tax and holder concentration are now really checked
+            via RugCheck + the same robust holder path as the paid API.
+            The only thing Quick Check still doesn't do is insider-cluster
+            tracing — for that, use the full audit on the main site or
+            the Risk-Data API. */}
         <p className="text-slate-500 text-xs mb-6">
-          Fast scan: mint/freeze authority, liquidity, holder concentration.
-          Doesn't check honeypot, LP lock, insider clusters, or tax — for
+          Fast scan: mint/freeze authority, liquidity, holder concentration,
+          honeypot, LP lock and tax. Doesn't check insider clusters — for
           those, use the full audit on the main site or the Risk-Data API.
         </p>
 
@@ -223,16 +231,49 @@ export default function QuickCheckPage() {
         {result && (
           <div className="bg-slate-900/60 border-2 border-purple-500/30 rounded-lg p-4 text-sm space-y-1">
             <div className="text-3xl font-black text-emerald-400">{result.securityScore}/100</div>
-            <div>Mint authority revoked: {String(result.mintAuthRevoked ?? '—')}</div>
-            <div>Freeze authority revoked: {String(result.freezeAuthRevoked ?? '—')}</div>
-            <div>Holder risk: {result.holderRisk?.riskLevel ?? '—'}</div>
+            <div className="text-xs text-slate-400">{result.verdict}</div>
+            <div>Mint authority revoked: {String(result.checks?.mintAuthority?.revoked ?? '—')}</div>
+            <div>Freeze authority revoked: {String(result.checks?.freezeAuthority?.revoked ?? '—')}</div>
+            <div>Holder risk: {result.checks?.holderDistribution?.riskLevel ?? '—'}</div>
+            <div>
+              Top 10 holders:{' '}
+              {result.checks?.holderDistribution?.top10Percent != null
+                ? result.checks.holderDistribution.top10Percent.toFixed(1) + '%'
+                : '—'}
+            </div>
+            <div>
+              Honeypot risk:{' '}
+              {result.checks?.honeypotRisk === true
+                ? '🚨 Yes'
+                : result.checks?.honeypotRisk === false
+                  ? '✅ No'
+                  : '—'}
+            </div>
+            <div>
+              LP locked:{' '}
+              {result.checks?.lpLock?.percent != null ? result.checks.lpLock.percent + '%' : '—'}
+            </div>
+            <div>
+              Jupiter verified:{' '}
+              {result.checks?.jupiterVerified === true
+                ? '✅ Yes'
+                : result.checks?.jupiterVerified === false
+                  ? 'No'
+                  : '—'}
+            </div>
             <div>Liquidity: {result.liquidity != null ? `$${result.liquidity}` : '—'}</div>
-            {/* v1.2: this score can't reflect honeypot/LP-lock/cluster
-                risk — see the header note above for why. Repeating it
-                right next to the number, not just at the top of the
-                page, since this is the part someone screenshots. */}
-            <div className="text-slate-500 text-xs pt-1">
-              Fast scan only — not checked: honeypot, LP lock, insider clusters, tax.
+            {result.capsTriggered?.length > 0 && (
+              <div className="text-xs text-amber-400/80 pt-1">
+                Capped by: {result.capsTriggered.map((c) => c.reason).join(', ')}
+              </div>
+            )}
+            {/* v1.3: only insider clusters remain outside Quick Check's
+                scope — honeypot, LP lock, tax and holders are now real
+                checks (see lib/helius-client.js v1.3). */}
+            <div className="text-[11px] text-slate-500 pt-2 border-t border-slate-700/60">
+              Quick Check scans: mint/freeze authority, holder concentration, liquidity, honeypot risk,
+              LP lock and taxes (RugCheck + live RPC). Insider-cluster tracing is NOT included — for that
+              use the full Risk-Data API.
             </div>
           </div>
         )}
