@@ -499,7 +499,20 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
     let clusterAnalysis: 'complete' | 'pending' = 'pending';
 
     if (row && row.status === 'complete') {
-      insiderClusters = row.clusters;
+      // v1.11: rows written before the funder classification (detector
+      // v7.3) lack the four classification fields — normalize them to
+      // the honest defaults instead of trusting undefined.
+      insiderClusters = row.clusters.map((c) => {
+        const cluster = c as Partial<InsiderCluster>;
+        return {
+          funder: cluster.funder ?? '',
+          wallets: cluster.wallets ?? [],
+          funder_class: cluster.funder_class ?? 'unknown',
+          funder_label: cluster.funder_label ?? null,
+          funder_confidence: cluster.funder_confidence ?? null,
+          false_positive_likely: cluster.false_positive_likely ?? false,
+        };
+      });
       clusterAnalysis = 'complete';
     }
 

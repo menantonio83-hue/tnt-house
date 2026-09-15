@@ -252,8 +252,16 @@ async function traceClusters(ca) {
   // and is grown by hand (see that file's header); this filter is a
   // no-op until entries are added, which is intentional: excluding
   // nothing is the correct behavior for an address nobody has verified.
+  //
+  // v1.11: KNOWN_CEX_FUNDERS is now a Record<string, string> (v2.0 of
+  // that file) — same addresses, now with labels. hasOwnProperty keeps
+  // this an "is it listed?" check so the label doesn't change behavior
+  // here.
   const clusters = Object.entries(funderMap)
-    .filter(([funder, holders]) => holders.length >= 2 && !KNOWN_CEX_FUNDERS.has(funder))
+    .filter(
+      ([funder, holders]) =>
+        holders.length >= 2 && !Object.prototype.hasOwnProperty.call(KNOWN_CEX_FUNDERS, funder),
+    )
     .map(([funder, holders]) => ({ funder, holders }));
 
   return {

@@ -47,7 +47,18 @@ export type ClusterCacheStatus = 'pending' | 'complete' | 'failed';
 export interface ClusterCacheRow {
   mint: string;
   status: ClusterCacheStatus;
-  clusters: Array<{ funder: string; wallets: string[] }>;
+  // v6.3: clusters now carry funder-classification fields (detector
+  // v7.3). Loose structural type so pre-classification rows without
+  // the fields still read cleanly — lib/token-risk-core.ts normalizes
+  // the missing fields to their honest defaults.
+  clusters: Array<{
+    funder: string;
+    wallets: string[];
+    funder_class?: string;
+    funder_label?: string | null;
+    funder_confidence?: number | null;
+    false_positive_likely?: boolean;
+  }>;
   checked_holders: number;
   error: string | null;
   updated_at: string;

@@ -1,38 +1,36 @@
-// Version 1.1 — lib/known-cex-funders.ts
+// Version 2.0 — lib/known-cex-funders.ts
 //
-// A small, manually-curated whitelist of Solana wallet addresses known to
-// belong to centralized exchanges or bridges, used by
-// app/api/cluster-check/route.js to avoid flagging "multiple top holders
-// funded by the same exchange deposit wallet" as an insider cluster.
+// A small, manually-curated whitelist of Solana wallet addresses known
+// to belong to centralized exchanges, bridges or co-signer
+// infrastructure hot wallets. This is the SINGLE source of truth for
+// both cluster surfaces:
+//   - app/api/cluster-check/route.js (manual "Check Clusters" button)
+//     excludes these funders from its cluster list (v1.10, unchanged);
+//   - lib/insider-cluster-detector.ts (the real safety_score engine)
+//     classifies them as funder_class: 'cex' with confidence 1.0 and
+//     false_positive_likely: true, so a shared CEX/infra funding source
+//     stops penalizing computeSafetyScoreBase (v7.3).
 //
-// WHY THIS FILE IS EMPTY BY DEFAULT: no free, verifiable API for Solana
-// CEX wallet labels exists as of this writing (checked: Helius Wallet
-// Identity API requires a paid plan and returns 403 on a free key; Vybe
-// Network's labeled-accounts endpoint is gated behind its paid tier too,
-// despite Vybe having a free plan for other endpoints). Hardcoding
-// addresses without a way to verify them would mean guessing — exactly
-// the thing this project's own working rule forbids ("say 'I don't know'
-// rather than substitute a plausible value").
+// v2.0: type changed from ReadonlySet<string> to Record<string, string>
+// (address -> human label) so the detector can report the REAL label
+// instead of just "excluded". route.js's old `.has()` caller was updated
+// to match. The list is grown BY HAND, one verified address at a time:
+//   1. a funder shows up in a cluster;
+//   2. look it up on a free public explorer (solscan.io / solana.fm)
+//      and confirm the exchange/infra label there;
+//   3. add it below with the label and the date you checked (labels can
+//      be re-used or retired, so a dated entry is easier to re-verify).
 //
-// So this list starts empty and is meant to be grown BY HAND, one
-// verified address at a time:
-//   1. cluster-check flags a funder address as shared across 2+ holders.
-//   2. Look the funder address up on a free public explorer — e.g.
-//      https://solscan.io/account/<address> or https://solana.fm — and
-//      check whether it carries an exchange/bridge label there.
-//   3. If confirmed, add it below with the exchange name and the date
-//      you checked it (labels can be re-used or retired, so a dated
-//      entry is easier to eventually re-verify than an undated one).
-//
-// Most exchange HOT wallets should no longer need to be listed here at
-// all: v1.9 of cluster-check/route.js already excludes any holder whose
-// true first transaction couldn't be confirmed within the RPC page
-// budget (3000 signatures back), which is true of essentially every
-// established CEX hot wallet. What this list is actually for is the
-// remaining gap — newer or lower-traffic exchange DEPOSIT addresses,
-// which can have short enough histories to pass that check and still
-// not be a real insider link.
-export const KNOWN_CEX_FUNDERS: ReadonlySet<string> = new Set([
-  // Example (do not uncomment without verifying the address yourself):
-  // '4xLpwxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx', // Binance deposit — verified 2026-09-11 via solscan.io
-]);
+// Why the list can stay small: established exchange HOT wallets are
+// already handled by the age/balance hop rules in the detector (v1.9/
+// v7.0 — see git history), and the new composite infra heuristic in
+// insider-cluster-detector v7.3 covers co-signer-style wallets. This
+// allowlist covers the remaining gap with certain labels: verified
+// addresses that either predate the heuristic or deserve a real name
+// instead of an inferred one.
+export const KNOWN_CEX_FUNDERS: Record<string, string> = {
+  // Binance 2 Hot Wallet (verified on-chain 2026-09-15)
+  '5tzFkiKscXHK5ZXCGbXZxdw7gTjjD1mBwuoFbhUvuAi9': 'Binance Hot Wallet',
+  // Fomo Co-signer Hot Wallet (verified on-chain 2026-09-15)
+  'AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51': 'Fomo Co-signer',
+};

@@ -1,4 +1,8 @@
-// Version 1.2 — lib/funder-cache.ts
+// Version 1.3 — lib/funder-cache.ts
+//
+// v1.3: CachedFunder gains amountLamports (first-funding amount). New
+// field only — old entries without it remain valid, so no key/migration
+// churn. See the field comment for why it's cacheable.
 //
 // v1.2: FIXED WRONG ENV VAR NAMES — this file (and lib/webhook-lock.ts,
 // lib/demo-limit.ts) checked process.env.UPSTASH_REDIS_REST_URL /
@@ -50,6 +54,13 @@ const KEY_PREFIX = 'funder:';
 export interface CachedFunder {
   funder: string;
   blockTime: number | null;
+  // v1.3: how much SOL this wallet first received from its funder
+  // (lamports). A fixed historical fact, so cacheable like the rest.
+  // Used by insider-cluster-detector's funder classification when THIS
+  // wallet is itself a cluster funder — the micro-transfer signal is
+  // then available even on a cache hit. Optional so pre-v1.3 entries
+  // still read cleanly (they just degrade to "amount unknown").
+  amountLamports?: number | null;
 }
 
 // Returns the cached funder-resolution result for a wallet address, or

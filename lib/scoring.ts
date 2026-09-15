@@ -126,10 +126,18 @@ export function classifyHolderRisk(
   return 'LOW';
 }
 
-// Structural type only — we read nothing but the wallet count, so this
-// module does not need to import lib/insider-cluster-detector.
+// Structural type only — we read the wallet count and (v1.5) the
+// false_positive_likely flag, so this module still does not need to
+// import lib/insider-cluster-detector.
 export interface ScoringCluster {
   wallets: unknown[];
+  // v1.5: clusters classified as likely false positives (known CEX hot
+  // wallets / confirmed infra funding patterns — see funder_class in
+  // lib/insider-cluster-detector.ts) stay VISIBLE in API responses but
+  // no longer count toward the insider penalty below. Optional so
+  // older cached rows and callers passing raw wallet counts keep
+  // working unchanged.
+  false_positive_likely?: boolean;
 }
 
 // ─── Additive base (max 100, before caps) ───
@@ -190,8 +198,13 @@ export function computeSafetyScoreBase(
   if (clusterAnalysis === 'pending') {
     insiderScore = 12;
   } else {
-    const clusteredWallets = clusters.reduce((sum, c) => sum + c.wallets.length, 0);
-    const penalty = clusters.length * 8 + clusteredWallets * 3;
+    // v1.5: clusters flagged as likely false positives (shared CEX /
+    // infra funder, not insider control) are excluded from the penalty.
+    // They remain in the API response (insider_clusters) with the flag
+    // and classification — honest, just not punitive.
+    const realClusters = clusters.filter((c) => !c.false_positive_likely);
+    const clusteredWallets = realClusters.reduce((sum, c) => sum + c.wallets.length, 0);
+    const penalty = realClusters.length * 8 + clusteredWallets * 3;
     insiderScore = Math.max(0, 25 - penalty);
   }
 
