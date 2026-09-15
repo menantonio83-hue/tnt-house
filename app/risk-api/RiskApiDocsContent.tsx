@@ -1,4 +1,9 @@
-// Version 1.1 — app/risk-api/RiskApiDocsContent.tsx
+// Version 1.2 — app/risk-api/RiskApiDocsContent.tsx
+//
+// v1.2: EXAMPLE_RESPONSE's insider_clusters entry now shows the four
+// funder-classification fields added in v1.20 (see i18n.ts changelog)
+// — funder_class, funder_label, funder_confidence, false_positive_likely
+// — so the sample response matches what the live API actually returns.
 //
 // v1.1: added the mcpFreeTierNote callout to the Rate Limiting section
 // — this page previously only documented the REST/keyed rate-limit
@@ -122,7 +127,19 @@ const EXAMPLE_RESPONSE = {
   caps_triggered: [],
   dominant_cap: null,
   cluster_analysis: 'complete',
-  insider_clusters: [{ funder: '9xQe...k2Pd', wallets: ['7uF3...aZ1', '3mN8...qR2'] }],
+  insider_clusters: [
+    {
+      funder: '9xQe...k2Pd',
+      wallets: ['7uF3...aZ1', '3mN8...qR2'],
+      // v1.20: funder classification -- known CEX/infra funders stay
+      // visible here but no longer count toward the insider penalty
+      // in safety_score. See fieldInsiderClusters in i18n.ts.
+      funder_class: 'unknown',
+      funder_label: null,
+      funder_confidence: null,
+      false_positive_likely: false,
+    },
+  ],
   insider_holder_count: 2,
   mint_authority: { revoked: true, address: null },
   freeze_authority: { revoked: true, address: null },
