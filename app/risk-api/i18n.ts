@@ -354,7 +354,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     step3Desc: 'Your bot gets a score instantly — act on it or skip the trade. First-ever check on a brand-new mint may take a minute to reach the full picture.',
     responseFieldsTitle: 'Response fields',
     fieldSafetyScore: '0–100. Weighted from authorities, holder concentration, liquidity, volume, and real insider-cluster penalties.',
-    fieldInsiderClusters: 'Wallets that share a first-funder — an on-chain-provable insider/sniper signal, not a guess.',
+    fieldInsiderClusters: 'Wallets that share a first-funder — an on-chain-provable insider/sniper signal, not a guess. Each cluster also carries funder_class, funder_label, funder_confidence, and false_positive_likely: known CEX/bridge hot wallets and confirmed high-fan-out infra funders stay visible here but no longer count toward the insider penalty in safety_score.',
     fieldClusterAnalysis: '"pending" on a token\'s first-ever check (cluster trace runs in the background), "complete" after ~1–2 minutes.',
     fieldAuthorities: 'Whether each authority is revoked, and its address if still active.',
     fieldHoneypotLpLocked: 'honeypot_risk (boolean) and lp_locked ({ locked, percent }) from RugCheck. null means it could not be checked, not "safe."',
@@ -400,6 +400,13 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'Changelog',
     changelogNote: 'No mailing list or webhooks yet for update announcements — this page and the X / Telegram links in the footer are the way to stay current.',
     changelogEntries: [
+      {
+        version: 'v1.20',
+        date: '2026-09-15',
+        changes: [
+          "insider_clusters: each cluster now carries funder_class ('cex' | 'infra' | 'likely_exchange_or_infra' | 'unknown'), funder_label, funder_confidence, and false_positive_likely. A shared first-funder that's a known exchange/bridge hot wallet, or matches a high-fan-out infrastructure pattern (thousands of funded accounts, micro-transfer rent payments, high tx frequency), stays visible in the response for transparency but no longer counts toward the insider penalty in safety_score -- fixes false positives we found live on CEX hot wallets being scored as insider clusters.",
+        ],
+      },
       {
         version: 'v1.19',
         date: '2026-08-29',
@@ -1602,7 +1609,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     step3Desc: 'Твой бот получает скор мгновенно — действуй или пропускай сделку. Самая первая проверка совсем нового минта может занять минуту до полной картины.',
     responseFieldsTitle: 'Поля ответа',
     fieldSafetyScore: '0–100. Взвешено по authorities, концентрации холдеров, ликвидности, объёму и реальным штрафам за инсайдерские кластеры.',
-    fieldInsiderClusters: 'Кошельки с общим первым фандером — доказуемый он-чейн сигнал инсайдера/снайпера, а не догадка.',
+    fieldInsiderClusters: 'Кошельки с общим первым фандером — доказуемый он-чейн сигнал инсайдера/снайпера, а не догадка. У каждого кластера также есть funder_class, funder_label, funder_confidence и false_positive_likely: известные CEX/bridge-кошельки и подтверждённые инфраструктурные фондеры с массовым фандингом остаются видны в ответе, но больше не штрафуют safety_score как инсайдерский сигнал.',
     fieldClusterAnalysis: '"pending" при первой проверке токена (трассировка кластеров считается в фоне), "complete" через ~1–2 минуты.',
     fieldAuthorities: 'Отозвана ли каждая authority, и её адрес, если ещё активна.',
     fieldHoneypotLpLocked: 'honeypot_risk (булево) и lp_locked ({ locked, percent }) от RugCheck. null означает "не удалось проверить", а не "безопасно".',
@@ -1648,6 +1655,13 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     changelogTitle: 'История изменений',
     changelogNote: 'Пока нет рассылки или вебхуков для анонсов обновлений — следить за актуальным состоянием можно по этой странице и ссылкам на X / Telegram в подвале.',
     changelogEntries: [
+      {
+        version: 'v1.20',
+        date: '2026-09-15',
+        changes: [
+          "insider_clusters: у каждого кластера теперь есть funder_class ('cex' | 'infra' | 'likely_exchange_or_infra' | 'unknown'), funder_label, funder_confidence и false_positive_likely. Общий первый фандер, который оказался известным hot wallet биржи/моста, или подходит под паттерн инфраструктуры (тысячи профинансированных аккаунтов, микро-переводы на rent, высокая частота транзакций), остаётся видимым в ответе для прозрачности, но больше не штрафует safety_score как инсайдерский сигнал -- чинит ложные срабатывания, которые мы живьём поймали на биржевых hot wallet'ах, помеченных как инсайдерские кластеры.",
+        ],
+      },
       {
         version: 'v1.19',
         date: '2026-08-29',
