@@ -1,4 +1,28 @@
-// Version 1.2 — lib/cluster-check-cache.ts
+// Version 1.3 — lib/cluster-check-cache.ts
+//
+// FIX v1.3: bumped CACHE_VERSION from 'v2' to 'v3'. Not a shape change on
+// its own, but app/api/cluster-check/route.js (v1.12) just switched from
+// its own 1-hop-only trace to the shared 3-hop
+// lib/insider-cluster-detector.ts engine — a real, on-chain-verifiable
+// difference in what a cluster IS for the same mint (confirmed live on
+// UNTIE: v1.11 route cached "no shared funding source", the shared
+// engine finds a real 2-wallet cluster 2 hops up). Every mint checked
+// before this deploy has a 12h-old cache entry under the OLD key that
+// would otherwise keep answering with the weaker result for up to 12
+// hours after the fix shipped, silently. Bumping the version prefix
+// makes every such entry an automatic miss, exactly the mechanism this
+// constant's original comment describes ("so a deploy can never serve a
+// payload the current code doesn't understand") — this deploy doesn't
+// change the payload's SHAPE, but it changes what the payload MEANS for
+// any mint traced before it, which is the same problem this version
+// bump exists to solve.
+//
+// Also widened CachedTrace's `clusters` entries to the fields the shared
+// engine's output actually carries (funder_class / funder_label /
+// funder_confidence), which app/api/cluster-check/route.js has written
+// since v1.12 but this interface hadn't caught up to name. No runtime
+// change — JSON storage never cared — this only makes the type honest
+// about what's already being read and written.
 //
 // Cache + spend control for /api/cluster-check (the First Funder Trace).
 //
@@ -46,20 +70,29 @@ const MISSES_PER_IP_PER_HOUR = 10;
 const MISSES_PER_IP_PER_DAY = 20;
 const MISSES_GLOBAL_PER_DAY = 200;
 
-// Bumped whenever the cached response shape changes, so a deploy can
-// never serve a payload the current code doesn't understand.
+// Bumped whenever the cached response shape OR MEANING changes, so a
+// deploy can never serve a payload the current code doesn't understand
+// (or, as of v1.3, one that means something different now than when it
+// was cached — see the FIX v1.3 note above).
 //
-// v1.2: bumped for the new `unconfirmed` field (see CachedTrace) so
-// every cached entry reflects the new signal from the start, rather
-// than mixing pre-v1.9-route entries (no field, silently reads as "none
-// unconfirmed") with post-fix ones for up to 12h.
-const CACHE_VERSION = 'v2';
+// v1.3: v2 -> v3, for the route's switch to the shared 3-hop detector.
+const CACHE_VERSION = 'v3';
 
 const ALERT_KEY_DEGRADED = 'cluster-check-redis-degraded';
 
 export interface CachedTrace {
   checked: number;
-  clusters: Array<{ funder: string; holders: string[] }>;
+  clusters: Array<{
+    funder: string;
+    holders: string[];
+    // v1.3: present on every entry written since route.js v1.12 (the
+    // shared-engine switch); absent on anything that somehow survived
+    // from before it despite the version bump. Optional so either
+    // parses.
+    funder_class?: string;
+    funder_label?: string | null;
+    funder_confidence?: number | null;
+  }>;
   clusterCount: number;
   // v1.2: holders whose true first transaction could not be confirmed
   // within the RPC page budget (see findOldestSignature in
