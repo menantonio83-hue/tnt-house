@@ -1,4 +1,24 @@
-// Version 1.1 — app/api/widget/token-risk/route.ts
+// Version 1.2 — app/api/widget/token-risk/route.ts
+//
+// v1.2: added realHolderCount, sourced from Solana Tracker's
+// /tokens/{address}/holders `total` field — the genuine total number
+// of holder wallets. Every number this route previously returned
+// (top10Percent, largestHolderPercent, and the pre-existing
+// holderCount field below) comes from getTokenLargestAccounts, a
+// Solana RPC method that returns AT MOST 20 accounts by protocol
+// design. That is a valid slice for concentration math (top10Percent
+// only needs the top 10-20 anyway) but was wrongly reused elsewhere in
+// the codebase as a total headcount, so any token with 20+ real
+// holders showed exactly "20 wallets" — caught live on $Bonk
+// (hundreds of thousands of real holders, displayed as 20). RugCheck's
+// own totalHolders field (tried as a fix before this one) turned out
+// to be nullable and frequently absent, falling back to the same
+// 20-item topHolders array. realHolderCount is fetched best-effort in
+// parallel with the existing Helius call and is null (never 0, never
+// omitted) whenever Solana Tracker doesn't answer in time — a null
+// total must never be displayed as "0 wallets" or dropped from the
+// response, since both look like real, if unfortunate, answers to
+// whoever reads this field next.
 //
 // v1.1 (M-8 fix): per-IP + global rate limits. Every call to this
 // anonymous endpoint fans out to Helius with retries, so unmetered
@@ -49,6 +69,40 @@ const redis =
   process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN
     ? new Redis({ url: process.env.KV_REST_API_URL, token: process.env.KV_REST_API_TOKEN })
     : null;
+
+// v1.2: 4s timeout — this call must never be the reason the widget
+// feels slow. A miss here degrades to realHolderCount: null, which the
+// client already treats as "unknown", not to a hung request.
+const SOLANA_TRACKER_TIMEOUT_MS = 4000;
+
+async function fetchRealHolderCount(address: string): Promise<number | null> {
+  const apiKey = process.env.SOLANATRACKER_API_KEY;
+  if (!apiKey) {
+    console.error('[widget/token-risk] SOLANATRACKER_API_KEY not configured, skipping realHolderCount.');
+    return null;
+  }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), SOLANA_TRACKER_TIMEOUT_MS);
+  try {
+    const res = await fetch(`https://data.solanatracker.io/tokens/${address}/holders`, {
+      headers: { 'x-api-key': apiKey },
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      console.error(`[widget/token-risk] ${address}: Solana Tracker holders lookup failed (${res.status})`);
+      return null;
+    }
+    const json = await res.json();
+    // total is the genuine holder-wallet count; every other field on
+    // this response (the top-100 `holders` array) is out of scope here.
+    return typeof json.total === 'number' ? json.total : null;
+  } catch (e) {
+    console.error(`[widget/token-risk] ${address}: Solana Tracker holders lookup errored — ${(e as Error).message}`);
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 function extractClientIp(request: NextRequest): string {
   const forwardedFor = request.headers.get('x-forwarded-for');
@@ -112,7 +166,10 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const data = await getHolderDistributionRobust(address);
+    const [data, realHolderCount] = await Promise.all([
+      getHolderDistributionRobust(address),
+      fetchRealHolderCount(address),
+    ]);
 
     // The impossible-value guard below catches readings that cannot be true
     // (>100%, NaN). It does NOT catch a FAILED reading: getHolderDistributionRobust
@@ -145,7 +202,7 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { ...data, source: 'helius' },
+      { ...data, realHolderCount, source: 'helius' },
       {
         headers: {
           'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60',
