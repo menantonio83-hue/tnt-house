@@ -2668,8 +2668,18 @@ export default function TntHouse() {
             typeof ownHolderData.largestHolderPercent === 'number'
               ? ownHolderData.largestHolderPercent
               : null;
-          holderCount =
-            typeof ownHolderData.holderCount === 'number' ? ownHolderData.holderCount : null;
+          // FIX v1.126: holderCount used to come from ownHolderData here too
+          // (getHolderDistributionRobust -> Solana's getTokenLargestAccounts),
+          // which is CAPPED AT 20 by the RPC method itself, not by our code.
+          // top10Percent/largestHolderPercent are legitimate uses of that
+          // same 20-account snapshot (concentration only needs the top slice),
+          // but "how many wallets hold this token" is a different question,
+          // and this endpoint can never answer it correctly once a token has
+          // 20+ real holders — it silently returned exactly 20 for every such
+          // token, real or not (caught live on $Bonk: hundreds of thousands
+          // of actual holders, displayed as "20 wallets"). holderCount is now
+          // sourced from RugCheck's real totalHolders field unconditionally,
+          // independent of which branch computed the concentration numbers.
         } else if (Array.isArray(rugData.topHolders) && rugData.topHolders.length > 0) {
           var usablePcts = rugData.topHolders
             .slice(0, 10)
@@ -2695,11 +2705,18 @@ export default function TntHouse() {
           // fell back to RugCheck. The figure was available the whole time; it
           // just was not read.
           largestHolderPercent = usablePcts.length > 0 ? Math.max.apply(null, usablePcts) : null;
-          if (typeof rugData.totalHolders === 'number') {
-            holderCount = rugData.totalHolders;
-          } else {
-            holderCount = rugData.topHolders.length;
-          }
+        }
+        // FIX v1.126: holderCount ("Holders: N wallets" on the card) is now
+        // always sourced from RugCheck's totalHolders — the only field in
+        // this whole function that actually counts every holder rather than
+        // a fixed-size slice — regardless of which branch above ran. Falls
+        // back to the topHolders array length only if RugCheck's own total
+        // is missing, which undercounts but is still honest about being a
+        // partial figure rather than a wrong one presented as complete.
+        if (typeof rugData.totalHolders === 'number') {
+          holderCount = rugData.totalHolders;
+        } else if (Array.isArray(rugData.topHolders) && rugData.topHolders.length > 0) {
+          holderCount = rugData.topHolders.length;
         }
 
         // Real LP-locked percentage, averaged across reported markets.
