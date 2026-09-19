@@ -2706,14 +2706,24 @@ export default function TntHouse() {
           // just was not read.
           largestHolderPercent = usablePcts.length > 0 ? Math.max.apply(null, usablePcts) : null;
         }
-        // FIX v1.126: holderCount ("Holders: N wallets" on the card) is now
-        // always sourced from RugCheck's totalHolders — the only field in
-        // this whole function that actually counts every holder rather than
-        // a fixed-size slice — regardless of which branch above ran. Falls
-        // back to the topHolders array length only if RugCheck's own total
-        // is missing, which undercounts but is still honest about being a
-        // partial figure rather than a wrong one presented as complete.
-        if (typeof rugData.totalHolders === 'number') {
+        // FIX v1.127: v1.126 moved holderCount to rugData.totalHolders,
+        // reasoning it was the only field here that counts every holder
+        // instead of a fixed-size slice. Live testing on $Bonk after that
+        // fix deployed proved otherwise: RugCheck's totalHolders is
+        // nullable and was absent for that response, so the code fell
+        // through to topHolders.length — which is ALSO capped (RugCheck's
+        // own top-holders array tops out the same way Helius's
+        // getTokenLargestAccounts does), so "20 wallets" reappeared even
+        // after the fix. ownHolderData.realHolderCount (added in
+        // app/api/widget/token-risk/route.ts v1.2) comes from Solana
+        // Tracker's dedicated holders-total endpoint — an actual
+        // deduplicated headcount, not a capped slice — and is checked
+        // first now. rugData.totalHolders and topHolders.length remain as
+        // fallbacks for the (hopefully rare) case Solana Tracker's call
+        // itself fails or times out.
+        if (ownHolderData && typeof ownHolderData.realHolderCount === 'number') {
+          holderCount = ownHolderData.realHolderCount;
+        } else if (typeof rugData.totalHolders === 'number') {
           holderCount = rugData.totalHolders;
         } else if (Array.isArray(rugData.topHolders) && rugData.topHolders.length > 0) {
           holderCount = rugData.topHolders.length;
