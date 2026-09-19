@@ -1,4 +1,12 @@
-// Version 7.3 — lib/insider-cluster-detector.ts
+// Version 7.4 — lib/insider-cluster-detector.ts
+//
+// v7.4: distinguish "RugCheck returned no topHolders data" (upstream
+// failure — now thrown, so it is never cached as a clean result) from
+// "token genuinely has fewer than two holders" (still returned as a
+// normal empty-clusters result). Previously both cases silently
+// produced checkedHolders: 0 with no error, which let a failed read
+// score as "no shared funding source found" and get pinned in the
+// 12h cache. See the fix itself, further down, for the full story.
 //
 // v7.3: every detected cluster is now CLASSIFIED (allowlist +
 // composite infra heuristic) so downstream scoring can stop penalizing
@@ -480,7 +488,29 @@ export async function detectInsiderClusters(
   }
 
   const rugData = await rugRes.json();
-  const topHolders: string[] = (rugData.topHolders || [])
+
+  // v7.4: RugCheck can return 200 OK with an empty/missing topHolders
+  // array when the token isn't indexed yet, is mid rate-limit, or the
+  // upstream is having a bad moment. That is an upstream failure, not
+  // a token that genuinely has fewer than two holders — the two must
+  // stay distinguishable (see lib/holder-data-guard.ts's header for the
+  // same principle applied to holder-distribution.ts). Silently
+  // returning checkedHolders: 0 here let a failed read masquerade as a
+  // clean, cacheable "no clusters found" result, which then got pinned
+  // in Redis for 12h (writeClusterCache() only caches what this function
+  // returns normally, precisely because a thrown error is NOT cached).
+  // rugData.holderData?.totalHolders (the count the site's own UI shows
+  // as "Holders: N wallets") is a different field from topHolders and
+  // can be healthy while topHolders is empty — so it is not a valid
+  // substitute check here; only topHolders itself tells us whether the
+  // detailed list this function needs actually came back.
+  if (!Array.isArray(rugData.topHolders) || rugData.topHolders.length === 0) {
+    throw new Error(
+      'Could not fetch holder data for this token (RugCheck returned no topHolders data)',
+    );
+  }
+
+  const topHolders: string[] = rugData.topHolders
     .slice(0, MAX_HOLDERS_CHECKED)
     .map((h: any) => h.address || h.owner)
     .filter(Boolean);
