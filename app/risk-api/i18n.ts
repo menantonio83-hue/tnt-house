@@ -199,6 +199,8 @@ export interface RiskApiTranslations {
   webhooksResponseLabel: string;
   webhooksPayloadLabel: string;
   webhooksUnsubscribeNote: string;
+  webhooksDeliveryTitle: string;
+  webhooksDeliveryText: string;
 
   // Rate limiting section
   rateLimitingTitle: string;
@@ -383,6 +385,8 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     webhooksResponseLabel: 'Subscription created',
     webhooksPayloadLabel: 'Delivered to your callback_url',
     webhooksUnsubscribeNote: 'Fires once per crossing, not on every check. Verify each delivery with the X-Webhook-Signature header and the webhook_secret from the subscribe response (shown only once). Call DELETE /api/v1/webhooks/{id} to unsubscribe.',
+    webhooksDeliveryTitle: 'Delivery & Retries',
+    webhooksDeliveryText: 'Delivered via QStash: on a non-2xx response or timeout, we retry up to 3 times with exponential backoff, then give up. Each event carries a unique id (evt_...) — store it and skip anything you have already processed, since retries resend the identical event. A 200 response marks the event delivered even if your own processing fails afterward, so persist or act on the payload before returning it.',
     rateLimitingTitle: 'Rate Limiting',
     rateLimitingIntro: 'Every key gets 15 free requests per calendar day (UTC). Go over that with no call-credit balance and you get a 402, not a silent block — top up or subscribe and the same key keeps working immediately.',
     rateLimitHeaderLimitLabel: 'X-RateLimit-Limit',
@@ -703,6 +707,8 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     webhooksResponseLabel: 'Suscripción creada',
     webhooksPayloadLabel: 'Entregado a tu callback_url',
     webhooksUnsubscribeNote: 'Se dispara una sola vez por cruce, no en cada verificación. Verifica cada entrega con la cabecera X-Webhook-Signature y el webhook_secret de la respuesta de suscripción (se muestra una sola vez). Llama a DELETE /api/v1/webhooks/{id} para darte de baja.',
+    webhooksDeliveryTitle: 'Entrega y reintentos',
+    webhooksDeliveryText: 'La entrega se hace a través de QStash: ante una respuesta que no sea 2xx o un timeout, reintentamos hasta 3 veces con backoff exponencial y luego desistimos. Cada evento lleva un id único (evt_...) — guárdalo y omite lo que ya hayas procesado, ya que los reintentos reenvían el mismo evento. Una respuesta 200 marca el evento como entregado aunque tu procesamiento falle después, así que guarda o procesa el payload antes de responder.',
     rateLimitingTitle: 'Límite de solicitudes',
     rateLimitingIntro: 'Cada key tiene 15 solicitudes gratuitas por día natural (UTC). Si superas ese límite sin saldo de crédito, recibes un 402, no un bloqueo silencioso — recarga saldo o suscríbete y la misma key vuelve a funcionar de inmediato.',
     rateLimitHeaderLimitLabel: 'X-RateLimit-Limit',
@@ -1016,6 +1022,8 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     webhooksResponseLabel: 'Abonnement créé',
     webhooksPayloadLabel: 'Livré à votre callback_url',
     webhooksUnsubscribeNote: 'Se déclenche une seule fois par franchissement, pas à chaque vérification. Vérifiez chaque livraison avec l\'en-tête X-Webhook-Signature et le webhook_secret renvoyé lors de l\'abonnement (affiché une seule fois). Appelez DELETE /api/v1/webhooks/{id} pour vous désabonner.',
+    webhooksDeliveryTitle: 'Livraison et nouvelles tentatives',
+    webhooksDeliveryText: 'La livraison passe par QStash : en cas de réponse autre que 2xx ou de timeout, nous réessayons jusqu\'à 3 fois avec un backoff exponentiel, puis abandonnons. Chaque événement porte un id unique (evt_...) — conservez-le et ignorez ce que vous avez déjà traité, car les nouvelles tentatives renvoient le même événement. Une réponse 200 marque l\'événement comme livré même si votre traitement échoue ensuite, donc enregistrez ou traitez le payload avant de répondre.',
     rateLimitingTitle: 'Limitation de débit',
     rateLimitingIntro: 'Chaque clé dispose de 15 requêtes gratuites par jour calendaire (UTC). Au-delà, sans solde de crédit, vous recevez un 402, pas un blocage silencieux — rechargez ou abonnez-vous et la même clé refonctionne immédiatement.',
     rateLimitHeaderLimitLabel: 'X-RateLimit-Limit',
@@ -1329,6 +1337,8 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     webhooksResponseLabel: 'Η συνδρομή δημιουργήθηκε',
     webhooksPayloadLabel: 'Παραδίδεται στο callback_url σου',
     webhooksUnsubscribeNote: 'Ενεργοποιείται μία φορά ανά διάσχιση, όχι σε κάθε έλεγχο. Επιβεβαίωσε κάθε παράδοση με το header X-Webhook-Signature και το webhook_secret από την απόκριση εγγραφής (εμφανίζεται μία μόνο φορά). Κάλεσε DELETE /api/v1/webhooks/{id} για διαγραφή συνδρομής.',
+    webhooksDeliveryTitle: 'Παράδοση και επαναλήψεις',
+    webhooksDeliveryText: 'Η παράδοση γίνεται μέσω του QStash: σε απόκριση που δεν είναι 2xx ή σε timeout, επαναλαμβάνουμε έως 3 φορές με εκθετικό backoff και μετά σταματάμε. Κάθε συμβάν έχει μοναδικό id (evt_...) — αποθήκευσέ το και παράβλεψε όσα έχεις ήδη επεξεργαστεί, καθώς οι επαναλήψεις στέλνουν ξανά το ίδιο συμβάν. Μια απόκριση 200 σημαίνει ότι το συμβάν παραδόθηκε ακόμα κι αν η δική σου επεξεργασία αποτύχει μετά, γι\' αυτό αποθήκευσε ή επεξεργάσου το payload πριν απαντήσεις.',
     rateLimitingTitle: 'Όριο αιτημάτων',
     rateLimitingIntro: 'Κάθε key έχει 15 δωρεάν αιτήματα ανά ημερολογιακή ημέρα (UTC). Αν το ξεπεράσεις χωρίς υπόλοιπο πίστωσης, παίρνεις 402, όχι σιωπηλό μπλοκάρισμα — φόρτωσε υπόλοιπο ή κάνε συνδρομή και το ίδιο key ξαναδουλεύει αμέσως.',
     rateLimitHeaderLimitLabel: 'X-RateLimit-Limit',
@@ -1642,6 +1652,8 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     webhooksResponseLabel: 'Подписка создана',
     webhooksPayloadLabel: 'Доставляется на твой callback_url',
     webhooksUnsubscribeNote: 'Срабатывает один раз за пересечение, а не при каждой проверке. Проверяй каждую доставку через заголовок X-Webhook-Signature и webhook_secret из ответа на подписку (показывается только один раз). Вызови DELETE /api/v1/webhooks/{id}, чтобы отписаться.',
+    webhooksDeliveryTitle: 'Доставка и повторы',
+    webhooksDeliveryText: 'Доставка идёт через QStash: при ответе не 2xx или таймауте мы повторяем попытку до 3 раз с экспоненциальной задержкой, затем сдаёмся. У каждого события уникальный id (evt_...) — сохраняй его и пропускай уже обработанные события, потому что повтор присылает точно то же событие. Ответ 200 помечает событие доставленным, даже если твоя обработка потом упадёт с ошибкой, — сохраняй или обрабатывай payload до того как ответить.',
     rateLimitingTitle: 'Лимиты запросов',
     rateLimitingIntro: 'У каждого ключа 15 бесплатных запросов в календарные сутки (UTC). Превысил лимит без баланса кредитов — получишь 402, а не тихую блокировку: пополни баланс или оформи подписку — и тот же ключ сразу снова работает.',
     rateLimitHeaderLimitLabel: 'X-RateLimit-Limit',
@@ -1962,6 +1974,8 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     webhooksResponseLabel: 'Iscrizione creata',
     webhooksPayloadLabel: 'Consegnato al tuo callback_url',
     webhooksUnsubscribeNote: 'Si attiva una sola volta per attraversamento, non a ogni controllo. Verifica ogni consegna con l\'header X-Webhook-Signature e il webhook_secret restituito alla sottoscrizione (mostrato una sola volta). Chiama DELETE /api/v1/webhooks/{id} per annullare l\'iscrizione.',
+    webhooksDeliveryTitle: 'Consegna e nuovi tentativi',
+    webhooksDeliveryText: 'La consegna avviene tramite QStash: in caso di risposta non 2xx o timeout, riproviamo fino a 3 volte con backoff esponenziale, poi rinunciamo. Ogni evento ha un id univoco (evt_...) — salvalo e ignora ciò che hai già elaborato, perché i tentativi ripetuti reinviano lo stesso evento identico. Una risposta 200 segna l\'evento come consegnato anche se la tua elaborazione fallisce in seguito, quindi salva o elabora il payload prima di rispondere.',
     rateLimitingTitle: 'Limiti di richieste',
     rateLimitingIntro: 'Ogni key ha 15 richieste gratuite al giorno solare (UTC). Se lo superi senza saldo di credito, ricevi un 402, non un blocco silenzioso — ricarica il saldo o abbonati e la stessa key torna subito a funzionare.',
     rateLimitHeaderLimitLabel: 'X-RateLimit-Limit',
@@ -2275,6 +2289,8 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     webhooksResponseLabel: '订阅已创建',
     webhooksPayloadLabel: '推送到你的 callback_url',
     webhooksUnsubscribeNote: '每次跨越只触发一次，而非每次检测都触发。请使用 X-Webhook-Signature 请求头和订阅响应中返回的 webhook_secret（仅显示一次）验证每次推送。调用 DELETE /api/v1/webhooks/{id} 即可取消订阅。',
+    webhooksDeliveryTitle: '投递与重试',
+    webhooksDeliveryText: '推送通过 QStash 完成：如果收到非 2xx 响应或超时，我们会以指数退避的方式重试最多 3 次，之后放弃。每个事件都带有唯一的 id（evt_...）——请保存它，并跳过已处理过的事件，因为重试会重新发送完全相同的事件。返回 200 即视为该事件已投递，即使你之后的处理失败也是如此，因此请在响应之前先保存或处理好 payload。',
     rateLimitingTitle: '速率限制',
     rateLimitingIntro: '每个密钥每个日历日（UTC）有 15 次免费请求。超过这个额度且没有信用余额时，你会收到 402，而不是被默默拦截——充值或订阅后，同一个密钥会立即恢复可用。',
     rateLimitHeaderLimitLabel: 'X-RateLimit-Limit',

@@ -1,4 +1,15 @@
-// Version 1.2 — app/risk-api/RiskApiDocsContent.tsx
+// Version 1.3 — app/risk-api/RiskApiDocsContent.tsx
+//
+// v1.3: added a "Delivery & Retries" panel to the Webhooks section
+// (DeepSeek site-audit finding, 2026-09-21) — the doc showed the
+// signature header and payload shape but never said how many times a
+// failed delivery is retried, whether events carry a dedup id, or what
+// happens if the receiver returns 200 but then fails to process the
+// payload. All three were already true in the backend
+// (lib/qstash-publish.ts: retries: 3 with exponential backoff;
+// app/api/v1/webhooks/check/route.ts: unique evt_... id per event) —
+// this only documents behavior that already existed. Translated to all
+// 7 languages (i18n.ts: webhooksDeliveryTitle, webhooksDeliveryText).
 //
 // v1.2: EXAMPLE_RESPONSE's insider_clusters entry now shows the four
 // funder-classification fields added in v1.20 (see i18n.ts changelog)
@@ -395,6 +406,15 @@ X-RateLimit-Reset: 2026-07-24T00:00:00.000Z
               <pre className="text-[10px] sm:text-[11px] text-slate-300 overflow-x-auto leading-relaxed">
                 {JSON.stringify(WEBHOOK_PAYLOAD_EXAMPLE, null, 2)}
               </pre>
+            </div>
+          </div>
+
+          <div className="bg-slate-950 border-2 border-purple-500/40 rounded-lg shadow-[0_0_20px_rgba(153,69,255,0.15)] overflow-hidden mb-4">
+            <div className="border-b border-purple-500/20 px-4 py-2.5">
+              <div className="text-purple-400 font-bold text-xs">{t.webhooksDeliveryTitle}</div>
+            </div>
+            <div className="p-4">
+              <p className="text-xs text-slate-400 leading-relaxed">{t.webhooksDeliveryText}</p>
             </div>
           </div>
 
