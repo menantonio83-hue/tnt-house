@@ -1,3 +1,17 @@
+// Version 1.1 — lib/trial-limit.ts
+//
+// v1.1: added peekTrialLimit() — a read-only look at today's per-IP
+// count, for showing "N/3 free today" on page load (app/risk-api/
+// TryItWidget.tsx v1.7) before the visitor has run a single check, the
+// same way the site's own Quick Check widget shows its quota upfront
+// via GET-on-mount rather than only after a submit. Uses Redis GET, not
+// INCR — never consumes a call, never creates the key, never touches
+// the TTL. Fails OPEN (reports 0 used) on a Redis error: this is a
+// display hint, not enforcement, and the real gate (checkTrialLimit,
+// below) still fails closed exactly as before. A too-low number for a
+// few seconds is a cosmetic miss; refusing a legitimate free check
+// because the read failed is not.
+//
 // Version 1.0 — lib/trial-limit.ts
 //
 // H-2 fix: per-IP + global daily limits for the anonymous "try it now"
@@ -106,4 +120,28 @@ export async function checkTrialLimit(clientIp: string): Promise<TrialLimitResul
   }
 
   return { allowed: true, used: perIpUsed, limit: ANON_TRIAL_LIMIT, reason: 'ok' };
+}
+
+export interface TrialPeekResult {
+  used: number;
+  remaining: number;
+  limit: number;
+}
+
+// Read-only — no INCR, no key creation, no TTL touched. See v1.1 header
+// note above for why this fails open (used: 0) rather than closed.
+export async function peekTrialLimit(clientIp: string): Promise<TrialPeekResult> {
+  if (!redis) {
+    return { used: 0, remaining: ANON_TRIAL_LIMIT, limit: ANON_TRIAL_LIMIT };
+  }
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const perIpKey = `trial-limit:${clientIp}:${today}`;
+    const raw = await redis.get<number | string | null>(perIpKey);
+    const used = typeof raw === 'number' ? raw : typeof raw === 'string' ? parseInt(raw, 10) || 0 : 0;
+    return { used, remaining: Math.max(0, ANON_TRIAL_LIMIT - used), limit: ANON_TRIAL_LIMIT };
+  } catch (e) {
+    console.error('[trial-limit] Redis error in peekTrialLimit:', (e as Error).message);
+    return { used: 0, remaining: ANON_TRIAL_LIMIT, limit: ANON_TRIAL_LIMIT };
+  }
 }
