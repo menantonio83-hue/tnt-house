@@ -1,3 +1,15 @@
+// Version 1.4 — app/risk-api/TryItWidget.tsx
+//
+// v1.4: added the missing "Holders" row. holder_count has been on the
+// holder_distribution type since it was first added, but the JSX only
+// ever rendered largest_holder_percent/top10_percent from that object —
+// the widget never showed it at all, on any token, working or not. Only
+// surfaced when token-risk-core.ts v1.9 fixed the underlying value (it
+// used to silently cap at "20" for any token with 20+ real holders,
+// which would have made this row look broken the moment it existed).
+// Formatted with toLocaleString rather than formatUsdCompact — this is
+// a wallet count, not a currency figure.
+//
 // Version 1.3 — app/risk-api/TryItWidget.tsx
 //
 // v1.3: card now shows all 18 fields the API actually returns, not
@@ -463,6 +475,14 @@ export default function TryItWidget() {
                   <>
                     <StatRow label="Top holder" value={`${result.holder_distribution.largest_holder_percent.toFixed(1)}%`} />
                     <StatRow label="Top-10 holders" value={`${result.holder_distribution.top10_percent.toFixed(1)}%`} />
+                    <StatRow
+                      label="Holders"
+                      value={
+                        typeof result.holder_distribution.holder_count === 'number'
+                          ? result.holder_distribution.holder_count.toLocaleString('en-US')
+                          : '—'
+                      }
+                    />
                   </>
                 )}
                 {result.market && (
