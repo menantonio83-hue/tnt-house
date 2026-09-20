@@ -1,3 +1,29 @@
+// Version 1.9 — lib/token-risk-core.ts
+//
+// v1.9: holderCount here came ONLY from getHolderDistributionRobust
+// (Helius getTokenLargestAccounts), which returns AT MOST 20 accounts by
+// protocol design — the same capped-slice-shown-as-a-total-headcount bug
+// already fixed in app/api/widget/token-risk/route.ts v1.2 for the
+// consumer widget. This file was missed because it is a separate call
+// site: it is the shared engine behind the PAID Risk-Data API
+// (holder_distribution.holder_count in every /api/v1/token-risk
+// response) and, since the listed_tokens write moved server-side, the
+// engine behind /api/listed-tokens/audit too. Caught live: a listed
+// token re-audited through this route AFTER the widget fix had already
+// deployed still recorded holder_count=20, because that re-audit never
+// touches the widget route at all.
+//
+// Now runs fetchRealHolderCount() (lib/solana-tracker-holders.ts v1.0,
+// the same shared helper the widget route now imports) in parallel with
+// the existing fan-out, and uses it — falling back to the capped count
+// only if Solana Tracker has no answer — for BOTH the value fed into
+// scoring (holderRiskForScoring, where lib/scoring.ts's holders_lt_20 /
+// age-and-holders caps read it) and the value shown in the response
+// (holder_distribution.holder_count) and written to mint_risk_history.
+// top10Percent/largestHolderPercent are untouched: those are legitimate
+// uses of the same 20-account snapshot, since concentration math only
+// needs the top slice — unlike a total headcount.
+//
 // Version 1.8 — lib/token-risk-core.ts
 //
 // v1.8: the actual fix for the vesting-adjustment-doesn't-move-the-
@@ -135,6 +161,7 @@ import { PublicKey } from '@solana/web3.js';
 import { waitUntil } from '@vercel/functions';
 import { getMintInfo, getDexScreenerData } from '@/lib/helius-client';
 import { getHolderDistributionRobust, classifyRisk } from '@/lib/holder-distribution';
+import { fetchRealHolderCount } from '@/lib/solana-tracker-holders';
 import { sanitizeDexMarketData } from '@/lib/sanitize-market-data';
 import { detectInsiderClusters, type InsiderCluster } from '@/lib/insider-cluster-detector';
 import { getClusterCache, markClusterPending, saveClusterResult, markClusterFailed } from '@/lib/risk-api-cache';
@@ -391,12 +418,22 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
   }
 
   try {
-    const [mintInfo, holderRisk, rawDexData, rugCheckData] = await Promise.all([
+    const [mintInfo, holderRisk, rawDexData, rugCheckData, realHolderCount] = await Promise.all([
       withTimeout(getMintInfo(mint), MINT_INFO_TIMEOUT_MS, null),
       withTimeout(getHolderDistributionRobust(mint), HOLDER_RISK_TIMEOUT_MS, HOLDER_RISK_FALLBACK),
       withTimeout(getDexScreenerData(mint), DEX_TIMEOUT_MS, DEX_DATA_FALLBACK),
       withTimeout(getRugCheckRiskData(mint), RUGCHECK_TIMEOUT_MS, RUGCHECK_FALLBACK),
+      // v1.9: self-guarded (4s internal timeout, never throws) — no
+      // withTimeout wrapper needed, unlike the calls above.
+      fetchRealHolderCount(mint),
     ]);
+
+    // v1.9: prefer the genuine Solana Tracker headcount; fall back to the
+    // Helius-capped slice only when Solana Tracker has no answer. Used
+    // for BOTH scoring and the response/history below — never the raw
+    // holderRisk.holderCount directly past this point.
+    const effectiveHolderCount =
+      typeof realHolderCount === 'number' ? realHolderCount : holderRisk.holderCount;
 
     const dexData = sanitizeDexMarketData(rawDexData);
 
@@ -477,6 +514,10 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
     }
     const holderRiskForScoring = {
       ...holderRisk,
+      // v1.9: real count, not the 20-capped one — see holders_lt_20 and
+      // the age-and-holders cap in lib/scoring.ts, both of which compare
+      // this value against thresholds up to 50.
+      holderCount: effectiveHolderCount,
       top10Percent: freelyTradeableTop10Percent,
       largestHolderPercent: freelyTradeableLargestHolderPercent,
       // v1.8: computeApiSafetyScore reads riskLevel as a STRING, not
@@ -577,7 +618,7 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
         mint,
         safetyScore,
         insiderClusterCount: insiderClusters.length,
-        holderCount: holderRisk.holderCount,
+        holderCount: effectiveHolderCount,
         top10Percent: holderRisk.top10Percent,
         priceUsd: dexData.price,
         liquidityUsd: dexData.liquidity,
@@ -637,7 +678,7 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
         risk_level: holderRisk.riskLevel,
         largest_holder_percent: holderRisk.largestHolderPercent,
         top10_percent: holderRisk.top10Percent,
-        holder_count: holderRisk.holderCount,
+        holder_count: effectiveHolderCount,
       },
       market: {
         price_usd: dexData.price,

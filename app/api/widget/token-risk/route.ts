@@ -1,4 +1,12 @@
-// Version 1.2 — app/api/widget/token-risk/route.ts
+// Version 1.3 — app/api/widget/token-risk/route.ts
+//
+// v1.3: fetchRealHolderCount() moved out to lib/solana-tracker-holders.ts
+// (v1.0) — token-risk-core.ts (the shared engine behind the paid
+// Risk-Data API and the server-side /api/listed-tokens/audit route) had
+// no equivalent call at all, so a listed token's stored holder_count
+// stayed on the old 20-capped number even after a post-fix re-audit. One
+// implementation now, imported by both. No behavior change on this
+// route — same function, same 4s timeout, same null-on-failure contract.
 //
 // v1.2: added realHolderCount, sourced from Solana Tracker's
 // /tokens/{address}/holders `total` field — the genuine total number
@@ -60,6 +68,7 @@ import {
   HOLDER_DATA_UNAVAILABLE_ERROR,
   HOLDER_DATA_UNAVAILABLE_MESSAGE,
 } from '@/lib/holder-data-guard';
+import { fetchRealHolderCount } from '@/lib/solana-tracker-holders';
 
 // v1.1: per-IP + global caps — see the v1.1 header note.
 const CALLS_PER_IP_PER_HOUR = 30;
@@ -69,40 +78,6 @@ const redis =
   process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN
     ? new Redis({ url: process.env.KV_REST_API_URL, token: process.env.KV_REST_API_TOKEN })
     : null;
-
-// v1.2: 4s timeout — this call must never be the reason the widget
-// feels slow. A miss here degrades to realHolderCount: null, which the
-// client already treats as "unknown", not to a hung request.
-const SOLANA_TRACKER_TIMEOUT_MS = 4000;
-
-async function fetchRealHolderCount(address: string): Promise<number | null> {
-  const apiKey = process.env.SOLANATRACKER_API_KEY;
-  if (!apiKey) {
-    console.error('[widget/token-risk] SOLANATRACKER_API_KEY not configured, skipping realHolderCount.');
-    return null;
-  }
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), SOLANA_TRACKER_TIMEOUT_MS);
-  try {
-    const res = await fetch(`https://data.solanatracker.io/tokens/${address}/holders`, {
-      headers: { 'x-api-key': apiKey },
-      signal: controller.signal,
-    });
-    if (!res.ok) {
-      console.error(`[widget/token-risk] ${address}: Solana Tracker holders lookup failed (${res.status})`);
-      return null;
-    }
-    const json = await res.json();
-    // total is the genuine holder-wallet count; every other field on
-    // this response (the top-100 `holders` array) is out of scope here.
-    return typeof json.total === 'number' ? json.total : null;
-  } catch (e) {
-    console.error(`[widget/token-risk] ${address}: Solana Tracker holders lookup errored — ${(e as Error).message}`);
-    return null;
-  } finally {
-    clearTimeout(timeout);
-  }
-}
 
 function extractClientIp(request: NextRequest): string {
   const forwardedFor = request.headers.get('x-forwarded-for');
