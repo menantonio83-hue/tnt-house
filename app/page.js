@@ -4372,7 +4372,12 @@ export default function TntHouse() {
                   ) : (
                     <div className="bg-slate-800 border border-slate-600 rounded-lg px-2 py-1 text-center">
                       <div className="text-slate-400 font-black text-sm">0/{FREE_TOTAL}</div>
-                      <div className="text-[9px] text-slate-500">no slots</div>
+                      {/* FIX v1.114: was a hardcoded English "no slots" —
+                          every other label on this badge (and its sibling
+                          on the pricing table below) already goes through
+                          t.*, so a non-English visitor saw one English
+                          word stuck inside an otherwise-translated UI. */}
+                      <div className="text-[9px] text-slate-500">{t.noFreeSlots}</div>
                     </div>
                   )}
                 </div>
@@ -4831,6 +4836,15 @@ export default function TntHouse() {
                             <span className="text-[6px] bg-cyan-500/20 text-cyan-300 px-1 rounded font-bold border border-cyan-400/40 shadow-[0_0_4px_rgba(34,211,238,0.5)]">
                               ✓ AUDITED
                             </span>
+                            {/* FIX v1.114: disclose the conflict of
+                                interest instead of letting the platform's
+                                own token blend into the "independently
+                                audited" table with no distinction. */}
+                            {token.ca === MRDT_CA && (
+                              <span className="text-[6px] bg-purple-500/20 text-purple-300 px-1 rounded font-bold border border-purple-400/40">
+                                🏠 HOUSE TOKEN
+                              </span>
+                            )}
                           </div>
                           <span className="text-[8.5px] text-slate-300 font-semibold block truncate max-w-[110px]">
                             {token.name}
@@ -5326,7 +5340,18 @@ export default function TntHouse() {
                 <div className="grid grid-cols-1 gap-2 text-xs font-mono">
                   {[
                     [t.quickCheckLabel, t.free],
-                    [t.first10Prefix + FREE_TOTAL + t.first10Suffix, t.free],
+                    // FIX v1.114: this row used to hardcode `t.free` no
+                    // matter what — once all 60 lifetime free-listing
+                    // slots were claimed (see getFreeAuditsUsedCount /
+                    // FREE_TOTAL=60 "final" above), the pricing table kept
+                    // advertising "First 60 tokens FREE" right next to a
+                    // badge elsewhere on this same page truthfully showing
+                    // "0/60 — no slots". Same freeSlots state, same
+                    // fail-closed number, now driving both.
+                    [
+                      t.first10Prefix + FREE_TOTAL + t.first10Suffix,
+                      freeSlots > 0 ? t.free : t.noFreeSlots,
+                    ],
                     [t.tierBasic, '~$3 $MRDT/SOL/USDC'],
                     [t.tierFast, '~$9 $MRDT/SOL/USDC'],
                     [t.tierVIP, '~$29 $MRDT/SOL/USDC'],
@@ -5412,6 +5437,24 @@ export default function TntHouse() {
               <div className="text-slate-400 text-xs">Powered by $MRDT · AI Audits · Supabase</div>
               <div className="text-slate-500 text-[10px]">
                 Built with Next.js + Tailwind CSS · Solana Pay
+              </div>
+              {/* FEAT v1.114: minimum legal hygiene — none of these three
+                  existed anywhere on the site before. Not localized (t.*)
+                  on purpose: legal text is drafted once in English and
+                  should not silently drift out of sync across 7 machine
+                  translations. */}
+              <div className="flex items-center justify-center gap-3 pt-2 text-[10px] text-slate-500">
+                <a href="/disclaimer" className="hover:text-slate-300 transition-colors">
+                  Disclaimer
+                </a>
+                <span className="text-slate-700">·</span>
+                <a href="/terms" className="hover:text-slate-300 transition-colors">
+                  Terms
+                </a>
+                <span className="text-slate-700">·</span>
+                <a href="/privacy" className="hover:text-slate-300 transition-colors">
+                  Privacy
+                </a>
               </div>
             </div>
           </div>
