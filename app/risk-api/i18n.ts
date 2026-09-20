@@ -305,6 +305,7 @@ export interface RiskApiTranslations {
   // Try-it-now anon trial widget (no signup)
   tryItTitle: string;
   tryItSubtitle: string;
+  tryItFreeToday: string;
   tryItQuickTryLabel: string;
   tryItPlaceholder: string;
   tryItButton: string;
@@ -626,6 +627,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     emailPlaceholder: 'Email address',
     tryItTitle: 'Try it now — no signup',
     tryItSubtitle: '3 free checks, no email required',
+    tryItFreeToday: 'free today',
     tryItQuickTryLabel: 'or try a well-known token:',
     tryItPlaceholder: 'Paste a Solana mint address',
     tryItButton: 'Check risk',
@@ -938,6 +940,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     emailPlaceholder: 'Correo electrónico',
     tryItTitle: 'Pruébalo ahora — sin registro',
     tryItSubtitle: '3 comprobaciones gratis, sin email',
+    tryItFreeToday: 'gratis hoy',
     tryItQuickTryLabel: 'o prueba un token conocido:',
     tryItPlaceholder: 'Pega una dirección mint de Solana',
     tryItButton: 'Comprobar riesgo',
@@ -1250,6 +1253,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     emailPlaceholder: 'Adresse email',
     tryItTitle: 'Essayez maintenant — sans inscription',
     tryItSubtitle: '3 vérifications gratuites, sans email',
+    tryItFreeToday: "gratuit aujourd'hui",
     tryItQuickTryLabel: 'ou essayez un token connu :',
     tryItPlaceholder: 'Collez une adresse mint Solana',
     tryItButton: 'Vérifier le risque',
@@ -1562,6 +1566,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     emailPlaceholder: 'Διεύθυνση email',
     tryItTitle: 'Δοκίμασέ το τώρα — χωρίς εγγραφή',
     tryItSubtitle: '3 δωρεάν έλεγχοι, χωρίς email',
+    tryItFreeToday: 'δωρεάν σήμερα',
     tryItQuickTryLabel: 'ή δοκίμασε ένα γνωστό token:',
     tryItPlaceholder: 'Επικόλλησε μια διεύθυνση mint Solana',
     tryItButton: 'Έλεγχος ρίσκου',
@@ -1881,6 +1886,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     emailPlaceholder: 'Email адрес',
     tryItTitle: 'Попробуй прямо сейчас — без регистрации',
     tryItSubtitle: '3 бесплатные проверки, без email',
+    tryItFreeToday: 'бесплатно сегодня',
     tryItQuickTryLabel: 'или попробуй известный токен:',
     tryItPlaceholder: 'Вставь mint-адрес токена Solana',
     tryItButton: 'Проверить риск',
@@ -2193,6 +2199,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     emailPlaceholder: 'Indirizzo email',
     tryItTitle: 'Provalo ora — senza registrazione',
     tryItSubtitle: '3 controlli gratuiti, senza email',
+    tryItFreeToday: 'gratis oggi',
     tryItQuickTryLabel: 'oppure prova un token noto:',
     tryItPlaceholder: 'Incolla un indirizzo mint Solana',
     tryItButton: 'Controlla rischio',
@@ -2505,6 +2512,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     emailPlaceholder: '邮箱地址',
     tryItTitle: '立即试用 — 无需注册',
     tryItSubtitle: '3 次免费查询，无需邮箱',
+    tryItFreeToday: '今日免费',
     tryItQuickTryLabel: '或试试知名代币：',
     tryItPlaceholder: '粘贴 Solana mint 地址',
     tryItButton: '检查风险',

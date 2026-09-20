@@ -1,3 +1,15 @@
+// Version 1.7 — app/risk-api/TryItWidget.tsx
+//
+// v1.7: replaced the plain-text counter (v1.6) with a "N/3 free today"
+// badge matching the site's own Quick Check widget (app/page.js) --
+// bro asked for this exact style after the v1.6 text-only fix. Also
+// fetches the real count on mount now (GET /api/v1/trial/check, added
+// in that route's v1.2 / lib/trial-limit.ts's peekTrialLimit, v1.1),
+// same as Quick Check's GET-on-mount pattern, so the badge is accurate
+// from page load instead of only appearing after the first check.
+// Subtitle reverted to the static description text -- the badge is now
+// the one live counter, so the subtitle no longer needs to double as it.
+//
 // Version 1.6 — app/risk-api/TryItWidget.tsx
 //
 // v1.6: the top subtitle always read "3 free checks, no email
@@ -108,6 +120,11 @@ import RiskApiSignupForm from './RiskApiSignupForm';
 
 const FINGERPRINT_STORAGE_KEY = 'tnt_trial_fp';
 const MINT_REGEX = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/; // base58, Solana mint length range
+
+// Must match ANON_TRIAL_LIMIT in lib/trial-limit.ts — only used for the
+// badge denominator ("N/3"). The numerator (remaining) always comes
+// from the server; this is not a second source of truth for the limit.
+const TRIAL_LIMIT = 3;
 
 // Quick-try shortcuts — well-known, verified Solana mints (not
 // Ethereum tokens like PEPE, which don't exist as a canonical mint on
@@ -239,6 +256,22 @@ export default function TryItWidget() {
     getFingerprint().catch(() => {});
   }, []);
 
+  // v1.7: show the real "N/3 free today" count from page load, same as
+  // the site's own Quick Check widget (app/page.js's GET-on-mount
+  // pattern) — not only after the visitor has already run a check.
+  // Status-only, never spends a call (GET /api/v1/trial/check,
+  // peekTrialLimit in lib/trial-limit.ts v1.1).
+  useEffect(() => {
+    fetch('/api/v1/trial/check')
+      .then((r) => r.json())
+      .then((data) => {
+        if (typeof data.trial_calls_remaining === 'number') {
+          setRemaining(data.trial_calls_remaining);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const runCheck = async (mintToCheck: string) => {
     setErrorMsg('');
 
@@ -293,13 +326,21 @@ export default function TryItWidget() {
 
   return (
     <div className="border-2 border-emerald-500/30 rounded-lg bg-slate-900/40 p-5 sm:p-6 backdrop-blur-md">
-      <div className="flex items-center gap-2 text-base sm:text-lg font-black mb-1">
-        <Sparkles size={16} className="text-emerald-400" />
-        {t.tryItTitle}
+      <div className="flex items-start justify-between mb-1">
+        <div className="flex items-center gap-2 text-base sm:text-lg font-black">
+          <Sparkles size={16} className="text-emerald-400" />
+          {t.tryItTitle}
+        </div>
+        {remaining !== null && (
+          <div className="bg-emerald-500/20 border border-emerald-500/40 rounded-lg px-2 py-1 text-center shrink-0">
+            <div className="text-emerald-400 font-black text-sm">
+              {remaining}/{TRIAL_LIMIT}
+            </div>
+            <div className="text-[9px] text-emerald-500">{t.tryItFreeToday}</div>
+          </div>
+        )}
       </div>
-      <p className="text-xs text-slate-400 mb-4">
-        {remaining !== null ? t.tryItRemaining.replace('{n}', String(remaining)) : t.tryItSubtitle}
-      </p>
+      <p className="text-xs text-slate-400 mb-4">{t.tryItSubtitle}</p>
 
       {status === 'limit' ? (
         <div className="border border-amber-500/30 rounded-lg bg-amber-500/5 p-4">
