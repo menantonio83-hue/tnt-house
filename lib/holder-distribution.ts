@@ -1,3 +1,20 @@
+// Version 6.21 — lib/holder-distribution.ts
+//
+// v6.21: mega-mints (SOL, USDC — holder accounts in the millions) hit a
+// hard node-side refusal on getTokenLargestAccounts ("Too many accounts
+// requested") and v6.16 fast-failed them straight into the ERROR/
+// 502 path. That is now a two-source story: when the RPC node says no,
+// fetch the ranked top-100 holder breakdown from Solana Tracker's
+// pre-indexed /tokens/{address}/holders endpoint (see
+// lib/solana-tracker-holders.ts v1.1) and compute largest/top10
+// concentration from its ready-made `percentage` values, with the
+// genuine `total` as holderCount. Verified live 2026-09-20: SOL top10
+// 0.44%, USDC largest 12.18% / top10 32.88%, BONK 8.83% / 38.89% — all
+// classify LOW. Only this one error branch (hard mint-size limit) takes
+// the fallback; every other mint keeps the existing on-chain path
+// untouched. If Solana Tracker also has no answer, the honest ERROR
+// (and the caller's 502) remains as the final word.
+//
 // Version 6.20 — lib/holder-distribution.ts
 //
 // v6.20: classifyRisk() exported (was private). token-risk-core.ts's
@@ -122,6 +139,7 @@
 
 import { PublicKey } from '@solana/web3.js';
 import { getAssociatedTokenAddress } from '@solana/spl-token';
+import { fetchHolderBreakdown } from './solana-tracker-holders';
 
 // v6.17: not every project "burns" via the actual SPL Burn instruction
 // (which reduces mint.supply directly and leaves no token account
@@ -416,9 +434,55 @@ export async function getHolderDistributionRobust(mint: string): Promise<HolderD
     if (isUnretriableMintSizeLimit(lastFailureReason)) {
       // Confirmed hard node-side refusal, not a flaky failure — no
       // point spending the backoff + a second attempt on a request the
-      // node has already explicitly said it won't do. Fail fast.
+      // node has already explicitly said it won't do.
       console.warn(
-        `[holder-distribution] ${mint}: hard mint-size limit hit on attempt ${attempt}/${MAX_ATTEMPTS}, not retrying — ${lastFailureReason}`,
+        `[holder-distribution] ${mint}: hard mint-size limit hit on attempt ${attempt}/${MAX_ATTEMPTS}, trying Solana Tracker breakdown — ${lastFailureReason}`,
+      );
+
+      // v6.21: second data source for mega-mints. Solana Tracker serves
+      // the top-100 ranked holders pre-indexed, so it answers for the
+      // exact mints the RPC node refuses to scan.
+      const tracker = await fetchHolderBreakdown(mint);
+      if (tracker) {
+        const largestHolderPercent = tracker.holders[0].percentage;
+        const top10Percent = tracker.holders
+          .slice(0, 10)
+          .reduce((sum, h) => sum + h.percentage, 0);
+        const holderCount =
+          typeof tracker.total === 'number' ? tracker.total : tracker.holders.length;
+
+        // getTokenSupply is the cheap call and still works for
+        // mega-mints — fill totalSupply/totalSupplyRaw so vesting-lock
+        // detection (which needs the exact raw string, see v6.19) keeps
+        // working. Two outcomes land in the same safe bucket: a failed
+        // read degrades to '0', and a native mint like SOL has no token
+        // supply at all — the node itself answers amount:"0" for it
+        // (verified live 2026-09-20 on Helius and the public node).
+        // lib/vesting-lock-detector.ts explicitly treats '0' as
+        // "no locks", which is correct for both cases.
+        let totalSupply = 0;
+        let totalSupplyRaw = '0';
+        const supply = await callSolanaRpc('getTokenSupply', [mint], SUPPLY_TIMEOUT_MS);
+        if (supply.ok && supply.data) {
+          totalSupply = parseInt(supply.data.value.amount, 10);
+          totalSupplyRaw = supply.data.value.amount;
+        }
+
+        console.log(
+          `[holder-distribution] ${mint}: Solana Tracker fallback ok — largest=${largestHolderPercent.toFixed(2)}%, top10=${top10Percent.toFixed(2)}%, total=${holderCount}`,
+        );
+        return {
+          riskLevel: classifyRisk(largestHolderPercent, top10Percent),
+          largestHolderPercent,
+          top10Percent,
+          holderCount,
+          totalSupply,
+          totalSupplyRaw,
+        };
+      }
+
+      console.error(
+        `[holder-distribution] ${mint}: hard mint-size limit AND Solana Tracker fallback unavailable — ${lastFailureReason}`,
       );
       break;
     }
