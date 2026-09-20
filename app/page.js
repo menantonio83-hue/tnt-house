@@ -4767,7 +4767,23 @@ export default function TntHouse() {
                   </tr>
                 </thead>
                 <tbody>
-                  {/* Pinned MRDT row */}
+                  {/* Pinned MRDT row.
+                      FIX v1.114 (2026-09-21 site audit, corrected pass):
+                      the HOUSE TOKEN badge added earlier this same day was
+                      wired into the Supabase-listed-tokens .map() below,
+                      but $MRDT is never in that table — it lives in this
+                      separate, hardcoded, always-shown row instead, which
+                      the earlier pass missed because it isn't produced by
+                      any .map(). This is the actual row the original
+                      audit meant: a permanent 98/100 "verified" score for
+                      the platform's own token, previously with no
+                      distinction from an independently audited listing.
+                      NOTE left for the founder, not fixed here: liquidity
+                      ($13K+), volume24h (0) and the score itself (98) are
+                      static literals, not computed by getSafetyScore() —
+                      only the price is live (via Jupiter). Left as-is
+                      since replacing marketing copy with wired-up live
+                      data is a product decision, not a bug fix. */}
                   <tr
                     onClick={function () {
                       openTokenBlueprint({
@@ -4789,6 +4805,9 @@ export default function TntHouse() {
                       <span className="text-sm">⚽️</span>
                       <div>
                         <span className="text-emerald-400 font-extrabold text-[10px]">$MRDT</span>
+                        <span className="text-[6px] bg-purple-500/20 text-purple-300 px-1 rounded font-bold border border-purple-400/40 ml-1 align-middle">
+                          🏠 HOUSE TOKEN
+                        </span>
                         <div className="text-[7px] text-slate-400">MARADONATOKEN</div>
                       </div>
                     </td>
@@ -4805,6 +4824,7 @@ export default function TntHouse() {
                       </div>
                     </td>
                   </tr>
+
 
                   {/* Supabase listed tokens */}
                   {filterAndSortTokens(listedTokens).map(function (token, i) {
