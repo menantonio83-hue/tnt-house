@@ -1,3 +1,10 @@
+// Version 1.2 — app/api/v1/trial/check/route.ts
+//
+// v1.2: added GET — a status-only peek (peekTrialLimit, lib/trial-limit.ts
+// v1.1) so the widget can show "N/3 free today" on page load, before the
+// visitor submits anything. Never increments, never consumes a call —
+// the POST handler below is still the only thing that spends one.
+//
 // Version 1.1 — app/api/v1/trial/check/route.ts
 //
 // v1.1 (H-2 fix): quota moved OFF the client-supplied fingerprint and
@@ -27,7 +34,7 @@
 // never silently diverge on scoring logic.
 
 import { NextRequest, NextResponse } from 'next/server';
-import { checkTrialLimit, ANON_TRIAL_LIMIT } from '@/lib/trial-limit';
+import { checkTrialLimit, peekTrialLimit, ANON_TRIAL_LIMIT } from '@/lib/trial-limit';
 import { fetchTokenRisk } from '@/lib/token-risk-core';
 
 // Same background-cluster-job budget as the real token-risk route —
@@ -59,6 +66,26 @@ function extractClientIp(request: NextRequest): string {
   const forwardedFor = request.headers.get('x-forwarded-for');
   if (forwardedFor) return forwardedFor.split(',')[0].trim();
   return 'unknown';
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const peek = await peekTrialLimit(extractClientIp(request));
+    return NextResponse.json(
+      {
+        trial_calls_used: peek.used,
+        trial_calls_remaining: peek.remaining,
+        trial_calls_limit: peek.limit,
+      },
+      { headers: RESPONSE_HEADERS },
+    );
+  } catch (error: any) {
+    console.error('[trial/check] GET error:', error);
+    return NextResponse.json(
+      { error: 'Internal error' },
+      { status: 500, headers: RESPONSE_HEADERS },
+    );
+  }
 }
 
 export async function POST(request: NextRequest) {
