@@ -1,3 +1,20 @@
+// Version 1.5 — app/risk-api/TryItWidget.tsx
+//
+// v1.5: "Insider clusters" showed a confident green "0" whenever
+// insider_clusters was an empty array -- but the API can return that
+// same empty array in TWO different states: cluster_analysis: "complete"
+// (genuinely checked, none found) and "pending" (the background trace
+// hasn't finished yet -- see lib/token-risk-core.ts's getClusterCache/
+// markClusterPending). Caught live: a 2-day-old token's cache miss
+// showed "Insider clusters: 0" in emerald here while the SAME check on
+// the main site's synchronous /api/cluster-check for the same mint
+// returned an honest "Could not fetch holder data" error -- this
+// widget was quietly showing a clean bill of health for a token that
+// hadn't actually been traced yet, on the exact page meant to prove
+// the depth of this check to a skeptical developer. Now shows
+// "checking…" in amber with a note when pending, and only shows a
+// green/red confirmed count once cluster_analysis is "complete".
+//
 // Version 1.4 — app/risk-api/TryItWidget.tsx
 //
 // v1.4: added the missing "Holders" row. holder_count has been on the
@@ -95,6 +112,7 @@ interface TrialResult {
   safety_score: number;
   dominant_cap: string | null;
   insider_clusters: unknown[];
+  cluster_analysis?: 'pending' | 'complete';
   mint_authority: { revoked: boolean; address: string | null } | null;
   freeze_authority: { revoked: boolean; address: string | null } | null;
   contract_renounced: boolean;
@@ -375,10 +393,31 @@ export default function TryItWidget() {
               <div className="divide-y divide-purple-500/10 text-xs">
                 <StatRow
                   label="Insider clusters"
-                  value={result.insider_clusters?.length ?? 0}
-                  valueClassName={(result.insider_clusters?.length ?? 0) > 0 ? 'text-red-400' : 'text-emerald-400'}
-                  suffix={(result.insider_clusters?.length ?? 0) > 0 ? ' found' : ''}
+                  value={
+                    result.cluster_analysis === 'pending'
+                      ? 'checking…'
+                      : (result.insider_clusters?.length ?? 0)
+                  }
+                  valueClassName={
+                    result.cluster_analysis === 'pending'
+                      ? 'text-amber-400'
+                      : (result.insider_clusters?.length ?? 0) > 0
+                        ? 'text-red-400'
+                        : 'text-emerald-400'
+                  }
+                  suffix={
+                    result.cluster_analysis === 'pending'
+                      ? ''
+                      : (result.insider_clusters?.length ?? 0) > 0
+                        ? ' found'
+                        : ''
+                  }
                 />
+                {result.cluster_analysis === 'pending' && (
+                  <div className="px-4 py-2 text-[10px] text-amber-300/80 text-center">
+                    Full on-chain funding trace runs in the background — check again in ~30s for a confirmed result.
+                  </div>
+                )}
                 <StatRow
                   label="Mint authority"
                   value={result.mint_authority?.revoked ? 'revoked ✓' : 'active ⚠️'}
