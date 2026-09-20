@@ -1,3 +1,16 @@
+// Version 1.6 — app/risk-api/TryItWidget.tsx
+//
+// v1.6: the top subtitle always read "3 free checks, no email
+// required" -- literally, forever, regardless of how many the visitor
+// had actually used. Caught live: a person who ran 2 checks still saw
+// "3" and reasonably read it as a broken counter. That line and the
+// real remaining count (tryItRemaining, shown separately near the
+// button) were two independent pieces of copy that never talked to
+// each other. Now the subtitle itself switches to the live "{n} left"
+// once a check has run (remaining !== null), and the old duplicate
+// display near the button was removed -- one honest counter instead
+// of one static claim plus one live one in a different spot.
+//
 // Version 1.5 — app/risk-api/TryItWidget.tsx
 //
 // v1.5: "Insider clusters" showed a confident green "0" whenever
@@ -284,7 +297,9 @@ export default function TryItWidget() {
         <Sparkles size={16} className="text-emerald-400" />
         {t.tryItTitle}
       </div>
-      <p className="text-xs text-slate-400 mb-4">{t.tryItSubtitle}</p>
+      <p className="text-xs text-slate-400 mb-4">
+        {remaining !== null ? t.tryItRemaining.replace('{n}', String(remaining)) : t.tryItSubtitle}
+      </p>
 
       {status === 'limit' ? (
         <div className="border border-amber-500/30 rounded-lg bg-amber-500/5 p-4">
@@ -564,10 +579,6 @@ export default function TryItWidget() {
                 <span className="text-[10px] text-slate-600 font-mono">tnt-audit.com/risk-api</span>
               </div>
             </div>
-          )}
-
-          {remaining !== null && status !== 'error' && (
-            <p className="text-[11px] text-slate-400 mt-3">{t.tryItRemaining.replace('{n}', String(remaining))}</p>
           )}
         </>
       )}
