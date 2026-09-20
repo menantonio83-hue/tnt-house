@@ -2761,12 +2761,28 @@ export default function TntHouse() {
           sellTaxPercent = rugData.transferFee.pct;
         }
 
-        var mintRevoked = !risks.some(function (r) {
-          return r.name && r.name.toLowerCase().includes('mint');
-        });
-        var freezeRevoked = !risks.some(function (r) {
-          return r.name && r.name.toLowerCase().includes('freeze');
-        });
+        var mintRevoked =
+          // FIX v1.128: prefer the on-chain fact — ownHolderData now
+          // carries mintAuthorityRevoked/freezeAuthorityRevoked from
+          // app/api/widget/token-risk/route.ts v1.4's direct RPC check,
+          // the same one the server engine (lib/token-risk-core.ts) uses
+          // for the free audit and the paid Risk-Data API. The old
+          // RugCheck-risk-name guess below only runs when the widget
+          // call itself failed (network error, timeout) — it never
+          // overrides a real on-chain answer, and RugCheck not naming a
+          // "mint" risk was never proof the authority was actually
+          // revoked, just that RugCheck didn't report one.
+          ownHolderData && typeof ownHolderData.mintAuthorityRevoked === 'boolean'
+            ? ownHolderData.mintAuthorityRevoked
+            : !risks.some(function (r) {
+                return r.name && r.name.toLowerCase().includes('mint');
+              });
+        var freezeRevoked =
+          ownHolderData && typeof ownHolderData.freezeAuthorityRevoked === 'boolean'
+            ? ownHolderData.freezeAuthorityRevoked
+            : !risks.some(function (r) {
+                return r.name && r.name.toLowerCase().includes('freeze');
+              });
         // Derived, not invented: "renounced" here just means both mint and
         // freeze authority are revoked — a real, checkable on-chain fact.
         var contractRenounced = mintRevoked && freezeRevoked;

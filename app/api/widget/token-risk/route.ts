@@ -1,3 +1,18 @@
+// Version 1.4 — app/api/widget/token-risk/route.ts
+//
+// v1.4: added mintAuthorityRevoked/freezeAuthorityRevoked, read directly
+// on-chain via lib/helius-client.js's getMintInfo() -- the exact same
+// call lib/token-risk-core.ts uses for the paid API and the free/server
+// audit path. app/page.js's PAID audit flow (the one call site still
+// running its own client-side code, not the server engine) previously
+// inferred revocation by checking whether RugCheck's risks[] happened to
+// name a "mint"/"freeze" risk -- a heuristic on a third party's risk
+// list, not the on-chain fact itself. RugCheck not flagging a risk is
+// not proof the authority is revoked. Both fields are null (never a
+// false "revoked") whenever the RPC call fails or times out -- the
+// paid flow's existing fallback to its own RugCheck-based guess only
+// triggers on that null, never overrides a real on-chain answer.
+//
 // Version 1.3 — app/api/widget/token-risk/route.ts
 //
 // v1.3: fetchRealHolderCount() moved out to lib/solana-tracker-holders.ts
@@ -63,6 +78,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Redis } from '@upstash/redis';
 import { getHolderDistributionRobust } from '@/lib/holder-distribution';
+import { getMintInfo } from '@/lib/helius-client';
+import { withTimeout } from '@/lib/with-timeout';
 import {
   isHolderReadingUnusable,
   HOLDER_DATA_UNAVAILABLE_ERROR,
@@ -141,10 +158,23 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const [data, realHolderCount] = await Promise.all([
+    // v1.4: same 4s ceiling as the Solana Tracker call — this is a
+    // completeness fetch, not a required one, so it must never be the
+    // reason the widget feels slow. withTimeout resolves to null on
+    // timeout rather than blocking, matching getMintInfo's own
+    // null-on-failure contract.
+    const MINT_INFO_TIMEOUT_MS = 4000;
+
+    const [data, realHolderCount, mintInfo] = await Promise.all([
       getHolderDistributionRobust(address),
       fetchRealHolderCount(address),
+      withTimeout(getMintInfo(address), MINT_INFO_TIMEOUT_MS, null),
     ]);
+
+    // v1.4: on-chain fact, never a false "revoked" — null (not a
+    // boolean) whenever the RPC call itself failed or timed out.
+    const mintAuthorityRevoked = mintInfo ? mintInfo.info.mintAuthority === null : null;
+    const freezeAuthorityRevoked = mintInfo ? mintInfo.info.freezeAuthority === null : null;
 
     // The impossible-value guard below catches readings that cannot be true
     // (>100%, NaN). It does NOT catch a FAILED reading: getHolderDistributionRobust
@@ -177,7 +207,7 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { ...data, realHolderCount, source: 'helius' },
+      { ...data, realHolderCount, mintAuthorityRevoked, freezeAuthorityRevoked, source: 'helius' },
       {
         headers: {
           'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60',
