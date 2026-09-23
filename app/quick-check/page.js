@@ -50,6 +50,7 @@
 // appears in the public Listing table (app/page.js).
 
 import { useState, useEffect, useRef } from 'react';
+import posthog from 'posthog-js';
 
 const PACKAGES = [
   { id: '5', checks: 5, usd: 1 },
@@ -82,6 +83,7 @@ export default function QuickCheckPage() {
   async function handleCheck(e) {
     e.preventDefault();
     if (!ca.trim()) return;
+    posthog.capture('quick_check_started', { ca: ca.trim() });
     setLoading(true);
     setError(null);
     setResult(null);
@@ -90,12 +92,14 @@ export default function QuickCheckPage() {
       const res = await fetch(`/api/quick-check?ca=${encodeURIComponent(ca.trim())}`);
       const data = await res.json();
       if (res.status === 402) {
+        posthog.capture('quick_check_limit_reached', { ca: ca.trim() });
         setPaywall(data);
         setQuota(data);
       } else if (!res.ok) {
         // data.message carries the "your check was NOT used" refund notice.
         setError(data.message || data.error || 'Something went wrong');
       } else {
+        posthog.capture('quick_check_completed', { ca: ca.trim(), score: data.auditResult ? data.auditResult.score : null });
         setResult(data.auditResult);
         setQuota(data.quota);
       }
