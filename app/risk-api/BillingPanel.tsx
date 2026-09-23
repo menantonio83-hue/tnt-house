@@ -107,7 +107,6 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import posthog from 'posthog-js';
 import { Loader2, KeyRound, CreditCard, Zap, CheckCircle2, AlertTriangle } from 'lucide-react';
 import CopyButton from './CopyButton';
 import { useRiskApiLang } from './LangContext';
@@ -280,7 +279,6 @@ export default function BillingPanel() {
         return;
       }
       setStatus(data);
-      posthog.capture('pricing_viewed', { context: 'billing_panel' });
       setStep('pick-tier');
     } catch {
       setErrorMsg('Network error — check your connection and try again.');
@@ -295,7 +293,6 @@ export default function BillingPanel() {
   };
 
   const handlePickTier = (k: Kind) => {
-    posthog.capture('upgrade_clicked', { kind: k });
     setKind(k);
     setStep('pick-currency');
   };

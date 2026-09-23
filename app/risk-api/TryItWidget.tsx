@@ -114,7 +114,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import posthog from 'posthog-js';
 import { Loader2, Sparkles, Lock } from 'lucide-react';
 import { useRiskApiLang } from './LangContext';
 import RiskApiSignupForm from './RiskApiSignupForm';
@@ -283,7 +282,6 @@ export default function TryItWidget() {
       return;
     }
 
-    posthog.capture('demo_called', { mint: trimmed });
     setStatus('loading');
 
     try {

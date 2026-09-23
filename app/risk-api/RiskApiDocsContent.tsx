@@ -40,8 +40,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
-import posthog from 'posthog-js';
+import { useState } from 'react';
 import { Terminal, Database, CreditCard, ArrowLeft } from 'lucide-react';
 import CopyButton from './CopyButton';
 import LangSwitcher from './LangSwitcher';
@@ -192,10 +191,6 @@ const EXAMPLE_RESPONSE = {
 export default function RiskApiDocsContent() {
   const { t } = useRiskApiLang();
   const [codeTab, setCodeTab] = useState<CodeTab>('curl');
-
-  useEffect(() => {
-    posthog.capture('docs_viewed');
-  }, []);
 
   const responseFields: Array<{ field: string; desc: string }> = [
     { field: 'safety_score', desc: t.fieldSafetyScore },

@@ -36,7 +36,6 @@
 
 import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import posthog from 'posthog-js';
 import { Loader2, KeyRound, AlertTriangle } from 'lucide-react';
 import CopyButton from './CopyButton';
 import { useRiskApiLang } from './LangContext';
@@ -59,7 +58,6 @@ export default function RiskApiSignupForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    posthog.capture('signup_started', { ref: ref || null });
     setStatus('loading');
     setErrorMsg('');
 
@@ -77,7 +75,6 @@ export default function RiskApiSignupForm() {
         return;
       }
 
-      posthog.capture('api_key_created', { daily_limit: data.daily_limit, ref: ref || null });
       setIssuedKey({ api_key: data.api_key, daily_limit: data.daily_limit });
       setStatus('success');
     } catch {
