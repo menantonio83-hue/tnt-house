@@ -1562,7 +1562,7 @@ export default function TntHouse() {
   var handleQuickCheck = async function (e) {
     e.preventDefault();
     if (!qcCa.trim()) return;
-    posthog.capture('token_audit_started', { ca: qcCa.trim(), source: 'quick_check' });
+    posthog.capture('quick_check_started', { ca: qcCa.trim() });
     setQcLoading(true);
     setQcError(null);
     setQcResult(null);
@@ -1571,12 +1571,14 @@ export default function TntHouse() {
       var res = await fetch('/api/quick-check?ca=' + encodeURIComponent(qcCa.trim()));
       var data = await res.json();
       if (res.status === 402) {
+        posthog.capture('quick_check_limit_reached', { ca: qcCa.trim() });
         setQcPaywall(data);
         setQcQuota(data);
       } else if (!res.ok) {
         // data.message carries the "your check was NOT used" refund notice.
         setQcError(data.message || data.error || 'Something went wrong');
       } else {
+        posthog.capture('quick_check_completed', { ca: qcCa.trim(), score: data.auditResult ? data.auditResult.score : null });
         setQcResult(data.auditResult);
         setQcQuota(data.quota);
       }
@@ -2319,6 +2321,7 @@ export default function TntHouse() {
       showToast(t.fillFields, 'error');
       return;
     }
+    posthog.capture('listing_started', { ca: formData.contractAddress, tier: selectedTier });
     if (freeSlots > 0) {
       setIsSending(true);
       // SWITCHED: the free path now audits and saves entirely server-side.
