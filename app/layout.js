@@ -1,6 +1,7 @@
 // app/layout.js
 import './globals.css';
 import { Analytics } from '@vercel/analytics/react';
+import { PostHogProvider } from './providers';
 
 export const metadata = {
   metadataBase: new URL('https://tnt-audit.com'),
@@ -38,8 +39,10 @@ export default function RootLayout({ children }) {
         <script src="https://cdn.tailwindcss.com"></script>
       </head>
       <body className="bg-black text-white" style={{ margin: 0 }}>
-        {children}
-        <Analytics />
+        <PostHogProvider>
+          {children}
+          <Analytics />
+        </PostHogProvider>
       </body>
     </html>
   );

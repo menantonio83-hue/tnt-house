@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import posthog from 'posthog-js';
 import { computeFullScore, classifyHolderRisk } from '@/lib/scoring';
 import {
   Shield,
@@ -1561,6 +1562,7 @@ export default function TntHouse() {
   var handleQuickCheck = async function (e) {
     e.preventDefault();
     if (!qcCa.trim()) return;
+    posthog.capture('token_audit_started', { ca: qcCa.trim(), source: 'quick_check' });
     setQcLoading(true);
     setQcError(null);
     setQcResult(null);
@@ -2342,6 +2344,7 @@ export default function TntHouse() {
     setInvoiceAmount(mrdtAmount);
     setInvoiceUsd(usd);
     setInvoiceLabel('TNT House ' + tierName + ' Audit - ' + formData.projectName);
+    posthog.capture('pricing_viewed', { tier: selectedTier, usd: usd });
     setShowPaymentModal(true);
   };
 
@@ -2413,6 +2416,8 @@ export default function TntHouse() {
     }
 
     var row = auditJson.row;
+
+    posthog.capture('audit_submitted', { ca: ca, tier: 'free', score: row.score });
 
     setLogs(function (prev) {
       return prev.slice(-12).concat(['[AUDIT] Score ' + row.score + '/100 — saving...']);
@@ -3333,6 +3338,12 @@ export default function TntHouse() {
       '&method=' + encodeURIComponent(verifyMethod) +
       '&label=' + encodeURIComponent(label) +
       '&wallet=' + encodeURIComponent(selectedWallet || 'Phantom');
+    posthog.capture('payment_started', {
+      kind: 'listing',
+      tier: tierAtPayment,
+      method: verifyMethod,
+      orderId: order.orderId,
+    });
     openWalletInAppBrowser(payUrl, selectedWallet);
     setShowInvoiceModal(false);
     setIsSending(true);
@@ -3678,6 +3689,16 @@ export default function TntHouse() {
             }
 
             if (completion && completion.ok === true) {
+              posthog.capture('payment_completed', {
+                kind: 'listing',
+                tier: auditData.tier,
+                orderId: auditData.orderId,
+              });
+              posthog.capture('audit_submitted', {
+                ca: auditData.ca,
+                tier: auditData.tier,
+                score: completion.row ? completion.row.score : auditData.score,
+              });
               // Show what the server actually stored rather than the
               // pre-payment snapshot the browser assembled.
               if (completion.row) {
@@ -4505,6 +4526,7 @@ export default function TntHouse() {
                       <select
                         value={selectedTier}
                         onChange={function (e) {
+                          posthog.capture('listing_selected', { tier: e.target.value });
                           setSelectedTier(e.target.value);
                         }}
                         className="w-full bg-slate-950 border border-purple-500/20 rounded px-3 py-2 text-xs text-white focus:border-purple-500 focus:outline-none font-mono"
