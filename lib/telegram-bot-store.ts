@@ -125,15 +125,21 @@ export async function linkExistingKey(telegramId: number, rawKey: string): Promi
 
 // Fire-and-forget — never awaited on the bot's reply path, same
 // convention as touchApiKeyUsage in lib/api-auth.ts.
+//
+// Wrapped in Promise.resolve(): Supabase's query builder is a
+// PromiseLike (thenable), not a real Promise (no .catch/.finally) —
+// waitUntil() from @vercel/functions requires a genuine Promise, which
+// is a real type error the build catches, not just a style nitpick.
 export function touchLastCheck(telegramId: number): void {
   waitUntil(
-    supabase
-      .from(LINKS_TABLE)
-      .update({ last_check_at: new Date().toISOString() })
-      .eq('telegram_id', telegramId)
-      .then(({ error }: { error: { message: string } | null }) => {
-        if (error) console.error('[telegram-bot-store] touchLastCheck error:', error.message);
-      }),
+    Promise.resolve(
+      supabase
+        .from(LINKS_TABLE)
+        .update({ last_check_at: new Date().toISOString() })
+        .eq('telegram_id', telegramId),
+    ).then(({ error }: { error: { message: string } | null }) => {
+      if (error) console.error('[telegram-bot-store] touchLastCheck error:', error.message);
+    }),
   );
 }
 
