@@ -161,6 +161,9 @@ interface TrialResult {
     largest_holder_percent: number;
     top10_percent: number;
     holder_count: number;
+    freely_tradeable_top10_percent?: number;
+    freely_tradeable_largest_holder_percent?: number;
+    scoring_risk_level?: string;
   };
   market?: {
     price_usd: number | null;
@@ -570,6 +573,17 @@ export default function TryItWidget() {
                   <>
                     <StatRow label="Top holder" value={`${result.holder_distribution.largest_holder_percent.toFixed(1)}%`} />
                     <StatRow label="Top-10 holders" value={`${result.holder_distribution.top10_percent.toFixed(1)}%`} />
+                    {/* Shown only when tokens locked in a vesting contract change the figure. */}
+                    {typeof result.holder_distribution.freely_tradeable_top10_percent === 'number' &&
+                      Math.abs(
+                        result.holder_distribution.freely_tradeable_top10_percent -
+                          result.holder_distribution.top10_percent,
+                      ) >= 0.05 && (
+                        <StatRow
+                          label="Top-10 after locks"
+                          value={`${result.holder_distribution.freely_tradeable_top10_percent.toFixed(1)}%`}
+                        />
+                      )}
                     <StatRow
                       label="Holders"
                       value={

@@ -1,3 +1,9 @@
+// Version 1.14 — lib/token-risk-core.ts
+//
+// v1.14: holder_distribution gains freely_tradeable_top10_percent,
+// freely_tradeable_largest_holder_percent and scoring_risk_level (the
+// vesting-adjusted values scoring uses). Raw fields unchanged.
+//
 // Version 1.13 — lib/token-risk-core.ts
 //
 // v1.13: flags[] gains single_holder_gt_50 (one holder > 50% of supply).
@@ -397,6 +403,10 @@ export interface TokenRiskResult {
     largest_holder_percent: number;
     top10_percent: number;
     holder_count: number;
+    // v1.14 — after subtracting tokens locked in known vesting contracts.
+    freely_tradeable_top10_percent?: number;
+    freely_tradeable_largest_holder_percent?: number;
+    scoring_risk_level?: string;
   };
   market?: {
     price_usd: number | null;
@@ -794,6 +804,12 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
         largest_holder_percent: holderRisk.largestHolderPercent,
         top10_percent: holderRisk.top10Percent,
         holder_count: effectiveHolderCount,
+        // v1.14: the figures scoring actually uses. The fields above stay
+        // RAW on-chain; these subtract tokens locked in known vesting
+        // contracts (equal to the raw values when there is no lock).
+        freely_tradeable_top10_percent: freelyTradeableTop10Percent,
+        freely_tradeable_largest_holder_percent: freelyTradeableLargestHolderPercent,
+        scoring_risk_level: holderRiskForScoring.riskLevel,
       },
       market: {
         price_usd: dexData.price,
