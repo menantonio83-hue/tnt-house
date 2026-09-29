@@ -1,3 +1,9 @@
+// Version 1.4 — app/api/telegram-bot/webhook/route.ts
+//
+// v1.4: no verdict label (Safe/Caution/High Risk) while the cluster scan
+// is pending — the card says "preliminary" instead, since the score at
+// that moment includes a placeholder for the insider-cluster component.
+//
 // Version 1.3 — app/api/telegram-bot/webhook/route.ts
 //
 // v1.3: result card now shows the cap explanation (result.explanation)
@@ -186,7 +192,15 @@ function formatCheckResult(
     clusterLine = '✅ Insider clusters: none found';
   }
 
-  const verdict = verdictFor(result.safety_score);
+  // v1.4: while the insider-cluster scan is still running, the score
+  // contains a neutral placeholder for that component (lib/scoring.ts),
+  // so it is provisional. Never show a verdict like "Safe" on a
+  // provisional number — it could drop once clusters are known. If the
+  // scan timed out, the score stays provisional and says so.
+  const provisional = result.cluster_analysis === 'pending';
+  const verdict = provisional
+    ? { icon: '⏳', label: 'preliminary, cluster scan not finished' }
+    : verdictFor(result.safety_score);
   const honeypotLine =
     result.honeypot_risk === null || result.honeypot_risk === undefined
       ? '❔ Honeypot: unknown'
