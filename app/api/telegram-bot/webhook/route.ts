@@ -1,3 +1,10 @@
+// Version 1.5 — app/api/telegram-bot/webhook/route.ts
+//
+// v1.5: cluster line shows the share of supply held by the counted
+// clusters (result.cluster_supply_pct, a lower bound: only top holders
+// are traced) and clusters flagged as likely CEX/infra funders get a
+// neutral "Linked wallets ... not counted" line instead of the 🚨.
+//
 // Version 1.4 — app/api/telegram-bot/webhook/route.ts
 //
 // v1.4: no verdict label (Safe/Caution/High Risk) while the cluster scan
@@ -186,8 +193,22 @@ function formatCheckResult(
       ? '⏳ Insider clusters: scan is slow — send /check again in a minute'
       : '⏳ Insider clusters: scanning… this card updates itself';
   } else if (clusters.length > 0) {
-    const wallets = clusters.reduce((n, c) => n + c.wallets.length, 0);
-    clusterLine = `🚨 Insider clusters: ${clusters.length} found (${wallets} wallets)`;
+    // v1.5: split counted clusters from likely CEX/infra funders. Those
+    // stay visible but do not count toward the score, so they must not
+    // get the alarm icon.
+    const counted = clusters.filter((c) => !c.false_positive_likely);
+    if (counted.length === 0) {
+      const linked = clusters.reduce((n, c) => n + c.wallets.length, 0);
+      clusterLine = `ℹ️ Linked wallets: ${linked} (likely exchange/infra funder, not counted)`;
+    } else {
+      const wallets = counted.reduce((n, c) => n + c.wallets.length, 0);
+      // Share of supply among the top holders checked — a lower bound.
+      const share =
+        typeof result.cluster_supply_pct === 'number'
+          ? `, ~${result.cluster_supply_pct}% of supply`
+          : '';
+      clusterLine = `🚨 Insider clusters: ${counted.length} found (${wallets} wallets${share})`;
+    }
   } else {
     clusterLine = '✅ Insider clusters: none found';
   }

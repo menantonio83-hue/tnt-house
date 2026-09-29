@@ -1,3 +1,28 @@
+// Version 1.6 — lib/scoring.ts
+//
+// v1.6 (2026-09-29): insider clusters are now scored by SHARE OF SUPPLY,
+// not just wallet count. The old penalty (8 per cluster + 3 per wallet)
+// saturated the 25-point insider bucket: 8 linked wallets holding 3%
+// and 2 wallets holding 30% looked identical, and because the other
+// buckets alone add up to 75 ("Safe" is >= 70), the flagship signal
+// could not pull a token out of the green band. Now:
+//   * insider bucket = round(25 * max(0, 1 - clusterSupplyPct / 25)),
+//     where clusterSupplyPct is the SUM of supply held by all
+//     non-false-positive clusters (sumClusterSupplyPct below);
+//   * hard caps by cluster supply (applyScoreCaps): >= 8% with 3+
+//     wallets -> 60, >= 15% -> 45, >= 25% -> 30, >= 40% -> 15, tightened
+//     further when 5+ wallets are involved, so the other buckets cannot
+//     hide a large cluster.
+// If ANY counted cluster has no supply figure (rows cached before this
+// version, or a holder missing from RugCheck's list) the old wallet-count
+// formula is used and no supply cap fires — unknown never becomes clean
+// or damning by accident. The site's own scoring path (app/page.js) does
+// not pass supply data yet, so it keeps the old behaviour until it does.
+// Thresholds are proposals from the 2026-09-29 review, NOT calibrated
+// yet — see the scoring-v2 plan in the project docs.
+// (Header note: v1.5 changes below — false-positive clusters excluded
+// from the penalty — shipped without a header bump.)
+//
 // Version 1.4 — lib/scoring.ts
 //
 // v1.4 (2026-09-12, fixing the mSOL/HNT regression found in the v1.3
@@ -138,6 +163,24 @@ export interface ScoringCluster {
   // older cached rows and callers passing raw wallet counts keep
   // working unchanged.
   false_positive_likely?: boolean;
+  // v1.6: percent of total supply held by this cluster's wallets (from
+  // RugCheck's top-holder list). null/absent = unknown.
+  supply_pct?: number | null;
+}
+
+// v1.6: the cluster share at which the insider bucket reaches 0 points.
+const INSIDER_SUPPLY_ZERO_POINT_PCT = 25;
+
+// v1.6: total supply share held by the given clusters, or null when ANY
+// of them lacks a usable figure (so callers fall back instead of
+// silently under-counting). An empty list is a genuine 0.
+export function sumClusterSupplyPct(clusters: ScoringCluster[]): number | null {
+  let total = 0;
+  for (const c of clusters) {
+    if (typeof c.supply_pct !== 'number' || !Number.isFinite(c.supply_pct)) return null;
+    total += c.supply_pct;
+  }
+  return Math.round(total * 10) / 10;
 }
 
 // ─── Additive base (max 100, before caps) ───
@@ -203,9 +246,18 @@ export function computeSafetyScoreBase(
     // They remain in the API response (insider_clusters) with the flag
     // and classification — honest, just not punitive.
     const realClusters = clusters.filter((c) => !c.false_positive_likely);
-    const clusteredWallets = realClusters.reduce((sum, c) => sum + c.wallets.length, 0);
-    const penalty = realClusters.length * 8 + clusteredWallets * 3;
-    insiderScore = Math.max(0, 25 - penalty);
+    const supplyPct = sumClusterSupplyPct(realClusters);
+    if (supplyPct !== null) {
+      // v1.6: score by share of supply.
+      insiderScore = Math.round(
+        25 * Math.max(0, 1 - supplyPct / INSIDER_SUPPLY_ZERO_POINT_PCT),
+      );
+    } else {
+      // Fallback (no supply figure): the pre-1.6 wallet-count penalty.
+      const clusteredWallets = realClusters.reduce((sum, c) => sum + c.wallets.length, 0);
+      const penalty = realClusters.length * 8 + clusteredWallets * 3;
+      insiderScore = Math.max(0, 25 - penalty);
+    }
   }
 
   const total = foundation + holderScore + liquidityScore + volumeScore + insiderScore;
@@ -245,6 +297,8 @@ export interface ScoreCapResult {
   // v1.3 — new cap tiers, same "did this tier actually pull the score
   // down" semantics as the flags above.
   lpRiskCapped: boolean;
+  // v1.6 — insider cluster supply-share cap actually pulled the score down.
+  clusterRiskCapped: boolean;
   mintAuthorityCapped: boolean;
   freezeAuthorityCapped: boolean;
   honeypotCapped: boolean;
@@ -293,6 +347,11 @@ export function applyScoreCaps(
     // v1.4 — Jupiter verification, from RugCheck's report. true softens
     // the mint combo and lp_unlocked_thin; null/absent = unverified.
     jupVerified?: boolean | null;
+    // v1.6 — insider cluster share: summed supply % of the counted
+    // (non-false-positive) clusters and their total wallet count.
+    // null/absent = unknown or cluster scan not finished: no cap fires.
+    clusterSupplyPct?: number | null;
+    clusterWalletCount?: number | null;
   },
   options?: { retroUnverified?: boolean },
 ): ScoreCapResult {
@@ -397,6 +456,35 @@ export function applyScoreCaps(
   const lpRiskCapped = lpRiskCap < 100 && afterContractRisk > lpRiskCap;
   const afterLpRisk = Math.min(afterContractRisk, lpRiskCap);
 
+  // v1.6: insider cluster supply-share cap. Hard cap so the additive
+  // buckets (which alone reach 75) cannot hide a large cluster. Tiers are
+  // uncalibrated proposals (see header); wallet count only TIGHTENS a cap
+  // that already fired.
+  const clusterSupplyPct = contractSignals.clusterSupplyPct;
+  const clusterWalletCount = contractSignals.clusterWalletCount ?? 0;
+  let clusterCapReason: string | null = null;
+  let clusterRiskCap = 100;
+  if (typeof clusterSupplyPct === 'number' && Number.isFinite(clusterSupplyPct)) {
+    if (clusterSupplyPct >= 40) {
+      clusterCapReason = 'insider_cluster_supply_ge_40';
+      clusterRiskCap = 15;
+    } else if (clusterSupplyPct >= 25) {
+      clusterCapReason = 'insider_cluster_supply_ge_25';
+      clusterRiskCap = 30;
+    } else if (clusterSupplyPct >= 15) {
+      clusterCapReason = 'insider_cluster_supply_ge_15';
+      clusterRiskCap = 45;
+    } else if (clusterSupplyPct >= 8 && clusterWalletCount >= 3) {
+      clusterCapReason = 'insider_cluster_supply_ge_8';
+      clusterRiskCap = 60;
+    }
+    if (clusterCapReason !== null && clusterSupplyPct >= 8 && clusterWalletCount > 4) {
+      clusterRiskCap = Math.max(5, clusterRiskCap - Math.min(15, (clusterWalletCount - 2) * 2));
+    }
+  }
+  const clusterRiskCapped = clusterRiskCap < 100 && afterLpRisk > clusterRiskCap;
+  const afterClusterRisk = Math.min(afterLpRisk, clusterRiskCap);
+
   // v1.3: authority caps. Mint is a COMBO condition — an active mint
   // authority caps only when the LP is also effectively unlocked
   // (lpLockedPct < 50 with liquidity > $10k). Stables keep their mint
@@ -420,8 +508,8 @@ export function applyScoreCaps(
   if (mintActiveAndLpUnlocked) {
     mintAuthorityCap = Math.min(mintAuthorityCap, MINT_ACTIVE_CAP);
   }
-  const mintAuthorityCapped = mintAuthorityCap < 100 && afterLpRisk > mintAuthorityCap;
-  const afterMintAuthority = Math.min(afterLpRisk, mintAuthorityCap);
+  const mintAuthorityCapped = mintAuthorityCap < 100 && afterClusterRisk > mintAuthorityCap;
+  const afterMintAuthority = Math.min(afterClusterRisk, mintAuthorityCap);
 
   const FREEZE_ACTIVE_CAP = 30;
   let freezeAuthorityCap = 100;
@@ -479,6 +567,8 @@ export function applyScoreCaps(
     dexData.liquidity > LP_UNLOCKED_LIQUIDITY_MIN
   )
     capsTriggered.push({ reason: 'lp_unlocked_thin', cap: lpUnlockedCapValue });
+  if (clusterCapReason !== null)
+    capsTriggered.push({ reason: clusterCapReason, cap: clusterRiskCap });
   if (dexData.liquidity !== null && dexData.liquidity < 500)
     capsTriggered.push({ reason: 'low_liquidity', cap: LOW_LIQUIDITY_CAP });
   if (holderRisk.top10Percent > 90) capsTriggered.push({ reason: 'top10_gt_90', cap: 30 });
@@ -543,6 +633,7 @@ export function applyScoreCaps(
     washTradingCapped,
     retroCapped,
     lpRiskCapped,
+    clusterRiskCapped,
     mintAuthorityCapped,
     freezeAuthorityCapped,
     honeypotCapped,
@@ -578,6 +669,9 @@ export function computeFullScore(
       lpBurned?: boolean | null;
       // v1.4 — Jupiter verification (softens mint combo + lp cap).
       jupVerified?: boolean | null;
+      // v1.6 — insider cluster share (see applyScoreCaps).
+      clusterSupplyPct?: number | null;
+      clusterWalletCount?: number | null;
     };
     retroUnverified?: boolean;
   },

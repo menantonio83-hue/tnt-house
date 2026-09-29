@@ -1,3 +1,16 @@
+// Version 7.5 — lib/insider-cluster-detector.ts
+//
+// v7.5: every cluster now carries supply_pct — the summed share of total
+// supply held by its wallets, read from the per-holder figures RugCheck
+// already returns in the SAME /report call we make for topHolders (they
+// used to be dropped; zero extra requests). lib/scoring.ts v1.6 scores
+// clusters by this instead of raw wallet count. null = unknown (a wallet
+// missing from the list, or the figures failed a sanity check) — callers
+// must treat null as unknown, never as 0. Note only the top
+// MAX_HOLDERS_CHECKED holders are traced, so this is a LOWER BOUND of a
+// cluster's real share. The source (pct vs amount/supply) and sum are
+// logged once per run so the units can be verified against Solscan.
+//
 // Version 7.4 — lib/insider-cluster-detector.ts
 //
 // v7.4: distinguish "RugCheck returned no topHolders data" (upstream
@@ -113,6 +126,9 @@ export interface InsiderCluster {
   // responses with this flag; scoring (lib/scoring.ts) skips its
   // penalty.
   false_positive_likely: boolean;
+  // v7.5: percent of total supply held by this cluster's wallets (lower
+  // bound — only the top holders are traced). null/absent = unknown.
+  supply_pct?: number | null;
 }
 
 export interface InsiderClusterDetectionResult {
@@ -474,6 +490,59 @@ async function classifyFunder(
   };
 }
 
+// v7.5: per-holder share of total supply (in PERCENT, 0-100) for the
+// holders we trace, keyed by the same address we trace. Primary source is
+// RugCheck's own per-holder `pct`; fallback is amount / token.supply.
+// Units are not documented well, so each candidate set must pass a sanity
+// check: the shares must sum to a plausible value (0 < sum <= 100.5).
+// A sum <= 1 is read as fractions (0-1) and scaled x100 — no real token's
+// top 10 holds under 1% in total. Returns {} when nothing plausible.
+function extractHolderSupplyPcts(
+  rugData: any,
+  mint: string,
+): Record<string, number> {
+  const slice: any[] = (rugData.topHolders as any[]).slice(0, MAX_HOLDERS_CHECKED);
+  const supplyRaw =
+    typeof rugData?.token?.supply === 'number' && rugData.token.supply > 0
+      ? rugData.token.supply
+      : null;
+
+  const attempt = (
+    source: string,
+    read: (h: any) => number | null,
+  ): Record<string, number> | null => {
+    const rows: Array<{ addr: string; pct: number }> = [];
+    for (const h of slice) {
+      const addr = h?.address || h?.owner;
+      const pct = read(h);
+      if (addr && pct !== null && Number.isFinite(pct) && pct >= 0) rows.push({ addr, pct });
+    }
+    if (rows.length === 0) return null;
+    let sum = rows.reduce((s, r) => s + r.pct, 0);
+    let scale = 1;
+    if (sum > 0 && sum <= 1) {
+      scale = 100;
+      sum *= 100;
+    }
+    if (!(sum > 0 && sum <= 100.5)) return null;
+    console.log(
+      `[insider-cluster-detector] ${mint}: holder supply shares from ${source}, ` +
+        `${rows.length} holders, sum ${sum.toFixed(2)}%, top ${(rows[0].pct * scale).toFixed(2)}%`,
+    );
+    const out: Record<string, number> = {};
+    for (const r of rows) out[r.addr] = r.pct * scale;
+    return out;
+  };
+
+  return (
+    attempt('pct', (h) => (typeof h?.pct === 'number' ? h.pct : null)) ??
+    attempt('amount/supply', (h) =>
+      supplyRaw !== null && typeof h?.amount === 'number' ? (h.amount / supplyRaw) * 100 : null,
+    ) ??
+    {}
+  );
+}
+
 // Main entry point: detect insider clusters among a mint's top holders.
 export async function detectInsiderClusters(
   mint: string,
@@ -518,6 +587,9 @@ export async function detectInsiderClusters(
   if (topHolders.length < 2) {
     return { clusters: [], checkedHolders: topHolders.length, errors: [] };
   }
+
+  // v7.5: supply shares for the traced holders (see extractHolderSupplyPcts).
+  const supplyPctByHolder = extractHolderSupplyPcts(rugData, mint);
 
   const connection = new Connection(RPC_URL, 'confirmed');
   const funderMap: Record<string, string[]> = {};
@@ -581,6 +653,13 @@ export async function detectInsiderClusters(
       null,
     );
 
+    // v7.5: summed share of supply held by this cluster's wallets, or
+    // null if any wallet has no known share (unknown, never a partial sum).
+    const knownShares = wallets.map((w) => supplyPctByHolder[w]);
+    const supplyPct = knownShares.every((v) => typeof v === 'number')
+      ? Math.round((knownShares as number[]).reduce((s, v) => s + v, 0) * 10) / 10
+      : null;
+
     clusters.push({
       funder,
       wallets,
@@ -588,6 +667,7 @@ export async function detectInsiderClusters(
       funder_label: classification?.funder_label ?? null,
       funder_confidence: classification?.funder_confidence ?? null,
       false_positive_likely: classification?.false_positive_likely ?? false,
+      supply_pct: supplyPct,
     });
   }
 

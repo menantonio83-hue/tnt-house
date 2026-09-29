@@ -1,3 +1,15 @@
+// Version 1.10 — lib/token-risk-core.ts
+//
+// v1.10: insider clusters are scored by share of supply (lib/scoring.ts
+// v1.6). Each cluster now carries supply_pct (from the detector, v7.5);
+// this file sums it over the counted (non-false-positive) clusters and
+// passes clusterSupplyPct / clusterWalletCount to applyScoreCaps, and
+// exposes cluster_supply_pct + cluster_wallet_count in the response.
+// Cached rows written before this version have no supply_pct: they read
+// as null and scoring falls back to the old wallet-count formula until
+// the row refreshes (10 min TTL). While the scan is pending both new
+// fields are null.
+//
 // Version 1.9 — lib/token-risk-core.ts
 //
 // v1.9: holderCount here came ONLY from getHolderDistributionRobust
@@ -237,6 +249,10 @@ function explainDominantCap(reason: string | null | undefined): string | undefin
     mint_authority_active: 'Score capped because the mint authority is active while the LP is effectively unlocked (print-and-dump configuration).',
     freeze_authority_active: 'Score capped because the freeze authority is still active and can freeze holder funds.',
     lp_unlocked_thin: 'Score capped because real liquidity exists but less than half of the LP is locked.',
+    insider_cluster_supply_ge_40: 'Score capped because wallets linked by a shared funder hold 40% or more of supply.',
+    insider_cluster_supply_ge_25: 'Score capped because wallets linked by a shared funder hold 25% or more of supply.',
+    insider_cluster_supply_ge_15: 'Score capped because wallets linked by a shared funder hold 15% or more of supply.',
+    insider_cluster_supply_ge_8: 'Score capped because 3+ wallets linked by a shared funder hold 8% or more of supply.',
     permanent_delegate: 'Score capped because the token has a permanent delegate enabled, letting a third party move holder funds.',
     hidden_owner: 'Score capped because a hidden owner or proxy contract was detected.',
     high_tax: 'Score capped because the transfer tax exceeds 10%.',
@@ -309,6 +325,9 @@ export interface TokenRiskResult {
   explanation?: string;
   cluster_analysis?: 'complete' | 'pending';
   insider_clusters?: InsiderCluster[];
+  // v1.10 — see the version note at the top of this file.
+  cluster_supply_pct?: number | null;
+  cluster_wallet_count?: number | null;
   mint_authority?: { revoked: boolean; address: string | null };
   freeze_authority?: { revoked: boolean; address: string | null };
   // v1.10: real values from RugCheck (lib/rugcheck-client.ts), not the
@@ -389,6 +408,7 @@ import {
   applyScoreCaps,
   classifyHolderRisk,
   computeFullScore,
+  sumClusterSupplyPct,
   type ScoreCapResult,
   type HolderRiskLevel,
 } from '@/lib/scoring';
@@ -552,10 +572,23 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
           funder_label: cluster.funder_label ?? null,
           funder_confidence: cluster.funder_confidence ?? null,
           false_positive_likely: cluster.false_positive_likely ?? false,
+          // v1.10: rows cached before the supply share existed read as
+          // unknown (null), never 0.
+          supply_pct: typeof cluster.supply_pct === 'number' ? cluster.supply_pct : null,
         };
       });
       clusterAnalysis = 'complete';
     }
+
+    // v1.10: share of supply held by the clusters that COUNT for scoring
+    // (false-positive CEX/infra funders excluded). null while the scan is
+    // pending or when any counted cluster has no supply figure.
+    const countedClusters =
+      clusterAnalysis === 'complete' ? insiderClusters.filter((c) => !c.false_positive_likely) : [];
+    const clusterSupplyPct = clusterAnalysis === 'complete' ? sumClusterSupplyPct(countedClusters) : null;
+    const clusterWalletCount = clusterAnalysis === 'complete'
+      ? countedClusters.reduce((n, c) => n + c.wallets.length, 0)
+      : null;
 
     if (!row || !isFresh) {
       await markClusterPending(mint);
@@ -604,6 +637,9 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
       // v1.10 (scoring v1.4): Jupiter verification mitigates the mint
       // combo and lp_unlocked_thin (mSOL/HNT/JitoSOL case).
       jupVerified: rugCheckData.jup_verified,
+      // v1.10 (scoring v1.6): insider cluster supply share.
+      clusterSupplyPct,
+      clusterWalletCount,
     });
 
     // History write: fire-and-forget, never awaited, never allowed to
@@ -651,6 +687,10 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
       explanation: explainDominantCap(dominantCap),
       cluster_analysis: clusterAnalysis,
       insider_clusters: insiderClusters,
+      // v1.10: summed supply share (%) and wallet count of the clusters
+      // counted for scoring; null while pending / when a share is unknown.
+      cluster_supply_pct: clusterSupplyPct,
+      cluster_wallet_count: clusterWalletCount,
       mint_authority: {
         revoked: mintAuthorityRevoked,
         address: mintAuthorityRevoked ? null : mintInfo.info.mintAuthority,
