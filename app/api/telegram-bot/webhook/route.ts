@@ -1,3 +1,16 @@
+// Version 1.1 — app/api/telegram-bot/webhook/route.ts
+//
+// v1.1: on a never-before-scanned mint, insider-cluster detection is
+// still a pending background job at reply time — the bot said "still
+// scanning, check again in ~10s", which a real user just doesn't do.
+// Worse, the safety_score shown at that point used a neutral placeholder
+// for the insider-cluster component (lib/scoring.ts), not the real
+// penalty — so the first score could be flat wrong, not just incomplete.
+// followUpClusterScan() now polls the cluster cache after replying and
+// sends a corrected follow-up message once the background job finishes,
+// with no extra quota charged. See that function's own header for the
+// exact mechanism.
+//
 // Version 1.0 — app/api/telegram-bot/webhook/route.ts
 //
 // "Insider Alerts" Telegram bot — a thin Telegram-protocol wrapper
@@ -24,8 +37,10 @@
 // end users directly.
 
 import { NextRequest, NextResponse } from 'next/server';
+import { waitUntil } from '@vercel/functions';
 import { fetchTokenRisk } from '@/lib/token-risk-core';
 import { enforceRateLimit } from '@/lib/rate-limit';
+import { getClusterCache } from '@/lib/risk-api-cache';
 import {
   getOrCreateLinkedKey,
   linkExistingKey,
@@ -131,6 +146,56 @@ function formatCheckResult(
   }
 
   return lines.join('\n');
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// v1.1: on the FIRST-ever check of a mint, lib/token-risk-core.ts's
+// insider-cluster detection hasn't run yet (it's a background job — see
+// lib/risk-api-cache.ts's stale-while-revalidate flow), so the initial
+// reply above shows "still scanning" AND — this is the part that matters,
+// not just cosmetics — the safety_score itself was computed with a
+// neutral placeholder (lib/scoring.ts: insiderScore = 12 while pending)
+// instead of the real insider-cluster penalty. So the FIRST score shown
+// for a never-before-scanned mint can be wrong, not just incomplete.
+//
+// This polls the (cheap, no RPC calls) cluster cache a couple of times
+// after replying, and once the background job finishes, re-runs the full
+// fetchTokenRisk (now backed by a warm cache) and sends the corrected
+// result as a follow-up message — same used/limit numbers as the
+// original call, since this is a free correction, not a second /check.
+// Gives up silently if the background job is unusually slow; the user
+// can always /check again manually.
+async function followUpClusterScan(
+  chatId: number,
+  mint: string,
+  used: number,
+  limit: number | null,
+): Promise<void> {
+  const POLL_DELAYS_MS = [12000, 15000]; // ~12s, then ~27s total
+
+  for (const delay of POLL_DELAYS_MS) {
+    await sleep(delay);
+    try {
+      const { row } = await getClusterCache(mint);
+      if (!row || row.status === 'pending') continue;
+
+      const updated = await fetchTokenRisk(mint);
+      await sendMessage(
+        chatId,
+        `🔄 <b>Cluster scan finished — updated result:</b>\n\n${formatCheckResult(updated, used, limit)}`,
+      );
+      return;
+    } catch (err) {
+      console.error('[telegram-bot] followUpClusterScan error:', err instanceof Error ? err.message : err);
+      return;
+    }
+  }
+  // Still pending after ~27s — background job is unusually slow or
+  // crashed. Say nothing further rather than spamming; /check again
+  // manually will pick up the cache whenever it does finish.
 }
 
 const HELP_TEXT =
@@ -276,6 +341,15 @@ export async function POST(request: NextRequest) {
       touchLastCheck(chatId);
       const result = await fetchTokenRisk(args);
       await sendMessage(chatId, formatCheckResult(result, limitResult.used, limitResult.limit));
+
+      // v1.1: cluster analysis still running for a never-before-scanned
+      // mint — see followUpClusterScan's header. Only fires for a
+      // successful lookup; a failed/invalid-mint result has no mint to
+      // poll the cache for.
+      if (result.ok && result.cluster_analysis === 'pending' && result.mint) {
+        waitUntil(followUpClusterScan(chatId, result.mint, limitResult.used, limitResult.limit));
+      }
+
       return NextResponse.json({ ok: true });
     }
 
