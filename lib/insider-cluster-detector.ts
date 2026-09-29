@@ -1,3 +1,13 @@
+// Version 7.7 — lib/insider-cluster-detector.ts
+//
+// v7.7: locker and AMM accounts (as labelled by RugCheck knownAccounts) are
+// excluded from holder tracing and from cluster supply shares. Found on
+// MRDT: a Streamflow vault (67%) and the Raydium pool (11%) were counted as
+// cluster members, giving supply_pct = 97.2%. Note: topHolders[].address is
+// the TOKEN ACCOUNT and .owner the wallet; tracing still uses `address`
+// (behaviour unchanged, see v7.x notes) — switching to `owner` is a
+// separate, riskier change.
+//
 // Version 7.6 — lib/insider-cluster-detector.ts
 //
 // v7.6: RPC calls are rate-limited through lib/rpc-throttle.ts (~8 req/s
@@ -503,11 +513,41 @@ async function classifyFunder(
 // check: the shares must sum to a plausible value (0 < sum <= 100.5).
 // A sum <= 1 is read as fractions (0-1) and scaled x100 — no real token's
 // top 10 holds under 1% in total. Returns {} when nothing plausible.
+// v7.7: the holders worth tracing. RugCheck's topHolders mixes real wallets
+// with program-controlled accounts (lockers such as Streamflow vaults,
+// AMM pools, bonding curves). Those are labelled in `knownAccounts`
+// (keyed by owner address, type LOCKER / AMM / CREATOR ...). A vault or
+// pool is not an insider wallet, and counting it inflated a cluster's
+// supply share to 97% on a token whose vault held 67%. We look at the
+// first MAX_HOLDERS_CONSIDERED entries, drop LOCKER/AMM accounts, and keep
+// up to MAX_HOLDERS_CHECKED of what is left.
+const MAX_HOLDERS_CONSIDERED = 20;
+
+function selectTraceableHolders(rugData: any): any[] {
+  const known: Record<string, any> =
+    rugData && typeof rugData.knownAccounts === 'object' && rugData.knownAccounts !== null
+      ? rugData.knownAccounts
+      : {};
+  const isProgramAccount = (h: any): boolean => {
+    const types = [known[h?.owner]?.type, known[h?.address]?.type];
+    return types.includes('LOCKER') || types.includes('AMM');
+  };
+  const considered: any[] = (rugData.topHolders as any[]).slice(0, MAX_HOLDERS_CONSIDERED);
+  const kept = considered.filter((h) => h && !isProgramAccount(h));
+  const skipped = considered.length - kept.length;
+  if (skipped > 0) {
+    console.log(
+      `[insider-cluster-detector] excluded ${skipped} locker/AMM account(s) from holder tracing`,
+    );
+  }
+  return kept.slice(0, MAX_HOLDERS_CHECKED);
+}
+
 function extractHolderSupplyPcts(
   rugData: any,
   mint: string,
 ): Record<string, number> {
-  const slice: any[] = (rugData.topHolders as any[]).slice(0, MAX_HOLDERS_CHECKED);
+  const slice: any[] = selectTraceableHolders(rugData);
   const supplyRaw =
     typeof rugData?.token?.supply === 'number' && rugData.token.supply > 0
       ? rugData.token.supply
@@ -585,8 +625,7 @@ export async function detectInsiderClusters(
     );
   }
 
-  const topHolders: string[] = rugData.topHolders
-    .slice(0, MAX_HOLDERS_CHECKED)
+  const topHolders: string[] = selectTraceableHolders(rugData)
     .map((h: any) => h.address || h.owner)
     .filter(Boolean);
 
