@@ -1,3 +1,13 @@
+// Version 1.6 — lib/rugcheck-client.ts
+//
+// v1.6: lp_locked.percent is now a liquidity-weighted average across
+// markets instead of a plain mean. The v1.5 note below claiming the
+// numeric percent "was never wrong" was itself wrong: with one deep pool
+// (~90% locked) and several dust pools (0%), the plain mean gave ~14%
+// while RugCheck's own summary said 90.35, and that wrong number fed the
+// lp_unlocked_thin cap (score -> 40) in scoring.ts. See the comment at
+// the computation for details.
+//
 // Version 1.5 — lib/rugcheck-client.ts
 //
 // v1.5: fixed lp_locked.locked — was `percent > 0`, so any nonzero lock
@@ -190,12 +200,29 @@ export async function getRugCheckRiskData(mint: string): Promise<RugCheckRiskDat
 
     let lp_locked: RugCheckRiskData['lp_locked'] = null;
     if (Array.isArray(data.markets) && data.markets.length > 0) {
-      const lpVals: number[] = data.markets
-        .map((m: any) => (m && m.lp && typeof m.lp.lpLockedPct === 'number' ? m.lp.lpLockedPct : null))
-        .filter((v: number | null): v is number => v !== null);
+      // v1.6: liquidity-WEIGHTED average across markets. It used to be a
+      // plain mean, so one deep pool at ~90% locked plus a few dust
+      // pools at 0% dragged the result to ~14% (live case: RugCheck's
+      // own summary said lpLockedPct 90.35 while the bot showed 14.3),
+      // which then tripped the lp_unlocked_thin cap (score -> 40) on
+      // tokens with genuinely locked liquidity. Each market's weight is
+      // its USD liquidity (base + quote). If no market reports USD
+      // values, fall back to the plain mean rather than lose the signal.
+      const markets: Array<{ pct: number; weight: number }> = [];
+      for (const m of data.markets) {
+        if (!m || !m.lp || typeof m.lp.lpLockedPct !== 'number') continue;
+        const weight =
+          (typeof m.lp.baseUSD === 'number' ? m.lp.baseUSD : 0) +
+          (typeof m.lp.quoteUSD === 'number' ? m.lp.quoteUSD : 0);
+        markets.push({ pct: m.lp.lpLockedPct, weight });
+      }
 
-      if (lpVals.length > 0) {
-        const avg = lpVals.reduce((a, b) => a + b, 0) / lpVals.length;
+      if (markets.length > 0) {
+        const totalWeight = markets.reduce((sum, mk) => sum + mk.weight, 0);
+        const avg =
+          totalWeight > 0
+            ? markets.reduce((sum, mk) => sum + mk.pct * mk.weight, 0) / totalWeight
+            : markets.reduce((sum, mk) => sum + mk.pct, 0) / markets.length;
         const percent = Math.round(avg * 10) / 10;
         // v1.5: `locked` used to be `percent > 0`, so 2.8% locked showed
         // as "✅ locked" everywhere this boolean is displayed (Telegram
