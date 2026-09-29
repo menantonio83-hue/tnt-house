@@ -1,3 +1,8 @@
+// Version 1.7 — lib/rugcheck-client.ts
+//
+// v1.7: hidden_owner no longer matches the bare substring "owner" (it hit
+// "...high ownership" holder-concentration risks and capped scores at 30).
+//
 // Version 1.6 — lib/rugcheck-client.ts
 //
 // v1.6: lp_locked.percent is now a liquidity-weighted average across
@@ -287,10 +292,15 @@ export async function getRugCheckRiskData(mint: string): Promise<RugCheckRiskDat
     // v1.3 — hidden owner / permanent delegate: only flagged if
     // RugCheck's risks[] actually names such a risk, same
     // don't-assume-false-negative rule as honeypot_risk above.
+    // v1.7: match "proxy" / "hidden owner" / the standalone word "owner",
+    // NOT the substring "owner" — that also matched RugCheck's ordinary
+    // holder-concentration risks ("Top 10 holders high ownership",
+    // "Single holder ownership"), which wrongly capped scores at 30 as a
+    // "hidden owner". Holder concentration is scored separately.
     const hidden_owner = risks.some(
       (r) =>
         typeof r.name === 'string' &&
-        (r.name.toLowerCase().includes('proxy') || r.name.toLowerCase().includes('owner')),
+        /proxy|hidden owner|\bowner\b/i.test(r.name),
     );
     const permanent_delegate = risks.some(
       (r) => typeof r.name === 'string' && r.name.toLowerCase().includes('delegate'),
