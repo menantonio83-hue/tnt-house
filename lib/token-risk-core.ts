@@ -1,3 +1,7 @@
+// Version 1.13 — lib/token-risk-core.ts
+//
+// v1.13: flags[] gains single_holder_gt_50 (one holder > 50% of supply).
+//
 // Version 1.12 — lib/token-risk-core.ts
 //
 // v1.12: additive response fields for AI-agent callers: largest_cluster_pct,
@@ -641,6 +645,14 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
     if (!freezeAuthorityRevoked) flags.push('freeze_authority_active');
     if (insiderClusters.some((c) => c.false_positive_likely)) flags.push('shared_cex_or_infra_funder');
     if (countedClusters.length > 0) flags.push('insider_cluster_detected');
+    // v1.13: one wallet holds more than half of supply (as reported in
+    // holder_distribution.largest_holder_percent).
+    if (
+      typeof holderRisk.largestHolderPercent === 'number' &&
+      Number.isFinite(holderRisk.largestHolderPercent) &&
+      holderRisk.largestHolderPercent > 50
+    )
+      flags.push('single_holder_gt_50');
 
     if (!row || !isFresh) {
       await markClusterPending(mint);
