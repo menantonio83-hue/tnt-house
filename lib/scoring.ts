@@ -1,3 +1,9 @@
+// Version 1.9 — lib/scoring.ts
+//
+// v1.9: cluster supply-share cap extracted into exported
+// getClusterSupplyCap() (same tiers, no behaviour change) so the website
+// display path can reuse it.
+//
 // Version 1.8 — lib/scoring.ts
 //
 // v1.8: the softened LP cap reports reason 'lp_unlocked_established'
@@ -194,6 +200,40 @@ export function sumClusterSupplyPct(clusters: ScoringCluster[]): number | null {
     total += c.supply_pct;
   }
   return Math.round(total * 10) / 10;
+}
+
+// v1.9: insider-cluster supply-share cap, extracted from applyScoreCaps so
+// the website (app/page.js display path) and the API share ONE rule.
+// Hard cap so the additive buckets (which alone reach 75) cannot hide a
+// large cluster. Tiers are uncalibrated proposals; wallet count only
+// TIGHTENS a cap that already fired. Returns null when no cap applies or
+// the share is unknown.
+export function getClusterSupplyCap(
+  supplyPct: number | null | undefined,
+  walletCount: number | null | undefined,
+): { reason: string; cap: number } | null {
+  if (typeof supplyPct !== 'number' || !Number.isFinite(supplyPct)) return null;
+  const wallets = typeof walletCount === 'number' ? walletCount : 0;
+  let reason: string | null = null;
+  let cap = 100;
+  if (supplyPct >= 40) {
+    reason = 'insider_cluster_supply_ge_40';
+    cap = 15;
+  } else if (supplyPct >= 25) {
+    reason = 'insider_cluster_supply_ge_25';
+    cap = 30;
+  } else if (supplyPct >= 15) {
+    reason = 'insider_cluster_supply_ge_15';
+    cap = 45;
+  } else if (supplyPct >= 8 && wallets >= 3) {
+    reason = 'insider_cluster_supply_ge_8';
+    cap = 60;
+  }
+  if (reason === null) return null;
+  if (supplyPct >= 8 && wallets > 4) {
+    cap = Math.max(5, cap - Math.min(15, (wallets - 2) * 2));
+  }
+  return { reason, cap };
 }
 
 // ─── Additive base (max 100, before caps) ───
@@ -491,28 +531,14 @@ export function applyScoreCaps(
   // buckets (which alone reach 75) cannot hide a large cluster. Tiers are
   // uncalibrated proposals (see header); wallet count only TIGHTENS a cap
   // that already fired.
-  const clusterSupplyPct = contractSignals.clusterSupplyPct;
-  const clusterWalletCount = contractSignals.clusterWalletCount ?? 0;
-  let clusterCapReason: string | null = null;
-  let clusterRiskCap = 100;
-  if (typeof clusterSupplyPct === 'number' && Number.isFinite(clusterSupplyPct)) {
-    if (clusterSupplyPct >= 40) {
-      clusterCapReason = 'insider_cluster_supply_ge_40';
-      clusterRiskCap = 15;
-    } else if (clusterSupplyPct >= 25) {
-      clusterCapReason = 'insider_cluster_supply_ge_25';
-      clusterRiskCap = 30;
-    } else if (clusterSupplyPct >= 15) {
-      clusterCapReason = 'insider_cluster_supply_ge_15';
-      clusterRiskCap = 45;
-    } else if (clusterSupplyPct >= 8 && clusterWalletCount >= 3) {
-      clusterCapReason = 'insider_cluster_supply_ge_8';
-      clusterRiskCap = 60;
-    }
-    if (clusterCapReason !== null && clusterSupplyPct >= 8 && clusterWalletCount > 4) {
-      clusterRiskCap = Math.max(5, clusterRiskCap - Math.min(15, (clusterWalletCount - 2) * 2));
-    }
-  }
+  // v1.9: the tier table now lives in getClusterSupplyCap() (exported) so
+  // the website's display path uses the exact same rule as the API.
+  const clusterCapResult = getClusterSupplyCap(
+    contractSignals.clusterSupplyPct,
+    contractSignals.clusterWalletCount ?? 0,
+  );
+  const clusterCapReason: string | null = clusterCapResult ? clusterCapResult.reason : null;
+  const clusterRiskCap = clusterCapResult ? clusterCapResult.cap : 100;
   const clusterRiskCapped = clusterRiskCap < 100 && afterLpRisk > clusterRiskCap;
   const afterClusterRisk = Math.min(afterLpRisk, clusterRiskCap);
 

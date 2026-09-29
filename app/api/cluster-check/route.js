@@ -144,6 +144,9 @@ async function traceClusters(ca) {
       funder_class: c.funder_class,
       funder_label: c.funder_label,
       funder_confidence: c.funder_confidence,
+      // Share of total supply held by this cluster's wallets (lower bound;
+      // null = unknown). Additive; the site uses it for the display score.
+      supply_pct: typeof c.supply_pct === 'number' ? c.supply_pct : null,
     })),
     clusterCount: realClusters.length,
     errors: result.errors.length > 0 ? result.errors : undefined,

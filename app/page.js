@@ -1,7 +1,12 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { computeFullScore, classifyHolderRisk } from '@/lib/scoring';
+import {
+  computeFullScore,
+  classifyHolderRisk,
+  getClusterSupplyCap,
+  sumClusterSupplyPct,
+} from '@/lib/scoring';
 import {
   Shield,
   Send,
@@ -1778,7 +1783,18 @@ export default function TntHouse() {
   var getDisplaySafetyScore = function (token, clusterRes) {
     var base = getSafetyScore(token);
     if (clusterRes && !clusterRes.error && clusterRes.clusterCount > 0) {
-      return Math.min(base, 39);
+      // Same rule as the API/bot (lib/scoring.ts getClusterSupplyCap):
+      // cap by the share of supply the clusters hold. Falls back to the
+      // legacy flat 39 only when the share is unknown (cached results
+      // written before supply_pct existed).
+      var clusterList = Array.isArray(clusterRes.clusters) ? clusterRes.clusters : [];
+      var clusterSupply = sumClusterSupplyPct(clusterList);
+      if (clusterSupply === null) return Math.min(base, 39);
+      var walletCount = clusterList.reduce(function (n, c) {
+        return n + (Array.isArray(c.holders) ? c.holders.length : 0);
+      }, 0);
+      var clusterCap = getClusterSupplyCap(clusterSupply, walletCount);
+      return clusterCap ? Math.min(base, clusterCap.cap) : base;
     }
     return base;
   };
