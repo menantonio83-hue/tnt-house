@@ -1,7 +1,7 @@
 // Version 1.7 — lib/scoring.ts
 //
 // v1.7 (2026-09-29): lp_unlocked_thin cap softened 40 -> 60 for established
-// pools (liquidity >= $250k and age >= 14d). RugCheck reports concentrated-
+// pools (liquidity >= $250k and age >= 7d; younger tokens have their own age caps). RugCheck reports concentrated-
 // liquidity pools (Meteora DLMM etc.) as 0% locked, which wrongly pinned
 // mature, deep tokens at 40. Jupiter-verified tokens keep their 75 floor.
 //
@@ -462,7 +462,7 @@ export function applyScoreCaps(
   // softened to 60 (still "Caution"), never lifted. Uncalibrated proposal.
   const LP_UNLOCKED_CAP_ESTABLISHED = 60;
   const LP_ESTABLISHED_MIN_LIQUIDITY = 250000;
-  const LP_ESTABLISHED_MIN_AGE_DAYS = 14;
+  const LP_ESTABLISHED_MIN_AGE_DAYS = 7;
   const lpEstablished =
     dexData.liquidity !== null &&
     dexData.liquidity >= LP_ESTABLISHED_MIN_LIQUIDITY &&
