@@ -1,3 +1,12 @@
+// Version 1.5 — lib/rugcheck-client.ts
+//
+// v1.5: fixed lp_locked.locked — was `percent > 0`, so any nonzero lock
+// (2.8%, 0.1%, anything) displayed as "✅ locked" in the Telegram bot and
+// the /risk-api live widget, even though that's functionally unlocked
+// liquidity. Now `percent >= 50`, matching the threshold scoring.ts
+// already uses to treat LP as "thin/unlocked" below 50%. Display-only
+// fix: the numeric `percent` field scoring.ts reads was never wrong.
+//
 // Version 1.4 — lib/rugcheck-client.ts
 //
 // v1.4: lp_burned — computed by checking the LP mint's authority on
@@ -188,7 +197,16 @@ export async function getRugCheckRiskData(mint: string): Promise<RugCheckRiskDat
       if (lpVals.length > 0) {
         const avg = lpVals.reduce((a, b) => a + b, 0) / lpVals.length;
         const percent = Math.round(avg * 10) / 10;
-        lp_locked = { locked: percent > 0, percent };
+        // v1.5: `locked` used to be `percent > 0`, so 2.8% locked showed
+        // as "✅ locked" everywhere this boolean is displayed (Telegram
+        // bot, /risk-api's live widget) — misleading, since 2.8% is
+        // functionally unlocked. Threshold now matches the ALREADY-
+        // established scoring semantics in scoring.ts (lpUnlockedCondition
+        // fires below 50%, treating it as thin/unlocked liquidity): a
+        // percent under 50 is not "locked" for display purposes either.
+        // Purely a display-boolean fix — the numeric `percent` field
+        // (what scoring.ts actually reads) is unchanged.
+        lp_locked = { locked: percent >= 50, percent };
       }
     }
 
