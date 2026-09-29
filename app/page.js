@@ -2807,10 +2807,9 @@ export default function TntHouse() {
         // lists such a risk; otherwise we don't know either way (shown
         // as "Unknown", not a false "No").
         var hasOwnerRisk = risks.some(function (r) {
-          return (
-            r.name &&
-            (r.name.toLowerCase().includes('proxy') || r.name.toLowerCase().includes('owner'))
-          );
+          // Match "proxy" / "hidden owner" / standalone "owner" — NOT the
+          // substring, which also hit "...high ownership" concentration risks.
+          return r.name && /proxy|hidden owner|\bowner\b/i.test(r.name);
         });
         var hiddenOwner = hasOwnerRisk ? 'Yes ⚠️' : 'No ✓';
 
