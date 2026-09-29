@@ -1,3 +1,10 @@
+// Version 1.7 — lib/scoring.ts
+//
+// v1.7 (2026-09-29): lp_unlocked_thin cap softened 40 -> 60 for established
+// pools (liquidity >= $250k and age >= 14d). RugCheck reports concentrated-
+// liquidity pools (Meteora DLMM etc.) as 0% locked, which wrongly pinned
+// mature, deep tokens at 40. Jupiter-verified tokens keep their 75 floor.
+//
 // Version 1.6 — lib/scoring.ts
 //
 // v1.6 (2026-09-29): insider clusters are now scored by SHARE OF SUPPLY,
@@ -447,8 +454,26 @@ export function applyScoreCaps(
     lpLockedPct < 50 &&
     dexData.liquidity !== null &&
     dexData.liquidity > LP_UNLOCKED_LIQUIDITY_MIN;
+  // v1.7: established-depth floor. Many mature tokens keep most liquidity
+  // in concentrated-liquidity pools (Meteora DLMM, Orca, Raydium CLMM)
+  // which RugCheck reports as 0% locked because there is no lockable LP
+  // token. A deep, aged pool (>= $250k, >= 14 days) with partial lock is
+  // a weaker exit-liquidity signal than a young thin one, so the cap is
+  // softened to 60 (still "Caution"), never lifted. Uncalibrated proposal.
+  const LP_UNLOCKED_CAP_ESTABLISHED = 60;
+  const LP_ESTABLISHED_MIN_LIQUIDITY = 250000;
+  const LP_ESTABLISHED_MIN_AGE_DAYS = 14;
+  const lpEstablished =
+    dexData.liquidity !== null &&
+    dexData.liquidity >= LP_ESTABLISHED_MIN_LIQUIDITY &&
+    dexData.ageDays !== null &&
+    dexData.ageDays >= LP_ESTABLISHED_MIN_AGE_DAYS;
   const lpUnlockedCapValue =
-    contractSignals.jupVerified === true ? LP_UNLOCKED_CAP_VERIFIED : LP_UNLOCKED_CAP;
+    contractSignals.jupVerified === true
+      ? LP_UNLOCKED_CAP_VERIFIED
+      : lpEstablished
+        ? LP_UNLOCKED_CAP_ESTABLISHED
+        : LP_UNLOCKED_CAP;
   let lpRiskCap = 100;
   if (lpUnlockedCondition) {
     lpRiskCap = Math.min(lpRiskCap, lpUnlockedCapValue);
