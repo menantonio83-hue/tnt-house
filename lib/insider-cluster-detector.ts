@@ -1,3 +1,8 @@
+// Version 7.6 — lib/insider-cluster-detector.ts
+//
+// v7.6: RPC calls are rate-limited through lib/rpc-throttle.ts (~8 req/s
+// process-wide) to stop constant 429 retries on the free Helius tier.
+//
 // Version 7.5 — lib/insider-cluster-detector.ts
 //
 // v7.5: every cluster now carries supply_pct — the summed share of total
@@ -80,6 +85,7 @@
 import { Connection, PublicKey } from '@solana/web3.js';
 import pLimit from 'p-limit';
 import { withTimeout } from '@/lib/with-timeout';
+import { throttledFetch } from '@/lib/rpc-throttle';
 import { getCachedFunder, setCachedFunderAsync, type CachedFunder } from '@/lib/funder-cache';
 import { KNOWN_CEX_FUNDERS } from '@/lib/known-cex-funders';
 
@@ -591,7 +597,9 @@ export async function detectInsiderClusters(
   // v7.5: supply shares for the traced holders (see extractHolderSupplyPcts).
   const supplyPctByHolder = extractHolderSupplyPcts(rugData, mint);
 
-  const connection = new Connection(RPC_URL, 'confirmed');
+  // v7.6: all RPC calls go through the shared throttle (lib/rpc-throttle.ts)
+  // so we stay under the provider's requests/sec limit.
+  const connection = new Connection(RPC_URL, { commitment: 'confirmed', fetch: throttledFetch });
   const funderMap: Record<string, string[]> = {};
   const traceByHolder: Record<string, FunderTraceResult> = {};
   const errors: Array<{ holder: string; error: string }> = [];
