@@ -1,3 +1,15 @@
+// Version 1.2 — app/api/telegram-bot/webhook/route.ts
+//
+// v1.2: one clean message instead of two. v1.1 sent the full result
+// twice (first with "still scanning", then a whole second block), which
+// read as clutter. Now the first reply is edited IN PLACE via
+// editMessageText once the cluster scan finishes, so the user only ever
+// sees a single card. Card layout is also uniform: one emoji-first line
+// per check (status icon, label, value), a divider under the score.
+// If the edit fails (message deleted, Telegram hiccup) we fall back to
+// a fresh message, and if the scan never finishes the card is edited to
+// say so instead of being left on "scanning" forever.
+//
 // Version 1.1 — app/api/telegram-bot/webhook/route.ts
 //
 // v1.1: on a never-before-scanned mint, insider-cluster detection is
@@ -68,11 +80,13 @@ interface TelegramUpdate {
   message?: TelegramMessage;
 }
 
-async function sendMessage(chatId: number, text: string): Promise<void> {
+// Returns the sent message's id (needed to edit it later), or null if
+// the send failed.
+async function sendMessage(chatId: number, text: string): Promise<number | null> {
   const token = process.env.TELEGRAM_INSIDER_BOT_TOKEN;
   if (!token) {
     console.error('[telegram-bot] TELEGRAM_INSIDER_BOT_TOKEN not set — cannot reply');
-    return;
+    return null;
   }
   try {
     const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
@@ -87,9 +101,40 @@ async function sendMessage(chatId: number, text: string): Promise<void> {
     });
     if (!res.ok) {
       console.error('[telegram-bot] sendMessage failed:', await res.text());
+      return null;
     }
+    const json = await res.json();
+    return typeof json?.result?.message_id === 'number' ? json.result.message_id : null;
   } catch (err) {
     console.error('[telegram-bot] sendMessage error:', err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
+// Edits a previously sent message in place. Returns true on success.
+async function editMessage(chatId: number, messageId: number, text: string): Promise<boolean> {
+  const token = process.env.TELEGRAM_INSIDER_BOT_TOKEN;
+  if (!token) return false;
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${token}/editMessageText`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        message_id: messageId,
+        text,
+        parse_mode: 'HTML',
+        disable_web_page_preview: true,
+      }),
+    });
+    if (!res.ok) {
+      console.error('[telegram-bot] editMessageText failed:', await res.text());
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('[telegram-bot] editMessageText error:', err instanceof Error ? err.message : err);
+    return false;
   }
 }
 
@@ -101,11 +146,11 @@ function shortMint(mint: string): string {
   return mint.length > 10 ? `${mint.slice(0, 4)}...${mint.slice(-4)}` : mint;
 }
 
-function verdictFor(score: number | undefined): string {
-  if (score === undefined) return 'Unknown';
-  if (score >= 70) return '🟢 Safe';
-  if (score >= 40) return '🟡 Caution';
-  return '🔴 High Risk';
+function verdictFor(score: number | undefined): { icon: string; label: string } {
+  if (score === undefined) return { icon: '⚪', label: 'Unknown' };
+  if (score >= 70) return { icon: '🟢', label: 'Safe' };
+  if (score >= 40) return { icon: '🟡', label: 'Caution' };
+  return { icon: '🔴', label: 'High Risk' };
 }
 
 // `used`/`limit` describe the CALLER's quota state right after this
@@ -116,27 +161,46 @@ function formatCheckResult(
   result: Awaited<ReturnType<typeof fetchTokenRisk>>,
   used: number,
   limit: number | null,
+  scanTimedOut = false,
 ): string {
   if (!result.ok) {
     return `❌ ${escapeHtml(result.error ?? 'Could not check this mint')}`;
   }
 
   const clusters = result.insider_clusters ?? [];
-  const clusterLine =
-    result.cluster_analysis === 'pending'
-      ? '🚨 Insider clusters: still scanning, check again in ~10s'
-      : clusters.length > 0
-        ? `🚨 Insider clusters: ${clusters.length} found (${clusters.reduce((n, c) => n + c.wallets.length, 0)} wallets)`
-        : '✅ Insider clusters: none found';
+  let clusterLine: string;
+  if (result.cluster_analysis === 'pending') {
+    clusterLine = scanTimedOut
+      ? '⏳ Insider clusters: scan is slow — send /check again in a minute'
+      : '⏳ Insider clusters: scanning… this card updates itself';
+  } else if (clusters.length > 0) {
+    const wallets = clusters.reduce((n, c) => n + c.wallets.length, 0);
+    clusterLine = `🚨 Insider clusters: ${clusters.length} found (${wallets} wallets)`;
+  } else {
+    clusterLine = '✅ Insider clusters: none found';
+  }
 
+  const verdict = verdictFor(result.safety_score);
+  const honeypotLine =
+    result.honeypot_risk === null || result.honeypot_risk === undefined
+      ? '❔ Honeypot: unknown'
+      : result.honeypot_risk
+        ? '🚨 Honeypot: yes'
+        : '✅ Honeypot: no';
+  const lpLine = result.lp_locked
+    ? `${result.lp_locked.locked ? '✅' : '⚠️'} LP locked: ${result.lp_locked.locked ? 'yes' : 'no'} (${result.lp_locked.percent}%)`
+    : '❔ LP locked: unknown';
+
+  // One emoji-first line per check, same shape everywhere: icon, label, value.
   const lines = [
     `🔍 <code>${escapeHtml(shortMint(result.mint))}</code>`,
-    `Risk Score: <b>${result.safety_score ?? '?'}/100</b> — ${verdictFor(result.safety_score)}`,
+    `${verdict.icon} Risk Score: <b>${result.safety_score ?? '?'}/100</b> — ${verdict.label}`,
+    '━━━━━━━━━━━━',
     clusterLine,
-    `Mint authority: ${result.mint_authority?.revoked ? 'revoked ✅' : 'active ⚠️'}`,
-    `Freeze authority: ${result.freeze_authority?.revoked ? 'revoked ✅' : 'active ⚠️'}`,
-    `Honeypot: ${result.honeypot_risk === null || result.honeypot_risk === undefined ? 'unknown' : result.honeypot_risk ? '⚠️ yes' : '✅ no'}`,
-    `LP locked: ${result.lp_locked ? `${result.lp_locked.locked ? '✅ yes' : '⚠️ no'} (${result.lp_locked.percent}%)` : 'unknown'}`,
+    `${result.mint_authority?.revoked ? '✅' : '⚠️'} Mint authority: ${result.mint_authority?.revoked ? 'revoked' : 'active'}`,
+    `${result.freeze_authority?.revoked ? '✅' : '⚠️'} Freeze authority: ${result.freeze_authority?.revoked ? 'revoked' : 'active'}`,
+    honeypotLine,
+    lpLine,
   ];
 
   if (limit !== null) {
@@ -170,11 +234,19 @@ function sleep(ms: number): Promise<void> {
 // can always /check again manually.
 async function followUpClusterScan(
   chatId: number,
+  messageId: number | null,
   mint: string,
   used: number,
   limit: number | null,
 ): Promise<void> {
   const POLL_DELAYS_MS = [12000, 15000]; // ~12s, then ~27s total
+
+  // v1.2: update the ORIGINAL card in place; only if that's impossible
+  // (no message id, or the edit failed) fall back to a fresh message.
+  const deliver = async (text: string) => {
+    if (messageId !== null && (await editMessage(chatId, messageId, text))) return;
+    await sendMessage(chatId, text);
+  };
 
   for (const delay of POLL_DELAYS_MS) {
     await sleep(delay);
@@ -183,19 +255,22 @@ async function followUpClusterScan(
       if (!row || row.status === 'pending') continue;
 
       const updated = await fetchTokenRisk(mint);
-      await sendMessage(
-        chatId,
-        `🔄 <b>Cluster scan finished — updated result:</b>\n\n${formatCheckResult(updated, used, limit)}`,
-      );
+      await deliver(formatCheckResult(updated, used, limit));
       return;
     } catch (err) {
       console.error('[telegram-bot] followUpClusterScan error:', err instanceof Error ? err.message : err);
       return;
     }
   }
+
   // Still pending after ~27s — background job is unusually slow or
-  // crashed. Say nothing further rather than spamming; /check again
-  // manually will pick up the cache whenever it does finish.
+  // crashed. Edit the card so it doesn't sit on "scanning…" forever.
+  try {
+    const latest = await fetchTokenRisk(mint);
+    await deliver(formatCheckResult(latest, used, limit, true));
+  } catch (err) {
+    console.error('[telegram-bot] followUpClusterScan timeout-edit error:', err instanceof Error ? err.message : err);
+  }
 }
 
 const HELP_TEXT =
@@ -340,14 +415,18 @@ export async function POST(request: NextRequest) {
 
       touchLastCheck(chatId);
       const result = await fetchTokenRisk(args);
-      await sendMessage(chatId, formatCheckResult(result, limitResult.used, limitResult.limit));
+      const sentId = await sendMessage(
+        chatId,
+        formatCheckResult(result, limitResult.used, limitResult.limit),
+      );
 
-      // v1.1: cluster analysis still running for a never-before-scanned
-      // mint — see followUpClusterScan's header. Only fires for a
-      // successful lookup; a failed/invalid-mint result has no mint to
-      // poll the cache for.
+      // v1.1/v1.2: cluster analysis still running for a never-before-
+      // scanned mint — see followUpClusterScan's header. It edits the
+      // message we just sent (sentId) once the scan is done. Only fires
+      // for a successful lookup; a failed/invalid-mint result has no
+      // mint to poll the cache for.
       if (result.ok && result.cluster_analysis === 'pending' && result.mint) {
-        waitUntil(followUpClusterScan(chatId, result.mint, limitResult.used, limitResult.limit));
+        waitUntil(followUpClusterScan(chatId, sentId, result.mint, limitResult.used, limitResult.limit));
       }
 
       return NextResponse.json({ ok: true });
