@@ -1,3 +1,9 @@
+// Version 1.3 — app/api/telegram-bot/webhook/route.ts
+//
+// v1.3: result card now shows the cap explanation (result.explanation)
+// under the checks when the score was pulled down by a cap, so a score
+// like 40/100 always comes with its reason.
+//
 // Version 1.2 — app/api/telegram-bot/webhook/route.ts
 //
 // v1.2: one clean message instead of two. v1.1 sent the full result
@@ -202,6 +208,14 @@ function formatCheckResult(
     honeypotLine,
     lpLine,
   ];
+
+  // v1.3: say WHY the score is what it is. A score pinned by a cap
+  // (e.g. exactly 40 on several different tokens) looks like a bug
+  // unless the reason is on the card. `explanation` comes ready-made
+  // from lib/token-risk-core.ts and is present only when a cap fired.
+  if (result.explanation) {
+    lines.push('', `ℹ️ <i>${escapeHtml(result.explanation)}</i>`);
+  }
 
   if (limit !== null) {
     lines.push('', `Checks used today: ${used}/${limit}`);
