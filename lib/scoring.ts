@@ -457,7 +457,7 @@ export function applyScoreCaps(
   // v1.7: established-depth floor. Many mature tokens keep most liquidity
   // in concentrated-liquidity pools (Meteora DLMM, Orca, Raydium CLMM)
   // which RugCheck reports as 0% locked because there is no lockable LP
-  // token. A deep, aged pool (>= $250k, >= 14 days) with partial lock is
+  // token. A deep, aged pool (>= $250k, >= 7 days) with partial lock is
   // a weaker exit-liquidity signal than a young thin one, so the cap is
   // softened to 60 (still "Caution"), never lifted. Uncalibrated proposal.
   const LP_UNLOCKED_CAP_ESTABLISHED = 60;
