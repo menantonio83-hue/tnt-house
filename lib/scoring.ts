@@ -1,4 +1,7 @@
-// Version 1.9 — lib/scoring.ts
+// Version 1.10 — lib/scoring.ts
+//
+// v1.10: unknown market data (liquidity and volume both null) scores neutral
+// (8+8) instead of 0+0, so a DexScreener gap does not cost ~30 points.
 //
 // v1.9: cluster supply-share cap extracted into exported
 // getClusterSupplyCap() (same tiers, no behaviour change) so the website
@@ -276,15 +279,25 @@ export function computeSafetyScoreBase(
   else if (holderRisk.riskLevel === 'HIGH') holderScore = 3;
   // CRITICAL -> 0, deliberately: a measured verdict of maximum concentration.
 
-  const liquidityScore =
-    dexData.liquidity && dexData.liquidity > 10000
+  // v1.10: NO market data at all (liquidity AND volume both unknown) is not
+  // evidence of a dead token — DexScreener drops pools with no recent trades
+  // and can fail. Score both market components neutrally (half marks) instead
+  // of 0/30. A KNOWN low or zero value still scores low as before, and the
+  // `no_market_data` flag / data_confidence tell the consumer it was unknown.
+  const marketUnknown = dexData.liquidity === null && dexData.volume24h === null;
+  const NEUTRAL_MARKET_SCORE = 8;
+
+  const liquidityScore = marketUnknown
+    ? NEUTRAL_MARKET_SCORE
+    : dexData.liquidity && dexData.liquidity > 10000
       ? 15
       : dexData.liquidity && dexData.liquidity > 1000
         ? 8
         : 0;
 
-  const volumeScore =
-    dexData.volume24h && dexData.volume24h > 5000
+  const volumeScore = marketUnknown
+    ? NEUTRAL_MARKET_SCORE
+    : dexData.volume24h && dexData.volume24h > 5000
       ? 15
       : dexData.volume24h && dexData.volume24h > 500
         ? 8

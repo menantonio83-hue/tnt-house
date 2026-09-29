@@ -233,6 +233,7 @@ const RUGCHECK_FALLBACK: RugCheckRiskData = {
   sell_tax_percent: null,
   dev_wallet_percent: null,
   token_program: null,
+  market_liquidity_usd: null,
 };
 
 const HOLDER_RISK_FALLBACK = {
@@ -495,7 +496,17 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
     const effectiveHolderCount =
       typeof realHolderCount === 'number' ? realHolderCount : holderRisk.holderCount;
 
-    const dexData = sanitizeDexMarketData(rawDexData);
+    const dexDataDex = sanitizeDexMarketData(rawDexData);
+    // v1.15: when DexScreener has no pool data (e.g. no recent trades) but
+    // RugCheck still sees pools, use RugCheck's liquidity so scoring does not
+    // treat an existing pool as absent. Volume stays null (unknown).
+    const dexData =
+      dexDataDex.liquidity === null &&
+      typeof rugCheckData.market_liquidity_usd === 'number' &&
+      rugCheckData.market_liquidity_usd > 0
+        ? { ...dexDataDex, liquidity: rugCheckData.market_liquidity_usd }
+        : dexDataDex;
+    const liquidityFromDex = dexDataDex.liquidity !== null;
 
     if (!mintInfo) {
       return {
@@ -642,6 +653,7 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
     const flags: string[] = [];
     if (clusterAnalysis === 'pending') flags.push('cluster_scan_pending');
     if (dexData.liquidity === null) flags.push('no_market_data');
+    if (!liquidityFromDex && dexData.liquidity !== null) flags.push('liquidity_from_rugcheck');
     if (dexData.ageDays !== null && dexData.ageDays < 7) flags.push('young_token');
     if (
       dexData.volume24h !== null &&

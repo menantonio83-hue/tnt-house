@@ -5,6 +5,7 @@
 //
 // Version 1.6 — lib/rugcheck-client.ts
 //
+// v1.8: market_liquidity_usd (RugCheck pool liquidity, fallback when DexScreener is empty).
 // v1.6: lp_locked.percent is now a liquidity-weighted average across
 // markets instead of a plain mean. The v1.5 note below claiming the
 // numeric percent "was never wrong" was itself wrong: with one deep pool
@@ -162,6 +163,9 @@ export interface RugCheckRiskData {
   sell_tax_percent: number | null;
   dev_wallet_percent: number | null;
   token_program: 'standard' | 'nonstandard' | null;
+  // v1.8: total USD liquidity across RugCheck's markets (base + quote).
+  // Fallback for when DexScreener has no pool data. null = none reported.
+  market_liquidity_usd: number | null;
 }
 
 const EMPTY_RESULT: RugCheckRiskData = {
@@ -178,6 +182,7 @@ const EMPTY_RESULT: RugCheckRiskData = {
   sell_tax_percent: null,
   dev_wallet_percent: null,
   token_program: null,
+  market_liquidity_usd: null,
 };
 
 // Real, deployed Solana program IDs for the two canonical token
@@ -323,6 +328,19 @@ export async function getRugCheckRiskData(mint: string): Promise<RugCheckRiskDat
         ? Math.round((data.creatorBalance / data.token.supply) * 1000) / 10
         : null;
 
+    // v1.8: summed pool liquidity as reported by RugCheck (fallback source).
+    let market_liquidity_usd: number | null = null;
+    if (Array.isArray(data.markets)) {
+      let total = 0;
+      for (const m of data.markets) {
+        if (!m || !m.lp) continue;
+        total +=
+          (typeof m.lp.baseUSD === 'number' ? m.lp.baseUSD : 0) +
+          (typeof m.lp.quoteUSD === 'number' ? m.lp.quoteUSD : 0);
+      }
+      if (total > 0) market_liquidity_usd = Math.round(total);
+    }
+
     const token_program =
       typeof data.tokenProgram === 'string' && data.tokenProgram.length > 0
         ? STANDARD_TOKEN_PROGRAMS.includes(data.tokenProgram)
@@ -344,6 +362,7 @@ export async function getRugCheckRiskData(mint: string): Promise<RugCheckRiskDat
       sell_tax_percent,
       dev_wallet_percent,
       token_program,
+      market_liquidity_usd,
     };
   } catch (err) {
     // Timeout (AbortSignal), network failure, or invalid JSON — a real
