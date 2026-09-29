@@ -1,3 +1,9 @@
+// Version 1.8 — lib/scoring.ts
+//
+// v1.8: the softened LP cap reports reason 'lp_unlocked_established'
+// (same cap value, 60) so explanations can distinguish it from the harsh
+// young/thin 'lp_unlocked_thin' (40).
+//
 // Version 1.7 — lib/scoring.ts
 //
 // v1.7 (2026-09-29): lp_unlocked_thin cap softened 40 -> 60 for established
@@ -591,7 +597,15 @@ export function applyScoreCaps(
     dexData.liquidity !== null &&
     dexData.liquidity > LP_UNLOCKED_LIQUIDITY_MIN
   )
-    capsTriggered.push({ reason: 'lp_unlocked_thin', cap: lpUnlockedCapValue });
+    // v1.8: the softened established-pool cap gets its own reason code so
+    // the human-readable explanation can say why the cap is milder.
+    capsTriggered.push({
+      reason:
+        lpEstablished && contractSignals.jupVerified !== true
+          ? 'lp_unlocked_established'
+          : 'lp_unlocked_thin',
+      cap: lpUnlockedCapValue,
+    });
   if (clusterCapReason !== null)
     capsTriggered.push({ reason: clusterCapReason, cap: clusterRiskCap });
   if (dexData.liquidity !== null && dexData.liquidity < 500)

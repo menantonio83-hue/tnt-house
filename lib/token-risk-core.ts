@@ -249,6 +249,7 @@ function explainDominantCap(reason: string | null | undefined): string | undefin
     mint_authority_active: 'Score capped because the mint authority is active while the LP is effectively unlocked (print-and-dump configuration).',
     freeze_authority_active: 'Score capped because the freeze authority is still active and can freeze holder funds.',
     lp_unlocked_thin: 'Score capped because real liquidity exists but less than half of the LP is locked.',
+    lp_unlocked_established: 'Score limited to 60: less than half of the LP is locked. The pool is deep and over a week old, so this is treated as a milder risk (many mature tokens use pools that cannot be locked).',
     insider_cluster_supply_ge_40: 'Score capped because wallets linked by a shared funder hold 40% or more of supply.',
     insider_cluster_supply_ge_25: 'Score capped because wallets linked by a shared funder hold 25% or more of supply.',
     insider_cluster_supply_ge_15: 'Score capped because wallets linked by a shared funder hold 15% or more of supply.',
