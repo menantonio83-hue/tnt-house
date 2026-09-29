@@ -2729,19 +2729,27 @@ export default function TntHouse() {
           holderCount = rugData.topHolders.length;
         }
 
-        // Real LP-locked percentage, averaged across reported markets.
+        // Real LP-locked percentage across reported markets, WEIGHTED by
+        // each market's liquidity (base+quote USD). A plain mean let a
+        // dust pool at 0% drag down a deep, locked pool (showed 14% vs
+        // RugCheck's 90%). Falls back to a plain mean if no USD values.
         var lpLockedPercent = null;
         if (Array.isArray(rugData.markets) && rugData.markets.length > 0) {
-          var lpVals = rugData.markets
-            .map(function (m) {
-              return m && m.lp && typeof m.lp.lpLockedPct === 'number' ? m.lp.lpLockedPct : null;
-            })
-            .filter(function (v) {
-              return v !== null;
-            });
-          if (lpVals.length > 0) {
-            lpLockedPercent =
-              Math.round((lpVals.reduce(function (a, b) { return a + b; }, 0) / lpVals.length) * 10) / 10;
+          var lpRows = [];
+          rugData.markets.forEach(function (m) {
+            if (!m || !m.lp || typeof m.lp.lpLockedPct !== 'number') return;
+            var usd =
+              (typeof m.lp.baseUSD === 'number' ? m.lp.baseUSD : 0) +
+              (typeof m.lp.quoteUSD === 'number' ? m.lp.quoteUSD : 0);
+            lpRows.push({ pct: m.lp.lpLockedPct, usd: usd });
+          });
+          if (lpRows.length > 0) {
+            var totalUsd = lpRows.reduce(function (a, r) { return a + r.usd; }, 0);
+            var mean =
+              totalUsd > 0
+                ? lpRows.reduce(function (a, r) { return a + r.pct * r.usd; }, 0) / totalUsd
+                : lpRows.reduce(function (a, r) { return a + r.pct; }, 0) / lpRows.length;
+            lpLockedPercent = Math.round(mean * 10) / 10;
           }
         }
 
