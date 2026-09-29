@@ -1,3 +1,7 @@
+// Version 6.12 — lib/sanitize-market-data.ts
+//
+// v6.12: passes through optional ageHours (additive, for API age_hours).
+//
 // Version 6.11 — lib/sanitize-market-data.ts
 //
 // Bug reported live on BONK: price_change_24h_percent came back as
@@ -20,6 +24,8 @@ export interface DexMarketData {
   volume24h: number | null;
   priceChange24h: number | null;
   ageDays: number | null;
+  // Optional, additive (v6.12): age in whole hours; absent on older callers.
+  ageHours?: number | null;
 }
 
 // Deliberately generous — even an extreme brand-new pump.fun pump rarely
@@ -41,5 +47,5 @@ export function sanitizeDexMarketData(data: DexMarketData): DexMarketData {
   const liquidity = data.liquidity !== null && data.liquidity >= 0 ? data.liquidity : null;
   const volume24h = data.volume24h !== null && data.volume24h >= 0 ? data.volume24h : null;
 
-  return { price, liquidity, volume24h, priceChange24h, ageDays: data.ageDays };
+  return { price, liquidity, volume24h, priceChange24h, ageDays: data.ageDays, ageHours: data.ageHours ?? null };
 }

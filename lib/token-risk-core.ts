@@ -1,3 +1,10 @@
+// Version 1.12 — lib/token-risk-core.ts
+//
+// v1.12: additive response fields for AI-agent callers: largest_cluster_pct,
+// flags[] (descriptive facts, not verdicts), data_confidence (what the
+// result is based on), market.age_hours. Scoring is untouched. Also adds
+// the lp_unlocked_established explanation (scoring v1.8).
+//
 // Version 1.10 — lib/token-risk-core.ts
 //
 // v1.10: insider clusters are scored by share of supply (lib/scoring.ts
@@ -329,6 +336,22 @@ export interface TokenRiskResult {
   // v1.10 — see the version note at the top of this file.
   cluster_supply_pct?: number | null;
   cluster_wallet_count?: number | null;
+  // v1.12 — additive fields for programmatic callers (AI agents).
+  // Share of supply held by the single biggest counted cluster (lower
+  // bound; null while pending / unknown).
+  largest_cluster_pct?: number | null;
+  // Descriptive facts that were true for this mint on this call. Not
+  // verdicts and not trade advice: consumers decide what to do with them.
+  flags?: string[];
+  // What this result is actually based on, so a caller can tell a
+  // complete check from a partial one.
+  data_confidence?: {
+    cluster_scan: 'complete' | 'pending';
+    holders_traced: number | null;
+    cluster_supply_is_lower_bound: boolean;
+    market_data_available: boolean;
+    rugcheck_data_available: boolean;
+  };
   mint_authority?: { revoked: boolean; address: string | null };
   freeze_authority?: { revoked: boolean; address: string | null };
   // v1.10: real values from RugCheck (lib/rugcheck-client.ts), not the
@@ -377,6 +400,8 @@ export interface TokenRiskResult {
     volume_24h_usd: number | null;
     price_change_24h_percent: number | null;
     age_days: number | null;
+    // v1.12: whole hours since the main pair was created (null = unknown).
+    age_hours?: number | null;
   };
   note?: string;
   checked_at?: string;
@@ -591,6 +616,32 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
       ? countedClusters.reduce((n, c) => n + c.wallets.length, 0)
       : null;
 
+    // v1.12: biggest single counted cluster (null if pending or any share
+    // unknown, same rule as clusterSupplyPct).
+    const largestClusterPct =
+      clusterAnalysis === 'complete' &&
+      countedClusters.every((c) => typeof c.supply_pct === 'number')
+        ? countedClusters.reduce((m, c) => Math.max(m, c.supply_pct as number), 0)
+        : null;
+
+    // v1.12: descriptive flags (facts, not verdicts).
+    const flags: string[] = [];
+    if (clusterAnalysis === 'pending') flags.push('cluster_scan_pending');
+    if (dexData.liquidity === null) flags.push('no_market_data');
+    if (dexData.ageDays !== null && dexData.ageDays < 7) flags.push('young_token');
+    if (
+      dexData.volume24h !== null &&
+      dexData.liquidity !== null &&
+      dexData.liquidity > 0 &&
+      dexData.volume24h / dexData.liquidity > 50
+    )
+      flags.push('high_turnover');
+    if (rugCheckData.lp_locked && !rugCheckData.lp_locked.locked) flags.push('lp_partially_or_not_locked');
+    if (!mintAuthorityRevoked) flags.push('mint_authority_active');
+    if (!freezeAuthorityRevoked) flags.push('freeze_authority_active');
+    if (insiderClusters.some((c) => c.false_positive_likely)) flags.push('shared_cex_or_infra_funder');
+    if (countedClusters.length > 0) flags.push('insider_cluster_detected');
+
     if (!row || !isFresh) {
       await markClusterPending(mint);
       // waitUntil() reads Vercel's request context via AsyncLocalStorage,
@@ -692,6 +743,17 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
       // counted for scoring; null while pending / when a share is unknown.
       cluster_supply_pct: clusterSupplyPct,
       cluster_wallet_count: clusterWalletCount,
+      largest_cluster_pct: largestClusterPct,
+      flags,
+      data_confidence: {
+        cluster_scan: clusterAnalysis,
+        holders_traced: clusterAnalysis === 'complete' && row ? row.checked_holders : null,
+        // Only the top holders are traced, so cluster shares are minimums.
+        cluster_supply_is_lower_bound: true,
+        market_data_available: dexData.liquidity !== null,
+        rugcheck_data_available:
+          rugCheckData.honeypot_risk !== null || rugCheckData.lp_locked !== null,
+      },
       mint_authority: {
         revoked: mintAuthorityRevoked,
         address: mintAuthorityRevoked ? null : mintInfo.info.mintAuthority,
@@ -727,6 +789,7 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
         volume_24h_usd: dexData.volume24h,
         price_change_24h_percent: dexData.priceChange24h,
         age_days: dexData.ageDays,
+        age_hours: dexData.ageHours ?? null,
       },
       note:
         rugCheckData.honeypot_risk === null && rugCheckData.lp_locked === null
