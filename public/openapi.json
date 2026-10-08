@@ -18,7 +18,7 @@
     "/api/v1/token-risk": {
       "get": {
         "summary": "Check a Solana token's safety score and insider clusters",
-        "description": "Returns a 0-100 safety score, insider funding clusters, holder distribution, mint/freeze authority status, and live market data for any Solana token mint address. The first-ever check on a given mint returns cluster_analysis: \"pending\" while insider detection runs in the background (usually complete within 1-2 minutes) — re-check the same mint shortly after for the full result.",
+        "description": "Returns a 0-100 safety score, insider funding clusters, holder distribution, mint/freeze authority status, and live market data for any Solana token mint address. The first-ever check on a given mint returns cluster_analysis: \"pending\" while insider detection runs in the background — re-check the same mint shortly after for the full result.",
         "operationId": "getTokenRisk",
         "parameters": [
           {
@@ -55,7 +55,7 @@
                         "pending",
                         "complete"
                       ],
-                      "description": "\"pending\" on a mint's first-ever check while the insider trace runs in the background; \"complete\" after ~1-2 minutes."
+                      "description": "\"pending\" on a mint's first-ever check while the insider trace runs in the background; \"complete\" once the trace finishes."
                     },
                     "insider_clusters": {
                       "type": "array",
