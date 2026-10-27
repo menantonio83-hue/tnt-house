@@ -1,4 +1,9 @@
-// Version 1.15 — lib/token-risk-core.ts
+// Version 1.16 — lib/token-risk-core.ts
+//
+// v1.16: one short retry (1.5s backoff, 12s budget, only if <30s elapsed)
+// when the holder read comes back unusable, before refusing the call and
+// firing the 'holder-data-unavailable' admin alert — so a transient RPC
+// blip no longer pages Telegram.
 //
 // v1.15: insider_clusters[] entries gain funder_path and deployer_linked
 // (detector v7.8). Cache rows written before v7.8 read as null (unknown),
@@ -216,6 +221,9 @@ import { findStreamflowLocks, freelyTradeablePercentOfLock, type VestingLock } f
 // see that file's header comment for the reasoning behind each value.
 export const MINT_INFO_TIMEOUT_MS = 12000;
 export const HOLDER_RISK_TIMEOUT_MS = 40000;
+export const HOLDER_RETRY_BACKOFF_MS = 1500;
+export const HOLDER_RETRY_TIMEOUT_MS = 12000;
+const HOLDER_RETRY_DEADLINE_MS = 30000;
 export const DEX_TIMEOUT_MS = 8000;
 export const RUGCHECK_TIMEOUT_MS = 8000;
 // v1.6: runs sequentially AFTER the main Promise.all group below (it
@@ -498,7 +506,8 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
   }
 
   try {
-    const [mintInfo, holderRisk, rawDexData, rugCheckData, realHolderCount] = await Promise.all([
+    const fetchStartedAt = Date.now();
+    const [mintInfo, firstHolderRisk, rawDexData, rugCheckData, realHolderCount] = await Promise.all([
       withTimeout(getMintInfo(mint), MINT_INFO_TIMEOUT_MS, null),
       withTimeout(getHolderDistributionRobust(mint), HOLDER_RISK_TIMEOUT_MS, HOLDER_RISK_FALLBACK),
       withTimeout(getDexScreenerData(mint), DEX_TIMEOUT_MS, DEX_DATA_FALLBACK),
@@ -507,6 +516,18 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
       // withTimeout wrapper needed, unlike the calls above.
       fetchRealHolderCount(mint),
     ]);
+
+    let holderRisk = firstHolderRisk;
+    if (isHolderReadingUnusable(holderRisk) && Date.now() - fetchStartedAt < HOLDER_RETRY_DEADLINE_MS) {
+      console.warn(`[token-risk-core] ${mint}: holder reading unusable; retrying once after backoff`);
+      await new Promise((r) => setTimeout(r, HOLDER_RETRY_BACKOFF_MS));
+      holderRisk = await withTimeout(getHolderDistributionRobust(mint), HOLDER_RETRY_TIMEOUT_MS, HOLDER_RISK_FALLBACK);
+      console.warn(
+        isHolderReadingUnusable(holderRisk)
+          ? `[token-risk-core] ${mint}: holder retry also unusable`
+          : `[token-risk-core] ${mint}: holder retry recovered`,
+      );
+    }
 
     // v1.9: prefer the genuine Solana Tracker headcount; fall back to the
     // Helius-capped slice only when Solana Tracker has no answer. Used

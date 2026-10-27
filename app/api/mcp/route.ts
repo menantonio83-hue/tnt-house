@@ -1,4 +1,8 @@
-// Version 1.6 — app/api/mcp/route.ts
+// Version 1.7 — app/api/mcp/route.ts
+//
+// v1.7: serverInfo name/version now read from
+// public/.well-known/mcp/server-card.json (was hard-coded '1.0.0' here vs
+// '1.2.0' in the card) — one source of truth.
 //
 // v1.6: replaces the v1.2 anonymous check_token_risk path (which shared
 // lib/demo-limit.ts's counter with the WEBSITE's no-email trial, 3/IP
@@ -109,6 +113,7 @@ import { waitUntil } from '@vercel/functions';
 import { z } from 'zod';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
+import serverCard from '@/public/.well-known/mcp/server-card.json';
 import { requireApiKey } from '@/lib/api-auth';
 import { enforceRateLimit, enforceRateLimitBatch } from '@/lib/rate-limit';
 import { fetchTokenRisk } from '@/lib/token-risk-core';
@@ -174,7 +179,7 @@ function extractUserAgent(request: NextRequest): string {
 // unused by every other tool.
 function buildServer(apiKey: ApiKeyRecord | null, clientIp: string, userAgent: string): McpServer {
   const server = new McpServer(
-    { name: 'tnt-house-risk-data-api', version: '1.0.0' },
+    { name: serverCard.serverInfo.name, version: serverCard.serverInfo.version },
     {
       // v1.5 FIX: instructions belongs in the SECOND constructor arg
       // (ServerOptions), not merged into the first (Implementation) —
