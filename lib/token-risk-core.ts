@@ -408,6 +408,8 @@ export interface TokenRiskResult {
   // never null, so callers can safely check .length without a null
   // guard.
   vesting_locks?: VestingLock[];
+  // v1.15 — locked supply in known vesting contracts, after excluding freely tradeable portions.
+  locked_supply_pct?: number;
   holder_distribution?: {
     risk_level: string;
     largest_holder_percent: number;
@@ -568,9 +570,11 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
     );
     let freelyTradeableTop10Percent = holderRisk.top10Percent;
     let freelyTradeableLargestHolderPercent = holderRisk.largestHolderPercent;
+    let lockedSupplyPct = 0;
     if (vestingLocks.length > 0) {
       const perLockDeductions = vestingLocks.map((lock) => lock.percent_of_supply - freelyTradeablePercentOfLock(lock));
       const lockedDeduction = perLockDeductions.reduce((sum, d) => sum + d, 0);
+      lockedSupplyPct = Math.round(lockedDeduction * 10) / 10;
       freelyTradeableTop10Percent = Math.max(0, holderRisk.top10Percent - lockedDeduction);
 
       // v1.7: classifyRisk() in holder-distribution.ts checks
@@ -824,6 +828,7 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
       token_program: rugCheckData.token_program,
       contract_renounced: mintAuthorityRevoked && freezeAuthorityRevoked,
       vesting_locks: vestingLocks,
+      locked_supply_pct: lockedSupplyPct,
       holder_distribution: {
         risk_level: holderRisk.riskLevel,
         largest_holder_percent: holderRisk.largestHolderPercent,

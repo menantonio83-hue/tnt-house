@@ -189,6 +189,7 @@ export async function POST(request: NextRequest) {
         dev_wallet_percent: result.dev_wallet_percent,
         token_program: result.token_program,
         vesting_locks: result.vesting_locks,
+        locked_supply_pct: result.locked_supply_pct,
         holder_distribution: result.holder_distribution,
         market: result.market,
         checked_at: result.checked_at,

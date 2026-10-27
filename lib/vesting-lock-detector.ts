@@ -1,4 +1,9 @@
-// Version 1.2 — lib/vesting-lock-detector.ts
+// Version 1.4 — lib/vesting-lock-detector.ts
+//
+// v1.4: next_unlock_at was stream.start (the lock START, already in the
+// past) instead of the next real unlock. Now computed by
+// computeNextUnlockAt(): the cliff date for a single-cliff lock, else the
+// next period boundary (capped at end).
 //
 // v1.2: fixed a SECOND precision bug found live on the same MRDT test
 // right after v1.1's fix — "Assertion failed" from bn.js. v1.1 built
@@ -99,6 +104,21 @@ export interface VestingLock {
   cancelable_by_sender: boolean;
 }
 
+// v1.4 — next timestamp (unix s) at which more tokens unlock.
+export function computeNextUnlockAt(
+  s: { start: number; end: number; cliff: number; period: number; amountPerPeriod: BN },
+  now: number
+): number | null {
+  const vestingStart = s.cliff > 0 ? s.cliff : s.start;
+  if (now < vestingStart) return vestingStart;
+  if (s.period > 0 && !s.amountPerPeriod.isZero()) {
+    const next = vestingStart + (Math.floor((now - vestingStart) / s.period) + 1) * s.period;
+    if (s.end > 0) return Math.min(next, s.end);
+    return next;
+  }
+  return s.end > now ? s.end : null;
+}
+
 let cachedClient: SolanaStreamClient | null = null;
 function getClient(): SolanaStreamClient {
   if (!cachedClient) {
@@ -154,6 +174,7 @@ export async function findStreamflowLocks(mint: string, totalSupplyRaw: string):
         const unlockedNow = stream.unlocked(now);
         const unlockedSoon = stream.unlocked(soon);
         const fullyUnlockedAt = stream.end ? new Date(stream.end * 1000).toISOString() : null;
+        const nextUnlockTs = unlockedNow.lt(deposited) ? computeNextUnlockAt(stream, now) : null;
 
         const lock: VestingLock = {
           protocol: 'streamflow',
@@ -161,8 +182,7 @@ export async function findStreamflowLocks(mint: string, totalSupplyRaw: string):
           percent_of_supply: percentOf(deposited, totalSupplyBN),
           unlocked_now_percent: percentOf(unlockedNow, deposited),
           unlocks_within_30d_percent: percentOf(unlockedSoon, deposited),
-          next_unlock_at:
-            unlockedNow.lt(deposited) && stream.start ? new Date(stream.start * 1000).toISOString() : null,
+          next_unlock_at: nextUnlockTs !== null ? new Date(nextUnlockTs * 1000).toISOString() : null,
           fully_unlocked_at: fullyUnlockedAt,
           cancelable_by_sender: stream.cancelableBySender,
         };
