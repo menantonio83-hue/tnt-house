@@ -4,6 +4,9 @@
 // when the holder read comes back unusable, before refusing the call and
 // firing the 'holder-data-unavailable' admin alert — so a transient RPC
 // blip no longer pages Telegram.
+// Also: locked_supply_pct (supply held in known vesting/lock contracts) and
+// toPublicTokenRisk() — the shared public builder REST/batch/x402 spread so
+// keyed replies carry the same fields as MCP.
 //
 // v1.15: insider_clusters[] entries gain funder_path and deployer_linked
 // (detector v7.8). Cache rows written before v7.8 read as null (unknown),
@@ -416,7 +419,7 @@ export interface TokenRiskResult {
   // never null, so callers can safely check .length without a null
   // guard.
   vesting_locks?: VestingLock[];
-  // v1.15 — locked supply in known vesting contracts, after excluding freely tradeable portions.
+  // v1.16 — locked supply in known vesting contracts, after excluding freely tradeable portions.
   locked_supply_pct?: number;
   holder_distribution?: {
     risk_level: string;
@@ -482,7 +485,7 @@ export {
   type HolderRiskLevel,
 };
 
-// v1.15: single public response builder shared by REST/batch/x402 so they match MCP.
+// v1.16: single public response builder shared by REST/batch/x402 so they match MCP.
 export type PublicTokenRisk = Omit<TokenRiskResult, 'ok' | 'status' | 'error' | 'details'>;
 export function toPublicTokenRisk(result: TokenRiskResult): PublicTokenRisk {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
