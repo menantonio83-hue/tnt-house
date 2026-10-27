@@ -343,15 +343,20 @@ export default function RiskApiDocsContent() {
 X-RateLimit-Limit: 15
 X-RateLimit-Remaining: 0
 X-RateLimit-Reset: 2026-07-24T00:00:00.000Z
+Retry-After: 21600
 
 {
   "error": "Daily free-tier limit reached and call-credit balance is empty",
   "limit": 15,
-  "used": 16,
+  "used": 15,
   "reset_at": "2026-07-24T00:00:00.000Z",
   "overage_rate_usd": 0.02,
   "upgrade_url": "https://tnt-audit.com/risk-api#billing",
-  "note": "Top up call credits or subscribe on the upgrade_url page — overage is billed at $0.02/call once you have a balance."
+  "x402_url": "https://tnt-audit.com/api/v1/token-risk/x402",
+  "x402_price_usd": 0.02,
+  "topup_url": "https://tnt-audit.com/api/v1/billing/create-invoice",
+  "min_topup_usd": 5,
+  "note": "Three ways to continue: (1) x402 at $0.02/call, no account ... (2) top up call credit ... (3) subscribe ..."
 }`}
             </pre>
           </div>

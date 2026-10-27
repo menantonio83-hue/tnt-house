@@ -105,6 +105,23 @@ export async function incrementDailyUsage(keyId: string, usageDateUtc: string): 
   return data as number;
 }
 
+// Reads today's (UTC) usage counter for this key without incrementing.
+// Returns 0 when the row does not exist, null on a database error.
+export async function getDailyUsage(keyId: string, usageDateUtc: string): Promise<number | null> {
+  const { data, error } = await supabase
+    .from('api_key_usage_daily')
+    .select('request_count')
+    .eq('key_id', keyId)
+    .eq('usage_date', usageDateUtc)
+    .maybeSingle();
+
+  if (error) {
+    console.error('[rate-limit-store] get_daily_usage error:', error.message);
+    return null;
+  }
+  return data?.request_count ?? 0;
+}
+
 // Same as incrementDailyUsage() but by an arbitrary amount — used by the
 // batch endpoint (N mints in one call = N counted, per the decided
 // billing model, not a discounted "1 call per batch"). Returns null on

@@ -1,3 +1,9 @@
+// Version 4.1 — lib/rate-limit.ts
+//
+// 4.1: Added x402/topup metadata + Retry-After headers on 402, cap `used`
+// at `limit`, and skip incrementing the daily counter when a free key is
+// already over quota and has no credit.
+//
 // Version 4.0 — lib/rate-limit.ts
 //
 // v4.0 (M-5 fix): the free tier now FAILS CLOSED. The personal daily
@@ -61,7 +67,7 @@
 
 import { NextResponse } from 'next/server';
 import type { ApiKeyRecord } from '@/lib/api-key-store';
-import { incrementDailyUsage, incrementDailyUsageBy, todayUtcDateString, nextUtcMidnightIso } from '@/lib/rate-limit-store';
+import { getDailyUsage, incrementDailyUsage, incrementDailyUsageBy, todayUtcDateString, nextUtcMidnightIso } from '@/lib/rate-limit-store';
 import { incrementSubscriptionUsage, incrementSubscriptionUsageBy, decrementCreditIfSufficient } from '@/lib/billing-store';
 import { consumeGlobalFreePool, GLOBAL_FREE_DAILY_LIMIT } from '@/lib/free-tier-global-pool';
 import {
@@ -70,6 +76,8 @@ import {
   SUBSCRIPTION_MONTHLY_QUOTA,
   OVERAGE_RATE_FREE_USD,
   OVERAGE_RATE_SUBSCRIBED_USD,
+  MIN_TOPUP_USD,
+  MAX_TOPUP_USD,
 } from '@/lib/billing-pricing';
 
 export interface RateLimitResult {
@@ -106,20 +114,33 @@ function buildLimitReachedResponse(
   overageRate: number,
   extraHeaders: HeadersInit,
 ): NextResponse {
+  const headers = new Headers(extraHeaders);
+  const resetTime = new Date(resetAt).getTime();
+  if (!Number.isNaN(resetTime)) {
+    headers.set('Retry-After', String(Math.max(1, Math.ceil((resetTime - Date.now()) / 1000))));
+  }
+  headers.set('X-RateLimit-Limit', String(limit));
+  headers.set('X-RateLimit-Remaining', '0');
+  headers.set('X-RateLimit-Reset', resetAt);
+
   return NextResponse.json(
     {
       error: message,
       limit,
-      used,
+      used: Math.min(used, limit),
       reset_at: resetAt,
       resets_in: humanizeResetAt(resetAt),
       overage_rate_usd: overageRate,
       subscription_price_usd: SUBSCRIPTION_USD,
       subscription_monthly_quota: SUBSCRIPTION_MONTHLY_QUOTA,
       upgrade_url: 'https://tnt-audit.com/risk-api#billing',
-      note: `Two ways to keep going: pay overage at $${overageRate}/call once you top up a balance, or subscribe for $${SUBSCRIPTION_USD} = ${SUBSCRIPTION_MONTHLY_QUOTA} calls/30 days at a lower $${OVERAGE_RATE_SUBSCRIBED_USD}/call overage rate after that. Details at upgrade_url.`,
+      x402_url: 'https://tnt-audit.com/api/v1/token-risk/x402',
+      x402_price_usd: 0.02,
+      topup_url: 'https://tnt-audit.com/api/v1/billing/create-invoice',
+      min_topup_usd: MIN_TOPUP_USD,
+      note: `Three ways to continue: (1) No account? Pay per call via x402 at $0.02/call (USDC on Solana) at x402_url. (2) Top up call credit with this key: POST topup_url with JSON {"api_key":"<your key>","kind":"topup","currency":"SOL" or "USDC","usd_amount":${MIN_TOPUP_USD}-${MAX_TOPUP_USD}}, send the exact pay_amount to the returned wallet_address, then POST /api/v1/billing/verify-payment with {"payment_id","api_key"} — after that each call over the free cap costs $${overageRate}. (3) Subscribe for $${SUBSCRIPTION_USD} = ${SUBSCRIPTION_MONTHLY_QUOTA} calls/30 days at $${OVERAGE_RATE_SUBSCRIBED_USD}/call overage after that. Your free quota resets at ${resetAt}.`,
     },
-    { status: 402, headers: extraHeaders },
+    { status: 402, headers },
   );
 }
 
@@ -239,6 +260,29 @@ export async function enforceRateLimit(
   // Free tier (including an expired subscription, which falls back here).
   const usageDate = todayUtcDateString();
   const resetAt = nextUtcMidnightIso();
+
+  const current = await getDailyUsage(key.id, usageDate);
+  if (current !== null && current >= FREE_DAILY_LIMIT && (key.credit_balance_usd ?? 0) < OVERAGE_RATE_FREE_USD) {
+    const used = Math.min(current, FREE_DAILY_LIMIT);
+    return {
+      allowed: false,
+      limit: FREE_DAILY_LIMIT,
+      used,
+      remaining: 0,
+      resetAt,
+      creditBalanceUsd: key.credit_balance_usd,
+      usedOverageCredit: false,
+      response: buildLimitReachedResponse(
+        'Daily free-tier limit reached and call-credit balance is empty',
+        FREE_DAILY_LIMIT,
+        used,
+        resetAt,
+        OVERAGE_RATE_FREE_USD,
+        extraHeaders,
+      ),
+    };
+  }
+
   const used = await incrementDailyUsage(key.id, usageDate);
 
   if (used === null) {
