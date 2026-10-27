@@ -1,5 +1,6 @@
-// Version 5.7 — app/risk-api/RiskApiSignupForm.tsx
+// Version 5.8 — app/risk-api/RiskApiSignupForm.tsx
 //
+// v5.8: maps known signup error_code values to i18n messages.
 // v5.7: reads a `?ref=<code>` query param off the URL (via
 // useSearchParams) and sends it along as `ref` in the signup POST body
 // — referral-partner tracking for revenue-share arrangements (see
@@ -70,7 +71,16 @@ export default function RiskApiSignupForm() {
       const data = await res.json();
 
       if (!res.ok) {
-        setErrorMsg(data.error || 'Something went wrong. Try again.');
+        let msg = data.error || 'Something went wrong. Try again.';
+        const errorCode = data.error_code;
+        if (errorCode === 'email_exists' && t.signupErrEmailExists) {
+          msg = t.signupErrEmailExists;
+        } else if (errorCode === 'signup_ip_limit' && t.signupErrIpLimit) {
+          msg = t.signupErrIpLimit.replace('{used}', String(data.used)).replace('{limit}', String(data.limit));
+        } else if (errorCode === 'signup_global_limit' && t.signupErrGlobalLimit) {
+          msg = t.signupErrGlobalLimit.replace('{used}', String(data.used)).replace('{limit}', String(data.limit));
+        }
+        setErrorMsg(msg);
         setStatus('error');
         return;
       }

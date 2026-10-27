@@ -118,11 +118,14 @@ export async function POST(request: NextRequest) {
     const clientIp = extractClientIp(request);
     const signupLimit = await checkSignupLimit(clientIp);
     if (!signupLimit.allowed) {
-      const message =
-        signupLimit.reason === 'global'
-          ? `Free-key signups are at capacity for today (${signupLimit.used}/${signupLimit.limit} issued globally) — try again after UTC midnight.`
-          : `Too many signups from this IP today (${signupLimit.used}/${signupLimit.limit}) — try again after UTC midnight, or use x402 (no signup at all): GET /api/v1/token-risk/x402.`;
-      return NextResponse.json({ error: message }, { status: 429 });
+      const isGlobalLimit = signupLimit.reason === 'global';
+      const message = isGlobalLimit
+        ? `Free-key signups are at capacity for today (${signupLimit.used}/${signupLimit.limit} issued globally) — try again after UTC midnight.`
+        : `Too many signups from this IP today (${signupLimit.used}/${signupLimit.limit}) — try again after UTC midnight, or use x402 (no signup at all): GET /api/v1/token-risk/x402.`;
+      const body = isGlobalLimit
+        ? { error: message, error_code: 'signup_global_limit', used: signupLimit.used, limit: signupLimit.limit }
+        : { error: message, error_code: 'signup_ip_limit', used: signupLimit.used, limit: signupLimit.limit };
+      return NextResponse.json(body, { status: 429 });
     }
 
     const email = rawEmail.toLowerCase();
@@ -144,6 +147,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error: 'This email already has an active API key',
+          error_code: 'email_exists',
           note: 'Keys are only shown once at creation and cannot be retrieved again. If you lost yours, contact us to have it reissued.',
         },
         { status: 409 },

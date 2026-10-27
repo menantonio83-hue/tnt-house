@@ -303,6 +303,9 @@ export interface RiskApiTranslations {
   freeTierNote: string;
   emailPlaceholder: string;
   signupHint: string;
+  signupErrEmailExists?: string;
+  signupErrIpLimit?: string;
+  signupErrGlobalLimit?: string;
 
   // Try-it-now anon trial widget (no signup)
   tryItTitle: string;
@@ -628,6 +631,9 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     getFreeKeyBtn: 'Get free API key',
     freeTierNote: 'Free tier: 15 requests/day. No credit card. One key per email.',
     signupHint: 'Enter your email, then copy the key that appears — shown once.',
+    signupErrEmailExists: 'This email already has an active API key. Keys are shown only once — if you lost yours, contact us to have it reissued.',
+    signupErrIpLimit: 'Too many signups from this IP today ({used}/{limit}) — try again after UTC midnight, or use x402 (no signup): GET /api/v1/token-risk/x402.',
+    signupErrGlobalLimit: 'Free-key signups are at capacity for today ({used}/{limit}) — try again after UTC midnight.',
     emailPlaceholder: 'Email address',
     tryItTitle: 'Try it now — no signup',
     tryItSubtitle: '3 free checks, no email required',
@@ -1895,6 +1901,9 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     getFreeKeyBtn: 'Получить бесплатный API-ключ',
     freeTierNote: 'Бесплатный тариф: 15 запросов/день. Без карты. Один ключ на email.',
     signupHint: 'Введи email и скопируй ключ, который появится — показывается один раз.',
+    signupErrEmailExists: 'На этот email уже выдан активный API-ключ. Ключ показывается только один раз — если потерял его, напиши нам, и мы выпустим новый.',
+    signupErrIpLimit: 'Слишком много регистраций с этого IP сегодня ({used}/{limit}) — попробуй после полуночи UTC или используй x402 без регистрации: GET /api/v1/token-risk/x402.',
+    signupErrGlobalLimit: 'Лимит бесплатных ключей на сегодня исчерпан ({used}/{limit}) — попробуй после полуночи UTC.',
     emailPlaceholder: 'Email адрес',
     tryItTitle: 'Попробуй прямо сейчас — без регистрации',
     tryItSubtitle: '3 бесплатные проверки, без email',
