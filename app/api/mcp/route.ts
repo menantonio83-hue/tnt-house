@@ -225,6 +225,8 @@ function buildServer(apiKey: ApiKeyRecord | null, clientIp: string, userAgent: s
               ? `Anonymous MCP calls are at capacity for today (${gate.used}/${gate.limit} globally). Get a free email key (15/day) at https://www.tnt-audit.com/risk-api or pay per call via x402 GET /api/v1/token-risk/x402 ($0.02).`
               : gate.reason === 'per_ip'
                 ? `Too many anonymous MCP calls from this IP today (${gate.used}/${gate.limit}). Get a free email key (15/day) at https://www.tnt-audit.com/risk-api or pay per call via x402 GET /api/v1/token-risk/x402 ($0.02).`
+                : gate.reason === 'per_subnet'
+                  ? `Too many anonymous MCP calls from this network today (${gate.used}/${gate.limit}). Get a free email key (15/day) at https://www.tnt-audit.com/risk-api or pay per call via x402 GET /api/v1/token-risk/x402 ($0.02).`
                 : gate.reason === 'infra'
                   ? 'Anonymous MCP access is temporarily unavailable. Please try again shortly, or use a free API key (15/day) from https://www.tnt-audit.com/risk-api.'
                   : `Anonymous MCP quota used (${gate.used}/${gate.limit} today). Get a free email key (15/day) at https://www.tnt-audit.com/risk-api or pay per call via x402 GET /api/v1/token-risk/x402 ($0.02).`;

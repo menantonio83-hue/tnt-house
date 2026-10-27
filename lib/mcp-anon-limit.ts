@@ -1,4 +1,9 @@
-// Version 1.1 — lib/mcp-anon-limit.ts
+// Version 1.2 — lib/mcp-anon-limit.ts
+//
+// v1.2: per-subnet daily ATTEMPTS cap (MCP_ANON_DAILY_LIMIT_PER_SUBNET)
+// keyed by the caller's /24 (IPv4) or /64 (IPv6) — see subnetOf(). Bounds
+// rotation through many addresses in one range, which the per-IP cap alone
+// can't. Same fail-closed try/catch as the other counters.
 //
 // v1.1 (M-1 fix): two additional layers on top of the per-identity
 // (IP+UA) bucket — both the IP and the User-Agent are client-controlled,
@@ -72,6 +77,8 @@ const MCP_ANON_DAILY_LIMIT = 5;
 // v1.1: rotation-proof per-IP daily cap (keyed by IP alone) and the
 // global daily backstop — see the v1.1 header note.
 const MCP_ANON_DAILY_LIMIT_PER_IP = 20;
+// 3x per-IP so shared NAT/proxy ranges like Glama infra aren't starved; still bounds /24 rotation.
+const MCP_ANON_DAILY_LIMIT_PER_SUBNET = 60;
 const MCP_ANON_DAILY_LIMIT_GLOBAL = 300;
 
 // Safety-margin TTL, not the reset schedule itself — the key naturally
@@ -97,14 +104,82 @@ function secondsUntilUtcMidnight(): number {
   return Math.max(1, Math.ceil((next - now.getTime()) / 1000));
 }
 
+export function subnetOf(ip: string): string {
+  const original = ip;
+  let value = ip.trim();
+
+  if (value.toLowerCase().startsWith('::ffff:')) {
+    const candidate = value.slice(7);
+    if (isDottedIPv4(candidate)) {
+      return ipv4Subnet(candidate);
+    }
+  }
+
+  if (isDottedIPv4(value)) {
+    return ipv4Subnet(value);
+  }
+
+  if (value.includes(':')) {
+    const zoneIndex = value.indexOf('%');
+    if (zoneIndex !== -1) {
+      value = value.slice(0, zoneIndex);
+    }
+
+    const groups = expandIPv6(value);
+    if (groups) {
+      if (groups.length !== 8 || groups.some((g) => !/^[0-9a-fA-F]{1,4}$/.test(g))) {
+        return `other:${original}`;
+      }
+      const h = groups.map((g) => parseInt(g, 16).toString(16));
+      return `${h[0]}:${h[1]}:${h[2]}:${h[3]}::/64`;
+    }
+  }
+
+  return `other:${original}`;
+}
+
+function isDottedIPv4(value: string): boolean {
+  const parts = value.split('.');
+  if (parts.length !== 4) return false;
+  return parts.every((part) => {
+    if (!/^\d{1,3}$/.test(part)) return false;
+    const n = Number(part);
+    return n >= 0 && n <= 255;
+  });
+}
+
+function ipv4Subnet(value: string): string {
+  const [a, b, c] = value.split('.');
+  return `${a}.${b}.${c}.0/24`;
+}
+
+function expandIPv6(value: string): string[] | null {
+  const doubleColon = value.indexOf('::');
+  if (doubleColon === -1) {
+    const groups = value.split(':');
+    return groups.length === 8 ? groups : null;
+  }
+
+  if (value.indexOf('::', doubleColon + 2) !== -1) return null;
+
+  const left = value.slice(0, doubleColon).split(':').filter(Boolean);
+  const right = value.slice(doubleColon + 2).split(':').filter(Boolean);
+  const missing = 8 - left.length - right.length;
+
+  if (missing < 1) return null;
+
+  const groups = [...left, ...Array(missing).fill('0'), ...right];
+  return groups.length === 8 ? groups : null;
+}
+
 export interface McpAnonDecision {
   allowed: boolean;
   used: number;
   limit: number;
   // Which counter decided the call: 'identity' (IP+UA successes),
-  // 'per_ip' and 'global' when blocked, 'infra' when Redis is
+  // 'per_ip'/'per_subnet'/'global' when blocked, 'infra' when Redis is
   // unavailable (fail closed), 'ok' when allowed.
-  reason: 'ok' | 'identity' | 'per_ip' | 'global' | 'infra';
+  reason: 'ok' | 'identity' | 'per_ip' | 'per_subnet' | 'global' | 'infra';
   resetAt: number; // unix seconds, UTC midnight — messaging only, not the actual Redis TTL
 }
 
@@ -124,17 +199,20 @@ export async function checkMcpAnonLimit(ip: string, userAgent: string): Promise<
 
   const today = new Date().toISOString().slice(0, 10);
   const perIpKey = `mcp-anon:ip:${hashIdentity(ip)}:${today}`;
+  const perSubnetKey = `mcp-anon:net:${hashIdentity(subnetOf(ip))}:${today}`;
   const globalKey = `mcp-anon:global:${today}`;
 
   try {
-    const [identityRaw, perIpUsed, globalUsed] = await Promise.all([
+    const [identityRaw, perIpUsed, perSubnetUsed, globalUsed] = await Promise.all([
       redis.get<number>(bucketKey(ip, userAgent)),
       redis.incr(perIpKey),
+      redis.incr(perSubnetKey),
       redis.incr(globalKey),
     ]);
 
     await Promise.all([
       perIpUsed === 1 ? redis.expire(perIpKey, secondsUntilUtcMidnight()) : Promise.resolve(),
+      perSubnetUsed === 1 ? redis.expire(perSubnetKey, secondsUntilUtcMidnight()) : Promise.resolve(),
       globalUsed === 1 ? redis.expire(globalKey, secondsUntilUtcMidnight()) : Promise.resolve(),
     ]);
 
@@ -142,6 +220,9 @@ export async function checkMcpAnonLimit(ip: string, userAgent: string): Promise<
 
     if (globalUsed > MCP_ANON_DAILY_LIMIT_GLOBAL) {
       return { allowed: false, used: globalUsed, limit: MCP_ANON_DAILY_LIMIT_GLOBAL, reason: 'global', resetAt };
+    }
+    if (perSubnetUsed > MCP_ANON_DAILY_LIMIT_PER_SUBNET) {
+      return { allowed: false, used: perSubnetUsed, limit: MCP_ANON_DAILY_LIMIT_PER_SUBNET, reason: 'per_subnet', resetAt };
     }
     if (perIpUsed > MCP_ANON_DAILY_LIMIT_PER_IP) {
       return { allowed: false, used: perIpUsed, limit: MCP_ANON_DAILY_LIMIT_PER_IP, reason: 'per_ip', resetAt };
