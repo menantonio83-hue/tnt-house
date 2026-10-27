@@ -1,3 +1,19 @@
+// Version 7.8 — lib/insider-cluster-detector.ts
+//
+// v7.8: every cluster now carries `funder_path` (the traced chain from a
+// holder's token account up to the cluster funder: nearest funder first,
+// root last) and `deployer_linked` (true when the mint's deployer, as
+// reported by RugCheck `creator`, sits anywhere on that chain or in the
+// cluster itself). Motivation (MRDT, 8Q22...): the reported funder Biw4ee
+// was correct as a ROOT (it funded the deployer AZyz, which funded AoWez,
+// which paid rent for the holder token accounts), but the response did not
+// show that the chain passes THROUGH the deployer — the single most
+// important fact for the reader. Detection, hop logic, caching and scoring
+// are unchanged; this is additive output only. deployer_linked is a lower
+// bound: the trace stops at MAX_HOP_DEPTH, so a deployer sitting above the
+// last traced hop is not seen (false = "not seen in traced chain", not
+// "proven unrelated").
+//
 // Version 7.7 — lib/insider-cluster-detector.ts
 //
 // v7.7: locker and AMM accounts (as labelled by RugCheck knownAccounts) are
@@ -145,6 +161,14 @@ export interface InsiderCluster {
   // v7.5: percent of total supply held by this cluster's wallets (lower
   // bound — only the top holders are traced). null/absent = unknown.
   supply_pct?: number | null;
+  // v7.8: traced funding chain, nearest funder first, root (== `funder`)
+  // last. Longest chain among the cluster's wallets. Absent/null on rows
+  // cached before v7.8.
+  funder_path?: string[] | null;
+  // v7.8: true when the deployer address is in funder_path, equals the
+  // funder, or is itself a cluster wallet. null = deployer unknown (or a
+  // pre-v7.8 cached row). Lower bound, see header.
+  deployer_linked?: boolean | null;
 }
 
 export interface InsiderClusterDetectionResult {
@@ -309,6 +333,8 @@ interface FunderTraceResult {
   // be captured without extra RPC (cache hit / chain exhausted) —
   // classifyFunder re-fetches it then.
   recentSigs: Array<{ signature: string; blockTime: number | null }> | null;
+  // v7.8: every funder visited, nearest first; last element === funder.
+  path: string[];
 }
 
 async function traceFunder(connection: Connection, holder: string): Promise<FunderTraceResult | null> {
@@ -316,6 +342,7 @@ async function traceFunder(connection: Connection, holder: string): Promise<Fund
   if (!first) return null;
 
   let resolvedFunder = first.funder;
+  const path: string[] = [first.funder]; // v7.8
   let transferAmountLamports = first.amountLamports;
   let recentSigs: FunderTraceResult['recentSigs'] = null;
 
@@ -341,13 +368,14 @@ async function traceFunder(connection: Connection, holder: string): Promise<Fund
 
     // Fresh / thin-balance funder — hop one level further up the chain.
     resolvedFunder = funderInfo.funder;
+    path.push(resolvedFunder); // v7.8
     transferAmountLamports = funderInfo.amountLamports;
     // The new parent's own signatures are unknown until the next hop
     // resolves it (and the loop may end without ever doing so).
     recentSigs = null;
   }
 
-  return { funder: resolvedFunder, transferAmountLamports, recentSigs };
+  return { funder: resolvedFunder, transferAmountLamports, recentSigs, path };
 }
 
 // ─── Funder classification (v7.3) ────────────────────────────────────
@@ -625,6 +653,11 @@ export async function detectInsiderClusters(
     );
   }
 
+  // v7.8: deployer as reported by RugCheck (same source as the API's
+  // deployer_address field); null when absent.
+  const deployer: string | null =
+    typeof rugData.creator === 'string' && rugData.creator.length > 0 ? rugData.creator : null;
+
   const topHolders: string[] = selectTraceableHolders(rugData)
     .map((h: any) => h.address || h.owner)
     .filter(Boolean);
@@ -707,6 +740,19 @@ export async function detectInsiderClusters(
       ? Math.round((knownShares as number[]).reduce((s, v) => s + v, 0) * 10) / 10
       : null;
 
+    // v7.8: longest traced chain among this cluster's wallets, and the
+    // deployer link derived from it.
+    const paths = wallets
+      .map((holder) => traceByHolder[holder]?.path)
+      .filter((pth): pth is string[] => Array.isArray(pth) && pth.length > 0);
+    const funderPath = paths.length > 0 ? paths.reduce((a, b) => (b.length > a.length ? b : a)) : null;
+    const deployerLinked: boolean | null =
+      deployer === null
+        ? null
+        : funder === deployer ||
+          wallets.includes(deployer) ||
+          paths.some((pth) => pth.includes(deployer));
+
     clusters.push({
       funder,
       wallets,
@@ -715,6 +761,8 @@ export async function detectInsiderClusters(
       funder_confidence: classification?.funder_confidence ?? null,
       false_positive_likely: classification?.false_positive_likely ?? false,
       supply_pct: supplyPct,
+      funder_path: funderPath,
+      deployer_linked: deployerLinked,
     });
   }
 

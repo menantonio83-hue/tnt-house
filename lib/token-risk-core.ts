@@ -1,3 +1,10 @@
+// Version 1.15 — lib/token-risk-core.ts
+//
+// v1.15: insider_clusters[] entries gain funder_path and deployer_linked
+// (detector v7.8). Cache rows written before v7.8 read as null (unknown),
+// never as false/empty — they fill in when the cluster cache refreshes.
+// No scoring change.
+//
 // Version 1.14 — lib/token-risk-core.ts
 //
 // v1.14: holder_distribution gains freely_tradeable_top10_percent,
@@ -626,6 +633,9 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
           // v1.10: rows cached before the supply share existed read as
           // unknown (null), never 0.
           supply_pct: typeof cluster.supply_pct === 'number' ? cluster.supply_pct : null,
+          // v1.15: pre-v7.8 rows have neither field -> unknown (null).
+          funder_path: Array.isArray(cluster.funder_path) ? cluster.funder_path : null,
+          deployer_linked: typeof cluster.deployer_linked === 'boolean' ? cluster.deployer_linked : null,
         };
       });
       clusterAnalysis = 'complete';
