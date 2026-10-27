@@ -1,4 +1,9 @@
-// Version 6.2 — lib/risk-api-cache.ts
+// Version 6.4 — lib/risk-api-cache.ts
+//
+// v6.4: cache versioning without a schema change — a 'complete' row whose
+// clusters lack funder_path (written before detector v7.8) is reported as
+// NOT fresh, so the existing stale-while-revalidate flow recomputes it
+// with the current detector on the next call.
 //
 // v6.2: switched to the service-role Supabase client (lib/supabase-admin.ts)
 // — risk_cluster_cache now has RLS enabled with no anon policies as part
@@ -58,6 +63,8 @@ export interface ClusterCacheRow {
     funder_label?: string | null;
     funder_confidence?: number | null;
     false_positive_likely?: boolean;
+    funder_path?: string[];
+    deployer_linked?: boolean;
   }>;
   checked_holders: number;
   error: string | null;
@@ -69,6 +76,15 @@ export interface CacheLookup {
   // false = no usable row, OR row exists but is old enough that a
   // background (re)compute should be triggered.
   isFresh: boolean;
+}
+
+function isPreV78Row(row: ClusterCacheRow): boolean {
+  return (
+    row.status === 'complete' &&
+    Array.isArray(row.clusters) &&
+    row.clusters.length > 0 &&
+    row.clusters.some((cluster) => !Array.isArray(cluster.funder_path))
+  );
 }
 
 export async function getClusterCache(mint: string): Promise<CacheLookup> {
@@ -89,7 +105,7 @@ export async function getClusterCache(mint: string): Promise<CacheLookup> {
   const ageMs = Date.now() - new Date(data.updated_at).getTime();
   const ttl = data.status === 'complete' ? COMPLETE_TTL_MS : PENDING_TTL_MS;
 
-  return { row: data as ClusterCacheRow, isFresh: ageMs < ttl };
+  return { row: data as ClusterCacheRow, isFresh: !isPreV78Row(data) && ageMs < ttl };
 }
 
 export async function markClusterPending(mint: string): Promise<void> {
