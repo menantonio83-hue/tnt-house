@@ -165,7 +165,7 @@ import { waitUntil } from '@vercel/functions';
 import { requireApiKey } from '@/lib/api-auth';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { logApiRequest } from '@/lib/request-logger';
-import { fetchTokenRisk } from '@/lib/token-risk-core';
+import { fetchTokenRisk, toPublicTokenRisk } from '@/lib/token-risk-core';
 import { checkDemoLimit } from '@/lib/demo-limit';
 import { consumeDemoPublicKey, DEMO_TOTAL_LIMIT } from '@/lib/demo-public-key-limit';
 
@@ -388,41 +388,7 @@ export async function GET(request: NextRequest) {
       return respond(
         NextResponse.json(
           {
-            mint: demoResult.mint,
-            safety_score: demoResult.safety_score,
-            maturity_capped: demoResult.maturity_capped,
-            market_health_capped: demoResult.market_health_capped,
-            contract_risk_capped: demoResult.contract_risk_capped,
-            rugged_capped: demoResult.rugged_capped,
-            caps_triggered: demoResult.caps_triggered,
-            dominant_cap: demoResult.dominant_cap,
-            cluster_analysis: demoResult.cluster_analysis,
-            insider_clusters: demoResult.insider_clusters,
-            cluster_supply_pct: demoResult.cluster_supply_pct,
-            cluster_wallet_count: demoResult.cluster_wallet_count,
-            largest_cluster_pct: demoResult.largest_cluster_pct,
-            rugcheck_insider_holder_count: demoResult.rugcheck_insider_holder_count,
-            insider_holder_count: demoResult.insider_holder_count,
-            mint_authority: demoResult.mint_authority,
-            freeze_authority: demoResult.freeze_authority,
-            contract_renounced: demoResult.contract_renounced,
-            honeypot_risk: demoResult.honeypot_risk,
-            lp_locked: demoResult.lp_locked,
-            rugged: demoResult.rugged,
-            jup_verified: demoResult.jup_verified,
-            deployer_address: demoResult.deployer_address,
-            hidden_owner: demoResult.hidden_owner,
-            permanent_delegate: demoResult.permanent_delegate,
-            buy_tax_percent: demoResult.buy_tax_percent,
-            sell_tax_percent: demoResult.sell_tax_percent,
-            dev_wallet_percent: demoResult.dev_wallet_percent,
-            token_program: demoResult.token_program,
-            vesting_locks: demoResult.vesting_locks,
-            locked_supply_pct: demoResult.locked_supply_pct,
-            holder_distribution: demoResult.holder_distribution,
-            market: demoResult.market,
-            note: demoResult.note,
-            checked_at: demoResult.checked_at,
+            ...toPublicTokenRisk(demoResult),
             demo: demoPublicField(decision.globalRemaining),
           },
           { headers: demoHeaders },
@@ -530,41 +496,7 @@ export async function GET(request: NextRequest) {
     return respond(
       NextResponse.json(
         {
-          mint: result.mint,
-          safety_score: result.safety_score,
-          maturity_capped: result.maturity_capped,
-          market_health_capped: result.market_health_capped,
-          contract_risk_capped: result.contract_risk_capped,
-          rugged_capped: result.rugged_capped,
-          caps_triggered: result.caps_triggered,
-          dominant_cap: result.dominant_cap,
-          cluster_analysis: result.cluster_analysis,
-          insider_clusters: result.insider_clusters,
-          cluster_supply_pct: result.cluster_supply_pct,
-          cluster_wallet_count: result.cluster_wallet_count,
-          largest_cluster_pct: result.largest_cluster_pct,
-          rugcheck_insider_holder_count: result.rugcheck_insider_holder_count,
-          insider_holder_count: result.insider_holder_count,
-          mint_authority: result.mint_authority,
-          freeze_authority: result.freeze_authority,
-          contract_renounced: result.contract_renounced,
-          honeypot_risk: result.honeypot_risk,
-          lp_locked: result.lp_locked,
-          rugged: result.rugged,
-          jup_verified: result.jup_verified,
-          deployer_address: result.deployer_address,
-          hidden_owner: result.hidden_owner,
-          permanent_delegate: result.permanent_delegate,
-          buy_tax_percent: result.buy_tax_percent,
-          sell_tax_percent: result.sell_tax_percent,
-          dev_wallet_percent: result.dev_wallet_percent,
-          token_program: result.token_program,
-          vesting_locks: result.vesting_locks,
-          locked_supply_pct: result.locked_supply_pct,
-          holder_distribution: result.holder_distribution,
-          market: result.market,
-          note: result.note,
-          checked_at: result.checked_at,
+          ...toPublicTokenRisk(result),
           ...(isDemoCall
             ? {
                 _demo: {

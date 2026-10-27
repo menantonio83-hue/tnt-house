@@ -474,6 +474,14 @@ export {
   type HolderRiskLevel,
 };
 
+// v1.15: single public response builder shared by REST/batch/x402 so they match MCP.
+export type PublicTokenRisk = Omit<TokenRiskResult, 'ok' | 'status' | 'error' | 'details'>;
+export function toPublicTokenRisk(result: TokenRiskResult): PublicTokenRisk {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { ok: _ok, status: _status, error: _error, details: _details, ...body } = result;
+  return body;
+}
+
 // Validates + fetches + scores a single mint. Never throws — every
 // failure path (bad address, upstream fetch failure, unexpected
 // exception) resolves to a TokenRiskFailure so a batch of N mints can

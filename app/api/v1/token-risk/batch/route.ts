@@ -42,7 +42,7 @@ import { waitUntil } from '@vercel/functions';
 import { requireApiKey } from '@/lib/api-auth';
 import { enforceRateLimitBatch } from '@/lib/rate-limit';
 import { logApiRequest } from '@/lib/request-logger';
-import { fetchTokenRisk } from '@/lib/token-risk-core';
+import { fetchTokenRisk, toPublicTokenRisk } from '@/lib/token-risk-core';
 
 // Same 60s ceiling as the single-mint route — a batch of 25 concurrent
 // fetchTokenRisk() calls has the same worst-case per-item budget
@@ -179,41 +179,7 @@ export async function POST(request: NextRequest) {
           result.ok
             ? {
                 ok: true,
-                mint: result.mint,
-                safety_score: result.safety_score,
-                maturity_capped: result.maturity_capped,
-                market_health_capped: result.market_health_capped,
-                contract_risk_capped: result.contract_risk_capped,
-                rugged_capped: result.rugged_capped,
-                caps_triggered: result.caps_triggered,
-                dominant_cap: result.dominant_cap,
-                cluster_analysis: result.cluster_analysis,
-                insider_clusters: result.insider_clusters,
-                cluster_supply_pct: result.cluster_supply_pct,
-                cluster_wallet_count: result.cluster_wallet_count,
-                largest_cluster_pct: result.largest_cluster_pct,
-                rugcheck_insider_holder_count: result.rugcheck_insider_holder_count,
-                insider_holder_count: result.insider_holder_count,
-                mint_authority: result.mint_authority,
-                freeze_authority: result.freeze_authority,
-                contract_renounced: result.contract_renounced,
-                honeypot_risk: result.honeypot_risk,
-                lp_locked: result.lp_locked,
-                rugged: result.rugged,
-                jup_verified: result.jup_verified,
-                deployer_address: result.deployer_address,
-                hidden_owner: result.hidden_owner,
-                permanent_delegate: result.permanent_delegate,
-                buy_tax_percent: result.buy_tax_percent,
-                sell_tax_percent: result.sell_tax_percent,
-                dev_wallet_percent: result.dev_wallet_percent,
-                token_program: result.token_program,
-                vesting_locks: result.vesting_locks,
-                locked_supply_pct: result.locked_supply_pct,
-                holder_distribution: result.holder_distribution,
-                market: result.market,
-                note: result.note,
-                checked_at: result.checked_at,
+                ...toPublicTokenRisk(result),
               }
             : {
                 ok: false,
