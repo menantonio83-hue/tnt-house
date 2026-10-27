@@ -1,3 +1,9 @@
+// Version 1.8 — app/api/mcp/route.ts
+//
+// v1.8: anonymous check_token_risk now also counts subnet+UA and
+// optional Mcp-Session-Id identity buckets (lib/mcp-anon-limit.ts v1.3);
+// keyed calls untouched.
+//
 // Version 1.7 — app/api/mcp/route.ts
 //
 // v1.7: serverInfo name/version now read from
@@ -119,7 +125,7 @@ import { enforceRateLimit, enforceRateLimitBatch } from '@/lib/rate-limit';
 import { fetchTokenRisk } from '@/lib/token-risk-core';
 import { getMintRiskHistory } from '@/lib/mint-risk-history-store';
 import { logApiRequest } from '@/lib/request-logger';
-import { checkMcpAnonLimit, recordMcpAnonSuccess } from '@/lib/mcp-anon-limit';
+import { checkMcpAnonLimit, normalizeSessionId, recordMcpAnonSuccess } from '@/lib/mcp-anon-limit';
 import type { ApiKeyRecord } from '@/lib/api-key-store';
 
 export const dynamic = 'force-dynamic';
@@ -172,12 +178,19 @@ function extractUserAgent(request: NextRequest): string {
   return request.headers.get('user-agent') ?? 'unknown';
 }
 
+// Optional MCP session id, passed through normalizeSessionId. Used only
+// for the anonymous check_token_risk identity quota (lib/mcp-anon-limit.ts
+// v1.3); keyed calls never touch it.
+function extractSessionId(request: NextRequest): string | null {
+  return normalizeSessionId(request.headers.get('mcp-session-id'));
+}
+
 // A server instance built with no ApiKeyRecord — reached for
 // PUBLIC_METHODS (initialize/tools list/ping) AND, as of v1.2, for an
 // unauthenticated "tools/call" of check_token_risk specifically (the
 // demo path). clientIp is only meaningful in that second case; it's
 // unused by every other tool.
-function buildServer(apiKey: ApiKeyRecord | null, clientIp: string, userAgent: string): McpServer {
+function buildServer(apiKey: ApiKeyRecord | null, clientIp: string, userAgent: string, sessionId: string | null): McpServer {
   const server = new McpServer(
     { name: serverCard.serverInfo.name, version: serverCard.serverInfo.version },
     {
@@ -218,7 +231,7 @@ function buildServer(apiKey: ApiKeyRecord | null, clientIp: string, userAgent: s
       // cost one of the 5.
       if (!apiKey) {
         const startedAt = Date.now();
-        const gate = await checkMcpAnonLimit(clientIp, userAgent);
+        const gate = await checkMcpAnonLimit(clientIp, userAgent, sessionId);
         if (!gate.allowed) {
           const message =
             gate.reason === 'global'
@@ -234,7 +247,7 @@ function buildServer(apiKey: ApiKeyRecord | null, clientIp: string, userAgent: s
         }
         const result = await fetchTokenRisk(mint);
         if (result.ok) {
-          waitUntil(recordMcpAnonSuccess(clientIp, userAgent));
+          waitUntil(recordMcpAnonSuccess(clientIp, userAgent, sessionId));
         }
         waitUntil(
           logApiRequest({
@@ -431,7 +444,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const server = buildServer(apiKey, extractClientIp(request), extractUserAgent(request));
+  const server = buildServer(apiKey, extractClientIp(request), extractUserAgent(request), extractSessionId(request));
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined });
   await server.connect(transport);
   return transport.handleRequest(request);

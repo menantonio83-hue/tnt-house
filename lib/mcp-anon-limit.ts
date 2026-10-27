@@ -1,3 +1,22 @@
+// Version 1.3 — lib/mcp-anon-limit.ts
+//
+// v1.3: adds two more SUCCESS-only identity buckets, same 5/day ceiling:
+//   - subnet+UA: subnetOf(ip) + User-Agent, so a client that rotates its
+//     IP inside one /24 (IPv4) or /64 (IPv6) with the same User-Agent no
+//     longer gets a fresh 5/day on every new address (seen live: our own
+//     test box rotating across one /24 always got "call 1/5").
+//   - optional session: Mcp-Session-Id header (if the client sends one),
+//     normalized and capped to 256 chars before hashing. No header -> no
+//     session bucket, behaviour identical to before for that client.
+// A call is refused when ANY identity bucket has reached 5.
+// These are READ (redis.get) in checkMcpAnonLimit and only INCRed in
+// recordMcpAnonSuccess, exactly like the original IP+UA identity bucket.
+// The existing global/per_subnet/per_ip ATTEMPT counters are unchanged
+// and still INCRed on every check. identityUsed now = max(IP+UA,
+// subnet+UA, session-if-present), and the final 'identity' refusal uses
+// that value. Existing counter key formats are preserved so today's
+// counts carry over.
+//
 // Version 1.2 — lib/mcp-anon-limit.ts
 //
 // v1.2: per-subnet daily ATTEMPTS cap (MCP_ANON_DAILY_LIMIT_PER_SUBNET)
@@ -98,6 +117,15 @@ function bucketKey(ip: string, userAgent: string): string {
   return `mcp-anon:${hash}:${today}`;
 }
 
+// v1.3: second identity bucket (subnet + UA) and optional session bucket.
+function subnetUaKey(ip: string, userAgent: string, today: string): string {
+  return `mcp-anon:netua:${hashIdentity(`${subnetOf(ip)}:${userAgent}`)}:${today}`;
+}
+
+function sessionKey(sessionId: string, today: string): string {
+  return `mcp-anon:sess:${hashIdentity(`sess:${sessionId}`)}:${today}`;
+}
+
 function secondsUntilUtcMidnight(): number {
   const now = new Date();
   const next = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0);
@@ -172,11 +200,23 @@ function expandIPv6(value: string): string[] | null {
   return groups.length === 8 ? groups : null;
 }
 
+export function normalizeSessionId(raw: string | null | undefined): string | null {
+  if (raw == null) return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  return trimmed.slice(0, 256);
+}
+
+export function anonIdentityUsed(ipUa: number | null, subnetUa: number | null, session: number | null): number {
+  return Math.max(ipUa ?? 0, subnetUa ?? 0, session ?? 0);
+}
+
 export interface McpAnonDecision {
   allowed: boolean;
   used: number;
   limit: number;
-  // Which counter decided the call: 'identity' (IP+UA successes),
+  // Which counter decided the call: 'identity' (max of the IP+UA,
+  // subnet+UA and optional session success buckets — v1.3),
   // 'per_ip'/'per_subnet'/'global' when blocked, 'infra' when Redis is
   // unavailable (fail closed), 'ok' when allowed.
   reason: 'ok' | 'identity' | 'per_ip' | 'per_subnet' | 'global' | 'infra';
@@ -190,7 +230,7 @@ export interface McpAnonDecision {
 // happens after" convention as lib/demo-limit.ts). Call BEFORE doing the
 // expensive upstream work, so a blocked visitor never triggers a real
 // Helius/DexScreener call.
-export async function checkMcpAnonLimit(ip: string, userAgent: string): Promise<McpAnonDecision> {
+export async function checkMcpAnonLimit(ip: string, userAgent: string, sessionId?: string | null): Promise<McpAnonDecision> {
   const resetAt = Math.floor(Date.now() / 1000) + secondsUntilUtcMidnight();
   if (!redis) {
     console.error('[mcp-anon-limit] Redis not configured, failing closed on anonymous MCP calls.');
@@ -202,9 +242,16 @@ export async function checkMcpAnonLimit(ip: string, userAgent: string): Promise<
   const perSubnetKey = `mcp-anon:net:${hashIdentity(subnetOf(ip))}:${today}`;
   const globalKey = `mcp-anon:global:${today}`;
 
+  const ipUaKey = bucketKey(ip, userAgent);
+  const netUaKey = subnetUaKey(ip, userAgent, today);
+  const normalizedSessionId = normalizeSessionId(sessionId);
+  const sessionReadKey = normalizedSessionId ? sessionKey(normalizedSessionId, today) : null;
+
   try {
-    const [identityRaw, perIpUsed, perSubnetUsed, globalUsed] = await Promise.all([
-      redis.get<number>(bucketKey(ip, userAgent)),
+    const [identityRaw, subnetUaRaw, sessionRaw, perIpUsed, perSubnetUsed, globalUsed] = await Promise.all([
+      redis.get<number>(ipUaKey),
+      redis.get<number>(netUaKey),
+      sessionReadKey ? redis.get<number>(sessionReadKey) : Promise.resolve(null),
       redis.incr(perIpKey),
       redis.incr(perSubnetKey),
       redis.incr(globalKey),
@@ -216,7 +263,10 @@ export async function checkMcpAnonLimit(ip: string, userAgent: string): Promise<
       globalUsed === 1 ? redis.expire(globalKey, secondsUntilUtcMidnight()) : Promise.resolve(),
     ]);
 
-    const identityUsed = identityRaw ?? 0;
+    const ipUaValue = identityRaw ?? null;
+    const subnetUaValue = subnetUaRaw ?? null;
+    const sessionValue = sessionReadKey ? sessionRaw ?? null : null;
+    const identityUsed = anonIdentityUsed(ipUaValue, subnetUaValue, sessionValue);
 
     if (globalUsed > MCP_ANON_DAILY_LIMIT_GLOBAL) {
       return { allowed: false, used: globalUsed, limit: MCP_ANON_DAILY_LIMIT_GLOBAL, reason: 'global', resetAt };
@@ -241,14 +291,26 @@ export async function checkMcpAnonLimit(ip: string, userAgent: string): Promise<
 // header. Fire-and-forget from the caller's perspective (wrap in
 // waitUntil()), same convention as logApiRequest() elsewhere in this
 // codebase.
-export async function recordMcpAnonSuccess(ip: string, userAgent: string): Promise<void> {
+export async function recordMcpAnonSuccess(ip: string, userAgent: string, sessionId?: string | null): Promise<void> {
   if (!redis) return;
-  const key = bucketKey(ip, userAgent);
+  const client = redis;
+  const today = new Date().toISOString().slice(0, 10);
+  const normalizedSessionId = normalizeSessionId(sessionId);
+
+  const keys = [bucketKey(ip, userAgent), subnetUaKey(ip, userAgent, today)];
+  if (normalizedSessionId) {
+    keys.push(sessionKey(normalizedSessionId, today));
+  }
+
   try {
-    const used = await redis.incr(key);
-    if (used === 1) {
-      await redis.expire(key, KEY_TTL_SECONDS);
-    }
+    await Promise.all(
+      keys.map(async (key) => {
+        const used = await client.incr(key);
+        if (used === 1) {
+          await client.expire(key, KEY_TTL_SECONDS);
+        }
+      }),
+    );
   } catch (e) {
     console.error('[mcp-anon-limit] Redis error recording success:', (e as Error).message);
   }
