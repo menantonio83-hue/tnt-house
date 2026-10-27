@@ -389,6 +389,8 @@ export interface TokenRiskResult {
   deployer_address?: string | null;
   rugged?: boolean | null;
   jup_verified?: boolean | null;
+  rugcheck_insider_holder_count?: number | null;
+  /** @deprecated alias for rugcheck_insider_holder_count */
   insider_holder_count?: number | null;
   // v1.5 — from lib/rugcheck-client.ts v1.3, same RugCheck call, zero
   // extra cost. contract_renounced is purely derived (mint + freeze
@@ -812,6 +814,7 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
       deployer_address: rugCheckData.deployer_address,
       rugged: rugCheckData.rugged,
       jup_verified: rugCheckData.jup_verified,
+      rugcheck_insider_holder_count: rugCheckData.insider_holder_count,
       insider_holder_count: rugCheckData.insider_holder_count,
       hidden_owner: rugCheckData.hidden_owner,
       permanent_delegate: rugCheckData.permanent_delegate,

@@ -151,6 +151,8 @@ const EXAMPLE_RESPONSE = {
       false_positive_likely: false,
     },
   ],
+  cluster_wallet_count: 2,
+  rugcheck_insider_holder_count: 2,
   insider_holder_count: 2,
   mint_authority: { revoked: true, address: null },
   freeze_authority: { revoked: true, address: null },

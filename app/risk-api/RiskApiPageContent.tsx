@@ -281,6 +281,8 @@ const EXAMPLE_RESPONSE = {
   dominant_cap: null,
   cluster_analysis: 'complete',
   insider_clusters: [{ funder: '9xQe...k2Pd', wallets: ['7uF3...aZ1', '3mN8...qR2'] }],
+  cluster_wallet_count: 2,
+  rugcheck_insider_holder_count: 2,
   insider_holder_count: 2,
   mint_authority: { revoked: true, address: null },
   freeze_authority: { revoked: true, address: null },
