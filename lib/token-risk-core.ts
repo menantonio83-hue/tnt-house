@@ -1,4 +1,12 @@
-// Version 1.16 — lib/token-risk-core.ts
+// Version 1.17 — lib/token-risk-core.ts
+//
+// v1.17: locked_supply_pct now counts only non-cancelable tokens currently
+// locked (unlocked_now_percent excluded); new locked_supply_unlocking_30d_pct
+// reports the portion still locked now but unlocking within 30d. Scoring
+// deductions are unchanged: tokens unlocking within 30 days still count as
+// freely tradeable for the top-10 / largest-holder caps (found live on MRDT:
+// 67.1% Streamflow lock with a cliff 27 days out -> deduction 0, so the old
+// locked_supply_pct read 0 although the whole lock was still locked).
 //
 // v1.16: one short retry (1.5s backoff, 12s budget, only if <30s elapsed)
 // when the holder read comes back unusable, before refusing the call and
@@ -419,8 +427,12 @@ export interface TokenRiskResult {
   // never null, so callers can safely check .length without a null
   // guard.
   vesting_locks?: VestingLock[];
-  // v1.16 — locked supply in known vesting contracts, after excluding freely tradeable portions.
+  // v1.17 — share of supply currently locked on-chain in non-cancelable known
+  // vesting contracts (percent_of_supply minus what has already unlocked).
+  // Informational: scoring uses its own 30-day forward-looking deduction.
   locked_supply_pct?: number;
+  // v1.17 — locked now but unlocking within 30d (non-cancelable locks only), rounded 0.1.
+  locked_supply_unlocking_30d_pct?: number;
   holder_distribution?: {
     risk_level: string;
     largest_holder_percent: number;
@@ -603,11 +615,30 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
     let freelyTradeableTop10Percent = holderRisk.top10Percent;
     let freelyTradeableLargestHolderPercent = holderRisk.largestHolderPercent;
     let lockedSupplyPct = 0;
+    let lockedSupplyUnlocking30dPct = 0;
     if (vestingLocks.length > 0) {
       const perLockDeductions = vestingLocks.map((lock) => lock.percent_of_supply - freelyTradeablePercentOfLock(lock));
       const lockedDeduction = perLockDeductions.reduce((sum, d) => sum + d, 0);
-      lockedSupplyPct = Math.round(lockedDeduction * 10) / 10;
       freelyTradeableTop10Percent = Math.max(0, holderRisk.top10Percent - lockedDeduction);
+
+      const nonCancelableLocks = vestingLocks.filter((lock) => !lock.cancelable_by_sender);
+      lockedSupplyPct =
+        Math.round(
+          nonCancelableLocks.reduce(
+            (sum, lock) => sum + lock.percent_of_supply * (1 - lock.unlocked_now_percent / 100),
+            0
+          ) * 10
+        ) / 10;
+      lockedSupplyUnlocking30dPct = Math.max(
+        0,
+        Math.round(
+          nonCancelableLocks.reduce(
+            (sum, lock) =>
+              sum + (lock.percent_of_supply * (lock.unlocks_within_30d_percent - lock.unlocked_now_percent)) / 100,
+            0
+          ) * 10
+        ) / 10
+      );
 
       // v1.7: classifyRisk() in holder-distribution.ts checks
       // largestHolderPercent FIRST and independently of top10Percent
@@ -674,6 +705,10 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
           // v1.15: pre-v7.8 rows have neither field -> unknown (null).
           funder_path: Array.isArray(cluster.funder_path) ? cluster.funder_path : null,
           deployer_linked: typeof cluster.deployer_linked === 'boolean' ? cluster.deployer_linked : null,
+          exchange_source:
+            cluster.exchange_source && typeof cluster.exchange_source === 'object'
+              ? cluster.exchange_source
+              : null,
         };
       });
       clusterAnalysis = 'complete';
@@ -861,6 +896,7 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
       contract_renounced: mintAuthorityRevoked && freezeAuthorityRevoked,
       vesting_locks: vestingLocks,
       locked_supply_pct: lockedSupplyPct,
+      locked_supply_unlocking_30d_pct: lockedSupplyUnlocking30dPct,
       holder_distribution: {
         risk_level: holderRisk.riskLevel,
         largest_holder_percent: holderRisk.largestHolderPercent,

@@ -1,4 +1,10 @@
-// Version 6.4 — lib/risk-api-cache.ts
+// Version 6.5 — lib/risk-api-cache.ts
+//
+// v6.5: rows written before detector v7.10 are stale too — a complete row
+// whose clusters lack funder_path OR lack exchange_source is reported as
+// NOT fresh, so the stale-while-revalidate flow recomputes it on next call.
+// Rows with no clusters stay valid (v7.10 can only split clusters, never
+// create one from nothing).
 //
 // v6.4: cache versioning without a schema change — a 'complete' row whose
 // clusters lack funder_path (written before detector v7.8) is reported as
@@ -65,6 +71,7 @@ export interface ClusterCacheRow {
     false_positive_likely?: boolean;
     funder_path?: string[];
     deployer_linked?: boolean;
+    exchange_source?: { address: string; label: string } | null;
   }>;
   checked_holders: number;
   error: string | null;
@@ -78,12 +85,16 @@ export interface CacheLookup {
   isFresh: boolean;
 }
 
-function isPreV78Row(row: ClusterCacheRow): boolean {
+function isStaleDetectorRow(row: ClusterCacheRow): boolean {
   return (
     row.status === 'complete' &&
     Array.isArray(row.clusters) &&
     row.clusters.length > 0 &&
-    row.clusters.some((cluster) => !Array.isArray(cluster.funder_path))
+    row.clusters.some(
+      (cluster) =>
+        !Array.isArray(cluster.funder_path) ||
+        !Object.prototype.hasOwnProperty.call(cluster, 'exchange_source'),
+    )
   );
 }
 
@@ -105,7 +116,7 @@ export async function getClusterCache(mint: string): Promise<CacheLookup> {
   const ageMs = Date.now() - new Date(data.updated_at).getTime();
   const ttl = data.status === 'complete' ? COMPLETE_TTL_MS : PENDING_TTL_MS;
 
-  return { row: data as ClusterCacheRow, isFresh: !isPreV78Row(data) && ageMs < ttl };
+  return { row: data as ClusterCacheRow, isFresh: !isStaleDetectorRow(data) && ageMs < ttl };
 }
 
 export async function markClusterPending(mint: string): Promise<void> {

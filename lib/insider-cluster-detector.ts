@@ -1,4 +1,16 @@
-// Version 7.9 — lib/insider-cluster-detector.ts
+// Version 7.10 — lib/insider-cluster-detector.ts
+//
+// v7.10: when a traced funder path ends in a known exchange hot wallet and
+// path.length >= 2, the exchange is recorded as exchangeSource and the
+// cluster funder is the last non-exchange wallet (the exchange itself only
+// remains the funder for direct one-hop fundings). The check runs AFTER the
+// loop: with MAX_HOP_DEPTH = 3 the v7.9 in-loop check never saw the last
+// pushed hop. Found live on MRDT: holder -> AoWez -> AZyz (deployer) ->
+// Biw4ee (Revolut) made Revolut the funder; once allowlisted it would be
+// classified 'cex' / false_positive_likely and the deployer-linked cluster
+// would stop counting in the score. Now funder = AZyz and Revolut is shown
+// as exchange_source. Cached rows without exchange_source are stale (cache
+// v6.5), so they are recomputed (one-time RPC cost per mint).
 //
 // v7.9: known exchange hot wallets (lib/known-cex-funders.ts) are terminal
 // funders in traceFunder — never hop past them. Their huge histories could
@@ -174,6 +186,10 @@ export interface InsiderCluster {
   // funder, or is itself a cluster wallet. null = deployer unknown (or a
   // pre-v7.8 cached row). Lower bound, see header.
   deployer_linked?: boolean | null;
+  // v7.10: known exchange that funded the root of funder_path, if the
+  // traced chain ended at an exchange and path.length >= 2; otherwise null.
+  // funder_path still ends at `funder`.
+  exchange_source?: { address: string; label: string } | null;
 }
 
 export interface InsiderClusterDetectionResult {
@@ -338,6 +354,11 @@ interface FunderTraceResult {
   // be captured without extra RPC (cache hit / chain exhausted) —
   // classifyFunder re-fetches it then.
   recentSigs: Array<{ signature: string; blockTime: number | null }> | null;
+  // v7.10: when a traced chain ended at a known exchange and path.length >= 2,
+  // this records that exchange; otherwise null. `funder` is then the last
+  // non-exchange wallet in the path and recentSigs is null so classifyFunder
+  // refetches against that wallet.
+  exchangeSource: { address: string; label: string } | null;
   // v7.8: every funder visited, nearest first; last element === funder.
   path: string[];
 }
@@ -350,6 +371,8 @@ async function traceFunder(connection: Connection, holder: string): Promise<Fund
   const path: string[] = [first.funder]; // v7.8
   let transferAmountLamports = first.amountLamports;
   let recentSigs: FunderTraceResult['recentSigs'] = null;
+  let exchangeSource: FunderTraceResult['exchangeSource'] = null;
+  let prevAmount = transferAmountLamports;
 
   for (let hop = 1; hop < MAX_HOP_DEPTH; hop++) {
     // v7.9: known exchange hot wallets are terminal funders — never hop past them.
@@ -378,6 +401,7 @@ async function traceFunder(connection: Connection, holder: string): Promise<Fund
     }
 
     // Fresh / thin-balance funder — hop one level further up the chain.
+    prevAmount = transferAmountLamports;
     resolvedFunder = funderInfo.funder;
     path.push(resolvedFunder); // v7.8
     transferAmountLamports = funderInfo.amountLamports;
@@ -386,7 +410,25 @@ async function traceFunder(connection: Connection, holder: string): Promise<Fund
     recentSigs = null;
   }
 
-  return { funder: resolvedFunder, transferAmountLamports, recentSigs, path };
+  // v7.10: a terminal exchange hop is only meaningful as a funder when it
+  // directly funded the holder (path.length === 1). Otherwise, pop it off so
+  // the cluster funder is the last non-exchange wallet and record the
+  // exchange as an attribution source.
+  if (path.length >= 2 && isKnownExchangeWallet(resolvedFunder)) {
+    exchangeSource = { address: resolvedFunder, label: KNOWN_CEX_FUNDERS[resolvedFunder] };
+    path.pop();
+    resolvedFunder = path[path.length - 1];
+    transferAmountLamports = prevAmount;
+    recentSigs = null;
+  }
+
+  return {
+    funder: resolvedFunder,
+    transferAmountLamports,
+    recentSigs,
+    path,
+    exchangeSource,
+  };
 }
 
 // ─── Funder classification (v7.3) ────────────────────────────────────
@@ -763,6 +805,10 @@ export async function detectInsiderClusters(
         : funder === deployer ||
           wallets.includes(deployer) ||
           paths.some((pth) => pth.includes(deployer));
+    const exchangeSource =
+      wallets
+        .map((holder) => traceByHolder[holder]?.exchangeSource ?? null)
+        .find((exchange) => exchange !== null) ?? null;
 
     clusters.push({
       funder,
@@ -774,6 +820,7 @@ export async function detectInsiderClusters(
       supply_pct: supplyPct,
       funder_path: funderPath,
       deployer_linked: deployerLinked,
+      exchange_source: exchangeSource,
     });
   }
 
