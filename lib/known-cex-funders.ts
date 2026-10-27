@@ -1,4 +1,8 @@
-// Version 2.0 — lib/known-cex-funders.ts
+// Version 2.1 — lib/known-cex-funders.ts
+//
+// v2.1: added the Revolut Solana withdrawal hot wallet and an
+// isKnownExchangeWallet() helper (the detector's traceFunder v7.9 stops
+// at these instead of hopping past them).
 //
 // A small, manually-curated whitelist of Solana wallet addresses known
 // to belong to centralized exchanges, bridges or co-signer
@@ -33,4 +37,10 @@ export const KNOWN_CEX_FUNDERS: Record<string, string> = {
   '5tzFkiKscXHK5ZXCGbXZxdw7gTjjD1mBwuoFbhUvuAi9': 'Binance Hot Wallet',
   // Fomo Co-signer Hot Wallet (verified on-chain 2026-09-15)
   'AgmLJBMDCqWynYnQiPCuj9ewsNNsBJXyzoUhD9LJzN51': 'Fomo Co-signer',
+  // Revolut Solana withdrawal hot wallet (user-reported 2026-10-27; re-verify on explorer)
+  'Biw4eeaiYYYq6xSqEd7GzdwsrrndxA8mqdxfAtG3PTUU': 'Revolut (Solana withdrawals)',
 };
+
+export function isKnownExchangeWallet(address: string): boolean {
+  return Object.prototype.hasOwnProperty.call(KNOWN_CEX_FUNDERS, address);
+}

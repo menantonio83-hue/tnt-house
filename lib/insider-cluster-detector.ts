@@ -1,4 +1,9 @@
-// Version 7.8 — lib/insider-cluster-detector.ts
+// Version 7.9 — lib/insider-cluster-detector.ts
+//
+// v7.9: known exchange hot wallets (lib/known-cex-funders.ts) are terminal
+// funders in traceFunder — never hop past them. Their huge histories could
+// make the age/balance check misread them as fresh and promote whatever
+// wallet once funded the exchange to "real funder" / funder_path.
 //
 // v7.8: every cluster now carries `funder_path` (the traced chain from a
 // holder's token account up to the cluster funder: nearest funder first,
@@ -113,7 +118,7 @@ import pLimit from 'p-limit';
 import { withTimeout } from '@/lib/with-timeout';
 import { throttledFetch } from '@/lib/rpc-throttle';
 import { getCachedFunder, setCachedFunderAsync, type CachedFunder } from '@/lib/funder-cache';
-import { KNOWN_CEX_FUNDERS } from '@/lib/known-cex-funders';
+import { KNOWN_CEX_FUNDERS, isKnownExchangeWallet } from '@/lib/known-cex-funders';
 
 const RPC_URL = process.env.HELIUS_RPC_URL || 'https://api.mainnet-beta.solana.com';
 const RUGCHECK_URL = 'https://api.rugcheck.xyz/v1/tokens';
@@ -347,6 +352,12 @@ async function traceFunder(connection: Connection, holder: string): Promise<Fund
   let recentSigs: FunderTraceResult['recentSigs'] = null;
 
   for (let hop = 1; hop < MAX_HOP_DEPTH; hop++) {
+    // v7.9: known exchange hot wallets are terminal funders — never hop past them.
+    if (isKnownExchangeWallet(resolvedFunder)) {
+      recentSigs = null;
+      break;
+    }
+
     const [funderInfo, balanceSol] = await Promise.all([
       resolveWalletFunder(connection, resolvedFunder),
       fetchBalanceSol(connection, resolvedFunder),
