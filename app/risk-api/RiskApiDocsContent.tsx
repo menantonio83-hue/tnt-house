@@ -1,4 +1,18 @@
-// Version 1.3 — app/risk-api/RiskApiDocsContent.tsx
+// Version 1.4 — app/risk-api/RiskApiDocsContent.tsx
+//
+// v1.4: docs-audit fixes (2026-10-28), content only — no API change.
+// New "MCP server" section (id="mcp": endpoint, README config snippet,
+// the 6 tools from app/api/mcp/route.ts and which ones work without a
+// key). x402 Python example replaced with the official x402 SDK
+// (x402[svm,httpx], v2 exact scheme; openlibx402-client did not speak
+// x402 v2). EXAMPLE_RESPONSE rebuilt from lib/token-risk-core.ts's real
+// field set with a placeholder mint + "illustrative" caption; new
+// response-field rows. 402 example now mirrors the real body from
+// lib/rate-limit.ts + lib/refusal-options.ts (error_code, options[]).
+// All example URLs moved to https://www.tnt-audit.com. Price suffixes
+// (/call, /30 days) now translated. id="x402" on the x402 card.
+//
+// Version 1.3
 //
 // v1.3: added a "Delivery & Retries" panel to the Webhooks section
 // (DeepSeek site-audit finding, 2026-09-21) — the doc showed the
@@ -47,19 +61,20 @@ import LangSwitcher from './LangSwitcher';
 import { useRiskApiLang } from './LangContext';
 import ChatWidget from './ChatWidget';
 
-const CURL_EXAMPLE = `curl "https://tnt-audit.com/api/v1/token-risk?mint=<MINT_ADDRESS>" \\
+const CURL_EXAMPLE = `curl "https://www.tnt-audit.com/api/v1/token-risk?mint=<MINT_ADDRESS>" \\
   -H "Authorization: Bearer tnt_sk_your_key_here"`;
 
 const PYTHON_EXAMPLE = `import requests
 
 API_KEY = "tnt_sk_your_key_here"
-MINT_ADDRESS = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+MINT_ADDRESS = "<MINT_ADDRESS>"
 
 response = requests.get(
-    "https://tnt-audit.com/api/v1/token-risk",
+    "https://www.tnt-audit.com/api/v1/token-risk",
     params={"mint": MINT_ADDRESS},
     headers={"Authorization": f"Bearer {API_KEY}"},
 )
+response.raise_for_status()  # 401/402/429 etc. raise instead of failing on a missing key
 data = response.json()
 
 if data["safety_score"] < 50:
@@ -71,7 +86,7 @@ else:
 
 const TYPESCRIPT_EXAMPLE = `async function checkTokenRisk(mint: string, apiKey: string) {
   const res = await fetch(
-    \`https://tnt-audit.com/api/v1/token-risk?mint=\${mint}\`,
+    \`https://www.tnt-audit.com/api/v1/token-risk?mint=\${mint}\`,
     { headers: { Authorization: \`Bearer \${apiKey}\` } },
   );
 
@@ -79,7 +94,7 @@ const TYPESCRIPT_EXAMPLE = `async function checkTokenRisk(mint: string, apiKey: 
   return res.json();
 }`;
 
-const WEBHOOK_SUBSCRIBE_EXAMPLE = `curl -X POST "https://tnt-audit.com/api/v1/webhooks/subscribe" \\
+const WEBHOOK_SUBSCRIBE_EXAMPLE = `curl -X POST "https://www.tnt-audit.com/api/v1/webhooks/subscribe" \\
   -H "Authorization: Bearer tnt_sk_your_key_here" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -120,6 +135,50 @@ const WEBHOOK_PAYLOAD_EXAMPLE = {
   },
 };
 
+const MCP_ENDPOINT = 'https://www.tnt-audit.com/api/mcp';
+
+// Same snippet as README.md ("tnt-house-risk-data-api" key).
+const MCP_CONFIG_EXAMPLE = `{
+  "mcpServers": {
+    "tnt-house-risk-data-api": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://www.tnt-audit.com/api/mcp"]
+    }
+  }
+}`;
+
+// Verified 2026-10-28 against x402 2.25.0 (pip install "x402[svm,httpx]"):
+// imports resolve, and x402HTTPClient builds a v2 PAYMENT-SIGNATURE
+// header (scheme exact, solana mainnet, amount 20000) from our live
+// 402 challenge. Nothing was paid during the check.
+const X402_PYTHON_EXAMPLE = `pip install "x402[svm,httpx]"
+
+import asyncio, os
+
+from x402 import x402Client
+from x402.http.clients import x402HttpxClient
+from x402.mechanisms.svm import KeypairSigner
+from x402.mechanisms.svm.exact import register_exact_svm_client
+
+async def main():
+    # Base58 private key of a Solana wallet holding a little USDC
+    # (mainnet, $0.02+ per call) -- load it from an env var, never hardcode it.
+    signer = KeypairSigner.from_base58(os.environ["SOLANA_PRIVATE_KEY_B58"])
+
+    client = x402Client()
+    register_exact_svm_client(client, signer)  # x402 v2, exact scheme on Solana
+
+    # x402HttpxClient runs the whole 402 -> sign -> pay -> retry flow for you
+    async with x402HttpxClient(client, timeout=60) as http:
+        r = await http.get(
+            "https://www.tnt-audit.com/api/v1/token-risk/x402?mint=<MINT_ADDRESS>"
+        )
+        r.raise_for_status()
+        data = r.json()
+        print(data["safety_score"], data["insider_clusters"])
+
+asyncio.run(main())`;
+
 type CodeTab = 'curl' | 'python' | 'typescript';
 
 const CODE_EXAMPLES: Record<CodeTab, { label: string; code: string }> = {
@@ -128,76 +187,120 @@ const CODE_EXAMPLES: Record<CodeTab, { label: string; code: string }> = {
   typescript: { label: 'TypeScript', code: TYPESCRIPT_EXAMPLE },
 };
 
+// Illustrative only (fictional token, made-up values) — the field set and
+// order mirror lib/token-risk-core.ts (toPublicTokenRisk output). Shown:
+// a 4-day-old token whose score is capped at 75 by the age cap.
 const EXAMPLE_RESPONSE = {
-  mint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
-  safety_score: 78,
-  maturity_capped: false,
+  mint: '<MINT_ADDRESS>',
+  safety_score: 75,
+  maturity_capped: true,
   market_health_capped: false,
-  contract_risk_capped: false,
   rugged_capped: false,
-  caps_triggered: [],
-  dominant_cap: null,
+  contract_risk_capped: false,
+  wash_trading_capped: false,
+  lp_risk_capped: false,
+  mint_authority_capped: false,
+  freeze_authority_capped: false,
+  honeypot_capped: false,
+  reliefs_triggered: [],
+  caps_triggered: [{ reason: 'age_lt_7d', cap: 75 }],
+  dominant_cap: 'age_lt_7d',
+  explanation: 'Score capped because the token is under 7 days old.',
   cluster_analysis: 'complete',
   insider_clusters: [
     {
       funder: '9xQe...k2Pd',
       wallets: ['7uF3...aZ1', '3mN8...qR2'],
-      // v1.20: funder classification -- known CEX/infra funders stay
-      // visible here but no longer count toward the insider penalty
-      // in safety_score. See fieldInsiderClusters in i18n.ts.
       funder_class: 'unknown',
       funder_label: null,
       funder_confidence: null,
       false_positive_likely: false,
+      supply_pct: 3.1,
+      funder_path: ['9xQe...k2Pd'],
+      deployer_linked: false,
+      exchange_source: null,
     },
   ],
+  cluster_supply_pct: 3.1,
   cluster_wallet_count: 2,
-  rugcheck_insider_holder_count: 2,
-  insider_holder_count: 2,
+  largest_cluster_pct: 3.1,
+  flags: ['young_token', 'insider_cluster_detected'],
+  data_confidence: {
+    cluster_scan: 'complete',
+    holders_traced: 20,
+    cluster_supply_is_lower_bound: true,
+    market_data_available: true,
+    rugcheck_data_available: true,
+  },
   mint_authority: { revoked: true, address: null },
   freeze_authority: { revoked: true, address: null },
-  contract_renounced: true,
   honeypot_risk: false,
   lp_locked: { locked: true, percent: 100 },
+  lp_burned: { burned: true },
+  deployer_address: '5DkR...w8Lm',
   rugged: false,
-  jup_verified: true,
-  deployer_address: '9xQe...k2Pd',
+  jup_verified: false,
+  rugcheck_insider_holder_count: 2,
+  insider_holder_count: 2,
   hidden_owner: false,
   permanent_delegate: false,
   buy_tax_percent: null,
   sell_tax_percent: null,
   dev_wallet_percent: 1.8,
   token_program: 'standard',
-  // No vesting/lock contract detected among top holders for this mint.
-  // When one is found (Streamflow, v1), each entry looks like:
+  contract_renounced: true,
+  // No vesting/lock contract detected among top holders here. When one is
+  // found (Streamflow, v1), each entry looks like:
   // { protocol: "streamflow", holder_address, percent_of_supply,
   //   unlocked_now_percent, unlocks_within_30d_percent,
   //   next_unlock_at, fully_unlocked_at, cancelable_by_sender }
   vesting_locks: [],
+  locked_supply_pct: 0,
+  locked_supply_unlocking_30d_pct: 0,
   holder_distribution: {
     risk_level: 'LOW',
     largest_holder_percent: 4.2,
     top10_percent: 22.7,
-    holder_count: 20,
+    holder_count: 1840,
+    freely_tradeable_top10_percent: 22.7,
+    freely_tradeable_largest_holder_percent: 4.2,
+    scoring_risk_level: 'LOW',
+    holder_data_stale: false,
+    holder_data_age_seconds: 0,
   },
   market: {
     price_usd: 0.0000412,
     liquidity_usd: 84210,
     volume_24h_usd: 512300,
     price_change_24h_percent: 12.4,
-    age_days: 3,
+    age_days: 4,
+    age_hours: 98,
   },
-  checked_at: '2026-07-18T12:00:00.000Z',
+  checked_at: '2026-10-28T12:00:00.000Z',
 };
 
 export default function RiskApiDocsContent() {
   const { t } = useRiskApiLang();
   const [codeTab, setCodeTab] = useState<CodeTab>('curl');
 
+  const mcpTools: Array<{ name: string; desc: string; noKey: boolean }> = [
+    { name: 'check_token_risk', desc: t.mcpToolCheckTokenRisk, noKey: true },
+    { name: 'check_token_risk_batch', desc: t.mcpToolBatch, noKey: false },
+    { name: 'get_free_api_key', desc: t.mcpToolFreeKey, noKey: true },
+    { name: 'create_topup_invoice', desc: t.mcpToolTopup, noKey: false },
+    { name: 'check_payment', desc: t.mcpToolCheckPayment, noKey: false },
+    { name: 'get_token_risk_history', desc: t.mcpToolHistory, noKey: true },
+  ];
+
   const responseFields: Array<{ field: string; desc: string }> = [
     { field: 'safety_score', desc: t.fieldSafetyScore },
+    { field: 'caps_triggered / dominant_cap / explanation', desc: t.fieldCapsTriggered },
+    { field: '*_capped / reliefs_triggered', desc: t.fieldCapFlags },
     { field: 'insider_clusters', desc: t.fieldInsiderClusters },
     { field: 'cluster_analysis', desc: t.fieldClusterAnalysis },
+    { field: 'cluster_supply_pct / largest_cluster_pct / cluster_wallet_count', desc: t.fieldClusterSupply },
+    { field: 'flags', desc: t.fieldFlags },
+    { field: 'data_confidence', desc: t.fieldDataConfidence },
     { field: 'mint_authority / freeze_authority', desc: t.fieldAuthorities },
     { field: 'honeypot_risk / lp_locked', desc: t.fieldHoneypotLpLocked },
     { field: 'holder_distribution', desc: t.fieldHolderDistribution },
@@ -206,8 +309,9 @@ export default function RiskApiDocsContent() {
     { field: 'buy_tax_percent / sell_tax_percent', desc: t.fieldTax },
     { field: 'dev_wallet_percent', desc: t.fieldDevWallet },
     { field: 'token_program / contract_renounced', desc: t.fieldProgramRenounced },
-    { field: 'caps_triggered / dominant_cap', desc: t.fieldCapsTriggered },
+    { field: 'rugged / jup_verified / lp_burned / deployer_address / insider_holder_count', desc: t.fieldRugcheckExtra },
     { field: 'vesting_locks', desc: t.fieldVestingLocks },
+    { field: 'locked_supply_pct / locked_supply_unlocking_30d_pct', desc: t.fieldLockedSupply },
   ];
 
   return (
@@ -245,7 +349,7 @@ export default function RiskApiDocsContent() {
               <span className="text-[10px] text-slate-500 hidden sm:flex items-center gap-2">
                 application/json
                 <a href="/openapi.json" className="underline hover:text-purple-300 transition">openapi.json</a>
-                <CopyButton text="https://tnt-audit.com/openapi.json" label={t.copyOpenApiUrl} />
+                <CopyButton text="https://www.tnt-audit.com/openapi.json" label={t.copyOpenApiUrl} />
               </span>
             </div>
 
@@ -275,6 +379,7 @@ export default function RiskApiDocsContent() {
               </div>
 
               <div className="border-t border-purple-500/10 pt-3">
+                <p className="text-[10px] text-amber-300/80 mb-1.5">{t.exampleIllustrativeNote}</p>
                 <pre className="text-[10px] sm:text-[11px] text-slate-300 overflow-x-auto leading-relaxed max-h-96">
                   {JSON.stringify(EXAMPLE_RESPONSE, null, 2)}
                 </pre>
@@ -304,6 +409,57 @@ export default function RiskApiDocsContent() {
           </div>
           <p className="text-[11px] text-slate-500 mt-4">{t.rateLimitHeadersNote}</p>
           <p className="text-[11px] text-slate-500 mt-1.5">{t.webhooksRoadmapNote}</p>
+        </section>
+
+        {/* MCP server — app/api/mcp/route.ts */}
+        <section id="mcp" className="pb-14 scroll-mt-20">
+          <h2 className="text-xl sm:text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-emerald-400 mb-4">
+            {t.mcpTitle}
+          </h2>
+          <p className="text-xs sm:text-sm text-slate-400 leading-relaxed mb-6">{t.mcpIntro}</p>
+
+          <div className="bg-slate-950 border-2 border-purple-500/40 rounded-lg shadow-[0_0_20px_rgba(153,69,255,0.15)] overflow-hidden mb-4">
+            <div className="flex items-center justify-between border-b border-purple-500/20 px-4 py-2.5 gap-2">
+              <div className="flex items-center gap-1.5 text-purple-400 font-bold text-xs min-w-0">
+                <Terminal size={13} className="shrink-0" />
+                <span className="truncate">{t.mcpEndpointLabel}: {MCP_ENDPOINT}</span>
+              </div>
+              <CopyButton text={MCP_ENDPOINT} label={t.copyLabel} />
+            </div>
+            <div className="p-4 space-y-3">
+              <div className="text-[10px] text-slate-500">{t.mcpConfigLabel}</div>
+              <div className="flex items-start justify-between gap-2">
+                <pre className="text-[11px] sm:text-xs text-emerald-400 overflow-x-auto flex-1 leading-relaxed">
+                  {MCP_CONFIG_EXAMPLE}
+                </pre>
+                <CopyButton text={MCP_CONFIG_EXAMPLE} label={t.copyLabel} />
+              </div>
+              <p className="text-[10px] text-slate-500 leading-relaxed">{t.mcpConfigNote}</p>
+            </div>
+          </div>
+
+          <div className="text-xs sm:text-sm font-bold text-white mb-3">{t.mcpToolsTitle}</div>
+          <div className="border border-purple-500/20 rounded-lg overflow-hidden divide-y divide-purple-500/10 mb-4">
+            {mcpTools.map((tool) => (
+              <div key={tool.name} className="p-3.5 sm:flex sm:gap-4 bg-slate-900/40">
+                <div className="sm:w-56 shrink-0 mb-1 sm:mb-0">
+                  <code className="text-[11px] sm:text-xs text-emerald-400 font-bold block">{tool.name}</code>
+                  <span
+                    className={
+                      'inline-block mt-1 text-[9px] font-bold tracking-wider px-1.5 py-0.5 rounded border ' +
+                      (tool.noKey
+                        ? 'text-emerald-300 border-emerald-500/40 bg-emerald-500/10'
+                        : 'text-purple-300 border-purple-500/40 bg-purple-500/10')
+                    }
+                  >
+                    {tool.noKey ? t.mcpNoKeyBadge : t.mcpKeyBadge}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400 leading-relaxed">{tool.desc}</p>
+              </div>
+            ))}
+          </div>
+          <p className="text-[11px] text-slate-500 leading-relaxed">{t.mcpAuthNote}</p>
         </section>
 
         {/* Rate limiting */}
@@ -340,25 +496,48 @@ export default function RiskApiDocsContent() {
             <p className="text-xs text-slate-400 leading-relaxed mb-3">{t.rateLimitExceededDesc}</p>
             <pre className="text-[10px] sm:text-[11px] text-slate-300 overflow-x-auto leading-relaxed bg-black/30 rounded p-3">
 {`HTTP/1.1 402 Payment Required
+Retry-After: 21600
 X-RateLimit-Limit: 15
 X-RateLimit-Remaining: 0
-X-RateLimit-Reset: 2026-07-24T00:00:00.000Z
-Retry-After: 21600
+X-RateLimit-Reset: 2026-10-29T00:00:00.000Z
 
 {
-  "error": "Daily free-tier limit reached and call-credit balance is empty",
   "limit": 15,
   "used": 15,
-  "reset_at": "2026-07-24T00:00:00.000Z",
+  "reset_at": "2026-10-29T00:00:00.000Z",
+  "resets_in": "6 hours",
   "overage_rate_usd": 0.02,
-  "upgrade_url": "https://tnt-audit.com/risk-api#billing",
-  "x402_url": "https://tnt-audit.com/api/v1/token-risk/x402",
+  "subscription_price_usd": 45,
+  "subscription_monthly_quota": 5000,
+  "upgrade_url": "https://www.tnt-audit.com/risk-api#billing",
+  "x402_url": "https://www.tnt-audit.com/api/v1/token-risk/x402",
   "x402_price_usd": 0.02,
-  "topup_url": "https://tnt-audit.com/api/v1/billing/create-invoice",
+  "topup_url": "https://www.tnt-audit.com/api/v1/billing/create-invoice",
   "min_topup_usd": 5,
-  "note": "Three ways to continue: (1) x402 at $0.02/call, no account ... (2) top up call credit ... (3) subscribe ..."
+  "note": "Three ways to continue: (1) No account? Pay per call via x402 ... (2) Top up call credit ... (3) Subscribe ...",
+  "error": "Daily free-tier limit reached and call-credit balance is empty",
+  "error_code": "free_daily_limit_reached",
+  "message": "Daily free-tier limit reached and call-credit balance is empty",
+  "options": [
+    {
+      "id": "top_up",
+      "title": "Top up call credit or subscribe",
+      "price": "$5-$500 credit (then $0.02/call), or $45 for 5000 calls/30 days",
+      "next_step": "Call the MCP tool create_topup_invoice (then check_payment), or POST ...",
+      "mcp_tool": { "name": "create_topup_invoice", "arguments": { ... } },
+      "http": { "method": "POST", "url": "https://www.tnt-audit.com/api/v1/billing/create-invoice", "body": { ... } }
+    },
+    {
+      "id": "x402",
+      "title": "Pay per call with x402 (no account)",
+      "price": "$0.02 per call, USDC on Solana",
+      "next_step": "GET https://www.tnt-audit.com/api/v1/token-risk/x402?mint=<mint>, then ...",
+      "http": { "method": "GET", "url": "https://www.tnt-audit.com/api/v1/token-risk/x402?mint=<mint>" }
+    }
+  ]
 }`}
             </pre>
+            <p className="text-[10px] text-slate-500 mt-2">{t.rateLimit402TrimmedNote}</p>
           </div>
 
           <p className="text-[11px] text-slate-500 mt-4">{t.rateLimitBestPractice}</p>
@@ -476,7 +655,7 @@ Retry-After: 21600
             </div>
             <div className="border border-emerald-500/30 rounded-lg p-5 bg-slate-900/40">
               <div className="text-[11px] font-bold text-emerald-400 tracking-widest mb-1">{t.tierPayPerCall}</div>
-              <div className="text-2xl font-black mb-3">$0.02<span className="text-sm text-slate-400">/call</span></div>
+              <div className="text-2xl font-black mb-3">$0.02<span className="text-sm text-slate-400">{t.perCallSuffix}</span></div>
               <ul className="space-y-2 text-xs text-slate-400">
                 <li>{t.payPerCallFeature1}</li>
                 <li>{t.payPerCallFeature2}</li>
@@ -485,7 +664,7 @@ Retry-After: 21600
             </div>
             <div className="border border-purple-500/30 rounded-lg p-5 bg-slate-900/40">
               <div className="text-[11px] font-bold text-purple-400 tracking-widest mb-1">{t.tierSubscription}</div>
-              <div className="text-2xl font-black mb-3">$45<span className="text-sm text-slate-400">/30 days</span></div>
+              <div className="text-2xl font-black mb-3">$45<span className="text-sm text-slate-400">{t.per30DaysSuffix}</span></div>
               <ul className="space-y-2 text-xs text-slate-400">
                 <li>{t.subFeature1}</li>
                 <li>{t.subFeature2}</li>
@@ -495,7 +674,7 @@ Retry-After: 21600
             <div className="border border-emerald-500/30 rounded-lg p-5 bg-slate-900/40">
               <div className="text-[11px] font-bold text-emerald-400 tracking-widest mb-1">{t.tierX402}</div>
               <div className="text-2xl font-black mb-3">
-                $0.02<span className="text-sm text-slate-400">/call</span>
+                $0.02<span className="text-sm text-slate-400">{t.perCallSuffix}</span>
               </div>
               <ul className="space-y-2 text-xs text-slate-400">
                 <li>{t.x402Feature1}</li>
@@ -506,7 +685,7 @@ Retry-After: 21600
           </div>
           <p className="text-[11px] text-slate-500 mt-4">{t.pricingNote}</p>
 
-          <div className="mt-6 bg-slate-950 border-2 border-emerald-500/30 rounded-lg shadow-[0_0_20px_rgba(16,185,129,0.1)] overflow-hidden">
+          <div id="x402" className="mt-6 scroll-mt-20 bg-slate-950 border-2 border-emerald-500/30 rounded-lg shadow-[0_0_20px_rgba(16,185,129,0.1)] overflow-hidden">
             <div className="flex items-center justify-between border-b border-emerald-500/20 px-4 py-2.5">
               <div className="flex items-center gap-1.5 text-emerald-400 font-bold text-xs">
                 <Terminal size={13} />
@@ -523,36 +702,19 @@ Retry-After: 21600
               </ol>
               <div className="border-t border-emerald-500/10 pt-3">
                 <pre className="text-[11px] sm:text-xs text-emerald-400 overflow-x-auto leading-relaxed">
-{`curl "https://tnt-audit.com/api/v1/token-risk/x402?mint=<MINT_ADDRESS>"
+{`curl "https://www.tnt-audit.com/api/v1/token-risk/x402?mint=<MINT_ADDRESS>"
 # -> 402 Payment Required, PAYMENT-REQUIRED header has the challenge
 
 # sign + pay with an x402-compatible client, then retry with:
-curl "https://tnt-audit.com/api/v1/token-risk/x402?mint=<MINT_ADDRESS>" \\
-  -H "X-PAYMENT: <base64 signed payment>"`}
+curl "https://www.tnt-audit.com/api/v1/token-risk/x402?mint=<MINT_ADDRESS>" \\
+  -H "PAYMENT-SIGNATURE: <base64 signed payment>"
+# (x402 v2 header; the legacy X-PAYMENT header is accepted too)`}
                 </pre>
               </div>
               <div className="border-t border-emerald-500/10 pt-3">
                 <div className="text-[10px] text-slate-500 mb-2">{t.x402PythonLabel}</div>
                 <pre className="text-[11px] sm:text-xs text-emerald-400 overflow-x-auto leading-relaxed">
-{`pip install openlibx402-client solders
-
-from openlibx402_client import X402AutoClient
-from solders.keypair import Keypair
-import base58, os
-
-# Load your Solana wallet's private key from an env var -- never hardcode it.
-# The wallet needs a small USDC balance on Solana mainnet ($0.02+ per call).
-private_key = base58.b58decode(os.environ["SOLANA_PRIVATE_KEY_B58"])
-keypair = Keypair.from_bytes(private_key)
-
-# X402AutoClient handles the whole 402 -> pay -> retry flow automatically --
-# this one call does everything the curl example above does by hand.
-client = X402AutoClient(wallet_keypair=keypair)
-response = await client.fetch(
-    "https://tnt-audit.com/api/v1/token-risk/x402?mint=<MINT_ADDRESS>"
-)
-data = response.json()
-print(data["safety_score"], data["insider_clusters"])`}
+{X402_PYTHON_EXAMPLE}
                 </pre>
               </div>
               <p className="text-[11px] text-slate-500 leading-relaxed border-t border-emerald-500/10 pt-3">{t.x402HowToNote}</p>

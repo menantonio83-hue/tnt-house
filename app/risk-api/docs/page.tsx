@@ -1,4 +1,8 @@
-// Version 1.1 — app/risk-api/docs/page.tsx
+// Version 1.2 — app/risk-api/docs/page.tsx
+//
+// v1.2: og:url moved to https://www.tnt-audit.com (the canonical host;
+// the bare domain redirects), added alternates.canonical, and the
+// descriptions now mention the MCP server section.
 //
 // v1.1: added openGraph/twitter metadata (og:title, og:description,
 // og:image) so links shared on X/Telegram/HN/Product Hunt render a
@@ -18,12 +22,15 @@ import RiskApiDocsContent from '../RiskApiDocsContent';
 export const metadata: Metadata = {
   title: 'Risk-Data API — Docs — TNT House',
   description:
-    'Full technical reference for the Risk-Data API: response schema, rate limiting, webhooks, changelog, and pricing.',
+    'Full technical reference for the Risk-Data API: response schema, MCP server, rate limiting, webhooks, changelog, and pricing.',
+  alternates: {
+    canonical: 'https://www.tnt-audit.com/risk-api/docs',
+  },
   openGraph: {
     title: 'Risk-Data API — Docs',
     description:
-      'Full technical reference: response schema, rate limiting, webhooks, changelog, and pricing for the Solana token risk-scoring API.',
-    url: 'https://tnt-audit.com/risk-api/docs',
+      'Full technical reference: response schema, MCP server, rate limiting, webhooks, changelog, and pricing for the Solana token risk-scoring API.',
+    url: 'https://www.tnt-audit.com/risk-api/docs',
     siteName: 'TNT House',
     images: [
       {
@@ -40,7 +47,7 @@ export const metadata: Metadata = {
     card: 'summary',
     title: 'Risk-Data API — Docs',
     description:
-      'Full technical reference: response schema, rate limiting, webhooks, changelog, and pricing.',
+      'Full technical reference: response schema, MCP server, rate limiting, webhooks, changelog, and pricing.',
     images: ['/tnt-shield-green.png'],
   },
 };

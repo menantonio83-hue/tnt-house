@@ -1,4 +1,19 @@
-// Version 1.10 — app/risk-api/i18n.ts
+// Version 1.11 — app/risk-api/i18n.ts
+//
+// v1.11: docs-audit fixes (2026-10-28), x 7 languages: new MCP section
+// keys (mcp*), new response-field keys (fieldCapFlags, fieldClusterSupply,
+// fieldFlags, fieldDataConfidence, fieldLockedSupply, fieldRugcheckExtra),
+// exampleIllustrativeNote, rateLimit402TrimmedNote, perCallSuffix /
+// per30DaysSuffix. Updated fieldInsiderClusters / fieldHolderDistribution /
+// fieldMarket / rateLimitingIntro (shared free pool) / rateLimitExceededDesc
+// / x402Step3 (PAYMENT-SIGNATURE) / x402PythonLabel / changelogNote (no
+// footer social links exist). Changelog: new v1.21; v1.19 no longer names
+// openlibx402; v1.15 PR #380 marked merged (2026-08-31, verified on
+// GitHub). RU: "звонок" -> "запрос", tier labels translated. pricingNote /
+// billingSub intentionally untouched. Translations drafted with
+// DeepSeek and reviewed.
+//
+// Version 1.10
 //
 // v1.10: demoPublicKeyTitle/Remaining/Copy/Note/Dead x 7 languages —
 // the public-demo-key experiment's live counter widget
@@ -320,6 +335,33 @@ export interface RiskApiTranslations {
   tryItLimitBody: string;
   tryItInvalidMint: string;
   tryItErrorGeneric: string;
+
+  // v1.21 docs audit (2026-10-28) — RiskApiDocsContent.tsx v1.4
+  mcpTitle: string;
+  mcpIntro: string;
+  mcpEndpointLabel: string;
+  mcpConfigLabel: string;
+  mcpConfigNote: string;
+  mcpToolsTitle: string;
+  mcpNoKeyBadge: string;
+  mcpKeyBadge: string;
+  mcpToolCheckTokenRisk: string;
+  mcpToolBatch: string;
+  mcpToolFreeKey: string;
+  mcpToolTopup: string;
+  mcpToolCheckPayment: string;
+  mcpToolHistory: string;
+  mcpAuthNote: string;
+  exampleIllustrativeNote: string;
+  fieldCapFlags: string;
+  fieldClusterSupply: string;
+  fieldFlags: string;
+  fieldDataConfidence: string;
+  fieldLockedSupply: string;
+  fieldRugcheckExtra: string;
+  rateLimit402TrimmedNote: string;
+  perCallSuffix: string;
+  per30DaysSuffix: string;
 }
 
 export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
@@ -360,12 +402,12 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     step3Desc: 'Your bot gets a score instantly — act on it or skip the trade.',
     responseFieldsTitle: 'Response fields',
     fieldSafetyScore: '0–100. Weighted from authorities, holder concentration, liquidity, volume, and real insider-cluster penalties.',
-    fieldInsiderClusters: 'Wallets that share a first-funder — an on-chain-provable insider/sniper signal, not a guess. Each cluster also carries funder_class, funder_label, funder_confidence, and false_positive_likely: known CEX/bridge hot wallets and confirmed high-fan-out infra funders stay visible here but no longer count toward the insider penalty in safety_score.',
+    fieldInsiderClusters: "Wallets that share a first-funder: an on-chain-provable insider/sniper signal, not a guess. Each cluster also carries funder_class, funder_label, funder_confidence, and false_positive_likely: known CEX/bridge hot wallets and confirmed high-fan-out infra funders stay visible here but no longer count toward the insider penalty in safety_score. supply_pct is the cluster's share of supply, funder_path the traced funding chain, deployer_linked whether that chain reaches the deployer, exchange_source the exchange that funded the root (each null when unknown).",
     fieldClusterAnalysis: '"pending" on a token\'s first-ever check (cluster trace runs in the background), "complete" once the trace finishes.',
     fieldAuthorities: 'Whether each authority is revoked, and its address if still active.',
     fieldHoneypotLpLocked: 'honeypot_risk (boolean) and lp_locked ({ locked, percent }) from RugCheck. null means it could not be checked, not "safe."',
-    fieldHolderDistribution: 'Largest holder %, top-10 %, risk level, and holder_count — the number of accounts in Solana\u2019s top-20-largest-holders response (a real RPC limit, not a full holder count for widely-held tokens like BONK or USDC).',
-    fieldMarket: 'Live price, liquidity, 24h volume, 24h change, and token age from DexScreener.',
+    fieldHolderDistribution: "Raw largest holder %, top-10 %, risk_level, and holder_count: the deduplicated holder-wallet count when available, otherwise the number of accounts in Solana's top-20-largest-holders RPC response (a real RPC limit). freely_tradeable_top10_percent, freely_tradeable_largest_holder_percent and scoring_risk_level are the figures scoring actually uses (supply locked in vesting contracts subtracted). holder_data_stale / holder_data_age_seconds show when the last good holder snapshot was served instead of a live read.",
+    fieldMarket: "Live price, liquidity, 24h volume, 24h change, and token age (age_days, plus age_hours) from DexScreener. If DexScreener has no liquidity figure, it may come from RugCheck (flag liquidity_from_rugcheck).",
     fieldOwnerDelegate: 'hidden_owner and permanent_delegate (booleans) from RugCheck\'s risk list. permanent_delegate is a Token-2022 extension letting that address move or burn ANY holder\'s tokens without permission — a severe risk. null means not checked, never a false "safe".',
     fieldTax: 'buy_tax_percent / sell_tax_percent — Token-2022 transfer-fee extension. Solana\'s transfer fee is symmetric, so both carry the same value. null means the mint has no such extension (not a failed check).',
     fieldDevWallet: 'dev_wallet_percent — the deployer\'s own on-chain holding as % of total supply. A distinct concentration signal from holder_distribution.top10_percent, since the deployer can hold a large stake while sitting outside any top-10 cutoff.',
@@ -391,7 +433,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     webhooksDeliveryTitle: 'Delivery & Retries',
     webhooksDeliveryText: 'Delivered via QStash: on a non-2xx response or timeout, we retry up to 3 times with exponential backoff, then give up. Each event carries a unique id (evt_...) — store it and skip anything you have already processed, since retries resend the identical event. A 200 response marks the event delivered even if your own processing fails afterward, so persist or act on the payload before returning it.',
     rateLimitingTitle: 'Rate Limiting',
-    rateLimitingIntro: 'Every key gets 15 free requests per calendar day (UTC). Go over that with no call-credit balance and you get a 402, not a silent block — top up or subscribe and the same key keeps working immediately.',
+    rateLimitingIntro: "Every key gets 15 free requests per calendar day (UTC). Free calls also share a site-wide daily capacity across all free keys: on a busy day you may get a 402 with error_code free_pool_capacity before reaching 15 (your first call of the day always goes through). Calls paid from credit or covered by a subscription never depend on that pool. Go over your quota with no call-credit balance and you get a 402, not a silent block: top up or subscribe and the same key keeps working immediately.",
     rateLimitHeaderLimitLabel: 'X-RateLimit-Limit',
     rateLimitHeaderLimitDesc: 'Your daily quota. Empty on unlimited/admin-issued keys.',
     rateLimitHeaderRemainingLabel: 'X-RateLimit-Remaining',
@@ -401,13 +443,22 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     rateLimitHeaderCreditLabel: 'X-Credit-Balance-Usd',
     rateLimitHeaderCreditDesc: 'Your current call-credit balance, once you have one.',
     rateLimitExceededTitle: 'What happens over the limit',
-    rateLimitExceededDesc: 'You get an HTTP 402 with a JSON body — limit, used, reset_at, overage_rate_usd, and an upgrade_url. No retries needed: as soon as you top up credit or subscribe, the same key starts working again on the very next call.',
+    rateLimitExceededDesc: "You get an HTTP 402 with a machine-readable JSON body: error_code, limit, used, reset_at, resets_in, prices, and options[], where each option (top up / subscribe, or x402) carries the exact next step so an agent can continue on its own. No retries needed: as soon as you top up credit or subscribe, the same key starts working again on the very next call.",
     rateLimitBestPractice: 'Check X-RateLimit-Remaining before firing off a batch of calls — reading a header costs nothing, a wasted 402 does not.',
     versioningTitle: 'Versioning & Changelog',
     versioningIntro: "The API is versioned in the URL (/api/v1/...). Within v1, existing fields are never removed, renamed, or repurposed — only added. Integrations should ignore fields they don't recognize rather than fail on them. A genuinely breaking change ships as /api/v2/..., with v1 kept running for a reasonable overlap period — never a silent in-place break.",
     changelogTitle: 'Changelog',
-    changelogNote: 'No mailing list or webhooks yet for update announcements — this page and the X / Telegram links in the footer are the way to stay current.',
+    changelogNote: "No mailing list or announcement feed yet: this page is the place to stay current.",
     changelogEntries: [
+      {
+        version: 'v1.21',
+        date: '2026-10-28',
+        changes: [
+          "Docs: new MCP server section: endpoint https://www.tnt-audit.com/api/mcp, client config, and all 6 tools (check_token_risk, check_token_risk_batch, get_free_api_key, create_topup_invoice, check_payment, get_token_risk_history), including which ones work without a key.",
+          "Docs: the x402 Python example now uses the official x402 SDK (x402[svm,httpx], x402 v2 exact scheme on Solana). The previous openlibx402-client example did not speak x402 v2 and has been removed.",
+          "Docs: sample response and field reference brought in line with the live schema (explanation, cluster_supply_pct, flags, data_confidence, cap booleans, locked supply, holder-data freshness, age_hours); the 402 example now shows the full refusal body (error_code, options[]); all example URLs use https://www.tnt-audit.com. No API change.",
+        ],
+      },
       {
         version: 'v1.20',
         date: '2026-09-15',
@@ -419,7 +470,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
         version: 'v1.19',
         date: '2026-08-29',
         changes: [
-          "Docs: added a runnable Python example for the x402 endpoint (openlibx402-client + solders) alongside the existing curl example -- shows a bot/agent developer the full 402 -> pay -> retry flow in ~10 lines instead of just the raw HTTP mechanics.",
+          "Docs: added a runnable Python example for the x402 endpoint alongside the existing curl example (replaced in v1.21 by the official x402 SDK): shows a bot/agent developer the full 402 -> pay -> retry flow in a few lines instead of just the raw HTTP mechanics.",
         ],
       },
       {
@@ -449,7 +500,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
         date: '2026-08-21',
         changes: [
           'Published an Agent Plugins 1.0 package (plugin.json + mcp.json, agent-plugins.org spec) — lets Agent Plugins-compatible clients discover and connect to the MCP server with no manual setup.',
-          'Submitted a Codex-native plugin package to the awesome-codex-plugins directory (hashgraph-online/awesome-codex-plugins, PR #380) — HOL Plugin Scanner score 91/100, no critical/high findings, CI passing — pending maintainer review.',
+          "Submitted a Codex-native plugin package to the awesome-codex-plugins directory (hashgraph-online/awesome-codex-plugins, PR #380), HOL Plugin Scanner score 91/100, no critical/high findings, CI passing. Merged on 2026-08-31.",
         ],
       },
       {
@@ -577,12 +628,12 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     x402Feature2: 'USDC on Solana, settled per call via the x402 protocol',
     x402Feature3: 'Built for autonomous agents that pay their own way',
     x402HowToLabel: 'x402 protocol',
-    x402PythonLabel: 'Python (bot/agent client, handles the 402 flow automatically)',
+    x402PythonLabel: "Python, official x402 SDK (handles the 402 → pay → retry flow automatically)",
     x402HowToIntro:
       'x402 turns a 402 Payment Required into a working payment flow: call the endpoint with no auth, get a signed payment challenge back, pay it, retry with the receipt.',
     x402Step1: 'GET the endpoint with a mint — no Authorization header needed.',
     x402Step2: 'You get back HTTP 402 with a PAYMENT-REQUIRED header — a signed challenge for $0.02 in USDC on Solana.',
-    x402Step3: 'Sign and settle the payment with any x402-compatible client (or wallet/agent SDK), then retry the same request with an X-PAYMENT header carrying the signed payment.',
+    x402Step3: "Sign the payment with any x402-compatible client (or wallet/agent SDK), then retry the same request with the signed payment in a PAYMENT-SIGNATURE header (what x402 v2 clients send) or an X-PAYMENT header; both are accepted.",
     x402HowToNote:
       'Same $0.02/call rate as the standard pay-per-call tier, but no account or stored key needed — for agents that would rather settle per-request than hold a key. Listed on x402scan.com.',
     pricingNote: 'Paid in $MRDT / SOL / USDC via Solana Pay — same payment flow as the rest of TNT House. Solana Pay can\'t auto-charge, so the subscription is a manual 30-day top-up, not a recurring subscription in the traditional sense.',
@@ -647,6 +698,32 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     tryItLimitBody: 'Get a free API key below — 15 checks/day, no card required.',
     tryItInvalidMint: 'Enter a valid Solana mint address',
     tryItErrorGeneric: 'Something went wrong. Try again.',
+    // v1.21 docs audit (2026-10-28): MCP section, response fields, 402 note
+    mcpTitle: "MCP server",
+    mcpIntro: "Use the API as a tool from Claude, Cursor, and any other MCP-compatible agent: same engine and same JSON as the REST endpoint. Streamable HTTP transport, stateless (JSON-RPC over POST only).",
+    mcpEndpointLabel: "Endpoint",
+    mcpConfigLabel: "Claude Desktop / Cursor config (no key required)",
+    mcpConfigNote: "Clients that support remote MCP servers natively can use the endpoint URL directly instead of mcp-remote.",
+    mcpToolsTitle: "Tools",
+    mcpNoKeyBadge: "no key",
+    mcpKeyBadge: "API key",
+    mcpToolCheckTokenRisk: "Safety score, insider clusters, authorities, holder concentration and market data for one mint (the same response as GET /api/v1/token-risk). 5 free calls/day without a key; after that a free key (15/day), call credit, or a subscription.",
+    mcpToolBatch: "The same check for up to 25 mints in one call. N mints = N calls, all-or-nothing: the whole batch is rejected if your quota/credit can't cover it.",
+    mcpToolFreeKey: "Issues a free API key for an email address (15 checks/day). One active key per email; the key is returned once and also emailed. Signups are capped per IP and per day.",
+    mcpToolTopup: "Creates a Solana payment invoice for your key: call-credit top-up ($5–$500) or a 30-day subscription. Returns payment_id, the exact pay_amount and wallet_address.",
+    mcpToolCheckPayment: "Checks on-chain whether an invoice from create_topup_invoice has been paid and, if so, credits your key. Safe to repeat; throttled to one check per 5 seconds per payment_id.",
+    mcpToolHistory: "Hourly history of safety_score, insider-cluster count, holders, price, liquidity and volume for a mint over the last N days (max 90). Free and not counted against any quota.",
+    mcpAuthNote: "Pass a key as an Authorization: Bearer <api_key> header on every MCP request, or as the api_key argument of check_token_risk / check_token_risk_batch if your client can't set headers (the header wins). Quota refusals return error_code and options[] with the exact next step. x402 pay-per-call is a REST endpoint, see Limits & pricing below.",
+    exampleIllustrativeNote: "Illustrative response: values are made up for a fictional token, not live data for any real mint. Optional fields such as explanation and note appear only when they apply.",
+    fieldCapFlags: "One boolean per scoring cap tier (maturity, market_health, contract_risk, rugged, wash_trading, lp_risk, mint_authority, freeze_authority, honeypot): true only when that cap actually pulled the score down. reliefs_triggered lists mitigations that loosened a cap ({ reason, from, to }), e.g. a burned or locked LP.",
+    fieldClusterSupply: "Share of supply (%) held by all counted insider clusters and by the largest one, plus how many wallets they include. Clusters marked false_positive_likely are excluded. null while cluster_analysis is \"pending\" or when a share is unknown. Only top holders are traced, so these are lower bounds.",
+    fieldFlags: "Descriptive facts, not verdicts, e.g. young_token, cluster_scan_pending, no_market_data, high_turnover, mint_authority_active, freeze_authority_active, lp_partially_or_not_locked, insider_cluster_detected, shared_cex_or_infra_funder, single_holder_gt_50.",
+    fieldDataConfidence: "How complete this answer is: cluster_scan (\"pending\" | \"complete\"), holders_traced, cluster_supply_is_lower_bound, market_data_available, rugcheck_data_available. Use it to tell \"low risk\" apart from \"not enough data\".",
+    fieldLockedSupply: "Share of supply (%) currently locked in known non-cancelable vesting/lock contracts, and the part of it that unlocks within the next 30 days. See vesting_locks for the individual contracts.",
+    fieldRugcheckExtra: "From RugCheck: rugged (confirmed rug), jup_verified (Jupiter-verified token), lp_burned ({ burned }), deployer_address, and insider_holder_count (rugcheck_insider_holder_count carries the same value). null means it could not be checked.",
+    rateLimit402TrimmedNote: "Long text fields (note, options[].next_step) are shortened here; the real response carries the full text.",
+    perCallSuffix: "/call",
+    per30DaysSuffix: "/30 days",
   },
   es: {
     flag: '🇪🇸',
@@ -685,12 +762,12 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     step3Desc: 'Tu bot recibe una puntuación al instante — actúa o descarta el trade.',
     responseFieldsTitle: 'Campos de la respuesta',
     fieldSafetyScore: '0–100. Ponderado según autoridades, concentración de holders, liquidez, volumen y penalizaciones reales por clústeres de insiders.',
-    fieldInsiderClusters: 'Wallets que comparten un mismo financiador inicial — una señal de insider/sniper demostrable on-chain, no una suposición.',
+    fieldInsiderClusters: "Wallets que comparten un primer financiador: una señal de insider/sniper demostrable on-chain, no una suposición. Cada cluster también lleva funder_class, funder_label, funder_confidence y false_positive_likely: las hot wallets conocidas de CEX/bridge y los funders de infraestructura confirmados de alto fan-out siguen visibles aquí pero ya no cuentan para la penalización de insider en safety_score. supply_pct es la participación del cluster en el suministro, funder_path la cadena de financiación rastreada, deployer_linked si esa cadena llega al deployer, exchange_source el exchange que financió la raíz (cada uno null cuando se desconoce).",
     fieldClusterAnalysis: '"pending" en la primera comprobación de un token (el rastreo de clústeres corre en segundo plano), "complete" cuando termina el rastreo.',
     fieldAuthorities: 'Si cada autoridad está revocada, y su dirección si sigue activa.',
     fieldHoneypotLpLocked: 'honeypot_risk (booleano) y lp_locked ({ locked, percent }) de RugCheck. null significa que no se pudo comprobar, no "seguro".',
-    fieldHolderDistribution: '% del mayor holder, % del top-10, nivel de riesgo, y holder_count — el número de cuentas en la respuesta de los 20 mayores holders de Solana (un límite real de la RPC, no un recuento total de holders para tokens muy distribuidos como BONK o USDC).',
-    fieldMarket: 'Precio en vivo, liquidez, volumen 24h, cambio 24h y antigüedad del token desde DexScreener.',
+    fieldHolderDistribution: "% bruto del mayor holder, % del top-10, risk_level y holder_count: el recuento deduplicado de wallets de holders cuando está disponible; de lo contrario, el número de cuentas en la respuesta RPC de los 20 mayores holders de Solana (un límite real de la RPC). freely_tradeable_top10_percent, freely_tradeable_largest_holder_percent y scoring_risk_level son las cifras que realmente usa la puntuación (suministro bloqueado en contratos de vesting restado). holder_data_stale / holder_data_age_seconds muestran cuándo se sirvió el último snapshot bueno de holders en lugar de una lectura en vivo.",
+    fieldMarket: "Precio en vivo, liquidez, volumen 24h, cambio 24h y antigüedad del token (age_days, más age_hours) desde DexScreener. Si DexScreener no tiene cifra de liquidez, puede provenir de RugCheck (flag liquidity_from_rugcheck).",
     fieldOwnerDelegate: 'hidden_owner y permanent_delegate (booleanos) de la lista de riesgos de RugCheck. permanent_delegate es una extensión Token-2022 que permite a esa dirección mover o quemar los tokens de CUALQUIER holder sin permiso — un riesgo severo. null significa que no se comprobó, nunca un falso "seguro".',
     fieldTax: 'buy_tax_percent / sell_tax_percent — extensión de comisión de transferencia de Token-2022. La comisión de Solana es simétrica, así que ambos valores coinciden. null significa que el mint no tiene esa extensión (no un fallo de comprobación).',
     fieldDevWallet: 'dev_wallet_percent — la propia tenencia on-chain del deployer, como % del suministro total. Señal de concentración distinta de holder_distribution.top10_percent, ya que el deployer puede tener una posición grande sin estar en el top-10.',
@@ -716,7 +793,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     webhooksDeliveryTitle: 'Entrega y reintentos',
     webhooksDeliveryText: 'La entrega se hace a través de QStash: ante una respuesta que no sea 2xx o un timeout, reintentamos hasta 3 veces con backoff exponencial y luego desistimos. Cada evento lleva un id único (evt_...) — guárdalo y omite lo que ya hayas procesado, ya que los reintentos reenvían el mismo evento. Una respuesta 200 marca el evento como entregado aunque tu procesamiento falle después, así que guarda o procesa el payload antes de responder.',
     rateLimitingTitle: 'Límite de solicitudes',
-    rateLimitingIntro: 'Cada key tiene 15 solicitudes gratuitas por día natural (UTC). Si superas ese límite sin saldo de crédito, recibes un 402, no un bloqueo silencioso — recarga saldo o suscríbete y la misma key vuelve a funcionar de inmediato.',
+    rateLimitingIntro: "Cada key tiene 15 solicitudes gratuitas por día natural (UTC). Las llamadas gratuitas también comparten una capacidad diaria global del sitio entre todas las claves gratuitas: en un día concurrido puedes recibir un 402 con error_code free_pool_capacity antes de llegar a 15 (tu primera llamada del día siempre pasa). Las llamadas pagadas con crédito o cubiertas por una suscripción nunca dependen de ese pool. Supera tu cuota sin saldo de crédito de llamadas y recibes un 402, no un bloqueo silencioso: recarga o suscríbete y la misma key sigue funcionando de inmediato.",
     rateLimitHeaderLimitLabel: 'X-RateLimit-Limit',
     rateLimitHeaderLimitDesc: 'Tu cuota diaria. Vacío en keys ilimitadas o emitidas por un admin.',
     rateLimitHeaderRemainingLabel: 'X-RateLimit-Remaining',
@@ -726,18 +803,34 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     rateLimitHeaderCreditLabel: 'X-Credit-Balance-Usd',
     rateLimitHeaderCreditDesc: 'Tu saldo de crédito actual, en cuanto tengas uno.',
     rateLimitExceededTitle: 'Qué pasa al superar el límite',
-    rateLimitExceededDesc: 'Recibes un HTTP 402 con un cuerpo JSON — limit, used, reset_at, overage_rate_usd y un upgrade_url. No hace falta reintentar: en cuanto recargues saldo o te suscribas, la misma key vuelve a funcionar en la siguiente llamada.',
+    rateLimitExceededDesc: "Recibes un HTTP 402 con un cuerpo JSON legible por máquina: error_code, limit, used, reset_at, resets_in, prices y options[], donde cada opción (recargar / suscribirse, o x402) lleva el siguiente paso exacto para que un agente pueda continuar por su cuenta. No hace falta reintentar: en cuanto recargues crédito o te suscribas, la misma key vuelve a funcionar en la siguiente llamada.",
     rateLimitBestPractice: 'Revisa X-RateLimit-Remaining antes de lanzar un lote de llamadas — leer una cabecera no cuesta nada, un 402 desperdiciado sí.',
     versioningTitle: 'Versionado y registro de cambios',
     versioningIntro: 'La API se versiona en la URL (/api/v1/...). Dentro de v1, los campos existentes nunca se eliminan, renombran ni cambian de propósito — solo se añaden. Las integraciones deberían ignorar los campos que no reconozcan en lugar de fallar por ellos. Un cambio realmente disruptivo se publica como /api/v2/..., manteniendo v1 en funcionamiento durante un periodo de solapamiento razonable — nunca una ruptura silenciosa en el mismo endpoint.',
     changelogTitle: 'Registro de cambios',
-    changelogNote: 'Todavía no hay lista de correo ni webhooks para anunciar novedades — esta página y los enlaces de X / Telegram del pie son la forma de mantenerte al día.',
+    changelogNote: "Todavía no hay lista de correo ni feed de anuncios: esta página es el lugar para mantenerte al día.",
     changelogEntries: [
+      {
+        version: 'v1.21',
+        date: '2026-10-28',
+        changes: [
+          "Documentación: nueva sección del servidor MCP: endpoint https://www.tnt-audit.com/api/mcp, configuración del cliente y las 6 herramientas (check_token_risk, check_token_risk_batch, get_free_api_key, create_topup_invoice, check_payment, get_token_risk_history), incluyendo cuáles funcionan sin clave.",
+          "Documentación: el ejemplo de Python para x402 ahora usa el SDK oficial de x402 (x402[svm,httpx], esquema exacto x402 v2 en Solana). El ejemplo anterior con openlibx402-client no hablaba x402 v2 y se ha eliminado.",
+          "Documentación: la respuesta de ejemplo y la referencia de campos se han alineado con el esquema en vivo (explanation, cluster_supply_pct, flags, data_confidence, booleanos de tope, suministro bloqueado, frescura de datos de holders, age_hours); el ejemplo de 402 ahora muestra el cuerpo completo de denegación (error_code, options[]); todas las URLs de ejemplo usan https://www.tnt-audit.com. Sin cambios en la API.",
+        ],
+      },
+      {
+        version: 'v1.20',
+        date: '2026-09-15',
+        changes: [
+          "insider_clusters: cada clúster ahora incluye funder_class ('cex' | 'infra' | 'likely_exchange_or_infra' | 'unknown'), funder_label, funder_confidence y false_positive_likely. Un primer financiador compartido que sea una hot wallet conocida de exchange/bridge, o que coincida con un patrón de infraestructura de alta dispersión (miles de cuentas financiadas, pagos de renta por microtransferencias, alta frecuencia de transacciones), permanece visible en la respuesta por motivos de transparencia pero ya no cuenta para la penalización por insider en safety_score -- corrige falsos positivos que encontramos en vivo en hot wallets de CEX que se puntuaban como clústeres insider.",
+        ],
+      },
       {
         version: 'v1.19',
         date: '2026-08-29',
         changes: [
-          "Documentación: se añadió un ejemplo funcional en Python para el endpoint x402 (openlibx402-client + solders) junto al ejemplo curl existente -- muestra a un desarrollador de bots/agentes el flujo completo 402 -> pago -> reintento en ~10 líneas en vez de solo la mecánica HTTP.",
+          "Documentación: se añadió un ejemplo de Python ejecutable para el endpoint x402 junto al ejemplo curl existente (reemplazado en v1.21 por el SDK oficial de x402): muestra a un desarrollador de bots/agentes el flujo completo 402 -> pago -> reintento en unas pocas líneas en lugar de solo la mecánica HTTP cruda.",
         ],
       },
       {
@@ -767,7 +860,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
         date: '2026-08-21',
         changes: [
           'Publicado un paquete Agent Plugins 1.0 (plugin.json + mcp.json, especificación agent-plugins.org) — permite que los clientes compatibles con Agent Plugins descubran y se conecten al servidor MCP sin configuración manual.',
-          'Enviado un paquete de plugin nativo de Codex al directorio awesome-codex-plugins (hashgraph-online/awesome-codex-plugins, PR #380) — puntuación del HOL Plugin Scanner 91/100, sin hallazgos críticos ni altos, CI en verde — pendiente de revisión de los mantenedores.',
+          "Enviado un paquete de plugin nativo de Codex al directorio awesome-codex-plugins (hashgraph-online/awesome-codex-plugins, PR #380), puntuación del HOL Plugin Scanner 91/100, sin hallazgos críticos ni altos, CI en verde. Fusionado el 2026-08-31.",
         ],
       },
       {
@@ -895,12 +988,12 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     x402Feature2: 'USDC en Solana, liquidado por llamada vía el protocolo x402',
     x402Feature3: 'Pensado para agentes autónomos que pagan por sí mismos',
     x402HowToLabel: 'protocolo x402',
-    x402PythonLabel: 'Python (cliente para bots/agentes, gestiona el flujo 402 automáticamente)',
+    x402PythonLabel: "Python, SDK oficial de x402 (gestiona el flujo 402 → pago → reintento automáticamente)",
     x402HowToIntro:
       'x402 convierte un 402 Payment Required en un flujo de pago funcional: llamas al endpoint sin autenticación, recibes un reto de pago firmado, lo pagas y reintentas con el recibo.',
     x402Step1: 'Haz GET al endpoint con un mint — no necesitas cabecera Authorization.',
     x402Step2: 'Recibes un HTTP 402 con una cabecera PAYMENT-REQUIRED — un reto firmado por $0.02 en USDC en Solana.',
-    x402Step3: 'Firma y liquida el pago con cualquier cliente compatible con x402 (o SDK de wallet/agente), luego reintenta la misma petición con una cabecera X-PAYMENT que lleve el pago firmado.',
+    x402Step3: "Firma el pago con cualquier cliente compatible con x402 (o SDK de wallet/agente) y luego reintenta la misma petición con el pago firmado en una cabecera PAYMENT-SIGNATURE (lo que envían los clientes x402 v2) o una cabecera X-PAYMENT; se aceptan ambas.",
     x402HowToNote:
       'La misma tarifa de $0.02/llamada que el nivel estándar de pago por llamada, pero sin necesidad de cuenta ni de guardar una key — para agentes que prefieren liquidar por petición. Listado en x402scan.com.',
     pricingNote: 'Se paga en $MRDT / SOL / USDC vía Solana Pay — el mismo flujo de pago que el resto de TNT House. Solana Pay no puede cobrar automáticamente, así que la suscripción es una recarga manual de 30 días, no una suscripción recurrente en el sentido tradicional.',
@@ -962,6 +1055,32 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     tryItLimitBody: 'Consigue una API key gratis abajo — 15 comprobaciones/día, sin tarjeta.',
     tryItInvalidMint: 'Introduce una dirección mint de Solana válida',
     tryItErrorGeneric: 'Algo salió mal. Inténtalo de nuevo.',
+    // v1.21 docs audit (2026-10-28): MCP section, response fields, 402 note
+    mcpTitle: "Servidor MCP",
+    mcpIntro: "Usa la API como herramienta desde Claude, Cursor y cualquier otro agente compatible con MCP: el mismo motor y el mismo JSON que el endpoint REST. Transporte HTTP Streamable, sin estado (JSON-RPC solo mediante POST).",
+    mcpEndpointLabel: "Endpoint",
+    mcpConfigLabel: "Configuración de Claude Desktop / Cursor (no requiere clave)",
+    mcpConfigNote: "Los clientes que soportan servidores MCP remotos de forma nativa pueden usar directamente la URL del endpoint en lugar de mcp-remote.",
+    mcpToolsTitle: "Herramientas",
+    mcpNoKeyBadge: "sin clave",
+    mcpKeyBadge: "clave API",
+    mcpToolCheckTokenRisk: "Puntuación de seguridad, clusters de insider, autoridades, concentración de holders y datos de mercado para un mint (la misma respuesta que GET /api/v1/token-risk). 5 llamadas gratis/día sin clave; después, una clave gratuita (15/día), crédito de llamadas o una suscripción.",
+    mcpToolBatch: "La misma comprobación para hasta 25 mints en una sola llamada. N mints = N llamadas, todo o nada: el lote completo se rechaza si tu cuota/crédito no puede cubrirlo.",
+    mcpToolFreeKey: "Emite una clave API gratuita para una dirección de correo electrónico (15 comprobaciones/día). Una clave activa por correo; la clave se devuelve una sola vez y también se envía por correo. Los registros están limitados por IP y por día.",
+    mcpToolTopup: "Crea una factura de pago en Solana para tu key: recarga de crédito de llamadas ($5–$500) o una suscripción de 30 días. Devuelve payment_id, el pay_amount exacto y wallet_address.",
+    mcpToolCheckPayment: "Comprueba on-chain si una factura de create_topup_invoice ha sido pagada y, si es así, acredita tu key. Es seguro repetirla; limitado a una comprobación cada 5 segundos por payment_id.",
+    mcpToolHistory: "Historial por horas de safety_score, número de clusters de insider, holders, precio, liquidez y volumen para un mint durante los últimos N días (máx. 90). Gratis y no cuenta contra ninguna cuota.",
+    mcpAuthNote: "Pasa una key como cabecera Authorization: Bearer <api_key> en cada solicitud MCP, o como el argumento api_key de check_token_risk / check_token_risk_batch si tu cliente no puede establecer cabeceras (la cabecera tiene prioridad). Las denegaciones por cuota devuelven error_code y options[] con el siguiente paso exacto. x402 de pago por llamada es un endpoint REST; consulta Límites y precios más abajo.",
+    exampleIllustrativeNote: "Respuesta ilustrativa: los valores son inventados para un token ficticio, no datos en vivo de ningún mint real. Los campos opcionales como explanation y note aparecen solo cuando corresponde.",
+    fieldCapFlags: "Un booleano por cada nivel de tope de puntuación (maturity, market_health, contract_risk, rugged, wash_trading, lp_risk, mint_authority, freeze_authority, honeypot): true solo cuando ese tope realmente bajó la puntuación. reliefs_triggered lista las mitigaciones que aflojaron un tope ({ reason, from, to }), p. ej., una LP quemada o bloqueada.",
+    fieldClusterSupply: "Porcentaje del suministro (%) en manos de todos los clusters de insider contabilizados y del más grande, más cuántas wallets incluyen. Los clusters marcados como false_positive_likely se excluyen. null mientras cluster_analysis sea \"pending\" o cuando se desconoce una participación. Solo se rastrean los principales holders, por lo que son límites inferiores.",
+    fieldFlags: "Hechos descriptivos, no veredictos, p. ej. young_token, cluster_scan_pending, no_market_data, high_turnover, mint_authority_active, freeze_authority_active, lp_partially_or_not_locked, insider_cluster_detected, shared_cex_or_infra_funder, single_holder_gt_50.",
+    fieldDataConfidence: "Qué tan completa es esta respuesta: cluster_scan (\"pending\" | \"complete\"), holders_traced, cluster_supply_is_lower_bound, market_data_available, rugcheck_data_available. Úsalo para distinguir \"riesgo bajo\" de \"datos insuficientes\".",
+    fieldLockedSupply: "Porcentaje del suministro (%) actualmente bloqueado en contratos de vesting/lock no cancelables conocidos, y la parte que se desbloquea dentro de los próximos 30 días. Consulta vesting_locks para los contratos individuales.",
+    fieldRugcheckExtra: "Desde RugCheck: rugged (rug confirmado), jup_verified (token verificado por Jupiter), lp_burned ({ burned }), deployer_address, e insider_holder_count (rugcheck_insider_holder_count lleva el mismo valor). null significa que no se pudo comprobar.",
+    rateLimit402TrimmedNote: "Los campos de texto largos (note, options[].next_step) se acortan aquí; la respuesta real lleva el texto completo.",
+    perCallSuffix: "/llamada",
+    per30DaysSuffix: "/30 días",
   },
   fr: {
     flag: '🇫🇷',
@@ -1000,12 +1119,12 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     step3Desc: 'Votre bot obtient un score instantanément — agissez ou passez votre chemin.',
     responseFieldsTitle: 'Champs de la réponse',
     fieldSafetyScore: '0–100. Pondéré selon les autorités, la concentration des holders, la liquidité, le volume et de vraies pénalités liées aux clusters d\'insiders.',
-    fieldInsiderClusters: 'Wallets partageant un même premier financeur — un signal insider/sniper prouvable on-chain, pas une supposition.',
+    fieldInsiderClusters: "Wallets partageant un même premier financeur : un signal insider/sniper prouvable on-chain, pas une supposition. Chaque cluster porte également funder_class, funder_label, funder_confidence et false_positive_likely : les hot wallets CEX/bridge connus et les funders d'infrastructure à haut fan-out confirmés restent visibles ici mais ne comptent plus dans la pénalité insider du safety_score. supply_pct est la part de l'offre du cluster, funder_path la chaîne de financement tracée, deployer_linked indique si cette chaîne atteint le déployeur, exchange_source l'exchange qui a financé la racine (chacun null si inconnu).",
     fieldClusterAnalysis: '"pending" lors de la toute première vérification d\'un token (le traçage des clusters tourne en arrière-plan), "complete" une fois le traçage terminé.',
     fieldAuthorities: 'Si chaque autorité est révoquée, et son adresse si elle est encore active.',
     fieldHoneypotLpLocked: "honeypot_risk (booléen) et lp_locked ({ locked, percent }) issus de RugCheck. null signifie que la vérification a échoué, jamais « sûr ».",
-    fieldHolderDistribution: '% du plus gros holder, % du top-10, niveau de risque, et holder_count — le nombre de comptes dans la réponse des 20 plus gros holders de Solana (une vraie limite de la RPC, pas un décompte complet des holders pour des tokens très détenus comme BONK ou USDC).',
-    fieldMarket: 'Prix en direct, liquidité, volume 24h, variation 24h et âge du token, via DexScreener.',
+    fieldHolderDistribution: "Pourcentage brut du plus gros détenteur, % du top-10, risk_level et holder_count : le nombre dédupliqué de portefeuilles détenteurs lorsqu'il est disponible, sinon le nombre de comptes dans la réponse RPC des 20 plus gros détenteurs de Solana (une vraie limite RPC). freely_tradeable_top10_percent, freely_tradeable_largest_holder_percent et scoring_risk_level sont les chiffres que le scoring utilise réellement (offre verrouillée dans des contrats de vesting soustraite). holder_data_stale / holder_data_age_seconds indiquent quand le dernier bon instantané de détenteurs a été servi au lieu d'une lecture en direct.",
+    fieldMarket: "Prix en direct, liquidité, volume 24h, variation 24h et âge du token (age_days, plus age_hours) via DexScreener. Si DexScreener n'a pas de donnée de liquidité, elle peut provenir de RugCheck (drapeau liquidity_from_rugcheck).",
     fieldOwnerDelegate: 'hidden_owner et permanent_delegate (booléens) issus de la liste de risques de RugCheck. permanent_delegate est une extension Token-2022 permettant à cette adresse de déplacer ou brûler les tokens de N\'IMPORTE QUEL holder sans permission — un risque sévère. null signifie non vérifié, jamais un faux "sûr".',
     fieldTax: 'buy_tax_percent / sell_tax_percent — extension de frais de transfert Token-2022. Les frais de Solana sont symétriques, donc les deux valeurs sont identiques. null signifie que le mint n\'a pas cette extension (pas un échec de vérification).',
     fieldDevWallet: 'dev_wallet_percent — la propre participation on-chain du déployeur, en % de l\'offre totale. Signal de concentration distinct de holder_distribution.top10_percent, car le déployeur peut détenir une part importante sans figurer dans le top 10.',
@@ -1031,7 +1150,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     webhooksDeliveryTitle: 'Livraison et nouvelles tentatives',
     webhooksDeliveryText: 'La livraison passe par QStash : en cas de réponse autre que 2xx ou de timeout, nous réessayons jusqu\'à 3 fois avec un backoff exponentiel, puis abandonnons. Chaque événement porte un id unique (evt_...) — conservez-le et ignorez ce que vous avez déjà traité, car les nouvelles tentatives renvoient le même événement. Une réponse 200 marque l\'événement comme livré même si votre traitement échoue ensuite, donc enregistrez ou traitez le payload avant de répondre.',
     rateLimitingTitle: 'Limitation de débit',
-    rateLimitingIntro: 'Chaque clé dispose de 15 requêtes gratuites par jour calendaire (UTC). Au-delà, sans solde de crédit, vous recevez un 402, pas un blocage silencieux — rechargez ou abonnez-vous et la même clé refonctionne immédiatement.',
+    rateLimitingIntro: "Chaque clé dispose de 15 requêtes gratuites par jour calendaire (UTC). Les appels gratuits partagent également une capacité quotidienne globale du site entre toutes les clés gratuites : un jour chargé, vous pouvez recevoir un 402 avec error_code free_pool_capacity avant d'atteindre 15 (votre premier appel de la journée passe toujours). Les appels payés par crédit ou couverts par un abonnement ne dépendent jamais de ce pool. Dépassez votre quota sans solde de crédit d'appel et vous recevez un 402, pas un blocage silencieux : rechargez ou abonnez-vous et la même clé refonctionne immédiatement.",
     rateLimitHeaderLimitLabel: 'X-RateLimit-Limit',
     rateLimitHeaderLimitDesc: 'Votre quota quotidien. Vide pour les clés illimitées/émises par un admin.',
     rateLimitHeaderRemainingLabel: 'X-RateLimit-Remaining',
@@ -1041,18 +1160,34 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     rateLimitHeaderCreditLabel: 'X-Credit-Balance-Usd',
     rateLimitHeaderCreditDesc: 'Votre solde de crédit actuel, dès que vous en avez un.',
     rateLimitExceededTitle: 'Que se passe-t-il au-delà de la limite',
-    rateLimitExceededDesc: "Vous recevez un HTTP 402 avec un corps JSON — limit, used, reset_at, overage_rate_usd et un upgrade_url. Pas besoin de réessayer : dès que vous rechargez du crédit ou vous abonnez, la même clé refonctionne dès le prochain appel.",
+    rateLimitExceededDesc: "Vous recevez un HTTP 402 avec un corps JSON lisible par machine : error_code, limit, used, reset_at, resets_in, prices et options[], où chaque option (recharger / s'abonner, ou x402) porte l'étape suivante exacte pour qu'un agent puisse continuer de lui-même. Pas besoin de réessayer : dès que vous rechargez du crédit ou vous abonnez, la même clé refonctionne dès le prochain appel.",
     rateLimitBestPractice: "Vérifiez X-RateLimit-Remaining avant de lancer un lot d'appels — lire un en-tête ne coûte rien, un 402 gâché si.",
     versioningTitle: 'Versions et journal des modifications',
     versioningIntro: "L'API est versionnée dans l'URL (/api/v1/...). Au sein de v1, les champs existants ne sont jamais supprimés, renommés ni détournés de leur usage — seulement ajoutés. Les intégrations doivent ignorer les champs qu'elles ne reconnaissent pas plutôt que d'échouer à cause d'eux. Un changement véritablement cassant est publié sous /api/v2/..., avec v1 maintenue en fonctionnement pendant une période de recouvrement raisonnable — jamais une rupture silencieuse sur place.",
     changelogTitle: 'Journal des modifications',
-    changelogNote: 'Pas encore de liste de diffusion ni de webhooks pour les annonces — cette page et les liens X / Telegram en pied de page sont le moyen de rester à jour.',
+    changelogNote: "Pas encore de liste de diffusion ni de flux d'annonces : cette page est l'endroit pour rester à jour.",
     changelogEntries: [
+      {
+        version: 'v1.21',
+        date: '2026-10-28',
+        changes: [
+          "Docs : nouvelle section serveur MCP : endpoint https://www.tnt-audit.com/api/mcp, configuration client, et les 6 outils (check_token_risk, check_token_risk_batch, get_free_api_key, create_topup_invoice, check_payment, get_token_risk_history), y compris ceux qui fonctionnent sans clé.",
+          "Docs : l'exemple Python x402 utilise désormais le SDK x402 officiel (x402[svm,httpx], schéma exact x402 v2 sur Solana). L'exemple précédent openlibx402-client ne parlait pas x402 v2 et a été supprimé.",
+          "Docs : exemple de réponse et référence des champs alignés sur le schéma en direct (explanation, cluster_supply_pct, flags, data_confidence, booléens de plafond, offre verrouillée, fraîcheur des données de détenteurs, age_hours) ; l'exemple 402 montre maintenant le corps de refus complet (error_code, options[]) ; toutes les URL d'exemple utilisent https://www.tnt-audit.com. Aucun changement d'API.",
+        ],
+      },
+      {
+        version: 'v1.20',
+        date: '2026-09-15',
+        changes: [
+          "insider_clusters: chaque cluster comporte désormais funder_class ('cex' | 'infra' | 'likely_exchange_or_infra' | 'unknown'), funder_label, funder_confidence et false_positive_likely. Un premier financeur partagé qui est un hot wallet connu d'exchange/bridge, ou qui correspond à un motif d'infrastructure à forte ramification (des milliers de comptes financés, des paiements de loyer par micro-transfert, une fréquence de transactions élevée), reste visible dans la réponse par souci de transparence mais ne compte plus dans la pénalité d'initié dans safety_score -- corrige les faux positifs que nous avons trouvés en direct sur les hot wallets CEX qui étaient notés comme des clusters d'initiés.",
+        ],
+      },
       {
         version: 'v1.19',
         date: '2026-08-29',
         changes: [
-          "Docs : ajout d'un exemple Python fonctionnel pour l'endpoint x402 (openlibx402-client + solders) en plus de l'exemple curl existant -- montre à un développeur de bot/agent le flux complet 402 -> paiement -> nouvelle tentative en ~10 lignes au lieu de la seule mécanique HTTP.",
+          "Docs : ajout d'un exemple Python exécutable pour l'endpoint x402 en plus de l'exemple curl existant (remplacé en v1.21 par le SDK x402 officiel) : montre à un développeur de bot/agent le flux complet 402 -> paiement -> nouvelle tentative en quelques lignes au lieu de la seule mécanique HTTP brute.",
         ],
       },
       {
@@ -1082,7 +1217,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
         date: '2026-08-21',
         changes: [
           "Publication d'un paquet Agent Plugins 1.0 (plugin.json + mcp.json, spécification agent-plugins.org) — permet aux clients compatibles Agent Plugins de découvrir et de se connecter au serveur MCP sans configuration manuelle.",
-          "Paquet de plugin natif Codex soumis à l'annuaire awesome-codex-plugins (hashgraph-online/awesome-codex-plugins, PR #380) — score HOL Plugin Scanner 91/100, aucune découverte critique ou élevée, CI au vert — en attente de revue par les mainteneurs.",
+          "Soumission d'un paquet de plugin natif Codex au répertoire awesome-codex-plugins (hashgraph-online/awesome-codex-plugins, PR #380), score HOL Plugin Scanner 91/100, aucune découverte critique ou élevée, CI au vert. Fusionné le 2026-08-31.",
         ],
       },
       {
@@ -1210,12 +1345,12 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     x402Feature2: 'USDC sur Solana, réglé par appel via le protocole x402',
     x402Feature3: 'Conçu pour les agents autonomes qui paient eux-mêmes',
     x402HowToLabel: 'protocole x402',
-    x402PythonLabel: 'Python (client bot/agent, gère le flux 402 automatiquement)',
+    x402PythonLabel: "Python, SDK x402 officiel (gère le flux 402 → paiement → nouvelle tentative automatiquement)",
     x402HowToIntro:
       "x402 transforme un 402 Payment Required en un vrai flux de paiement : appelez l'endpoint sans authentification, recevez un défi de paiement signé, payez-le, puis réessayez avec le reçu.",
     x402Step1: "Faites un GET sur l'endpoint avec un mint — pas besoin d'en-tête Authorization.",
     x402Step2: 'Vous recevez un HTTP 402 avec un en-tête PAYMENT-REQUIRED — un défi signé pour 0,02 $ en USDC sur Solana.',
-    x402Step3: "Signez et réglez le paiement avec n'importe quel client compatible x402 (ou SDK wallet/agent), puis réessayez la même requête avec un en-tête X-PAYMENT contenant le paiement signé.",
+    x402Step3: "Signez le paiement avec n'importe quel client compatible x402 (ou SDK wallet/agent), puis réessayez la même requête avec le paiement signé dans un en-tête PAYMENT-SIGNATURE (ce que les clients x402 v2 envoient) ou un en-tête X-PAYMENT ; les deux sont acceptés.",
     x402HowToNote:
       'Le même tarif de 0,02 $/appel que le niveau paiement à l\'appel standard, mais sans compte ni clé à stocker — pour les agents qui préfèrent régler par requête. Référencé sur x402scan.com.',
     pricingNote: 'Payable en $MRDT / SOL / USDC via Solana Pay — le même flux de paiement que le reste de TNT House. Solana Pay ne peut pas prélever automatiquement, donc l\'abonnement est une recharge manuelle de 30 jours, pas un abonnement récurrent au sens traditionnel.',
@@ -1277,6 +1412,32 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     tryItLimitBody: 'Obtenez une clé API gratuite ci-dessous — 15 vérifications/jour, sans carte.',
     tryItInvalidMint: 'Entrez une adresse mint Solana valide',
     tryItErrorGeneric: "Une erreur s'est produite. Réessayez.",
+    // v1.21 docs audit (2026-10-28): MCP section, response fields, 402 note
+    mcpTitle: "Serveur MCP",
+    mcpIntro: "Utilisez l'API comme un outil depuis Claude, Cursor et tout autre agent compatible MCP : même moteur et même JSON que l'endpoint REST. Transport Streamable HTTP, sans état (JSON-RPC via POST uniquement).",
+    mcpEndpointLabel: "Endpoint",
+    mcpConfigLabel: "Configuration Claude Desktop / Cursor (aucune clé requise)",
+    mcpConfigNote: "Les clients qui prennent en charge les serveurs MCP distants nativement peuvent utiliser l'URL de l'endpoint directement au lieu de mcp-remote.",
+    mcpToolsTitle: "Outils",
+    mcpNoKeyBadge: "sans clé",
+    mcpKeyBadge: "clé API",
+    mcpToolCheckTokenRisk: "Score de sécurité, clusters insider, autorités, concentration des détenteurs et données de marché pour un mint (la même réponse que GET /api/v1/token-risk). 5 appels gratuits/jour sans clé ; ensuite une clé gratuite (15/jour), du crédit d'appel ou un abonnement.",
+    mcpToolBatch: "La même vérification pour jusqu'à 25 mints en un seul appel. N mints = N appels, tout ou rien : le lot entier est rejeté si votre quota/crédit ne peut pas le couvrir.",
+    mcpToolFreeKey: "Émet une clé API gratuite pour une adresse e-mail (15 vérifications/jour). Une clé active par e-mail ; la clé est renvoyée une seule fois et également envoyée par e-mail. Les inscriptions sont plafonnées par IP et par jour.",
+    mcpToolTopup: "Crée une facture de paiement Solana pour votre clé : recharge de crédit d'appel (5 $ – 500 $) ou un abonnement de 30 jours. Renvoie payment_id, le montant exact pay_amount et wallet_address.",
+    mcpToolCheckPayment: "Vérifie sur la chaîne si une facture de create_topup_invoice a été payée et, si c'est le cas, crédite votre clé. Peut être répété sans risque ; limité à une vérification toutes les 5 secondes par payment_id.",
+    mcpToolHistory: "Historique horaire du safety_score, du nombre de clusters insider, des détenteurs, du prix, de la liquidité et du volume pour un mint sur les N derniers jours (max 90). Gratuit et non décompté d'aucun quota.",
+    mcpAuthNote: "Passez une clé comme en-tête Authorization: Bearer <api_key> sur chaque requête MCP, ou comme argument api_key de check_token_risk / check_token_risk_batch si votre client ne peut pas définir d'en-têtes (l'en-tête a priorité). Les refus de quota renvoient error_code et options[] avec l'étape suivante exacte. Le paiement à l'appel x402 est un endpoint REST, voir Limites et tarifs ci-dessous.",
+    exampleIllustrativeNote: "Réponse illustrative : les valeurs sont inventées pour un token fictif, pas des données en direct pour un mint réel. Les champs optionnels tels que explanation et note n'apparaissent que lorsqu'ils s'appliquent.",
+    fieldCapFlags: "Un booléen par niveau de plafond de scoring (maturity, market_health, contract_risk, rugged, wash_trading, lp_risk, mint_authority, freeze_authority, honeypot) : true uniquement lorsque ce plafond a réellement tiré le score vers le bas. reliefs_triggered liste les atténuations qui ont assoupli un plafond ({ reason, from, to }), par exemple une LP brûlée ou verrouillée.",
+    fieldClusterSupply: "Part de l'offre (%) détenue par tous les clusters insider comptés et par le plus grand, plus le nombre de portefeuilles qu'ils incluent. Les clusters marqués false_positive_likely sont exclus. null tant que cluster_analysis est \"pending\" ou lorsqu'une part est inconnue. Seuls les principaux détenteurs sont tracés, donc ce sont des bornes inférieures.",
+    fieldFlags: "Faits descriptifs, pas des verdicts, par exemple young_token, cluster_scan_pending, no_market_data, high_turnover, mint_authority_active, freeze_authority_active, lp_partially_or_not_locked, insider_cluster_detected, shared_cex_or_infra_funder, single_holder_gt_50.",
+    fieldDataConfidence: "Dans quelle mesure cette réponse est complète : cluster_scan (\"pending\" | \"complete\"), holders_traced, cluster_supply_is_lower_bound, market_data_available, rugcheck_data_available. Utilisez-le pour distinguer \"risque faible\" de \"données insuffisantes\".",
+    fieldLockedSupply: "Part de l'offre (%) actuellement verrouillée dans des contrats de vesting/lock non annulables connus, et la partie qui se déverrouille dans les 30 prochains jours. Voir vesting_locks pour les contrats individuels.",
+    fieldRugcheckExtra: "Depuis RugCheck : rugged (rug confirmé), jup_verified (token vérifié par Jupiter), lp_burned ({ burned }), deployer_address et insider_holder_count (rugcheck_insider_holder_count porte la même valeur). null signifie qu'il n'a pas pu être vérifié.",
+    rateLimit402TrimmedNote: "Les champs de texte longs (note, options[].next_step) sont raccourcis ici ; la réponse réelle contient le texte complet.",
+    perCallSuffix: "/appel",
+    per30DaysSuffix: "/30 jours",
   },
   el: {
     flag: '🇬🇷',
@@ -1315,12 +1476,12 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     step3Desc: 'Το bot σου παίρνει σκορ αμέσως — προχώρα ή πέρασε το trade.',
     responseFieldsTitle: 'Πεδία απόκρισης',
     fieldSafetyScore: '0–100. Σταθμισμένο από authorities, συγκέντρωση holders, ρευστότητα, όγκο και πραγματικές ποινές insider-cluster.',
-    fieldInsiderClusters: 'Wallets που μοιράζονται τον ίδιο πρώτο χρηματοδότη — ένα on-chain αποδείξιμο σήμα insider/sniper, όχι εικασία.',
+    fieldInsiderClusters: "Wallets που μοιράζονται έναν πρώτο χρηματοδότη: ένα on-chain αποδείξιμο σήμα insider/sniper, όχι εικασία. Κάθε cluster φέρει επίσης funder_class, funder_label, funder_confidence και false_positive_likely: γνωστά hot wallets CEX/bridge και επιβεβαιωμένοι infra funders υψηλής διασποράς παραμένουν ορατά εδώ αλλά δεν προσμετρώνται πλέον στην ποινή insider στο safety_score. Το supply_pct είναι το μερίδιο προμήθειας του cluster, το funder_path η ανιχνευμένη αλυσίδα χρηματοδότησης, το deployer_linked αν αυτή η αλυσίδα φτάνει στον deployer, το exchange_source το ανταλλακτήριο που χρηματοδότησε τη ρίζα (κάθε ένα null όταν είναι άγνωστο).",
     fieldClusterAnalysis: '"pending" στον πρώτο έλεγχο ενός token (η ανίχνευση clusters τρέχει στο παρασκήνιο), "complete" όταν ολοκληρωθεί η ανίχνευση.',
     fieldAuthorities: 'Αν κάθε authority έχει ανακληθεί, και η διεύθυνσή της αν είναι ακόμα ενεργή.',
     fieldHoneypotLpLocked: 'honeypot_risk (boolean) και lp_locked ({ locked, percent }) από το RugCheck. Το null σημαίνει ότι δεν ήταν δυνατός ο έλεγχος, όχι «ασφαλές».',
-    fieldHolderDistribution: '% μεγαλύτερου holder, top-10 %, επίπεδο κινδύνου, και holder_count — ο αριθμός λογαριασμών στην απόκριση των 20 μεγαλύτερων holders της Solana (πραγματικό όριο του RPC, όχι πλήρης αριθμός holders για ευρέως κατεχόμενα tokens όπως το BONK ή το USDC).',
-    fieldMarket: 'Τιμή σε πραγματικό χρόνο, ρευστότητα, όγκος 24ω, μεταβολή 24ω και ηλικία του token, από το DexScreener.',
+    fieldHolderDistribution: "Ακατέργαστο % μεγαλύτερου holder, top-10 %, risk_level και holder_count: ο αριθμός αποδιπλασιασμένων holder-wallets όταν είναι διαθέσιμος, αλλιώς ο αριθμός λογαριασμών στην απόκριση RPC των 20 μεγαλύτερων holders της Solana (πραγματικό όριο RPC). Τα freely_tradeable_top10_percent, freely_tradeable_largest_holder_percent και scoring_risk_level είναι τα νούμερα που χρησιμοποιεί πραγματικά η βαθμολόγηση (αφαιρείται η προμήθεια κλειδωμένη σε vesting contracts). Τα holder_data_stale / holder_data_age_seconds δείχνουν πότε εξυπηρετήθηκε το τελευταίο καλό snapshot holder αντί για ζωντανή ανάγνωση.",
+    fieldMarket: "Ζωντανή τιμή, ρευστότητα, όγκος 24ω, μεταβολή 24ω και ηλικία token (age_days, συν age_hours) από το DexScreener. Αν το DexScreener δεν έχει νούμερο ρευστότητας, μπορεί να προέρχεται από το RugCheck (σημαία liquidity_from_rugcheck).",
     fieldOwnerDelegate: 'hidden_owner και permanent_delegate (boolean) από τη λίστα κινδύνων του RugCheck. Το permanent_delegate είναι επέκταση Token-2022 που επιτρέπει σε εκείνη τη διεύθυνση να μετακινεί ή να καίει τα tokens ΟΠΟΙΟΥΔΗΠΟΤΕ holder χωρίς άδεια — σοβαρός κίνδυνος. Το null σημαίνει ότι δεν ελέγχθηκε, ποτέ ψευδές «ασφαλές».',
     fieldTax: 'buy_tax_percent / sell_tax_percent — επέκταση transfer-fee του Token-2022. Η προμήθεια στη Solana είναι συμμετρική, οπότε και τα δύο έχουν την ίδια τιμή. Το null σημαίνει ότι το mint δεν έχει τέτοια επέκταση (όχι αποτυχημένος έλεγχος).',
     fieldDevWallet: 'dev_wallet_percent — το δικό του on-chain μερίδιο του deployer ως % της συνολικής προσφοράς. Διαφορετικό σήμα συγκέντρωσης από το holder_distribution.top10_percent, αφού ο deployer μπορεί να κρατά μεγάλο μερίδιο χωρίς να είναι στους top-10.',
@@ -1346,7 +1507,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     webhooksDeliveryTitle: 'Παράδοση και επαναλήψεις',
     webhooksDeliveryText: 'Η παράδοση γίνεται μέσω του QStash: σε απόκριση που δεν είναι 2xx ή σε timeout, επαναλαμβάνουμε έως 3 φορές με εκθετικό backoff και μετά σταματάμε. Κάθε συμβάν έχει μοναδικό id (evt_...) — αποθήκευσέ το και παράβλεψε όσα έχεις ήδη επεξεργαστεί, καθώς οι επαναλήψεις στέλνουν ξανά το ίδιο συμβάν. Μια απόκριση 200 σημαίνει ότι το συμβάν παραδόθηκε ακόμα κι αν η δική σου επεξεργασία αποτύχει μετά, γι\' αυτό αποθήκευσε ή επεξεργάσου το payload πριν απαντήσεις.',
     rateLimitingTitle: 'Όριο αιτημάτων',
-    rateLimitingIntro: 'Κάθε key έχει 15 δωρεάν αιτήματα ανά ημερολογιακή ημέρα (UTC). Αν το ξεπεράσεις χωρίς υπόλοιπο πίστωσης, παίρνεις 402, όχι σιωπηλό μπλοκάρισμα — φόρτωσε υπόλοιπο ή κάνε συνδρομή και το ίδιο key ξαναδουλεύει αμέσως.',
+    rateLimitingIntro: "Κάθε key λαμβάνει 15 δωρεάν αιτήματα ανά ημερολογιακή ημέρα (UTC). Οι δωρεάν κλήσεις μοιράζονται επίσης μια ημερήσια χωρητικότητα σε όλο το site για όλα τα δωρεάν keys: μια μέρα με φόρτο μπορεί να λάβεις 402 με error_code free_pool_capacity πριν φτάσεις τα 15 (η πρώτη κλήση της ημέρας περνάει πάντα). Οι κλήσεις που πληρώνονται από πίστωση ή καλύπτονται από συνδρομή δεν εξαρτώνται ποτέ από αυτό το pool. Αν ξεπεράσεις το όριό σου χωρίς υπόλοιπο πίστωσης κλήσεων, λαμβάνεις 402, όχι σιωπηλό μπλοκάρισμα: φόρτωσε υπόλοιπο ή κάνε συνδρομή και το ίδιο key συνεχίζει να δουλεύει αμέσως.",
     rateLimitHeaderLimitLabel: 'X-RateLimit-Limit',
     rateLimitHeaderLimitDesc: 'Η ημερήσια ποσόστωσή σου. Κενό σε απεριόριστα ή διαχειριστικά keys.',
     rateLimitHeaderRemainingLabel: 'X-RateLimit-Remaining',
@@ -1356,18 +1517,34 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     rateLimitHeaderCreditLabel: 'X-Credit-Balance-Usd',
     rateLimitHeaderCreditDesc: 'Το τρέχον υπόλοιπο πίστωσής σου, μόλις αποκτήσεις ένα.',
     rateLimitExceededTitle: 'Τι συμβαίνει πέρα από το όριο',
-    rateLimitExceededDesc: 'Λαμβάνεις HTTP 402 με JSON σώμα — limit, used, reset_at, overage_rate_usd και ένα upgrade_url. Δεν χρειάζονται επαναλήψεις: μόλις φορτώσεις πίστωση ή κάνεις συνδρομή, το ίδιο key ξαναδουλεύει από την επόμενη κλήση.',
+    rateLimitExceededDesc: "Λαμβάνεις HTTP 402 με μηχανικά αναγνώσιμο σώμα JSON: error_code, limit, used, reset_at, resets_in, prices και options[], όπου κάθε επιλογή (φόρτωση πίστωσης / συνδρομή, ή x402) φέρει το ακριβές επόμενο βήμα ώστε ένας agent να μπορεί να συνεχίσει μόνος του. Δεν χρειάζονται επαναλήψεις: μόλις φορτώσεις πίστωση ή κάνεις συνδρομή, το ίδιο key αρχίζει να δουλεύει ξανά από την αμέσως επόμενη κλήση.",
     rateLimitBestPractice: 'Έλεγξε το X-RateLimit-Remaining πριν στείλεις μια δέσμη κλήσεων — η ανάγνωση ενός header δεν κοστίζει τίποτα, ένα χαμένο 402 όμως ναι.',
     versioningTitle: 'Εκδόσεις & Ιστορικό αλλαγών',
     versioningIntro: 'Το API έχει έκδοση στο URL (/api/v1/...). Μέσα στο v1, τα υπάρχοντα πεδία δεν αφαιρούνται, δεν μετονομάζονται ούτε αλλάζουν σκοπό ποτέ — μόνο προστίθενται. Οι ενσωματώσεις θα πρέπει να αγνοούν πεδία που δεν αναγνωρίζουν αντί να αποτυγχάνουν εξαιτίας τους. Μια πραγματικά ασύμβατη αλλαγή δημοσιεύεται ως /api/v2/..., με το v1 να συνεχίζει να λειτουργεί για ένα λογικό διάστημα επικάλυψης — ποτέ μια σιωπηλή αλλαγή επί τόπου.',
     changelogTitle: 'Ιστορικό αλλαγών',
-    changelogNote: 'Δεν υπάρχει ακόμα mailing list ή webhooks για ανακοινώσεις ενημερώσεων — αυτή η σελίδα και οι σύνδεσμοι X / Telegram στο footer είναι ο τρόπος να μένεις ενήμερος.',
+    changelogNote: "Δεν υπάρχει ακόμα mailing list ή feed ανακοινώσεων: αυτή η σελίδα είναι ο τρόπος να μένεις ενήμερος.",
     changelogEntries: [
+      {
+        version: 'v1.21',
+        date: '2026-10-28',
+        changes: [
+          "Docs: νέα ενότητα MCP server: endpoint https://www.tnt-audit.com/api/mcp, ρυθμίσεις client και όλα τα 6 εργαλεία (check_token_risk, check_token_risk_batch, get_free_api_key, create_topup_invoice, check_payment, get_token_risk_history), συμπεριλαμβανομένου ποια λειτουργούν χωρίς key.",
+          "Docs: το παράδειγμα Python για x402 χρησιμοποιεί πλέον το επίσημο x402 SDK (x402[svm,httpx], ακριβές σχήμα x402 v2 στο Solana). Το προηγούμενο παράδειγμα openlibx402-client δεν μιλούσε x402 v2 και αφαιρέθηκε.",
+          "Docs: το δείγμα απόκρισης και η αναφορά πεδίων ευθυγραμμίστηκαν με το ζωντανό σχήμα (explanation, cluster_supply_pct, flags, data_confidence, cap booleans, locked supply, φρεσκάδα holder-data, age_hours)· το παράδειγμα 402 δείχνει τώρα το πλήρες σώμα άρνησης (error_code, options[])· όλα τα παραδείγματα URL χρησιμοποιούν https://www.tnt-audit.com. Καμία αλλαγή στο API.",
+        ],
+      },
+      {
+        version: 'v1.20',
+        date: '2026-09-15',
+        changes: [
+          "insider_clusters: κάθε cluster φέρει πλέον funder_class ('cex' | 'infra' | 'likely_exchange_or_infra' | 'unknown'), funder_label, funder_confidence και false_positive_likely. Ένας κοινός πρώτος χρηματοδότης που είναι γνωστό hot wallet exchange/bridge ή ταιριάζει με ένα μοτίβο υποδομής υψηλής διασποράς (χιλιάδες χρηματοδοτούμενοι λογαριασμοί, πληρωμές ενοικίου με μικρομεταφορές, υψηλή συχνότητα συναλλαγών), παραμένει ορατός στην απόκριση για λόγους διαφάνειας αλλά δεν προσμετράται πλέον στην ποινή insider στο safety_score -- διορθώνει ψευδή θετικά που βρήκαμε ζωντανά σε hot wallets CEX που βαθμολογούνταν ως insider clusters.",
+        ],
+      },
       {
         version: 'v1.19',
         date: '2026-08-29',
         changes: [
-          "Docs: προστέθηκε ένα λειτουργικό παράδειγμα Python για το endpoint x402 (openlibx402-client + solders) δίπλα στο υπάρχον παράδειγμα curl -- δείχνει σε έναν προγραμματιστή bot/agent την πλήρη ροή 402 -> πληρωμή -> επανάληψη σε ~10 γραμμές αντί μόνο τον ωμό μηχανισμό HTTP.",
+          "Docs: προστέθηκε ένα εκτελέσιμο παράδειγμα Python για το endpoint x402 δίπλα στο υπάρχον παράδειγμα curl (αντικαταστάθηκε στην v1.21 από το επίσημο x402 SDK): δείχνει σε έναν προγραμματιστή bot/agent την πλήρη ροή 402 -> πληρωμή -> επανάληψη σε λίγες γραμμές αντί μόνο τον ωμό μηχανισμό HTTP.",
         ],
       },
       {
@@ -1397,7 +1574,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
         date: '2026-08-21',
         changes: [
           'Δημοσιεύτηκε πακέτο Agent Plugins 1.0 (plugin.json + mcp.json, προδιαγραφή agent-plugins.org) — επιτρέπει σε συμβατούς clients Agent Plugins να ανακαλύπτουν και να συνδέονται με τον MCP server χωρίς χειροκίνητη ρύθμιση.',
-          'Υποβλήθηκε native πακέτο plugin για Codex στον κατάλογο awesome-codex-plugins (hashgraph-online/awesome-codex-plugins, PR #380) — βαθμολογία HOL Plugin Scanner 91/100, καμία κρίσιμη ή υψηλή εύρεση, CI επιτυχές — σε αναμονή ελέγχου από τους συντηρητές.',
+          "Υποβλήθηκε native πακέτο plugin για Codex στον κατάλογο awesome-codex-plugins (hashgraph-online/awesome-codex-plugins, PR #380), βαθμολογία HOL Plugin Scanner 91/100, καμία κρίσιμη ή υψηλή εύρεση, CI επιτυχές. Συγχωνεύτηκε στις 2026-08-31.",
         ],
       },
       {
@@ -1525,12 +1702,12 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     x402Feature2: 'USDC στη Solana, εκκαθάριση ανά κλήση μέσω του πρωτοκόλλου x402',
     x402Feature3: 'Φτιαγμένο για αυτόνομους agents που πληρώνουν μόνοι τους',
     x402HowToLabel: 'πρωτόκολλο x402',
-    x402PythonLabel: 'Python (client για bot/agent, χειρίζεται τη ροή 402 αυτόματα)',
+    x402PythonLabel: "Python, επίσημο x402 SDK (χειρίζεται αυτόματα τη ροή 402 → πληρωμή → επανάληψη)",
     x402HowToIntro:
       'Το x402 μετατρέπει ένα 402 Payment Required σε λειτουργική ροή πληρωμής: καλείς το endpoint χωρίς αυθεντικοποίηση, παίρνεις πίσω μια υπογεγραμμένη πρόκληση πληρωμής, την πληρώνεις, ξαναδοκιμάζεις με την απόδειξη.',
     x402Step1: 'Κάνε GET στο endpoint με ένα mint — δεν χρειάζεται header Authorization.',
     x402Step2: 'Παίρνεις πίσω HTTP 402 με header PAYMENT-REQUIRED — μια υπογεγραμμένη πρόκληση για $0.02 σε USDC στη Solana.',
-    x402Step3: 'Υπόγραψε και εκκαθάρισε την πληρωμή με οποιονδήποτε client συμβατό με x402 (ή SDK wallet/agent), μετά ξαναδοκίμασε το ίδιο αίτημα με header X-PAYMENT που φέρει την υπογεγραμμένη πληρωμή.',
+    x402Step3: "Υπόγραψε την πληρωμή με οποιονδήποτε client συμβατό με x402 (ή SDK wallet/agent), μετά ξαναδοκίμασε το ίδιο αίτημα με την υπογεγραμμένη πληρωμή σε header PAYMENT-SIGNATURE (αυτό που στέλνουν οι clients x402 v2) ή σε header X-PAYMENT· και τα δύο γίνονται δεκτά.",
     x402HowToNote:
       'Ίδια τιμή $0.02/κλήση με το βασικό επίπεδο πληρωμής ανά κλήση, αλλά χωρίς λογαριασμό ή αποθηκευμένο key — για agents που προτιμούν να πληρώνουν ανά αίτημα. Καταχωρημένο στο x402scan.com.',
     pricingNote: 'Πληρωμή σε $MRDT / SOL / USDC μέσω Solana Pay — ίδια ροή πληρωμής με το υπόλοιπο TNT House. Το Solana Pay δεν μπορεί να χρεώσει αυτόματα, οπότε η συνδρομή είναι μια χειροκίνητη ανανέωση 30 ημερών, όχι επαναλαμβανόμενη συνδρομή με την παραδοσιακή έννοια.',
@@ -1592,6 +1769,32 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     tryItLimitBody: 'Πάρε δωρεάν API key παρακάτω — 15 έλεγχοι/ημέρα, χωρίς κάρτα.',
     tryItInvalidMint: 'Βάλε μια έγκυρη διεύθυνση mint Solana',
     tryItErrorGeneric: 'Κάτι πήγε στραβά. Δοκίμασε ξανά.',
+    // v1.21 docs audit (2026-10-28): MCP section, response fields, 402 note
+    mcpTitle: "MCP server",
+    mcpIntro: "Χρησιμοποίησε το API ως εργαλείο από τον Claude, το Cursor και οποιονδήποτε άλλο συμβατό με MCP agent: ίδια μηχανή και ίδιο JSON με το REST endpoint. Μεταφορά Streamable HTTP, stateless (μόνο JSON-RPC μέσω POST).",
+    mcpEndpointLabel: "Endpoint",
+    mcpConfigLabel: "Ρυθμίσεις Claude Desktop / Cursor (δεν απαιτείται key)",
+    mcpConfigNote: "Οι clients που υποστηρίζουν εγγενώς απομακρυσμένους MCP servers μπορούν να χρησιμοποιήσουν απευθείας το URL του endpoint αντί για το mcp-remote.",
+    mcpToolsTitle: "Εργαλεία",
+    mcpNoKeyBadge: "χωρίς key",
+    mcpKeyBadge: "API key",
+    mcpToolCheckTokenRisk: "Βαθμολογία ασφάλειας, insider clusters, authorities, συγκέντρωση holders και δεδομένα αγοράς για ένα mint (η ίδια απόκριση με το GET /api/v1/token-risk). 5 δωρεάν κλήσεις/ημέρα χωρίς key· μετά, δωρεάν key (15/ημέρα), πίστωση κλήσεων ή συνδρομή.",
+    mcpToolBatch: "Ο ίδιος έλεγχος για έως 25 mints σε μία κλήση. N mints = N κλήσεις, όλα ή τίποτα: ολόκληρο το batch απορρίπτεται αν το όριο/η πίστωσή σου δεν το καλύπτει.",
+    mcpToolFreeKey: "Εκδίδει ένα δωρεάν API key για μια διεύθυνση email (15 έλεγχοι/ημέρα). Ένα ενεργό key ανά email· το key επιστρέφεται μία φορά και αποστέλλεται επίσης με email. Οι εγγραφές περιορίζονται ανά IP και ανά ημέρα.",
+    mcpToolTopup: "Δημιουργεί ένα τιμολόγιο πληρωμής Solana για το key σου: ανανέωση πίστωσης κλήσεων ($5–$500) ή συνδρομή 30 ημερών. Επιστρέφει payment_id, το ακριβές pay_amount και wallet_address.",
+    mcpToolCheckPayment: "Ελέγχει on-chain αν έχει πληρωθεί ένα τιμολόγιο από το create_topup_invoice και, αν ναι, πιστώνει το key σου. Ασφαλές να επαναληφθεί· περιορίζεται σε έναν έλεγχο ανά 5 δευτερόλεπτα ανά payment_id.",
+    mcpToolHistory: "Ωριαίο ιστορικό safety_score, αριθμού insider-cluster, holders, τιμής, ρευστότητας και όγκου για ένα mint τις τελευταίες N ημέρες (μέγιστο 90). Δωρεάν και δεν προσμετράται σε κανένα όριο.",
+    mcpAuthNote: "Πέρασε ένα key ως header Authorization: Bearer <api_key> σε κάθε αίτημα MCP, ή ως όρισμα api_key των check_token_risk / check_token_risk_batch αν ο client σου δεν μπορεί να θέσει headers (το header υπερισχύει). Οι αρνήσεις λόγω ορίου επιστρέφουν error_code και options[] με το ακριβές επόμενο βήμα. Το x402 pay-per-call είναι REST endpoint, δες Όρια & τιμολόγηση παρακάτω.",
+    exampleIllustrativeNote: "Ενδεικτική απόκριση: οι τιμές είναι επινοημένες για ένα φανταστικό token, όχι ζωντανά δεδομένα για κανένα πραγματικό mint. Προαιρετικά πεδία όπως explanation και note εμφανίζονται μόνο όταν ισχύουν.",
+    fieldCapFlags: "Ένα boolean ανά βαθμίδα ορίου βαθμολόγησης (maturity, market_health, contract_risk, rugged, wash_trading, lp_risk, mint_authority, freeze_authority, honeypot): true μόνο όταν αυτό το cap πραγματικά κατέβασε το score. Το reliefs_triggered απαριθμεί μετριασμούς που χαλάρωσαν ένα cap ({ reason, from, to }), π.χ. ένα burned ή locked LP.",
+    fieldClusterSupply: "Μερίδιο προμήθειας (%) που κατέχουν όλα τα μετρημένα insider clusters και το μεγαλύτερο από αυτά, συν πόσα wallets περιλαμβάνουν. Τα clusters με σήμανση false_positive_likely εξαιρούνται. null ενώ το cluster_analysis είναι \"pending\" ή όταν ένα μερίδιο είναι άγνωστο. Μόνο οι κορυφαίοι holders ανιχνεύονται, οπότε αυτά είναι κατώτατα όρια.",
+    fieldFlags: "Περιγραφικά γεγονότα, όχι ετυμηγορίες, π.χ. young_token, cluster_scan_pending, no_market_data, high_turnover, mint_authority_active, freeze_authority_active, lp_partially_or_not_locked, insider_cluster_detected, shared_cex_or_infra_funder, single_holder_gt_50.",
+    fieldDataConfidence: "Πόσο πλήρης είναι αυτή η απάντηση: cluster_scan (\"pending\" | \"complete\"), holders_traced, cluster_supply_is_lower_bound, market_data_available, rugcheck_data_available. Χρησιμοποίησέ το για να ξεχωρίσεις το «χαμηλός κίνδυνος» από το «ανεπαρκή δεδομένα».",
+    fieldLockedSupply: "Μερίδιο προμήθειας (%) που είναι επί του παρόντος κλειδωμένο σε γνωστά μη ακυρώσιμα vesting/lock contracts, και το μέρος του που ξεκλειδώνει μέσα στις επόμενες 30 ημέρες. Δες το vesting_locks για τα επιμέρους συμβόλαια.",
+    fieldRugcheckExtra: "Από το RugCheck: rugged (επιβεβαιωμένο rug), jup_verified (token επαληθευμένο από Jupiter), lp_burned ({ burned }), deployer_address και insider_holder_count (το rugcheck_insider_holder_count φέρει την ίδια τιμή). null σημαίνει ότι δεν μπόρεσε να ελεγχθεί.",
+    rateLimit402TrimmedNote: "Τα μεγάλα πεδία κειμένου (note, options[].next_step) συντομεύονται εδώ· η πραγματική απόκριση φέρει το πλήρες κείμενο.",
+    perCallSuffix: "/κλήση",
+    per30DaysSuffix: "/30 ημέρες",
   },
   ru: {
     flag: '🇷🇺',
@@ -1630,12 +1833,12 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     step3Desc: 'Твой бот получает скор мгновенно — действуй или пропускай сделку.',
     responseFieldsTitle: 'Поля ответа',
     fieldSafetyScore: '0–100. Взвешено по authorities, концентрации холдеров, ликвидности, объёму и реальным штрафам за инсайдерские кластеры.',
-    fieldInsiderClusters: 'Кошельки с общим первым фандером — доказуемый он-чейн сигнал инсайдера/снайпера, а не догадка. У каждого кластера также есть funder_class, funder_label, funder_confidence и false_positive_likely: известные CEX/bridge-кошельки и подтверждённые инфраструктурные фондеры с массовым фандингом остаются видны в ответе, но больше не штрафуют safety_score как инсайдерский сигнал.',
+    fieldInsiderClusters: "Кошельки с общим первым фандером: доказуемый он-чейн сигнал инсайдера/снайпера, а не догадка. Каждый кластер также содержит funder_class, funder_label, funder_confidence и false_positive_likely: известные CEX/bridge-горячие кошельки и подтверждённые инфраструктурные фондеры с массовым фандингом остаются видны здесь, но больше не учитываются в штрафе за инсайдеров в safety_score. supply_pct — доля кластера в предложении, funder_path — отслеженная цепочка финансирования, deployer_linked — достигает ли эта цепочка деплойера, exchange_source — биржа, финансировавшая корень (каждое значение null, если неизвестно).",
     fieldClusterAnalysis: '"pending" при первой проверке токена (трассировка кластеров считается в фоне), "complete" когда трассировка завершится.',
     fieldAuthorities: 'Отозвана ли каждая authority, и её адрес, если ещё активна.',
     fieldHoneypotLpLocked: 'honeypot_risk (булево) и lp_locked ({ locked, percent }) от RugCheck. null означает "не удалось проверить", а не "безопасно".',
-    fieldHolderDistribution: '% крупнейшего холдера, % топ-10, уровень риска и holder_count — число аккаунтов в ответе топ-20 крупнейших холдеров Solana (реальное ограничение самого RPC, а не полное число холдеров для широко распределённых токенов вроде BONK или USDC).',
-    fieldMarket: 'Живая цена, ликвидность, объём за 24ч, изменение за 24ч и возраст токена — с DexScreener.',
+    fieldHolderDistribution: "Сырой % крупнейшего холдера, % топ-10, risk_level и holder_count: дедуплицированное число кошельков-холдеров, когда доступно, иначе число аккаунтов в ответе RPC Solana о 20 крупнейших холдерах (реальное ограничение RPC). freely_tradeable_top10_percent, freely_tradeable_largest_holder_percent и scoring_risk_level — это значения, которые фактически использует скоринг (вычитается предложение, заблокированное в вестинг-контрактах). holder_data_stale / holder_data_age_seconds показывают, когда последний удачный снимок холдеров был отдан вместо живого чтения.",
+    fieldMarket: "Живая цена, ликвидность, объём за 24ч, изменение за 24ч и возраст токена (age_days, плюс age_hours) из DexScreener. Если у DexScreener нет данных о ликвидности, она может быть взята из RugCheck (флаг liquidity_from_rugcheck).",
     fieldOwnerDelegate: 'hidden_owner и permanent_delegate (булевы) из списка рисков RugCheck. permanent_delegate — расширение Token-2022, позволяющее этому адресу списывать или сжигать токены ЛЮБОГО холдера без разрешения — серьёзный риск. null значит "не проверялось", никогда не ложное "безопасно".',
     fieldTax: 'buy_tax_percent / sell_tax_percent — расширение Token-2022 transfer fee. Комиссия в Solana симметрична, поэтому оба поля совпадают. null значит, что у минта нет такого расширения (а не что проверка провалилась).',
     fieldDevWallet: 'dev_wallet_percent — собственная он-чейн доля деплойера в % от общего supply. Отдельный сигнал концентрации от holder_distribution.top10_percent — деплойер может держать крупную долю, не входя при этом в топ-10.',
@@ -1661,7 +1864,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     webhooksDeliveryTitle: 'Доставка и повторы',
     webhooksDeliveryText: 'Доставка идёт через QStash: при ответе не 2xx или таймауте мы повторяем попытку до 3 раз с экспоненциальной задержкой, затем сдаёмся. У каждого события уникальный id (evt_...) — сохраняй его и пропускай уже обработанные события, потому что повтор присылает точно то же событие. Ответ 200 помечает событие доставленным, даже если твоя обработка потом упадёт с ошибкой, — сохраняй или обрабатывай payload до того как ответить.',
     rateLimitingTitle: 'Лимиты запросов',
-    rateLimitingIntro: 'У каждого ключа 15 бесплатных запросов в календарные сутки (UTC). Превысил лимит без баланса кредитов — получишь 402, а не тихую блокировку: пополни баланс или оформи подписку — и тот же ключ сразу снова работает.',
+    rateLimitingIntro: "У каждого ключа 15 бесплатных запросов в календарные сутки (UTC). Бесплатные запросы также делят общесайтовую суточную ёмкость между всеми бесплатными ключами: в загруженный день ты можешь получить 402 с error_code free_pool_capacity до того, как достигнешь 15 (твой первый запрос за день всегда проходит). Запросы, оплаченные из кредита или покрытые подпиской, никогда не зависят от этого пула. Превысил квоту без баланса кредитов — получишь 402, а не тихую блокировку: пополни или оформи подписку — и тот же ключ сразу снова работает.",
     rateLimitHeaderLimitLabel: 'X-RateLimit-Limit',
     rateLimitHeaderLimitDesc: 'Твоя дневная квота. Пусто у безлимитных/выданных админом ключей.',
     rateLimitHeaderRemainingLabel: 'X-RateLimit-Remaining',
@@ -1669,15 +1872,24 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     rateLimitHeaderResetLabel: 'X-RateLimit-Reset',
     rateLimitHeaderResetDesc: 'ISO-таймстамп следующего сброса квоты (следующая полночь по UTC или дата продления подписки).',
     rateLimitHeaderCreditLabel: 'X-Credit-Balance-Usd',
-    rateLimitHeaderCreditDesc: 'Текущий баланс кредитов на звонки, как только он появится.',
+    rateLimitHeaderCreditDesc: 'Текущий баланс кредитов на запросы, как только он появится.',
     rateLimitExceededTitle: 'Что происходит при превышении лимита',
-    rateLimitExceededDesc: 'Приходит HTTP 402 с JSON-телом — limit, used, reset_at, overage_rate_usd и upgrade_url. Повторные попытки не нужны: как только пополнишь баланс или оформишь подписку, тот же ключ снова заработает уже на следующем вызове.',
+    rateLimitExceededDesc: "Ты получаешь HTTP 402 с машиночитаемым JSON-телом: error_code, limit, used, reset_at, resets_in, prices и options[], где каждая опция (пополнение / подписка или x402) несёт точный следующий шаг, чтобы агент мог продолжить самостоятельно. Повторные попытки не нужны: как только пополнишь кредит или оформишь подписку, тот же ключ снова заработает уже на следующем вызове.",
     rateLimitBestPractice: 'Проверяй X-RateLimit-Remaining перед отправкой пачки запросов — прочитать заголовок бесплатно, а вот впустую словленный 402 — нет.',
     versioningTitle: 'Версионирование и история изменений',
     versioningIntro: 'API версионируется через URL (/api/v1/...). Внутри v1 существующие поля никогда не удаляются, не переименовываются и не меняют смысл — только добавляются. Интеграциям стоит игнорировать незнакомые поля, а не падать из-за них. По-настоящему ломающее изменение выйдет как /api/v2/..., а v1 продолжит работать разумный переходный период — никогда никаких тихих изменений на месте.',
     changelogTitle: 'История изменений',
-    changelogNote: 'Пока нет рассылки или вебхуков для анонсов обновлений — следить за актуальным состоянием можно по этой странице и ссылкам на X / Telegram в подвале.',
+    changelogNote: "Пока нет рассылки или ленты анонсов: эта страница — место, чтобы оставаться в курсе.",
     changelogEntries: [
+      {
+        version: 'v1.21',
+        date: '2026-10-28',
+        changes: [
+          "Доки: новый раздел MCP-сервера: эндпоинт https://www.tnt-audit.com/api/mcp, конфиг клиента и все 6 инструментов (check_token_risk, check_token_risk_batch, get_free_api_key, create_topup_invoice, check_payment, get_token_risk_history), включая информацию, какие из них работают без ключа.",
+          "Доки: пример Python для x402 теперь использует официальный x402 SDK (x402[svm,httpx], точная схема x402 v2 на Solana). Предыдущий пример с openlibx402-client не поддерживал x402 v2 и был удалён.",
+          "Доки: пример ответа и справочник полей приведены в соответствие с живой схемой (explanation, cluster_supply_pct, flags, data_confidence, булевы флаги ограничений, заблокированное предложение, свежесть данных холдеров, age_hours); пример 402 теперь показывает полное тело отказа (error_code, options[]); все URL в примерах используют https://www.tnt-audit.com. Без изменений API.",
+        ],
+      },
       {
         version: 'v1.20',
         date: '2026-09-15',
@@ -1689,7 +1901,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
         version: 'v1.19',
         date: '2026-08-29',
         changes: [
-          "Доки: добавлен рабочий пример на Python для x402-эндпоинта (openlibx402-client + solders) рядом с существующим curl-примером -- показывает разработчику бота/агента полный флоу 402 -> оплата -> повтор запроса в ~10 строках, а не только сырую HTTP-механику.",
+          "Доки: добавлен работающий пример Python для x402-эндпоинта рядом с существующим примером curl (заменён в v1.21 официальным x402 SDK): показывает разработчику бота/агента полный флоу 402 -> оплата -> повтор запроса в нескольких строках, а не только сырую HTTP-механику.",
         ],
       },
       {
@@ -1719,7 +1931,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
         date: '2026-08-21',
         changes: [
           'Опубликован пакет Agent Plugins 1.0 (plugin.json + mcp.json, спецификация agent-plugins.org) — позволяет клиентам, совместимым с Agent Plugins, находить и подключаться к MCP-серверу без ручной настройки.',
-          'Подан нативный Codex-пакет плагина в каталог awesome-codex-plugins (hashgraph-online/awesome-codex-plugins, PR #380) — скор HOL Plugin Scanner 91/100, критичных и high-находок нет, CI зелёный — ожидает ревью мейнтейнеров.',
+          "Подан нативный Codex-пакет плагина в каталог awesome-codex-plugins (hashgraph-online/awesome-codex-plugins, PR #380), оценка HOL Plugin Scanner 91/100, критичных и high-находок нет, CI зелёный. Смёржен 2026-08-31.",
         ],
       },
       {
@@ -1734,7 +1946,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
         version: 'v1.13',
         date: '2026-08-13',
         changes: [
-          'Снижение цен: pay-per-call $0.07 -> $0.04/звонок, overage с подпиской $0.03 -> $0.02/звонок, подписка $49 -> $45 за 1000 звонков/30 дней, x402 $0.07 -> $0.02/звонок — приведено в соответствие с ценами прямых конкурентов после сравнительного анализа.',
+          'Снижение цен: pay-per-call $0.07 -> $0.04/запрос, overage с подпиской $0.03 -> $0.02/запрос, подписка $49 -> $45 за 1000 запросов/30 дней, x402 $0.07 -> $0.02/запрос — приведено в соответствие с ценами прямых конкурентов после сравнительного анализа.',
         ],
       },
       {
@@ -1829,12 +2041,12 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
       },
     ],
     pricingTitle: 'Лимиты и цены',
-    tierFree: 'FREE',
+    tierFree: 'БЕСПЛАТНО',
     tierFreeAmount: '15 запр./день',
     freeFeature1: 'Полная схема ответа',
     freeFeature2: 'Детект инсайдерских кластеров',
     freeFeature3: 'Без карты',
-    tierPayPerCall: 'PAY-PER-CALL',
+    tierPayPerCall: 'ОПЛАТА ЗА ЗАПРОС',
     payPerCallFeature1: 'Пополнение на любую сумму $5–$500',
     payPerCallFeature2: 'Списывается только сверх бесплатных 15/день',
     payPerCallFeature3: 'Подписчики платят $0.015/запрос за превышение своей квоты',
@@ -1842,17 +2054,17 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     subFeature1: '5000 запросов включено',
     subFeature2: '$0.015/запрос сверх лимита далее',
     subFeature3: 'Ручное продление — без автосписания',
-    tierX402: 'X402 (ОПЛАТА ЗА ЗВОНОК, БЕЗ КЛЮЧА)',
+    tierX402: 'X402 (ОПЛАТА ЗА ЗАПРОС, БЕЗ КЛЮЧА)',
     x402Feature1: 'Без API-ключа, без регистрации — платишь за каждый запрос',
-    x402Feature2: 'USDC в сети Solana, расчёт за звонок через протокол x402',
+    x402Feature2: 'USDC в сети Solana, оплата каждого запроса через протокол x402',
     x402Feature3: 'Для автономных агентов, которые платят сами за себя',
     x402HowToLabel: 'протокол x402',
-    x402PythonLabel: 'Python (клиент для бота/агента, сам проходит весь флоу 402)',
+    x402PythonLabel: "Python, официальный x402 SDK (автоматически проходит флоу 402 → оплата → повтор запроса)",
     x402HowToIntro:
       'x402 превращает 402 Payment Required в рабочий платёжный флоу: дёргаешь эндпоинт без авторизации, получаешь подписанный платёжный челлендж, оплачиваешь его, повторяешь запрос с квитанцией.',
     x402Step1: 'Делаешь GET на эндпоинт с mint — заголовок Authorization не нужен.',
     x402Step2: 'В ответ приходит HTTP 402 с заголовком PAYMENT-REQUIRED — подписанный челлендж на $0.02 в USDC на Solana.',
-    x402Step3: 'Подписываешь и оплачиваешь через любой x402-совместимый клиент (или wallet/agent SDK), затем повторяешь тот же запрос с заголовком X-PAYMENT, содержащим подписанный платёж.',
+    x402Step3: "Подпиши платёж любым x402-совместимым клиентом (или wallet/agent SDK), затем повтори тот же запрос с подписанным платежом в заголовке PAYMENT-SIGNATURE (то, что отправляют клиенты x402 v2) или X-PAYMENT; принимаются оба.",
     x402HowToNote:
       'Та же ставка $0.02/запрос, что и в обычном pay-per-call тарифе, но без аккаунта и без хранения ключа — для агентов, которым удобнее платить за каждый запрос. Указан на x402scan.com.',
     pricingNote: 'Оплата в $MRDT / SOL / USDC через Solana Pay — тот же флоу, что и на остальном TNT House. Solana Pay не умеет автосписание, поэтому подписка — это ручное пополнение на 30 дней, а не рекуррентная подписка в привычном смысле.',
@@ -1917,6 +2129,32 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     tryItLimitBody: 'Получи бесплатный API-ключ ниже — 15 проверок/день, без карты.',
     tryItInvalidMint: 'Введи корректный mint-адрес Solana',
     tryItErrorGeneric: 'Что-то пошло не так. Попробуй ещё раз.',
+    // v1.21 docs audit (2026-10-28): MCP section, response fields, 402 note
+    mcpTitle: "MCP-сервер",
+    mcpIntro: "Используй API как инструмент из Claude, Cursor и любого другого MCP-совместимого агента: тот же движок и тот же JSON, что и у REST-эндпоинта. Транспорт Streamable HTTP, без состояния (только JSON-RPC через POST).",
+    mcpEndpointLabel: "Эндпоинт",
+    mcpConfigLabel: "Конфиг Claude Desktop / Cursor (ключ не требуется)",
+    mcpConfigNote: "Клиенты, которые нативно поддерживают удалённые MCP-серверы, могут использовать URL эндпоинта напрямую вместо mcp-remote.",
+    mcpToolsTitle: "Инструменты",
+    mcpNoKeyBadge: "без ключа",
+    mcpKeyBadge: "API-ключ",
+    mcpToolCheckTokenRisk: "Оценка безопасности, инсайдерские кластеры, полномочия, концентрация холдеров и рыночные данные для одного минта (тот же ответ, что и GET /api/v1/token-risk). 5 бесплатных вызовов/день без ключа; далее — бесплатный ключ (15/день), кредит за вызов или подписка.",
+    mcpToolBatch: "Та же проверка для до 25 минтов за один вызов. N минтов = N вызовов, всё или ничего: весь батч отклоняется, если твоя квота/кредит не покрывает его.",
+    mcpToolFreeKey: "Выдаёт бесплатный API-ключ на адрес электронной почты (15 проверок/день). Один активный ключ на email; ключ возвращается один раз и также отправляется на почту. Количество регистраций ограничено по IP и в сутки.",
+    mcpToolTopup: "Создаёт платёжный счёт Solana для твоего ключа: пополнение кредита за вызовы ($5–$500) или подписку на 30 дней. Возвращает payment_id, точную pay_amount и wallet_address.",
+    mcpToolCheckPayment: "Проверяет он-чейн, оплачен ли счёт из create_topup_invoice, и если да — зачисляет кредит на твой ключ. Можно безопасно повторять; не чаще одной проверки в 5 секунд на payment_id.",
+    mcpToolHistory: "Почасовая история safety_score, числа инсайдерских кластеров, холдеров, цены, ликвидности и объёма для минта за последние N дней (максимум 90). Бесплатно и не учитывается ни в какой квоте.",
+    mcpAuthNote: "Передавай ключ в заголовке Authorization: Bearer <api_key> при каждом MCP-запросе либо как аргумент api_key у check_token_risk / check_token_risk_batch, если твой клиент не умеет задавать заголовки (заголовок имеет приоритет). Отказы по квоте возвращают error_code и options[] с точным следующим шагом. x402 с оплатой за вызов — это REST-эндпоинт, см. «Лимиты и цены» ниже.",
+    exampleIllustrativeNote: "Иллюстративный ответ: значения выдуманы для вымышленного токена, это не живые данные какого-либо реального минта. Необязательные поля, такие как explanation и note, появляются только когда применимы.",
+    fieldCapFlags: "Один булев флаг на каждый уровень ограничения скоринга (maturity, market_health, contract_risk, rugged, wash_trading, lp_risk, mint_authority, freeze_authority, honeypot): true только тогда, когда это ограничение реально снизило оценку. reliefs_triggered перечисляет смягчения, ослабившие ограничение ({ reason, from, to }), например сожжённая или заблокированная LP.",
+    fieldClusterSupply: "Доля предложения (%) у всех учтённых инсайдерских кластеров и у крупнейшего из них, плюс сколько кошельков они включают. Кластеры с пометкой false_positive_likely исключаются. null, пока cluster_analysis находится в \"pending\" или когда доля неизвестна. Отслеживаются только топ-холдеры, поэтому это нижние оценки.",
+    fieldFlags: "Описательные факты, а не вердикты, например: young_token, cluster_scan_pending, no_market_data, high_turnover, mint_authority_active, freeze_authority_active, lp_partially_or_not_locked, insider_cluster_detected, shared_cex_or_infra_funder, single_holder_gt_50.",
+    fieldDataConfidence: "Насколько полон этот ответ: cluster_scan (\"pending\" | \"complete\"), holders_traced, cluster_supply_is_lower_bound, market_data_available, rugcheck_data_available. Используй это, чтобы отличить «низкий риск» от «недостаточно данных».",
+    fieldLockedSupply: "Доля предложения (%), заблокированная сейчас в известных неотменяемых вестинг/лок-контрактах, и её часть, которая разблокируется в ближайшие 30 дней. См. vesting_locks для отдельных контрактов.",
+    fieldRugcheckExtra: "Из RugCheck: rugged (подтверждённый раг), jup_verified (токен, верифицированный Jupiter), lp_burned ({ burned }), deployer_address и insider_holder_count (rugcheck_insider_holder_count несёт то же значение). null означает, что проверить не удалось.",
+    rateLimit402TrimmedNote: "Длинные текстовые поля (note, options[].next_step) здесь сокращены; реальный ответ содержит полный текст.",
+    perCallSuffix: "/запрос",
+    per30DaysSuffix: "/30 дней",
   },
   it: {
     flag: '🇮🇹',
@@ -1955,12 +2193,12 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     step3Desc: 'Il tuo bot ottiene un punteggio all\'istante — agisci o salta il trade.',
     responseFieldsTitle: 'Campi della risposta',
     fieldSafetyScore: '0–100. Ponderato su authorities, concentrazione degli holder, liquidità, volume e reali penalità da cluster di insider.',
-    fieldInsiderClusters: 'Wallet che condividono lo stesso primo finanziatore — un segnale insider/sniper dimostrabile on-chain, non un\'ipotesi.',
+    fieldInsiderClusters: "Wallet che condividono un primo finanziatore: un segnale insider/sniper dimostrabile on-chain, non un'ipotesi. Ogni cluster include anche funder_class, funder_label, funder_confidence e false_positive_likely: hot wallet noti di CEX/bridge e finanziatori infrastrutturali confermati ad alto fan-out rimangono visibili qui ma non contano più nella penalità insider in safety_score. supply_pct è la quota di offerta del cluster, funder_path la catena di finanziamento tracciata, deployer_linked se quella catena raggiunge il deployer, exchange_source l'exchange che ha finanziato la radice (ognuno null quando sconosciuto).",
     fieldClusterAnalysis: '"pending" al primo controllo di un token (il tracciamento dei cluster gira in background), "complete" a tracciamento concluso.',
     fieldAuthorities: 'Se ciascuna authority è revocata, e il suo indirizzo se ancora attiva.',
     fieldHoneypotLpLocked: 'honeypot_risk (booleano) e lp_locked ({ locked, percent }) da RugCheck. null significa che non è stato possibile verificarlo, non "sicuro".',
-    fieldHolderDistribution: '% del maggior holder, % del top-10, livello di rischio, e holder_count — il numero di account nella risposta dei 20 maggiori holder di Solana (un vero limite dell\'RPC, non un conteggio completo degli holder per token molto distribuiti come BONK o USDC).',
-    fieldMarket: 'Prezzo live, liquidità, volume 24h, variazione 24h ed età del token, da DexScreener.',
+    fieldHolderDistribution: "Dati grezzi: % del maggior holder, % top-10, risk_level e holder_count: il conteggio deduplicato dei wallet holder quando disponibile, altrimenti il numero di account nella risposta RPC dei 20 maggiori holder di Solana (un vero limite RPC). freely_tradeable_top10_percent, freely_tradeable_largest_holder_percent e scoring_risk_level sono le cifre che il punteggio utilizza effettivamente (offerta bloccata in contratti di vesting sottratta). holder_data_stale / holder_data_age_seconds mostrano quando è stata servita l'ultima buona snapshot degli holder invece di una lettura live.",
+    fieldMarket: "Prezzo live, liquidità, volume 24h, variazione 24h ed età del token (age_days, più age_hours) da DexScreener. Se DexScreener non ha un dato di liquidità, può provenire da RugCheck (flag liquidity_from_rugcheck).",
     fieldOwnerDelegate: 'hidden_owner e permanent_delegate (booleani) dalla lista di rischi di RugCheck. permanent_delegate è un\'estensione Token-2022 che permette a quell\'indirizzo di spostare o bruciare i token di QUALSIASI holder senza permesso — un rischio grave. null significa non verificato, mai un falso "sicuro".',
     fieldTax: 'buy_tax_percent / sell_tax_percent — estensione transfer-fee di Token-2022. La commissione di Solana è simmetrica, quindi entrambi i valori coincidono. null significa che il mint non ha questa estensione (non un controllo fallito).',
     fieldDevWallet: 'dev_wallet_percent — la partecipazione on-chain del deployer stesso, come % dell\'offerta totale. Segnale di concentrazione distinto da holder_distribution.top10_percent, poiché il deployer può detenere una quota importante pur restando fuori dalla top-10.',
@@ -1986,7 +2224,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     webhooksDeliveryTitle: 'Consegna e nuovi tentativi',
     webhooksDeliveryText: 'La consegna avviene tramite QStash: in caso di risposta non 2xx o timeout, riproviamo fino a 3 volte con backoff esponenziale, poi rinunciamo. Ogni evento ha un id univoco (evt_...) — salvalo e ignora ciò che hai già elaborato, perché i tentativi ripetuti reinviano lo stesso evento identico. Una risposta 200 segna l\'evento come consegnato anche se la tua elaborazione fallisce in seguito, quindi salva o elabora il payload prima di rispondere.',
     rateLimitingTitle: 'Limiti di richieste',
-    rateLimitingIntro: 'Ogni key ha 15 richieste gratuite al giorno solare (UTC). Se lo superi senza saldo di credito, ricevi un 402, non un blocco silenzioso — ricarica il saldo o abbonati e la stessa key torna subito a funzionare.',
+    rateLimitingIntro: "Ogni chiave riceve 15 richieste gratuite per giorno solare (UTC). Le chiamate gratuite condividono anche una capacità giornaliera a livello di sito tra tutte le chiavi gratuite: in un giorno di traffico potresti ricevere un 402 con error_code free_pool_capacity prima di raggiungere 15 (la prima chiamata del giorno passa sempre). Le chiamate pagate con credito o coperte da un abbonamento non dipendono mai da quel pool. Supera la tua quota senza saldo di credito per chiamate e ricevi un 402, non un blocco silenzioso: ricarica o abbonati e la stessa chiave continua a funzionare immediatamente.",
     rateLimitHeaderLimitLabel: 'X-RateLimit-Limit',
     rateLimitHeaderLimitDesc: 'La tua quota giornaliera. Vuoto per le key illimitate/emesse da admin.',
     rateLimitHeaderRemainingLabel: 'X-RateLimit-Remaining',
@@ -1996,18 +2234,34 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     rateLimitHeaderCreditLabel: 'X-Credit-Balance-Usd',
     rateLimitHeaderCreditDesc: 'Il tuo saldo di credito attuale, non appena ne hai uno.',
     rateLimitExceededTitle: 'Cosa succede oltre il limite',
-    rateLimitExceededDesc: 'Ricevi un HTTP 402 con un corpo JSON — limit, used, reset_at, overage_rate_usd e un upgrade_url. Nessun retry necessario: appena ricarichi credito o ti abboni, la stessa key torna a funzionare dalla chiamata successiva.',
+    rateLimitExceededDesc: "Ricevi un HTTP 402 con un corpo JSON machine-readable: error_code, limit, used, reset_at, resets_in, prices e options[], dove ogni opzione (ricarica / abbonamento, o x402) riporta il passo successivo esatto, così un agente può continuare da solo. Nessun retry necessario: appena ricarichi credito o ti abboni, la stessa chiave torna a funzionare dalla chiamata successiva.",
     rateLimitBestPractice: 'Controlla X-RateLimit-Remaining prima di lanciare un batch di chiamate — leggere un header non costa nulla, un 402 sprecato sì.',
     versioningTitle: 'Versionamento e changelog',
     versioningIntro: "L'API è versionata nell'URL (/api/v1/...). All'interno della v1, i campi esistenti non vengono mai rimossi, rinominati o riutilizzati con altro significato — solo aggiunti. Le integrazioni dovrebbero ignorare i campi che non riconoscono anziché fallire per colpa loro. Una modifica realmente incompatibile viene pubblicata come /api/v2/..., mantenendo la v1 attiva per un ragionevole periodo di sovrapposizione — mai una rottura silenziosa sullo stesso endpoint.",
     changelogTitle: 'Changelog',
-    changelogNote: "Non c'è ancora una mailing list o webhook per gli annunci di aggiornamento — questa pagina e i link X / Telegram nel footer sono il modo per restare aggiornati.",
+    changelogNote: "Non c'è ancora una mailing list o un feed di annunci: questa pagina è il posto per restare aggiornati.",
     changelogEntries: [
+      {
+        version: 'v1.21',
+        date: '2026-10-28',
+        changes: [
+          "Docs: nuova sezione server MCP: endpoint https://www.tnt-audit.com/api/mcp, configurazione client e tutti i 6 strumenti (check_token_risk, check_token_risk_batch, get_free_api_key, create_topup_invoice, check_payment, get_token_risk_history), inclusi quelli che funzionano senza chiave.",
+          "Docs: l'esempio Python per x402 ora utilizza l'SDK ufficiale x402 (x402[svm,httpx], schema esatto x402 v2 su Solana). Il precedente esempio openlibx402-client non supportava x402 v2 ed è stato rimosso.",
+          "Docs: risposta di esempio e riferimento ai campi allineati allo schema live (explanation, cluster_supply_pct, flags, data_confidence, booleani cap, offerta bloccata, freschezza dei dati holder, age_hours); l'esempio 402 ora mostra il corpo completo del rifiuto (error_code, options[]); tutti gli URL di esempio usano https://www.tnt-audit.com. Nessuna modifica API.",
+        ],
+      },
+      {
+        version: 'v1.20',
+        date: '2026-09-15',
+        changes: [
+          "insider_clusters: ogni cluster ora include funder_class ('cex' | 'infra' | 'likely_exchange_or_infra' | 'unknown'), funder_label, funder_confidence e false_positive_likely. Un primo finanziatore condiviso che sia un hot wallet noto di exchange/bridge, o che corrisponda a un pattern infrastrutturale ad alta ramificazione (migliaia di account finanziati, pagamenti di affitto tramite micro-transazioni, alta frequenza di transazioni), rimane visibile nella risposta per motivi di trasparenza ma non conta più nella penalità insider in safety_score -- corregge i falsi positivi che abbiamo riscontrato in produzione su hot wallet CEX valutati come cluster insider.",
+        ],
+      },
       {
         version: 'v1.19',
         date: '2026-08-29',
         changes: [
-          "Docs: aggiunto un esempio Python funzionante per l'endpoint x402 (openlibx402-client + solders) accanto all'esempio curl esistente -- mostra a uno sviluppatore di bot/agent l'intero flusso 402 -> pagamento -> nuovo tentativo in ~10 righe invece della sola meccanica HTTP grezza.",
+          "Docs: aggiunto un esempio Python eseguibile per l'endpoint x402 accanto all'esempio curl esistente (sostituito in v1.21 dall'SDK ufficiale x402): mostra a uno sviluppatore di bot/agent l'intero flusso 402 -> paga -> riprova in poche righe invece della sola meccanica HTTP grezza.",
         ],
       },
       {
@@ -2037,7 +2291,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
         date: '2026-08-21',
         changes: [
           "Pubblicato un pacchetto Agent Plugins 1.0 (plugin.json + mcp.json, specifica agent-plugins.org) — consente ai client compatibili con Agent Plugins di scoprire e connettersi al server MCP senza configurazione manuale.",
-          "Inviato un pacchetto di plugin nativo per Codex alla directory awesome-codex-plugins (hashgraph-online/awesome-codex-plugins, PR #380) — punteggio HOL Plugin Scanner 91/100, nessun rilievo critico o alto, CI verde — in attesa di revisione da parte dei maintainer.",
+          "Inviato un pacchetto di plugin nativo per Codex alla directory awesome-codex-plugins (hashgraph-online/awesome-codex-plugins, PR #380), punteggio HOL Plugin Scanner 91/100, nessun rilievo critico o alto, CI verde. Unito il 2026-08-31.",
         ],
       },
       {
@@ -2165,12 +2419,12 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     x402Feature2: 'USDC su Solana, regolato per chiamata tramite il protocollo x402',
     x402Feature3: 'Pensato per agenti autonomi che pagano da soli',
     x402HowToLabel: 'protocollo x402',
-    x402PythonLabel: 'Python (client per bot/agent, gestisce automaticamente il flusso 402)',
+    x402PythonLabel: "Python, SDK ufficiale x402 (gestisce automaticamente il flusso 402 → paga → riprova)",
     x402HowToIntro:
       "x402 trasforma un 402 Payment Required in un flusso di pagamento funzionante: chiami l'endpoint senza autenticazione, ricevi una sfida di pagamento firmata, la paghi, riprovi con la ricevuta.",
     x402Step1: "Fai una GET sull'endpoint con un mint — non serve l'header Authorization.",
     x402Step2: "Ricevi un HTTP 402 con un header PAYMENT-REQUIRED — una sfida firmata per $0.02 in USDC su Solana.",
-    x402Step3: "Firma e salda il pagamento con qualsiasi client compatibile x402 (o SDK wallet/agent), poi riprova la stessa richiesta con un header X-PAYMENT contenente il pagamento firmato.",
+    x402Step3: "Firma il pagamento con qualsiasi client compatibile x402 (o SDK wallet/agent), poi riprova la stessa richiesta con il pagamento firmato in un header PAYMENT-SIGNATURE (quello che inviano i client x402 v2) o in un header X-PAYMENT; entrambi sono accettati.",
     x402HowToNote:
       "Stessa tariffa di $0.02/chiamata del livello pagamento a chiamata standard, ma senza bisogno di account o di conservare una key — per agenti che preferiscono pagare per richiesta. Elencato su x402scan.com.",
     pricingNote: 'Pagabile in $MRDT / SOL / USDC via Solana Pay — lo stesso flusso di pagamento del resto di TNT House. Solana Pay non può addebitare automaticamente, quindi l\'abbonamento è una ricarica manuale di 30 giorni, non un abbonamento ricorrente in senso tradizionale.',
@@ -2232,6 +2486,32 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     tryItLimitBody: 'Ottieni una API key gratuita qui sotto — 15 controlli/giorno, senza carta.',
     tryItInvalidMint: 'Inserisci un indirizzo mint Solana valido',
     tryItErrorGeneric: 'Qualcosa è andato storto. Riprova.',
+    // v1.21 docs audit (2026-10-28): MCP section, response fields, 402 note
+    mcpTitle: "Server MCP",
+    mcpIntro: "Usa l'API come strumento da Claude, Cursor e qualsiasi altro agente compatibile MCP: stesso motore e stesso JSON dell'endpoint REST. Trasporto Streamable HTTP, senza stato (solo JSON-RPC su POST).",
+    mcpEndpointLabel: "Endpoint",
+    mcpConfigLabel: "Configurazione Claude Desktop / Cursor (nessuna chiave richiesta)",
+    mcpConfigNote: "I client che supportano nativamente server MCP remoti possono usare direttamente l'URL dell'endpoint invece di mcp-remote.",
+    mcpToolsTitle: "Strumenti",
+    mcpNoKeyBadge: "senza chiave",
+    mcpKeyBadge: "chiave API",
+    mcpToolCheckTokenRisk: "Punteggio di sicurezza, cluster insider, autorità, concentrazione degli holder e dati di mercato per un mint (la stessa risposta di GET /api/v1/token-risk). 5 chiamate gratuite al giorno senza chiave; dopo, una chiave gratuita (15/giorno), credito per chiamate o un abbonamento.",
+    mcpToolBatch: "Lo stesso controllo per fino a 25 mint in una chiamata. N mint = N chiamate, tutto o niente: l'intero batch viene rifiutato se la tua quota/il tuo credito non può coprirlo.",
+    mcpToolFreeKey: "Emette una chiave API gratuita per un indirizzo email (15 controlli/giorno). Una chiave attiva per email; la chiave viene restituita una volta e inviata anche via email. Le registrazioni sono limitate per IP e per giorno.",
+    mcpToolTopup: "Crea una fattura di pagamento Solana per la tua chiave: ricarica del credito per chiamate ($5–$500) o un abbonamento di 30 giorni. Restituisce payment_id, l'importo esatto pay_amount e wallet_address.",
+    mcpToolCheckPayment: "Controlla on-chain se una fattura da create_topup_invoice è stata pagata e, in tal caso, accredita la tua chiave. Sicuro da ripetere; limitato a un controllo ogni 5 secondi per payment_id.",
+    mcpToolHistory: "Cronologia oraria di safety_score, numero di cluster insider, holder, prezzo, liquidità e volume per un mint negli ultimi N giorni (max 90). Gratuita e non conteggiata in alcuna quota.",
+    mcpAuthNote: "Passa una chiave come header Authorization: Bearer <api_key> su ogni richiesta MCP, o come argomento api_key di check_token_risk / check_token_risk_batch se il tuo client non può impostare gli header (l'header ha la precedenza). I rifiuti per quota restituiscono error_code e options[] con il passo successivo esatto. x402 a chiamata è un endpoint REST, vedi Limiti e prezzi sotto.",
+    exampleIllustrativeNote: "Risposta illustrativa: i valori sono inventati per un token fittizio, non dati live per alcun mint reale. I campi opzionali come explanation e note compaiono solo quando applicabili.",
+    fieldCapFlags: "Un booleano per ogni livello di cap del punteggio (maturity, market_health, contract_risk, rugged, wash_trading, lp_risk, mint_authority, freeze_authority, honeypot): true solo quando quel cap ha effettivamente abbassato il punteggio. reliefs_triggered elenca le mitigazioni che hanno allentato un cap ({ reason, from, to }), ad es. una LP bruciata o bloccata.",
+    fieldClusterSupply: "Quota dell'offerta (%) detenuta da tutti i cluster insider conteggiati e dal più grande, più quanti wallet includono. I cluster contrassegnati false_positive_likely sono esclusi. null mentre cluster_analysis è \"pending\" o quando una quota è sconosciuta. Vengono tracciati solo i principali holder, quindi si tratta di limiti inferiori.",
+    fieldFlags: "Fatti descrittivi, non verdetti, ad es. young_token, cluster_scan_pending, no_market_data, high_turnover, mint_authority_active, freeze_authority_active, lp_partially_or_not_locked, insider_cluster_detected, shared_cex_or_infra_funder, single_holder_gt_50.",
+    fieldDataConfidence: "Quanto è completa questa risposta: cluster_scan (\"pending\" | \"complete\"), holders_traced, cluster_supply_is_lower_bound, market_data_available, rugcheck_data_available. Usalo per distinguere \"rischio basso\" da \"dati insufficienti\".",
+    fieldLockedSupply: "Quota dell'offerta (%) attualmente bloccata in contratti di vesting/lock noti non annullabili, e la parte di essa che si sblocca entro i prossimi 30 giorni. Vedi vesting_locks per i singoli contratti.",
+    fieldRugcheckExtra: "Da RugCheck: rugged (rug confermato), jup_verified (token verificato da Jupiter), lp_burned ({ burned }), deployer_address e insider_holder_count (rugcheck_insider_holder_count riporta lo stesso valore). null significa che non è stato possibile controllare.",
+    rateLimit402TrimmedNote: "I campi di testo lunghi (note, options[].next_step) sono accorciati qui; la risposta reale contiene il testo completo.",
+    perCallSuffix: "/chiamata",
+    per30DaysSuffix: "/30 giorni",
   },
   zh: {
     flag: '🇨🇳',
@@ -2270,12 +2550,12 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     step3Desc: '你的机器人立即获得分数——直接行动或跳过这笔交易。',
     responseFieldsTitle: '响应字段',
     fieldSafetyScore: '0–100 分。根据权限状态、持币集中度、流动性、交易量以及真实的内部人集群扣分综合加权得出。',
-    fieldInsiderClusters: '共享同一个首次资金来源的钱包 —— 一个链上可证明的内部人/狙击信号，而非猜测。',
+    fieldInsiderClusters: "共享同一个首次资金来源的钱包：一个链上可证明的内部人/狙击信号，而非猜测。每个集群还带有 funder_class、funder_label、funder_confidence 和 false_positive_likely：已知的 CEX/桥接热钱包以及已确认的高扇出基础设施出资方仍会在此显示，但不再计入 safety_score 中的内部人惩罚。supply_pct 是该集群占总供应量的比例，funder_path 是追溯到的资金链，deployer_linked 表示该链是否到达部署者，exchange_source 是为根账户提供资金的交易所（未知时均为 null）。",
     fieldClusterAnalysis: '代币首次检查时为 "pending"（集群追踪正在后台运行），追踪完成后变为 "complete"。',
     fieldAuthorities: '各权限是否已被撤销，若仍处于活跃状态则显示其地址。',
     fieldHoneypotLpLocked: 'honeypot_risk（布尔值）和 lp_locked（{ locked, percent }）来自 RugCheck。null 表示无法检测，而不是"安全"。',
-    fieldHolderDistribution: '最大持币者占比、前10名占比、风险等级，以及 holder_count —— 即 Solana 前20大持币者响应中的账户数量（这是 RPC 本身的真实限制，对于 BONK 或 USDC 这类持有非常分散的代币，并不代表完整持币人数）。',
-    fieldMarket: '来自 DexScreener 的实时价格、流动性、24小时交易量、24小时涨跌幅及代币存在天数。',
+    fieldHolderDistribution: "原始最大持币者占比、前10名占比、risk_level 和 holder_count：可用时为去重后的持币钱包数量，否则为 Solana 前20大持币者 RPC 响应中的账户数量（这是 RPC 本身的真实限制）。freely_tradeable_top10_percent、freely_tradeable_largest_holder_percent 和 scoring_risk_level 是评分实际使用的数据（已减去锁定在 vesting 合约中的供应量）。holder_data_stale / holder_data_age_seconds 显示最后一次可用的持币快照替代实时读取的时间。",
+    fieldMarket: "来自 DexScreener 的实时价格、流动性、24小时交易量、24小时涨跌幅以及代币存在天数（age_days，以及 age_hours）。如果 DexScreener 没有流动性数据，可能来自 RugCheck（标记 liquidity_from_rugcheck）。",
     fieldOwnerDelegate: 'hidden_owner 和 permanent_delegate（布尔值）来自 RugCheck 的风险列表。permanent_delegate 是 Token-2022 扩展，允许该地址在未经许可的情况下转移或销毁任意持币者的代币 —— 严重风险。null 表示未检测，绝不代表虚假的"安全"。',
     fieldTax: 'buy_tax_percent / sell_tax_percent —— Token-2022 转账手续费扩展。Solana 的手续费是对称的，因此两个字段值相同。null 表示该 mint 没有此扩展（而非检测失败）。',
     fieldDevWallet: 'dev_wallet_percent —— 部署者自身链上持仓占总供应量的百分比。这是与 holder_distribution.top10_percent 不同的独立集中度信号，因为部署者可能持有大量份额却不在前10名之列。',
@@ -2301,7 +2581,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     webhooksDeliveryTitle: '投递与重试',
     webhooksDeliveryText: '推送通过 QStash 完成：如果收到非 2xx 响应或超时，我们会以指数退避的方式重试最多 3 次，之后放弃。每个事件都带有唯一的 id（evt_...）——请保存它，并跳过已处理过的事件，因为重试会重新发送完全相同的事件。返回 200 即视为该事件已投递，即使你之后的处理失败也是如此，因此请在响应之前先保存或处理好 payload。',
     rateLimitingTitle: '速率限制',
-    rateLimitingIntro: '每个密钥每个日历日（UTC）有 15 次免费请求。超过这个额度且没有信用余额时，你会收到 402，而不是被默默拦截——充值或订阅后，同一个密钥会立即恢复可用。',
+    rateLimitingIntro: "每个密钥在每个日历日（UTC）有 15 次免费请求。所有免费密钥还共享全站每日免费调用容量：在繁忙的一天，你可能在达到 15 次之前收到带 error_code free_pool_capacity 的 402（你当天的第一次调用总会通过）。由额度支付或订阅覆盖的调用从来不依赖该池。超出配额且没有调用额度余额时，你会收到 402，而不是被默默拦截——充值或订阅后，同一个密钥会立即恢复可用。",
     rateLimitHeaderLimitLabel: 'X-RateLimit-Limit',
     rateLimitHeaderLimitDesc: '你的每日配额。无限量/管理员发放的密钥此项为空。',
     rateLimitHeaderRemainingLabel: 'X-RateLimit-Remaining',
@@ -2311,18 +2591,34 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     rateLimitHeaderCreditLabel: 'X-Credit-Balance-Usd',
     rateLimitHeaderCreditDesc: '你当前的通话信用余额（如果有的话）。',
     rateLimitExceededTitle: '超出限制后会发生什么',
-    rateLimitExceededDesc: '你会收到一个带 JSON 内容的 HTTP 402 —— limit、used、reset_at、overage_rate_usd 以及 upgrade_url。无需重试：一旦充值或订阅，同一个密钥在下一次调用时就会立即恢复正常。',
+    rateLimitExceededDesc: "你会收到一个带机器可读 JSON 主体的 HTTP 402：error_code、limit、used、reset_at、resets_in、prices 和 options[]，其中每个选项（充值 / 订阅，或 x402）都带有确切的下一步，以便智能体可以自行继续。无需重试：一旦充值额度或订阅，同一个密钥在下一次调用时就会立即恢复正常。",
     rateLimitBestPractice: '在发起一批调用之前先检查 X-RateLimit-Remaining —— 读取一个响应头不花钱，白白触发一次 402 却会。',
     versioningTitle: '版本管理与更新日志',
     versioningIntro: 'API 通过 URL 进行版本管理（/api/v1/...）。在 v1 内部，现有字段永远不会被删除、重命名或改变用途——只会新增字段。集成方应该忽略无法识别的字段，而不是因此报错。真正的不兼容变更会以 /api/v2/... 的形式发布，v1 会继续运行一段合理的过渡期——绝不会在原地进行静默的破坏性改动。',
     changelogTitle: '更新日志',
-    changelogNote: '目前还没有邮件列表或 webhook 用于更新通知——请通过本页面以及页脚的 X / Telegram 链接来获取最新动态。',
+    changelogNote: "目前还没有邮件列表或公告订阅源：本页面是获取最新动态的地方。",
     changelogEntries: [
+      {
+        version: 'v1.21',
+        date: '2026-10-28',
+        changes: [
+          "文档：新增 MCP 服务器部分：端点 https://www.tnt-audit.com/api/mcp、客户端配置，以及全部 6 个工具（check_token_risk、check_token_risk_batch、get_free_api_key、create_topup_invoice、check_payment、get_token_risk_history），包括哪些工具无需密钥即可使用。",
+          "文档：x402 Python 示例现在使用官方 x402 SDK（x402[svm,httpx]，Solana 上的 x402 v2 精确方案）。之前的 openlibx402-client 示例不支持 x402 v2，已移除。",
+          "文档：示例响应和字段参考已与实时 schema 保持一致（explanation、cluster_supply_pct、flags、data_confidence、cap 布尔值、锁定供应量、持币数据新鲜度、age_hours）；402 示例现在显示完整的拒绝响应体（error_code、options[]）；所有示例 URL 均使用 https://www.tnt-audit.com。无 API 变更。",
+        ],
+      },
+      {
+        version: 'v1.20',
+        date: '2026-09-15',
+        changes: [
+          "insider_clusters: 每个集群现在带有 funder_class ('cex' | 'infra' | 'likely_exchange_or_infra' | 'unknown')、funder_label、funder_confidence 和 false_positive_likely。一个共享的首个资金提供者如果是已知的交易所/跨链桥热钱包，或者匹配高扇出基础设施模式 (数千个受资账户、微转账租金支付、高交易频率)，出于透明度考虑在响应中保持可见，但不再计入 safety_score 中的内部人士惩罚 -- 修复了我们在线发现的 CEX 热钱包被评分为内部人士集群的误报。",
+        ],
+      },
       {
         version: 'v1.19',
         date: '2026-08-29',
         changes: [
-          "文档：为 x402 端点新增了一个可运行的 Python 示例（openlibx402-client + solders），与现有的 curl 示例并列 —— 用约 10 行代码向 bot/agent 开发者展示完整的 402 -> 付款 -> 重试流程，而不只是原始的 HTTP 机制。",
+          "文档：为 x402 端点新增了一个可运行的 Python 示例，与现有 curl 示例并列（在 v1.21 中被官方 x402 SDK 取代）：用几行代码向机器人/智能体开发者展示完整的 402 -> 支付 -> 重试流程，而非仅原始 HTTP 机制。",
         ],
       },
       {
@@ -2352,7 +2648,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
         date: '2026-08-21',
         changes: [
           '发布了 Agent Plugins 1.0 软件包（plugin.json + mcp.json，遵循 agent-plugins.org 规范）—— 让兼容 Agent Plugins 的客户端无需手动配置即可发现并连接到 MCP 服务器。',
-          '已向 awesome-codex-plugins 目录（hashgraph-online/awesome-codex-plugins，PR #380）提交了原生 Codex 插件包 —— HOL Plugin Scanner 评分 91/100，无严重或高危问题，CI 通过 —— 等待维护者审核。',
+          "已向 awesome-codex-plugins 目录（hashgraph-online/awesome-codex-plugins，PR #380）提交原生 Codex 插件包，HOL Plugin Scanner 评分 91/100，无严重或高危问题，CI 通过。已于 2026-08-31 合并。",
         ],
       },
       {
@@ -2480,12 +2776,12 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     x402Feature2: 'Solana 上的 USDC，通过 x402 协议按次结算',
     x402Feature3: '专为自主支付的自动化 agent 设计',
     x402HowToLabel: 'x402 协议',
-    x402PythonLabel: 'Python（bot/agent 客户端，自动处理 402 流程）',
+    x402PythonLabel: "Python，官方 x402 SDK（自动处理 402 → 支付 → 重试流程）",
     x402HowToIntro:
       'x402 把 402 Payment Required 变成一套可用的支付流程：无需鉴权即可调用接口，返回一个已签名的支付挑战，完成支付后携带凭证重试。',
     x402Step1: '用 mint 参数 GET 该接口 —— 不需要 Authorization 请求头。',
     x402Step2: '你会收到 HTTP 402，响应头带有 PAYMENT-REQUIRED —— 一个价值 $0.02 USDC（Solana 链上）的已签名支付挑战。',
-    x402Step3: '用任意兼容 x402 的客户端（或钱包/agent SDK）签名并完成支付，然后携带含已签名支付信息的 X-PAYMENT 请求头重试同一请求。',
+    x402Step3: "使用任意兼容 x402 的客户端（或钱包/agent SDK）签名支付，然后携带含已签名支付信息的 PAYMENT-SIGNATURE 请求头（x402 v2 客户端发送的）或 X-PAYMENT 请求头重试同一请求；两者均接受。",
     x402HowToNote:
       '与标准按次付费套餐相同的 $0.02/次费率，但无需账户或保存密钥 —— 适合那些更愿意按请求结算的 agent。已收录在 x402scan.com。',
     pricingNote: '通过 Solana Pay 以 $MRDT / SOL / USDC 支付 —— 与 TNT House 其他部分相同的支付流程。Solana Pay 无法自动扣款，因此订阅本质上是每 30 天手动充值一次，而非传统意义上的自动续订。',
@@ -2547,6 +2843,32 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     tryItLimitBody: '在下方获取免费 API 密钥 —— 每天 15 次查询，无需信用卡。',
     tryItInvalidMint: '请输入有效的 Solana mint 地址',
     tryItErrorGeneric: '出错了，请重试。',
+    // v1.21 docs audit (2026-10-28): MCP section, response fields, 402 note
+    mcpTitle: "MCP 服务器",
+    mcpIntro: "将 API 作为工具从 Claude、Cursor 及任何其他兼容 MCP 的智能体中使用：与 REST 端点相同的引擎和相同的 JSON。Streamable HTTP 传输，无状态（仅通过 POST 使用 JSON-RPC）。",
+    mcpEndpointLabel: "端点",
+    mcpConfigLabel: "Claude Desktop / Cursor 配置（无需密钥）",
+    mcpConfigNote: "原生支持远程 MCP 服务器的客户端可以直接使用端点 URL，而无需 mcp-remote。",
+    mcpToolsTitle: "工具",
+    mcpNoKeyBadge: "无需密钥",
+    mcpKeyBadge: "API 密钥",
+    mcpToolCheckTokenRisk: "针对一个 mint 的安全评分、内部人集群、权限、持币集中度及市场数据（与 GET /api/v1/token-risk 响应相同）。无密钥时每天 5 次免费调用；之后可使用免费密钥（15 次/天）、调用额度或订阅。",
+    mcpToolBatch: "在单次调用中对最多 25 个 mint 进行相同的检查。N 个 mint = N 次调用，全有或全无：如果配额/额度无法覆盖，整个批次会被拒绝。",
+    mcpToolFreeKey: "为电子邮件地址发放一个免费 API 密钥（每天 15 次检查）。每个邮箱一个有效密钥；密钥仅返回一次并同时通过邮件发送。注册按 IP 和按天限制。",
+    mcpToolTopup: "为你的密钥创建 Solana 支付发票：调用额度充值（$5–$500）或 30 天订阅。返回 payment_id、精确的 pay_amount 和 wallet_address。",
+    mcpToolCheckPayment: "在链上检查来自 create_topup_invoice 的发票是否已支付，如果已支付则为你的密钥添加额度。可安全重复；每个 payment_id 每 5 秒限制检查一次。",
+    mcpToolHistory: "一个 mint 在过去 N 天（最多 90）内的 safety_score、内部人集群数量、持币人数、价格、流动性和交易量的逐小时历史。免费且不计入任何配额。",
+    mcpAuthNote: "在每次 MCP 请求中，将密钥作为 Authorization: Bearer <api_key> 请求头传递；如果你的客户端无法设置请求头，则作为 check_token_risk / check_token_risk_batch 的 api_key 参数传递（请求头优先）。配额拒绝会返回 error_code 和 options[]，其中包含确切的下一步。x402 按次付费是一个 REST 端点，参见下方限额与价格。",
+    exampleIllustrativeNote: "示例响应：数值为虚构代币编造，并非任何真实 mint 的实时数据。explanation 和 note 等可选字段仅在适用时出现。",
+    fieldCapFlags: "每个评分上限层级对应一个布尔值（maturity、market_health、contract_risk、rugged、wash_trading、lp_risk、mint_authority、freeze_authority、honeypot）：仅当该上限实际拉低分数时为 true。reliefs_triggered 列出放宽上限的缓解措施（{ reason, from, to }），例如销毁或锁定的 LP。",
+    fieldClusterSupply: "所有已计入的内部人集群及最大集群持有的供应量占比（%），以及它们包含的钱包数量。标记为 false_positive_likely 的集群被排除。当 cluster_analysis 为 \"pending\" 或份额未知时为 null。仅追踪顶级持币者，因此这些是下限。",
+    fieldFlags: "描述性事实，而非结论，例如 young_token、cluster_scan_pending、no_market_data、high_turnover、mint_authority_active、freeze_authority_active、lp_partially_or_not_locked、insider_cluster_detected、shared_cex_or_infra_funder、single_holder_gt_50。",
+    fieldDataConfidence: "此答案的完整程度：cluster_scan（\"pending\" | \"complete\"）、holders_traced、cluster_supply_is_lower_bound、market_data_available、rugcheck_data_available。用它来区分“低风险”与“数据不足”。",
+    fieldLockedSupply: "当前锁定在已知不可取消的 vesting/lock 合约中的供应量占比（%），以及在未来 30 天内解锁的部分。详见 vesting_locks 中的具体合约。",
+    fieldRugcheckExtra: "来自 RugCheck：rugged（确认的 rug）、jup_verified（Jupiter 验证的代币）、lp_burned（{ burned }）、deployer_address，以及 insider_holder_count（rugcheck_insider_holder_count 携带相同值）。null 表示无法检查。",
+    rateLimit402TrimmedNote: "长文本字段（note、options[].next_step）在此处被缩短；真实响应包含完整文本。",
+    perCallSuffix: "/调用",
+    per30DaysSuffix: "/30 天",
   },
 };
 
