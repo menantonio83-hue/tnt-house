@@ -1,3 +1,7 @@
+// Version 7.18 — app/api/v1/billing/verify-payment/route.ts
+//
+// v7.18: logic moved to lib/billing-actions.ts, shared with MCP tools; behaviour unchanged
+//
 // Version 7.17 — app/api/v1/billing/verify-payment/route.ts
 //
 // v7.17: two race-condition fixes from the second external-review round:
@@ -45,9 +49,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { findApiKeyByRawKey } from '@/lib/api-key-store';
-import { getPaymentById, confirmPayment, expireStalePendingPayment } from '@/lib/billing-store';
-import { findMatchingPayment } from '@/lib/billing-verify';
-import { PENDING_INVOICE_TTL_MINUTES } from '@/lib/billing-pricing';
+import { verifyPaymentForKey } from '@/lib/billing-actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -69,106 +71,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ verified: false, reason: 'Invalid or revoked API key' }, { status: 401 });
     }
 
-    const payment = await getPaymentById(paymentId);
-    if (!payment) {
-      return NextResponse.json({ verified: false, reason: 'Unknown payment_id' }, { status: 404 });
-    }
-
-    if (payment.key_id !== key.id) {
-      // Deliberately the same generic shape as "unknown payment_id" —
-      // don't confirm to a caller that a payment_id exists but belongs
-      // to someone else.
-      return NextResponse.json({ verified: false, reason: 'Unknown payment_id' }, { status: 404 });
-    }
-
-    if (payment.status === 'confirmed') {
-      // Already resolved by an earlier poll — idempotent success, not an error.
-      return NextResponse.json({
-        verified: true,
-        already: true,
-        kind: payment.kind,
-        tx_signature: payment.tx_signature,
-      });
-    }
-
-    if (payment.status === 'expired') {
-      return NextResponse.json({
-        verified: false,
-        expired: true,
-        reason: 'This invoice has expired. Please create a new one.',
-      });
-    }
-
-    // payment.status === 'pending' from here on. Always search for a
-    // match FIRST — only consider expiring if genuinely not found, so a
-    // payment that landed on-chain just before the TTL boundary always
-    // gets at least one real chance to be matched on this exact poll.
-    const match = await findMatchingPayment(
-      payment.pay_amount,
-      payment.currency,
-      new Date(payment.created_at).getTime(),
-    );
-
-    if (!match.found || !match.signature) {
-      const justExpired = await expireStalePendingPayment(payment.id, PENDING_INVOICE_TTL_MINUTES);
-      if (justExpired) {
-        return NextResponse.json({
-          verified: false,
-          expired: true,
-          reason: 'This invoice expired before payment was detected. Please create a new one.',
-        });
-      }
-      return NextResponse.json({ verified: false, reason: match.reason || 'Not found yet' });
-    }
-
-    const result = await confirmPayment(payment.id, match.signature);
-
-    if (!result.claimed) {
-      if (result.reason) {
-        // Genuine collision caught by the DB constraint — this specific
-        // invoice did NOT get credited. Tell the truth instead of
-        // reporting success.
-        return NextResponse.json({
-          verified: false,
-          reason:
-            'This payment amount matched a transaction already used for a different invoice. Please start a new top-up/subscription — you were not charged twice.',
-        });
-      }
-
-      // No reason: ambiguous. Could be "a concurrent poll for this same
-      // payment_id already confirmed it" (fine) OR "it expired
-      // concurrently" OR some other state change. Never assume success —
-      // re-read the real status and answer honestly.
-      const recheck = await getPaymentById(payment.id);
-
-      if (recheck?.status === 'confirmed') {
-        return NextResponse.json({
-          verified: true,
-          already: true,
-          kind: recheck.kind,
-          tx_signature: recheck.tx_signature,
-        });
-      }
-      if (recheck?.status === 'expired') {
-        return NextResponse.json({
-          verified: false,
-          expired: true,
-          reason: 'This invoice expired before payment was detected. Please create a new one.',
-        });
-      }
-      return NextResponse.json({
-        verified: false,
-        reason: 'Could not confirm payment right now — please try again in a moment.',
-      });
-    }
-
-    return NextResponse.json({
-      verified: true,
-      kind: result.kind,
-      subscription_expires_at: result.subscription_expires_at ?? null,
-      credit_balance_usd: result.credit_balance_usd ?? null,
-      tx_signature: match.signature,
-    });
+    const result = await verifyPaymentForKey(key, paymentId);
+    return NextResponse.json(result.body, { status: result.status });
   } catch (error: any) {
     console.error('[billing/verify-payment] error:', error);
     return NextResponse.json({ verified: false, reason: error.message }, { status: 500 });

@@ -1,3 +1,7 @@
+// Version 1.13 — app/api/mcp/route.ts
+//
+// v1.13: added create_topup_invoice and check_payment self-authenticating billing tools; both reuse lib/billing-actions.ts (the exact REST billing logic) and never log the API key.
+//
 // Version 1.12 — app/api/mcp/route.ts
 //
 // v1.12: updated onboarding metadata — server instructions, check_token_risk/check_token_risk_batch descriptions, and public/.well-known/mcp/server-card.json now point agents at get_free_api_key / x402 / refusal options. No logic changes.
@@ -150,6 +154,8 @@ import { issueFreeApiKey } from '@/lib/free-key-signup';
 import { logApiRequest } from '@/lib/request-logger';
 import { checkMcpAnonLimit, normalizeSessionId, recordMcpAnonSuccess } from '@/lib/mcp-anon-limit';
 import { buildRefusalBody, freeKeyOption, x402Option } from '@/lib/refusal-options';
+import { createInvoiceForKey, verifyPaymentForKey } from '@/lib/billing-actions';
+import { MIN_TOPUP_USD, MAX_TOPUP_USD } from '@/lib/billing-pricing';
 import type { ApiKeyRecord } from '@/lib/api-key-store';
 
 export const dynamic = 'force-dynamic';
@@ -182,6 +188,10 @@ const PUBLIC_METHODS = new Set(['initialize', 'notifications/initialized', 'ping
 // MAX_BATCH_SIZE upstream calls in one shot — key or x402 only.
 const ANON_ALLOWED_TOOLS = new Set(['check_token_risk', 'get_token_risk_history', 'get_free_api_key']);
 
+// Tools that authenticate inside the handler via header key or api_key
+// argument, never anonymous. They require the caller's own API key.
+const SELF_AUTH_TOOLS = new Set(['create_topup_invoice', 'check_payment']);
+
 // Tools that accept an api_key argument when the MCP host cannot send
 // an Authorization header. The header still wins if both are present.
 const KEY_ARG_TOOLS = new Set(['check_token_risk', 'check_token_risk_batch']);
@@ -189,6 +199,8 @@ const KEY_ARG_TOOLS = new Set(['check_token_risk', 'check_token_risk_batch']);
 function jsonResult(data: unknown, isError = false) {
   return { content: [{ type: 'text' as const, text: JSON.stringify(data) }], isError };
 }
+
+const NEED_KEY_RESULT = jsonResult({ error: 'This tool needs your API key: send Authorization: Bearer <api_key> or pass the api_key argument. No key yet? Call get_free_api_key first.', error_code: 'missing_api_key' }, true);
 
 const API_KEY_ARG_DESCRIPTION = 'Optional. Your RiskDataApi key, for MCP hosts that cannot send an Authorization header. If both are present, the Authorization header wins.';
 
@@ -435,6 +447,57 @@ function buildServer(apiKey: ApiKeyRecord | null, clientIp: string, userAgent: s
   );
 
   server.registerTool(
+    'create_topup_invoice',
+    {
+      title: 'Create a top-up or subscription invoice',
+      description: `Creates a Solana payment invoice for your API key: kind "topup" adds call credit ($${MIN_TOPUP_USD}-$${MAX_TOPUP_USD}, usd_amount, default $${MIN_TOPUP_USD}); kind "subscription" buys 30 days. Returns payment_id, the exact pay_amount and wallet_address. Send exactly pay_amount, then call check_payment. Max 3 pending invoices per key.`,
+      inputSchema: {
+        api_key: z.string().max(200).optional().describe(API_KEY_ARG_DESCRIPTION),
+        kind: z.enum(['topup','subscription']).optional().describe('topup (default) or subscription'),
+        currency: z.enum(['USDC','SOL','MRDT']).optional().describe('Payment currency (default USDC)'),
+        usd_amount: z.number().optional().describe(`Top-up amount in USD, ${MIN_TOPUP_USD}-${MAX_TOPUP_USD} (default ${MIN_TOPUP_USD}); ignored for subscription`),
+      },
+    },
+    async ({ api_key, kind, currency, usd_amount }) => {
+      const resolved = await resolveCallKey(apiKey, api_key);
+      if (resolved.error) return resolved.error;
+      if (!resolved.key) return NEED_KEY_RESULT;
+      const kindValue = kind ?? 'topup';
+      const result = await createInvoiceForKey(resolved.key, {
+        kind: kindValue,
+        currency: currency ?? 'USDC',
+        usd_amount: kindValue === 'topup' ? (usd_amount ?? MIN_TOPUP_USD) : undefined,
+      });
+      if (result.status === 200) {
+        return jsonResult({
+          ...result.body,
+          next_step: `Send exactly pay_amount_formatted (${result.body.currency}) to wallet_address in ONE transaction within 45 minutes, then call check_payment with this payment_id until verified is true.`,
+        });
+      }
+      return jsonResult(result.body, true);
+    },
+  );
+
+  server.registerTool(
+    'check_payment',
+    {
+      title: 'Check an invoice payment',
+      description: 'Checks on-chain whether an invoice from create_topup_invoice has been paid and, if so, credits your key. Safe to call repeatedly (idempotent). Returns verified true/false with a reason.',
+      inputSchema: {
+        api_key: z.string().max(200).optional().describe(API_KEY_ARG_DESCRIPTION),
+        payment_id: z.string().max(100).describe('payment_id returned by create_topup_invoice'),
+      },
+    },
+    async ({ api_key, payment_id }) => {
+      const resolved = await resolveCallKey(apiKey, api_key);
+      if (resolved.error) return resolved.error;
+      if (!resolved.key) return NEED_KEY_RESULT;
+      const result = await verifyPaymentForKey(resolved.key, payment_id);
+      return jsonResult(result.body, result.status >= 400);
+    },
+  );
+
+  server.registerTool(
     'get_token_risk_history',
     {
       title: 'Get historical risk trend for a Solana token',
@@ -509,6 +572,7 @@ export async function POST(request: NextRequest) {
   const isPublic = method !== undefined && PUBLIC_METHODS.has(method);
   const isAnonAllowedCall = method === 'tools/call' && toolName !== undefined && ANON_ALLOWED_TOOLS.has(toolName);
   const isKeyArgCall = method === 'tools/call' && toolName !== undefined && KEY_ARG_TOOLS.has(toolName) && hasApiKeyArg;
+  const isSelfAuthCall = method === 'tools/call' && toolName !== undefined && SELF_AUTH_TOOLS.has(toolName);
 
   let apiKey: ApiKeyRecord | null = null;
   if (!isPublic) {
@@ -524,7 +588,10 @@ export async function POST(request: NextRequest) {
       // v1.10: check_token_risk / check_token_risk_batch with an
       // api_key argument also pass through here; the handlers
       // authenticate the argument and reject invalid keys.
-      if (!isAnonAllowedCall && !isKeyArgCall) {
+      // v1.13: create_topup_invoice / check_payment are always
+      // self-authenticating — they never allow anonymous access; the
+      // handlers require a key (header or api_key argument).
+      if (!isAnonAllowedCall && !isKeyArgCall && !isSelfAuthCall) {
         return auth.response ?? NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       }
     } else {

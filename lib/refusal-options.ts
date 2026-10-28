@@ -1,3 +1,7 @@
+// Version 1.1 — lib/refusal-options.ts
+//
+// v1.1: topUpOption now carries an mcp_tool (create_topup_invoice) and its next_step mentions the MCP tool first (create_topup_invoice then check_payment), followed by the REST fallback. All other options unchanged.
+//
 // Version 1.0 — lib/refusal-options.ts
 // One source of truth for the options[] block attached to every quota/credit refusal, used by lib/rate-limit.ts (REST + MCP keyed), the MCP anonymous refusal and the REST public-demo refusal.
 
@@ -45,7 +49,8 @@ export function topUpOption(overageRateUsd: number): RefusalOption {
     id: 'top_up',
     title: 'Top up call credit or subscribe',
     price: `$${MIN_TOPUP_USD}-$${MAX_TOPUP_USD} credit (then $${overageRateUsd}/call), or $${SUBSCRIPTION_USD} for ${SUBSCRIPTION_MONTHLY_QUOTA} calls/30 days`,
-    next_step: `POST ${SITE_ORIGIN}/api/v1/billing/create-invoice with {"api_key":"<your key>","kind":"topup","currency":"USDC","usd_amount":${MIN_TOPUP_USD}} (or "kind":"subscription"), send exactly pay_amount to wallet_address, then POST ${SITE_ORIGIN}/api/v1/billing/verify-payment with {"payment_id":"<payment_id>","api_key":"<your key>"} until verified is true.`,
+    next_step: `Call the MCP tool create_topup_invoice (then check_payment), or POST ${SITE_ORIGIN}/api/v1/billing/create-invoice with {"api_key":"<your key>","kind":"topup","currency":"USDC","usd_amount":${MIN_TOPUP_USD}} (or "kind":"subscription"), send exactly pay_amount to wallet_address, then POST ${SITE_ORIGIN}/api/v1/billing/verify-payment with {"payment_id":"<payment_id>","api_key":"<your key>"} until verified is true.`,
+    mcp_tool: { name: 'create_topup_invoice', arguments: { api_key: '<your key>', kind: 'topup', currency: 'USDC', usd_amount: MIN_TOPUP_USD } },
     http: { method: 'POST', url: SITE_ORIGIN + '/api/v1/billing/create-invoice', body: { api_key: '<your key>', kind: 'topup', currency: 'USDC', usd_amount: MIN_TOPUP_USD } },
   };
 }

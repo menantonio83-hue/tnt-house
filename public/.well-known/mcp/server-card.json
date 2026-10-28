@@ -1,7 +1,7 @@
 {
   "serverInfo": {
     "name": "tnt-house-risk-data-api",
-    "version": "1.3.0",
+    "version": "1.4.0",
     "description": "RiskDataApi — Solana token risk for AI agents. 5 MCP calls/day free with no signup, then a free email key (15/day, via the get_free_api_key tool) or x402 pay-per-call ($0.02 USDC). Returns safety_score, first-funder insider clusters, honeypot risk, LP lock, mint/freeze authority in one call."
   },
   "authentication": {
@@ -73,6 +73,56 @@
         },
         "required": [
           "email"
+        ]
+      }
+    },
+    {
+      "name": "create_topup_invoice",
+      "description": "Creates a Solana payment invoice for your API key: kind \"topup\" adds call credit ($5-$500, usd_amount, default $5); kind \"subscription\" buys 30 days. Returns payment_id, the exact pay_amount and wallet_address. Send exactly pay_amount, then call check_payment. Max 3 pending invoices per key.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "api_key": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Optional. Your RiskDataApi key, for MCP hosts that cannot send an Authorization header. If both are present, the Authorization header wins."
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["topup", "subscription"],
+            "description": "topup (default) or subscription"
+          },
+          "currency": {
+            "type": "string",
+            "enum": ["USDC", "SOL", "MRDT"],
+            "description": "Payment currency (default USDC)"
+          },
+          "usd_amount": {
+            "type": "number",
+            "description": "Top-up amount in USD, 5-500 (default 5); ignored for subscription"
+          }
+        }
+      }
+    },
+    {
+      "name": "check_payment",
+      "description": "Checks on-chain whether an invoice from create_topup_invoice has been paid and, if so, credits your key. Safe to call repeatedly (idempotent). Returns verified true/false with a reason.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "api_key": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Optional. Your RiskDataApi key, for MCP hosts that cannot send an Authorization header. If both are present, the Authorization header wins."
+          },
+          "payment_id": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "payment_id returned by create_topup_invoice"
+          }
+        },
+        "required": [
+          "payment_id"
         ]
       }
     },
