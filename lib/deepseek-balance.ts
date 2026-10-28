@@ -32,7 +32,8 @@ const CHECK_KEY = 'deepseek-balance-check';
 
 export async function checkDeepSeekBalanceIfDue(): Promise<void> {
   try {
-    const apiKey = process.env.DEEPSEEK_API_KEY;
+    // Check the balance of the key the chats actually use (NEW, falling back to old).
+    const apiKey = process.env.DEEPSEEK_API_KEY_NEW || process.env.DEEPSEEK_API_KEY;
     if (!apiKey) return; // nothing to check without a key
 
     const { data: existing, error: readError } = await supabaseAdmin

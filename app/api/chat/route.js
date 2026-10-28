@@ -1,4 +1,8 @@
-// Version 1.3 — app/api/chat/route.js
+// Version 1.4 — app/api/chat/route.js
+//
+// v1.4 (2026-10-28): model deepseek-v4-flash -> deepseek-v4-pro (thinking
+// disabled), key DEEPSEEK_API_KEY_NEW with fallback to DEEPSEEK_API_KEY.
+// Rate limit and input guards unchanged.
 //
 // v1.3 (2026-09-11): server-side rate limit and input guard. This route
 // had neither. The only cap on it was a counter in React state, so
@@ -92,12 +96,17 @@ export async function POST(request) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + process.env.DEEPSEEK_API_KEY,
+        // DEEPSEEK_API_KEY_NEW is the current key; falls back to the old
+        // DEEPSEEK_API_KEY so the chat keeps working if NEW isn't set in an env.
+        'Authorization': 'Bearer ' + (process.env.DEEPSEEK_API_KEY_NEW || process.env.DEEPSEEK_API_KEY),
       },
       body: JSON.stringify({
-        model: 'deepseek-v4-flash', // legacy alias 'deepseek-chat' retired by DeepSeek on 2026-07-24 (no fallback)
+        model: 'deepseek-v4-pro', // legacy alias 'deepseek-chat' retired by DeepSeek on 2026-07-24 (no fallback)
         max_tokens: 600,
         temperature: 0.7,
+        // Thinking explicitly disabled (same as app/api/risk-api-chat): a
+        // reasoning pass could eat the max_tokens budget and leave content empty.
+        thinking: { type: 'disabled' },
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           ...messages,
