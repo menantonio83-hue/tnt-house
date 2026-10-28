@@ -1,3 +1,7 @@
+// Version 6.22 — lib/holder-distribution.ts
+//
+// v6.22: Solana Tracker fallback is extracted and tried on any first RPC
+// failure, but at most once per call.
 // Version 6.21 — lib/holder-distribution.ts
 //
 // v6.21: mega-mints (SOL, USDC — holder accounts in the millions) hit a
@@ -328,6 +332,47 @@ export function classifyRisk(largestHolderPercent: number, top10Percent: number)
   return 'LOW';
 }
 
+async function tryTrackerFallback(mint: string, reason: string): Promise<HolderDistributionResult | null> {
+  console.warn(`[holder-distribution] ${mint}: trying Solana Tracker breakdown — ${reason}`);
+
+  const tracker = await fetchHolderBreakdown(mint);
+  if (!tracker) return null;
+
+  const largestHolderPercent = tracker.holders[0].percentage;
+  const top10Percent = tracker.holders
+    .slice(0, 10)
+    .reduce((sum, h) => sum + h.percentage, 0);
+  const holderCount =
+    typeof tracker.total === 'number' ? tracker.total : tracker.holders.length;
+
+  // getTokenSupply is the cheap call and still works for mega-mints —
+  // fill totalSupply/totalSupplyRaw so vesting-lock detection (which
+  // needs the exact raw string, see v6.19) keeps working. Two outcomes
+  // land in the same safe bucket: a failed read degrades to '0', and a
+  // native mint like SOL has no token supply at all — the node itself
+  // answers amount:"0" for it. lib/vesting-lock-detector.ts explicitly
+  // treats '0' as "no locks", which is correct for both cases.
+  let totalSupply = 0;
+  let totalSupplyRaw = '0';
+  const supply = await callSolanaRpc('getTokenSupply', [mint], SUPPLY_TIMEOUT_MS);
+  if (supply.ok && supply.data) {
+    totalSupply = parseInt(supply.data.value.amount, 10);
+    totalSupplyRaw = supply.data.value.amount;
+  }
+
+  console.log(
+    `[holder-distribution] ${mint}: Solana Tracker fallback ok — largest=${largestHolderPercent.toFixed(2)}%, top10=${top10Percent.toFixed(2)}%, total=${holderCount}`,
+  );
+  return {
+    riskLevel: classifyRisk(largestHolderPercent, top10Percent),
+    largestHolderPercent,
+    top10Percent,
+    holderCount,
+    totalSupply,
+    totalSupplyRaw,
+  };
+}
+
 export async function getHolderDistributionRobust(mint: string): Promise<HolderDistributionResult> {
   let lastFailureReason = 'unknown';
 
@@ -431,56 +476,14 @@ export async function getHolderDistributionRobust(mint: string): Promise<HolderD
 
     lastFailureReason = snapshot.reason ?? 'unknown';
 
-    if (isUnretriableMintSizeLimit(lastFailureReason)) {
-      // Confirmed hard node-side refusal, not a flaky failure — no
-      // point spending the backoff + a second attempt on a request the
-      // node has already explicitly said it won't do.
-      console.warn(
-        `[holder-distribution] ${mint}: hard mint-size limit hit on attempt ${attempt}/${MAX_ATTEMPTS}, trying Solana Tracker breakdown — ${lastFailureReason}`,
-      );
-
-      // v6.21: second data source for mega-mints. Solana Tracker serves
-      // the top-100 ranked holders pre-indexed, so it answers for the
-      // exact mints the RPC node refuses to scan.
-      const tracker = await fetchHolderBreakdown(mint);
-      if (tracker) {
-        const largestHolderPercent = tracker.holders[0].percentage;
-        const top10Percent = tracker.holders
-          .slice(0, 10)
-          .reduce((sum, h) => sum + h.percentage, 0);
-        const holderCount =
-          typeof tracker.total === 'number' ? tracker.total : tracker.holders.length;
-
-        // getTokenSupply is the cheap call and still works for
-        // mega-mints — fill totalSupply/totalSupplyRaw so vesting-lock
-        // detection (which needs the exact raw string, see v6.19) keeps
-        // working. Two outcomes land in the same safe bucket: a failed
-        // read degrades to '0', and a native mint like SOL has no token
-        // supply at all — the node itself answers amount:"0" for it
-        // (verified live 2026-09-20 on Helius and the public node).
-        // lib/vesting-lock-detector.ts explicitly treats '0' as
-        // "no locks", which is correct for both cases.
-        let totalSupply = 0;
-        let totalSupplyRaw = '0';
-        const supply = await callSolanaRpc('getTokenSupply', [mint], SUPPLY_TIMEOUT_MS);
-        if (supply.ok && supply.data) {
-          totalSupply = parseInt(supply.data.value.amount, 10);
-          totalSupplyRaw = supply.data.value.amount;
-        }
-
-        console.log(
-          `[holder-distribution] ${mint}: Solana Tracker fallback ok — largest=${largestHolderPercent.toFixed(2)}%, top10=${top10Percent.toFixed(2)}%, total=${holderCount}`,
-        );
-        return {
-          riskLevel: classifyRisk(largestHolderPercent, top10Percent),
-          largestHolderPercent,
-          top10Percent,
-          holderCount,
-          totalSupply,
-          totalSupplyRaw,
-        };
+    if (attempt === 1 || isUnretriableMintSizeLimit(lastFailureReason)) {
+      const trackerResult = await tryTrackerFallback(mint, lastFailureReason);
+      if (trackerResult) {
+        return trackerResult;
       }
+    }
 
+    if (isUnretriableMintSizeLimit(lastFailureReason)) {
       console.error(
         `[holder-distribution] ${mint}: hard mint-size limit AND Solana Tracker fallback unavailable — ${lastFailureReason}`,
       );

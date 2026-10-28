@@ -1,3 +1,7 @@
+// Version 1.18 — lib/token-risk-core.ts
+//
+// v1.18: serve the last good holder snapshot on unusable reads, and
+// rate-limit holder-data-unavailable admin alerts.
 // Version 1.17 — lib/token-risk-core.ts
 //
 // v1.17: locked_supply_pct now counts only non-cancelable tokens currently
@@ -213,6 +217,8 @@ import { PublicKey } from '@solana/web3.js';
 import { waitUntil } from '@vercel/functions';
 import { getMintInfo, getDexScreenerData } from '@/lib/helius-client';
 import { getHolderDistributionRobust, classifyRisk } from '@/lib/holder-distribution';
+import { getHolderSnapshot, saveHolderSnapshotAsync } from '@/lib/holder-snapshot-cache';
+import { shouldAlertHolderFailure } from '@/lib/holder-alert-gate';
 import { fetchRealHolderCount } from '@/lib/solana-tracker-holders';
 import { sanitizeDexMarketData } from '@/lib/sanitize-market-data';
 import { detectInsiderClusters, type InsiderCluster } from '@/lib/insider-cluster-detector';
@@ -442,6 +448,10 @@ export interface TokenRiskResult {
     freely_tradeable_top10_percent?: number;
     freely_tradeable_largest_holder_percent?: number;
     scoring_risk_level?: string;
+    // v1.18 — true when this holder_distribution was served from the
+    // last-good cached snapshot rather than a fresh on-chain read.
+    holder_data_stale?: boolean;
+    holder_data_age_seconds?: number | null;
   };
   market?: {
     price_usd: number | null;
@@ -544,12 +554,40 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
       );
     }
 
+    let holderDataStale = false;
+    let holderDataAgeSeconds: number | null = null;
+    let staleEffectiveHolderCount: number | null = null;
+
+    if (isHolderReadingUnusable(holderRisk)) {
+      const snap = await getHolderSnapshot(mint);
+      if (snap) {
+        holderRisk = {
+          riskLevel: snap.riskLevel,
+          largestHolderPercent: snap.largestHolderPercent,
+          top10Percent: snap.top10Percent,
+          holderCount: snap.holderCount,
+          totalSupply: snap.totalSupply,
+          totalSupplyRaw: snap.totalSupplyRaw,
+        };
+        holderDataStale = true;
+        holderDataAgeSeconds = Math.max(0, Math.floor((Date.now() - snap.savedAt) / 1000));
+        staleEffectiveHolderCount = snap.effectiveHolderCount;
+        console.warn(`[token-risk-core] ${mint}: holder read failed; serving last good snapshot (${holderDataAgeSeconds}s old)`);
+      }
+    }
+
     // v1.9: prefer the genuine Solana Tracker headcount; fall back to the
     // Helius-capped slice only when Solana Tracker has no answer. Used
     // for BOTH scoring and the response/history below — never the raw
-    // holderRisk.holderCount directly past this point.
+    // holderRisk.holderCount directly past this point. A last-good
+    // snapshot's effectiveHolderCount is preferred over its cached
+    // Helius-capped holder count when Solana Tracker has no answer.
     const effectiveHolderCount =
-      typeof realHolderCount === 'number' ? realHolderCount : holderRisk.holderCount;
+      typeof realHolderCount === 'number'
+        ? realHolderCount
+        : typeof staleEffectiveHolderCount === 'number'
+          ? staleEffectiveHolderCount
+          : holderRisk.holderCount;
 
     const dexDataDex = sanitizeDexMarketData(rawDexData);
     // v1.15: when DexScreener has no pool data (e.g. no recent trades) but
@@ -583,12 +621,18 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
     // have. See lib/holder-data-guard.ts.
     if (isHolderReadingUnusable(holderRisk)) {
       console.error(`[token-risk-core] ${mint}: holder reading unusable, refusing to score`);
-      void alertAdmin(
-        'holder-data-unavailable',
-        `Holder distribution could not be read for ${mint} after all retries, so the audit was ` +
-          'refused rather than scored on zeroes. Look for "[holder-distribution] ' +
-          `${mint}: giving up, last reason:" in the logs for the underlying RPC cause.`,
-      );
+      waitUntil((async () => {
+        if (await shouldAlertHolderFailure(mint)) {
+          await alertAdmin(
+            'holder-data-unavailable',
+            `Holder distribution could not be read for ${mint} after all retries, so the audit was ` +
+              'refused rather than scored on zeroes. Look for "[holder-distribution] ' +
+              `${mint}: giving up, last reason:" in the logs for the underlying RPC cause.`,
+          );
+        } else {
+          console.warn(`[token-risk-core] ${mint}: holder failure below alert threshold, alert suppressed`);
+        }
+      })());
       return {
         ok: false,
         mint,
@@ -597,6 +641,8 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
         details: HOLDER_DATA_UNAVAILABLE_MESSAGE,
       };
     }
+
+    if (!holderDataStale) saveHolderSnapshotAsync(mint, holderRisk, effectiveHolderCount);
 
     const mintAuthorityRevoked = mintInfo.info.mintAuthority === null;
     const freezeAuthorityRevoked = mintInfo.info.freezeAuthority === null;
@@ -818,19 +864,21 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
     // insider_cluster_count: 0 for this hour, which a later "complete"
     // call in the SAME hour will simply overwrite (last-write-wins,
     // matches the upsert's documented semantics).
-    waitUntil(
-      upsertMintRiskHistory({
-        mint,
-        safetyScore,
-        insiderClusterCount: insiderClusters.length,
-        holderCount: effectiveHolderCount,
-        top10Percent: holderRisk.top10Percent,
-        priceUsd: dexData.price,
-        liquidityUsd: dexData.liquidity,
-        volume24hUsd: dexData.volume24h,
-        priceChange24hPercent: dexData.priceChange24h,
-      }),
-    );
+    if (!holderDataStale) {
+      waitUntil(
+        upsertMintRiskHistory({
+          mint,
+          safetyScore,
+          insiderClusterCount: insiderClusters.length,
+          holderCount: effectiveHolderCount,
+          top10Percent: holderRisk.top10Percent,
+          priceUsd: dexData.price,
+          liquidityUsd: dexData.liquidity,
+          volume24hUsd: dexData.volume24h,
+          priceChange24hPercent: dexData.priceChange24h,
+        }),
+      );
+    }
 
     return {
       ok: true,
@@ -908,6 +956,8 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
         freely_tradeable_top10_percent: freelyTradeableTop10Percent,
         freely_tradeable_largest_holder_percent: freelyTradeableLargestHolderPercent,
         scoring_risk_level: holderRiskForScoring.riskLevel,
+        holder_data_stale: holderDataStale,
+        holder_data_age_seconds: holderDataAgeSeconds,
       },
       market: {
         price_usd: dexData.price,
