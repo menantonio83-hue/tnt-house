@@ -1,3 +1,8 @@
+// Version 2.4 — lib/api-auth.ts
+//
+// v2.4: added authenticateRawApiKey() for MCP hosts that cannot send
+// HTTP headers and pass their API key as an optional tool argument.
+//
 // Version 2.3 — lib/api-auth.ts
 //
 // Explicit auth check for Risk-Data API routes. Deliberately NOT a global
@@ -27,6 +32,25 @@ export interface ApiKeyAuthResult {
   ok: boolean;
   key: ApiKeyRecord | null;
   response: NextResponse | null;
+}
+
+// v2.4: authenticate a raw API key string. Returns the matching record
+// for a valid, non-revoked key; otherwise returns null. Shared with the
+// MCP api_key argument path so callers whose MCP host cannot send an
+// Authorization header still get the exact same key validation and
+// usage-stamp as the header path. Never logs the key.
+export async function authenticateRawApiKey(rawKey: unknown): Promise<ApiKeyRecord | null> {
+  if (typeof rawKey !== 'string') return null;
+  const trimmed = rawKey.trim();
+  if (!isValidKeyFormat(trimmed)) return null;
+
+  const record = await findApiKeyByHash(hashApiKey(trimmed));
+  if (!record) return null;
+
+  // Fire-and-forget usage stamp — same as requireApiKey.
+  waitUntil(touchApiKeyUsage(record.id, record.request_count));
+
+  return record;
 }
 
 export async function requireApiKey(
