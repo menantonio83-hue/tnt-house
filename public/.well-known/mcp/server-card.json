@@ -1,26 +1,31 @@
 {
   "serverInfo": {
     "name": "tnt-house-risk-data-api",
-    "version": "1.2.0",
-    "description": "RiskDataApi \u2014 Solana token risk, 5 MCP calls free. Returns safety_score, first-funder insider clusters, honeypot risk, LP lock, mint/freeze authority in one call. No signup for the first 5 calls/day \u2014 15/day with a free email key at tnt-audit.com/risk-api."
+    "version": "1.3.0",
+    "description": "RiskDataApi — Solana token risk for AI agents. 5 MCP calls/day free with no signup, then a free email key (15/day, via the get_free_api_key tool) or x402 pay-per-call ($0.02 USDC). Returns safety_score, first-funder insider clusters, honeypot risk, LP lock, mint/freeze authority in one call."
   },
   "authentication": {
     "required": false,
     "schemes": [
       "bearer"
     ],
-    "notes": "Bearer token is optional. Without one, calls are limited to 5/day per IP (100/day global cap) as an anonymous trial. With a free API key from tnt-audit.com/risk-api, the limit rises to 15/day."
+    "notes": "Bearer token is optional. Without a key, check_token_risk is limited to 5 successful calls/day per caller identity (also capped at 20/day per IP, 60/day per /24 subnet, and 300/day globally). get_token_risk_history is free/unmetered and get_free_api_key works with no key (IP and global signup caps apply, one active key per email). Pass a key via the Authorization: Bearer header or the api_key argument; the header wins if both are present. Quota refusals return JSON with error_code, message, and options[] (ids free_key, x402, top_up). Free email key: 15 calls/day via get_free_api_key(email) or POST https://www.tnt-audit.com/api/v1/signup. Pay per call: x402 $0.02 USDC on Solana at GET https://www.tnt-audit.com/api/v1/token-risk/x402?mint=<mint>, no account. Batch (max 25 mints) needs a key or x402, all-or-nothing."
   },
   "tools": [
     {
       "name": "check_token_risk",
-      "description": "Returns a 0-100 safety score, on-chain insider wallet clusters (wallets sharing a first funder), mint/freeze authority status, holder concentration, and live price/liquidity/volume for a single Solana token mint. Use before recommending or executing a trade on any Solana token.",
+      "description": "Returns a 0-100 safety score, on-chain insider wallet clusters (wallets sharing a first funder), mint/freeze authority status, holder concentration, and live price/liquidity/volume for a single Solana token mint. Use before recommending or executing a trade on any Solana token. 5 free anonymous calls/day, no signup. Then call get_free_api_key (15/day) or pay per call via x402; pass a key via the Authorization header or the api_key argument. Quota refusals return error_code + options[] with the exact next step.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "mint": {
             "type": "string",
             "description": "The Solana token mint address to check"
+          },
+          "api_key": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Optional. Your RiskDataApi key, for MCP hosts that cannot send an Authorization header. If both are present, the Authorization header wins."
           }
         },
         "required": [
@@ -30,7 +35,7 @@
     },
     {
       "name": "check_token_risk_batch",
-      "description": "Same as check_token_risk but for up to 25 mints in one call \u2014 N mints charged as N calls, same per-call economics as check_token_risk, no bulk discount. All-or-nothing: if the batch can't be fully covered by remaining quota/credit, the whole batch is rejected rather than partially processed.",
+      "description": "Same as check_token_risk but for up to 25 mints in one call — N mints charged as N calls, same per-call economics as check_token_risk, no bulk discount. All-or-nothing: if the batch can't be fully covered by remaining quota/credit, the whole batch is rejected rather than partially processed. Needs an API key (Authorization header or api_key argument) or x402 — no anonymous batch calls.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -42,6 +47,11 @@
             "minItems": 1,
             "maxItems": 25,
             "description": "1-25 Solana token mint addresses"
+          },
+          "api_key": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Optional. Your RiskDataApi key, for MCP hosts that cannot send an Authorization header. If both are present, the Authorization header wins."
           }
         },
         "required": [
@@ -50,8 +60,25 @@
       }
     },
     {
+      "name": "get_free_api_key",
+      "description": "Issues a free RiskDataApi key for an email address (15 checks/day instead of 5 anonymous calls/day). No email verification. One active key per email; the key is returned once and also emailed. Use it when you hit the anonymous daily limit.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Email address to register the free key to"
+          }
+        },
+        "required": [
+          "email"
+        ]
+      }
+    },
+    {
       "name": "get_token_risk_history",
-      "description": "Returns hourly historical data points (safety_score, insider_cluster_count, holder_count, price, liquidity, volume) for a mint over the last N days (max 90). Does not count against the free/subscription call quota \u2014 pure read from stored history, no live upstream call.",
+      "description": "Returns hourly historical data points (safety_score, insider_cluster_count, holder_count, price, liquidity, volume) for a mint over the last N days (max 90). Free and unmetered — no quota, works with or without an API key — pure read from stored history, no live upstream call.",
       "inputSchema": {
         "type": "object",
         "properties": {

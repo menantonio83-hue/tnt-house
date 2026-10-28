@@ -1,3 +1,7 @@
+// Version 1.12 — app/api/mcp/route.ts
+//
+// v1.12: updated onboarding metadata — server instructions, check_token_risk/check_token_risk_batch descriptions, and public/.well-known/mcp/server-card.json now point agents at get_free_api_key / x402 / refusal options. No logic changes.
+//
 // Version 1.11 — app/api/mcp/route.ts
 //
 // v1.11: structured, machine-readable refusals for quota/credit blocks — anonymous and keyed check_token_risk (and keyed batch) now carry error_code/message/options from lib/refusal-options.ts, so an AI agent can continue automatically (free key, x402, or top up).
@@ -250,7 +254,7 @@ function buildServer(apiKey: ApiKeyRecord | null, clientIp: string, userAgent: s
       // visitor reliably sees BEFORE they're asked for a key, unlike
       // README.md or server-card.json which not every client reads.
       instructions:
-        'check_token_risk works with NO API key for your first 5 calls/day (no signup) — just call the tool directly. get_token_risk_history is also free/unmetered, key or no key. Need more check_token_risk calls? Get a free key with a 15/day quota — for an autonomous agent, self-serve one with no human required: POST {"email":"you@example.com"} to https://tnt-audit.com/api/v1/signup, the JSON response includes api_key directly. (Human-friendly form at https://tnt-audit.com/risk-api works too.) Already have an x402-capable wallet? Skip signup entirely: GET https://tnt-audit.com/api/v1/token-risk/x402?mint=<mint> pays per call in USDC on Solana via the standard x402 402-Payment-Required flow, no key or account at all. check_token_risk_batch requires a key or x402 — no anonymous batch calls.',
+        'check_token_risk works with no signup: 5 free anonymous calls/day — just call the tool directly. On a quota refusal, read error_code + options[] and follow one to continue (free key, x402, or top up). get_free_api_key(email) issues a free key for 15 calls/day; pass it via the Authorization: Bearer header or the api_key argument (header wins). Pay per call with x402: GET https://www.tnt-audit.com/api/v1/token-risk/x402?mint=<mint> ($0.02 USDC on Solana, no account). check_token_risk_batch (max 25 mints) needs a key or x402; N mints = N calls, all-or-nothing. get_token_risk_history is free/unmetered.',
     },
   );
 
@@ -259,7 +263,7 @@ function buildServer(apiKey: ApiKeyRecord | null, clientIp: string, userAgent: s
     {
       title: 'Check Solana token risk',
       description:
-        'Returns a 0-100 safety score, on-chain insider wallet clusters (wallets sharing a first funder), mint/freeze authority status, holder concentration, and live price/liquidity/volume for a single Solana token mint. Use before recommending or executing a trade on any Solana token. 5 free MCP calls/day, no signup. Then email key or x402.',
+        'Returns a 0-100 safety score, on-chain insider wallet clusters (wallets sharing a first funder), mint/freeze authority status, holder concentration, and live price/liquidity/volume for a single Solana token mint. Use before recommending or executing a trade on any Solana token. 5 free anonymous calls/day, no signup. Then call get_free_api_key (15/day) or pay per call via x402; pass a key via the Authorization header or the api_key argument. Quota refusals return error_code + options[] with the exact next step.',
       inputSchema: {
         mint: z.string().describe('The Solana token mint address to check'),
         api_key: z.string().max(200).optional().describe(API_KEY_ARG_DESCRIPTION),
@@ -351,7 +355,7 @@ function buildServer(apiKey: ApiKeyRecord | null, clientIp: string, userAgent: s
     'check_token_risk_batch',
     {
       title: 'Check risk for multiple Solana tokens at once',
-      description: `Same as check_token_risk but for up to ${MAX_BATCH_SIZE} mints in one call — N mints charged as N calls, same per-call economics as check_token_risk, no bulk discount. All-or-nothing: if the batch can't be fully covered by remaining quota/credit, the whole batch is rejected rather than partially processed.`,
+      description: `Same as check_token_risk but for up to ${MAX_BATCH_SIZE} mints in one call — N mints charged as N calls, same per-call economics as check_token_risk, no bulk discount. All-or-nothing: if the batch can't be fully covered by remaining quota/credit, the whole batch is rejected rather than partially processed. Needs an API key (Authorization header or api_key argument) or x402 — no anonymous batch calls.`,
       inputSchema: {
         mints: z.array(z.string()).min(1).max(MAX_BATCH_SIZE).describe(`1-${MAX_BATCH_SIZE} Solana token mint addresses`),
         api_key: z.string().max(200).optional().describe(API_KEY_ARG_DESCRIPTION),
