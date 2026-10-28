@@ -161,6 +161,7 @@
 // after the response is sent).
 
 import { NextRequest, NextResponse } from 'next/server';
+import { buildRefusalBody, freeKeyOption, x402Option } from '@/lib/refusal-options';
 import { waitUntil } from '@vercel/functions';
 import { requireApiKey } from '@/lib/api-auth';
 import { enforceRateLimit } from '@/lib/rate-limit';
@@ -340,11 +341,12 @@ export async function GET(request: NextRequest) {
         if (decision.reason === 'identity_exhausted') {
           return respond(
             NextResponse.json(
-              {
-                error:
-                  "You've used your 5 free demo calls from this browser/IP. The public demo key is shared — get your own free key for a guaranteed 15/day quota, or use x402 pay-per-call (no key needed).",
-                demo: demoPublicField(decision.globalRemaining),
-              },
+              buildRefusalBody(
+                'demo_limit_reached',
+                "You've used your 5 free demo calls from this browser/IP. The public demo key is shared — get your own free key for a guaranteed 15/day quota, or use x402 pay-per-call (no key needed).",
+                [freeKeyOption(), x402Option()],
+                { demo: demoPublicField(decision.globalRemaining) },
+              ),
               { status: 402, headers: { ...CORS_HEADERS, ...demoPublicHeaders(decision.globalRemaining) } },
             ),
             { error: 'demo_public_identity_exhausted' },
@@ -353,10 +355,12 @@ export async function GET(request: NextRequest) {
         if (decision.reason === 'global_exhausted') {
           return respond(
             NextResponse.json(
-              {
-                error: `💀 Public demo is dead — all ${DEMO_TOTAL_LIMIT} calls used. It's not coming back. Get your own free key (15/day, no card): https://tnt-audit.com/risk-api`,
-                demo: demoPublicField(0),
-              },
+              buildRefusalBody(
+                'demo_limit_reached',
+                `💀 Public demo is dead — all ${DEMO_TOTAL_LIMIT} calls used. It's not coming back. Get your own free key (15/day, no card): https://tnt-audit.com/risk-api`,
+                [freeKeyOption(), x402Option()],
+                { demo: demoPublicField(0) },
+              ),
               { status: 402, headers: { ...CORS_HEADERS, ...demoPublicHeaders(0) } },
             ),
             { error: 'demo_public_global_exhausted' },

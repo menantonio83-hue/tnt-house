@@ -1,3 +1,6 @@
+// Version 4.2 — lib/rate-limit.ts
+//
+// v4.2: structured, machine-readable refusals — every quota/credit 402 now carries error_code/message/options from lib/refusal-options.ts so an AI agent can continue automatically (top up, x402, or free key).
 // Version 4.1 — lib/rate-limit.ts
 //
 // 4.1: Added x402/topup metadata + Retry-After headers on 402, cap `used`
@@ -79,6 +82,7 @@ import {
   MIN_TOPUP_USD,
   MAX_TOPUP_USD,
 } from '@/lib/billing-pricing';
+import { buildRefusalBody, topUpOption, x402Option, type RefusalErrorCode } from '@/lib/refusal-options';
 
 export interface RateLimitResult {
   allowed: boolean;
@@ -107,6 +111,7 @@ function humanizeResetAt(resetAtIso: string): string | null {
 }
 
 function buildLimitReachedResponse(
+  errorCode: RefusalErrorCode,
   message: string,
   limit: number,
   used: number,
@@ -124,22 +129,26 @@ function buildLimitReachedResponse(
   headers.set('X-RateLimit-Reset', resetAt);
 
   return NextResponse.json(
-    {
-      error: message,
-      limit,
-      used: Math.min(used, limit),
-      reset_at: resetAt,
-      resets_in: humanizeResetAt(resetAt),
-      overage_rate_usd: overageRate,
-      subscription_price_usd: SUBSCRIPTION_USD,
-      subscription_monthly_quota: SUBSCRIPTION_MONTHLY_QUOTA,
-      upgrade_url: 'https://tnt-audit.com/risk-api#billing',
-      x402_url: 'https://tnt-audit.com/api/v1/token-risk/x402',
-      x402_price_usd: 0.02,
-      topup_url: 'https://tnt-audit.com/api/v1/billing/create-invoice',
-      min_topup_usd: MIN_TOPUP_USD,
-      note: `Three ways to continue: (1) No account? Pay per call via x402 at $0.02/call (USDC on Solana) at x402_url. (2) Top up call credit with this key: POST topup_url with JSON {"api_key":"<your key>","kind":"topup","currency":"SOL" or "USDC","usd_amount":${MIN_TOPUP_USD}-${MAX_TOPUP_USD}}, send the exact pay_amount to the returned wallet_address, then POST /api/v1/billing/verify-payment with {"payment_id","api_key"} — after that each call over the free cap costs $${overageRate}. (3) Subscribe for $${SUBSCRIPTION_USD} = ${SUBSCRIPTION_MONTHLY_QUOTA} calls/30 days at $${OVERAGE_RATE_SUBSCRIBED_USD}/call overage after that. Your free quota resets at ${resetAt}.`,
-    },
+    buildRefusalBody(
+      errorCode,
+      message,
+      [topUpOption(overageRate), x402Option()],
+      {
+        limit,
+        used: Math.min(used, limit),
+        reset_at: resetAt,
+        resets_in: humanizeResetAt(resetAt),
+        overage_rate_usd: overageRate,
+        subscription_price_usd: SUBSCRIPTION_USD,
+        subscription_monthly_quota: SUBSCRIPTION_MONTHLY_QUOTA,
+        upgrade_url: 'https://tnt-audit.com/risk-api#billing',
+        x402_url: 'https://tnt-audit.com/api/v1/token-risk/x402',
+        x402_price_usd: 0.02,
+        topup_url: 'https://tnt-audit.com/api/v1/billing/create-invoice',
+        min_topup_usd: MIN_TOPUP_USD,
+        note: `Three ways to continue: (1) No account? Pay per call via x402 at $0.02/call (USDC on Solana) at x402_url. (2) Top up call credit with this key: POST topup_url with JSON {"api_key":"<your key>","kind":"topup","currency":"SOL" or "USDC","usd_amount":${MIN_TOPUP_USD}-${MAX_TOPUP_USD}}, send the exact pay_amount to the returned wallet_address, then POST /api/v1/billing/verify-payment with {"payment_id","api_key"} — after that each call over the free cap costs $${overageRate}. (3) Subscribe for $${SUBSCRIPTION_USD} = ${SUBSCRIPTION_MONTHLY_QUOTA} calls/30 days at $${OVERAGE_RATE_SUBSCRIBED_USD}/call overage after that. Your free quota resets at ${resetAt}.`,
+      },
+    ),
     { status: 402, headers },
   );
 }
@@ -155,15 +164,19 @@ function buildGlobalPoolReachedResponse(
   extraHeaders: HeadersInit,
 ): NextResponse {
   return NextResponse.json(
-    {
-      error: `Free tier is at capacity for today (${GLOBAL_FREE_DAILY_LIMIT}/${GLOBAL_FREE_DAILY_LIMIT} shared calls used across all free keys) — this is not specific to your key, you've only used ${personalUsed}/${personalLimit} of your own quota.`,
-      limit: GLOBAL_FREE_DAILY_LIMIT,
-      used: GLOBAL_FREE_DAILY_LIMIT,
-      reset_at: resetAt,
-      resets_in: humanizeResetAt(resetAt),
-      upgrade_url: 'https://tnt-audit.com/risk-api#billing',
-      note: 'Subscribe or top up call credits for guaranteed access that never depends on the shared free pool.',
-    },
+    buildRefusalBody(
+      'free_pool_capacity',
+      `Free tier is at capacity for today (${GLOBAL_FREE_DAILY_LIMIT}/${GLOBAL_FREE_DAILY_LIMIT} shared calls used across all free keys) — this is not specific to your key, you've only used ${personalUsed}/${personalLimit} of your own quota.`,
+      [topUpOption(OVERAGE_RATE_FREE_USD), x402Option()],
+      {
+        limit: GLOBAL_FREE_DAILY_LIMIT,
+        used: GLOBAL_FREE_DAILY_LIMIT,
+        reset_at: resetAt,
+        resets_in: humanizeResetAt(resetAt),
+        upgrade_url: 'https://tnt-audit.com/risk-api#billing',
+        note: 'Subscribe or top up call credits for guaranteed access that never depends on the shared free pool.',
+      },
+    ),
     { status: 402, headers: extraHeaders },
   );
 }
@@ -247,7 +260,8 @@ export async function enforceRateLimit(
       creditBalanceUsd: key.credit_balance_usd,
       usedOverageCredit: false,
       response: buildLimitReachedResponse(
-        'Monthly subscription quota reached and call-credit balance is empty',
+        'paid_balance_exceeded',
+        'Monthly subscription quota reached and call-credit balance is empty — top up call credit, or pay per call via x402 ($0.02/call, no account needed).',
         SUBSCRIPTION_MONTHLY_QUOTA,
         used,
         key.subscription_expires_at as string,
@@ -273,6 +287,7 @@ export async function enforceRateLimit(
       creditBalanceUsd: key.credit_balance_usd,
       usedOverageCredit: false,
       response: buildLimitReachedResponse(
+        'free_daily_limit_reached',
         'Daily free-tier limit reached and call-credit balance is empty',
         FREE_DAILY_LIMIT,
         used,
@@ -385,6 +400,7 @@ export async function enforceRateLimit(
     creditBalanceUsd: key.credit_balance_usd,
     usedOverageCredit: false,
     response: buildLimitReachedResponse(
+      'free_daily_limit_reached',
       'Daily free-tier limit reached and call-credit balance is empty',
       FREE_DAILY_LIMIT,
       used,
@@ -505,7 +521,8 @@ export async function enforceRateLimitBatch(
       creditBalanceUsd: key.credit_balance_usd,
       usedOverageCredit: false,
       response: buildLimitReachedResponse(
-        `Batch of ${count} needs ${overCount} overage call(s) past the monthly subscription quota, and the call-credit balance is insufficient to cover them`,
+        'paid_balance_exceeded',
+        `Batch of ${count} needs ${overCount} overage call(s) past the monthly subscription quota, and the call-credit balance is insufficient to cover them — top up call credit, or pay per call via x402 ($0.02/call, no account needed).`,
         SUBSCRIPTION_MONTHLY_QUOTA,
         usedAfter,
         key.subscription_expires_at as string,
@@ -629,6 +646,7 @@ export async function enforceRateLimitBatch(
     creditBalanceUsd: key.credit_balance_usd,
     usedOverageCredit: false,
     response: buildLimitReachedResponse(
+      'free_daily_limit_reached',
       `Batch of ${count} needs ${overCount} overage call(s) past the daily free-tier limit, and the call-credit balance is insufficient to cover them`,
       FREE_DAILY_LIMIT,
       usedAfter,
