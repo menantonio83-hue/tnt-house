@@ -9,6 +9,43 @@
 > x402: $0.02 USDC/call, no key — GET /api/v1/token-risk/x402
 > Subscription: $45 / 30 days / 5000 calls, then $0.015/call.
 
+## Agent quick start
+
+1. Connect MCP at https://www.tnt-audit.com/api/mcp
+2. Call `check_token_risk` with no key — 5 free anonymous calls/day.
+3. Need more: call `get_free_api_key(email)` (15/day free) or pay per call via x402 ($0.02 USDC). Refusals carry `options[]` with the next step.
+
+### Claude Desktop
+
+Add to `claude_desktop_config.json` (uses the `mcp-remote` bridge):
+
+```json
+{
+  "mcpServers": {
+    "riskdataapi": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://www.tnt-audit.com/api/mcp"]
+    }
+  }
+}
+```
+
+### Cursor
+
+Add to `~/.cursor/mcp.json` (or project `.cursor/mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "riskdataapi": {
+      "url": "https://www.tnt-audit.com/api/mcp"
+    }
+  }
+}
+```
+
+A key can be added as `"headers": {"Authorization": "Bearer <api_key>"}` in Cursor.
+
 Base URL: https://www.tnt-audit.com
 Full OpenAPI 3.1 spec: https://www.tnt-audit.com/openapi.json
 MCP server (stateless, for MCP-native agents): https://www.tnt-audit.com/api/mcp
