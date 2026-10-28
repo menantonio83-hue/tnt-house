@@ -1,4 +1,7 @@
-// Version 1.0 — lib/billing-actions.ts
+// Version 1.1 — lib/billing-actions.ts
+//
+// v1.1: exports verifyPaymentForKeyId(keyId, paymentId) so owner-handoff polling can verify a payment without exposing or requiring the full ApiKeyRecord; verifyPaymentForKey(key, paymentId) is now a thin wrapper.
+//
 // Shared by the REST billing routes and the MCP create_topup_invoice / check_payment tools so both have the same auth, tier rules, pending-invoice cap (MAX_PENDING_INVOICES_PER_KEY), salt-collision handling and verification.
 
 import type { ApiKeyRecord } from '@/lib/api-key-store';
@@ -150,8 +153,8 @@ export async function createInvoiceForKey(
   }
 }
 
-export async function verifyPaymentForKey(
-  key: ApiKeyRecord,
+export async function verifyPaymentForKeyId(
+  keyId: string,
   paymentId: unknown,
 ): Promise<BillingActionResult> {
   try {
@@ -165,7 +168,7 @@ export async function verifyPaymentForKey(
       return { status: 404, body: { verified: false, reason: 'Unknown payment_id' } };
     }
 
-    if (payment.key_id !== key.id) {
+    if (payment.key_id !== keyId) {
       // Deliberately the same generic shape as "unknown payment_id" —
       // don't confirm to a caller that a payment_id exists but belongs
       // to someone else.
@@ -288,4 +291,11 @@ export async function verifyPaymentForKey(
     console.error('[billing/verify-payment] error:', error);
     return { status: 500, body: { verified: false, reason: error.message } };
   }
+}
+
+export async function verifyPaymentForKey(
+  key: ApiKeyRecord,
+  paymentId: unknown,
+): Promise<BillingActionResult> {
+  return verifyPaymentForKeyId(key.id, paymentId);
 }

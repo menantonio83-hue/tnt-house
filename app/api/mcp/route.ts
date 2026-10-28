@@ -1,4 +1,6 @@
-// Version 1.14 — app/api/mcp/route.ts
+// Version 1.15 — app/api/mcp/route.ts
+//
+// v1.15: quota/credit refusals now attach owner handoff info via lib/owner-handoff — keyed blocks can carry a one-time $5 USDC top-up link for the key owner, anonymous blocks get owner_message + owner_pay_url pointing to https://www.tnt-audit.com/agent-access.
 //
 // v1.14: all public URLs in tool notes/instructions use the canonical https://www.tnt-audit.com origin.
 //
@@ -158,6 +160,7 @@ import { issueFreeApiKey } from '@/lib/free-key-signup';
 import { logApiRequest } from '@/lib/request-logger';
 import { checkMcpAnonLimit, normalizeSessionId, recordMcpAnonSuccess } from '@/lib/mcp-anon-limit';
 import { buildRefusalBody, freeKeyOption, x402Option } from '@/lib/refusal-options';
+import { attachOwnerHandoff, attachAnonOwnerInfo } from '@/lib/owner-handoff';
 import { createInvoiceForKey, verifyPaymentForKey } from '@/lib/billing-actions';
 import { MIN_TOPUP_USD, MAX_TOPUP_USD } from '@/lib/billing-pricing';
 import type { ApiKeyRecord } from '@/lib/api-key-store';
@@ -310,7 +313,16 @@ function buildServer(apiKey: ApiKeyRecord | null, clientIp: string, userAgent: s
                 : gate.reason === 'infra'
                   ? 'Anonymous MCP access is temporarily unavailable. Please try again shortly, or use a free API key (15/day) from https://www.tnt-audit.com/risk-api.'
                   : `Anonymous MCP quota used (${gate.used}/${gate.limit} today). Get a free email key (15/day) at https://www.tnt-audit.com/risk-api or pay per call via x402 GET /api/v1/token-risk/x402 ($0.02).`;
-          return jsonResult(buildRefusalBody(gate.reason === 'infra' ? 'anon_unavailable' : 'anon_limit_reached', message, [freeKeyOption(), x402Option()], { used: gate.used, limit: gate.limit }), true);
+          const anonRefusal = buildRefusalBody(
+            gate.reason === 'infra' ? 'anon_unavailable' : 'anon_limit_reached',
+            message,
+            [freeKeyOption(), x402Option()],
+            { used: gate.used, limit: gate.limit },
+          );
+          // Owner info only for a real quota block — an infra outage is not
+          // "your agent used its free calls".
+          const anonBody = gate.reason === 'infra' ? anonRefusal : attachAnonOwnerInfo(anonRefusal);
+          return jsonResult(anonBody, true);
         }
         const result = await fetchTokenRisk(mint);
         if (result.ok) {
@@ -348,7 +360,11 @@ function buildServer(apiKey: ApiKeyRecord | null, clientIp: string, userAgent: s
           logApiRequest({ keyId: callKey.id, mint, statusCode: 402, responseTimeMs: Date.now() - startedAt, error: 'rate_limited' }),
         );
         const refusal = rateLimit.response ? await rateLimit.response.clone().json().catch(() => null) : null;
-        return jsonResult(refusal ?? { error: 'Rate limit or credit balance exceeded.', error_code: 'rate_limited' }, true);
+        const withHandoff = await attachOwnerHandoff(refusal, callKey);
+        return jsonResult(
+          withHandoff ?? { error: 'Rate limit or credit balance exceeded.', error_code: 'rate_limited' },
+          true,
+        );
       }
 
       const result = await fetchTokenRisk(mint);
@@ -383,10 +399,12 @@ function buildServer(apiKey: ApiKeyRecord | null, clientIp: string, userAgent: s
       const callKey = resolved.key;
       if (!callKey) {
         return jsonResult(
-          buildRefusalBody(
-            'anon_limit_reached',
-            'Batch needs an API key or x402 — anonymous batch calls are not supported. Free key (15/day): https://www.tnt-audit.com/risk-api. x402: GET /api/v1/token-risk/x402 ($0.02/call).',
-            [freeKeyOption(), x402Option()],
+          attachAnonOwnerInfo(
+            buildRefusalBody(
+              'anon_limit_reached',
+              'Batch needs an API key or x402 — anonymous batch calls are not supported. Free key (15/day): https://www.tnt-audit.com/risk-api. x402: GET /api/v1/token-risk/x402 ($0.02/call).',
+              [freeKeyOption(), x402Option()],
+            ),
           ),
           true,
         );
@@ -404,7 +422,14 @@ function buildServer(apiKey: ApiKeyRecord | null, clientIp: string, userAgent: s
           }),
         );
         const refusal = rateLimit.response ? await rateLimit.response.clone().json().catch(() => null) : null;
-        return jsonResult(refusal ?? { error: 'Rate limit or credit balance exceeded for this batch.', error_code: 'rate_limited' }, true);
+        const withHandoff = await attachOwnerHandoff(refusal, callKey);
+        return jsonResult(
+          withHandoff ?? {
+            error: 'Rate limit or credit balance exceeded for this batch.',
+            error_code: 'rate_limited',
+          },
+          true,
+        );
       }
 
       const results = await Promise.all(mints.map((mint) => fetchTokenRisk(mint)));

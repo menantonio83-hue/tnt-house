@@ -1,3 +1,7 @@
+// Version 1.1 — app/api/v1/token-risk/batch/route.ts
+//
+// v1.1: keyed rate-limit refusals now carry an owner handoff via withOwnerHandoff — same one-time $5 USDC top-up flow as the single-mint endpoint.
+//
 // Version 1.0 — app/api/v1/token-risk/batch/route.ts
 //
 // POST /api/v1/token-risk/batch
@@ -42,6 +46,7 @@ import { waitUntil } from '@vercel/functions';
 import { requireApiKey } from '@/lib/api-auth';
 import { enforceRateLimitBatch } from '@/lib/rate-limit';
 import { logApiRequest } from '@/lib/request-logger';
+import { withOwnerHandoff } from '@/lib/owner-handoff';
 import { fetchTokenRisk, toPublicTokenRisk } from '@/lib/token-risk-core';
 
 // Same 60s ceiling as the single-mint route — a batch of 25 concurrent
@@ -137,7 +142,9 @@ export async function POST(request: NextRequest) {
     if (!rateLimit.allowed) {
       logBatch(402, 'rate_limited');
       return (
-        rateLimit.response ?? NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429, headers: CORS_HEADERS })
+        rateLimit.response
+          ? await withOwnerHandoff(rateLimit.response, auth.key)
+          : NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429, headers: CORS_HEADERS })
       );
     }
 

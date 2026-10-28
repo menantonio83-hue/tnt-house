@@ -1,4 +1,6 @@
-// Version 1.15 — app/api/v1/token-risk/route.ts
+// Version 1.16 — app/api/v1/token-risk/route.ts
+//
+// v1.16: keyed rate-limit refusals now attach an owner handoff via withOwnerHandoff so a human can pay a $5 USDC top-up for that specific key without exposing the key.
 //
 // v1.15: demo headers/messages/refusals use the canonical https://www.tnt-audit.com origin (also covers the v4 structured demo_limit_reached refusals added without a header bump).
 //
@@ -165,6 +167,7 @@
 // after the response is sent).
 
 import { NextRequest, NextResponse } from 'next/server';
+import { withOwnerHandoff } from '@/lib/owner-handoff';
 import { buildRefusalBody, freeKeyOption, x402Option } from '@/lib/refusal-options';
 import { waitUntil } from '@vercel/functions';
 import { requireApiKey } from '@/lib/api-auth';
@@ -423,8 +426,9 @@ export async function GET(request: NextRequest) {
       const rateLimit = await enforceRateLimit(auth.key, CORS_HEADERS);
       if (!rateLimit.allowed) {
         return respond(
-          rateLimit.response ??
-            NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429, headers: CORS_HEADERS }),
+          rateLimit.response
+            ? await withOwnerHandoff(rateLimit.response, auth.key)
+            : NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429, headers: CORS_HEADERS }),
           { error: 'rate_limited' },
         );
       }
