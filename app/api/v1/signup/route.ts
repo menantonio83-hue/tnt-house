@@ -1,3 +1,8 @@
+// Version 7.2 — app/api/v1/signup/route.ts
+//
+// v7.2: logic moved to lib/free-key-signup.ts, shared with the MCP
+// get_free_api_key tool; behaviour unchanged.
+//
 // Version 7.1 — app/api/v1/signup/route.ts
 //
 // v7.1: added IP + global daily rate limiting on the signup attempt
@@ -70,19 +75,9 @@
 // key-issuing flow from Stage 2).
 
 import { NextRequest, NextResponse } from 'next/server';
-import { waitUntil } from '@vercel/functions';
-import { supabaseAdmin as supabase } from '@/lib/supabase-admin';
-import { generateApiKey } from '@/lib/api-key';
-import { insertApiKey } from '@/lib/api-key-store';
-import { FREE_DAILY_LIMIT } from '@/lib/billing-pricing';
-import { sendApiKeyEmail } from '@/lib/send-email';
-import { checkSignupLimit } from '@/lib/signup-limit';
-import type { LangCode } from '@/app/risk-api/i18n';
+import { issueFreeApiKey } from '@/lib/free-key-signup';
 
 export const dynamic = 'force-dynamic';
-
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const VALID_LANGS: LangCode[] = ['en', 'es', 'fr', 'el', 'ru', 'it', 'zh'];
 
 // Same pattern as app/api/v1/token-risk/route.ts's route-local helper —
 // a two-line concern not worth a shared module.
@@ -92,93 +87,16 @@ function extractClientIp(request: NextRequest): string {
   return 'unknown';
 }
 
-// Known referral partners for revenue-share arrangements. Whitelisted
-// on purpose — this drives real payouts, so it must never accept
-// arbitrary client-supplied text. Add a new entry here (lowercase) when
-// onboarding a new partner; nothing else needs to change.
-const KNOWN_REFERRAL_CODES = ['lumo', 'demo_public'];
-
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => ({}));
-    const rawEmail = typeof body.email === 'string' ? body.email.trim() : '';
-    const lang = VALID_LANGS.includes(body.lang) ? (body.lang as LangCode) : undefined;
-    const rawRef = typeof body.ref === 'string' ? body.ref.trim().toLowerCase() : '';
-    const ref = KNOWN_REFERRAL_CODES.includes(rawRef) ? rawRef : null;
-
-    if (!rawEmail || !EMAIL_REGEX.test(rawEmail) || rawEmail.length > 200) {
-      return NextResponse.json({ error: 'Enter a valid email address' }, { status: 400 });
-    }
-
-    // v7.1: IP + global daily cap on signups themselves — closes a real
-    // abuse path (see lib/signup-limit.ts header): this endpoint has no
-    // email verification by design, so nothing else stopped a script
-    // from minting many keys/minute with fake emails. Checked before
-    // any Supabase work, right after cheap format validation.
-    const clientIp = extractClientIp(request);
-    const signupLimit = await checkSignupLimit(clientIp);
-    if (!signupLimit.allowed) {
-      const isGlobalLimit = signupLimit.reason === 'global';
-      const message = isGlobalLimit
-        ? `Free-key signups are at capacity for today (${signupLimit.used}/${signupLimit.limit} issued globally) — try again after UTC midnight.`
-        : `Too many signups from this IP today (${signupLimit.used}/${signupLimit.limit}) — try again after UTC midnight, or use x402 (no signup at all): GET /api/v1/token-risk/x402.`;
-      const body = isGlobalLimit
-        ? { error: message, error_code: 'signup_global_limit', used: signupLimit.used, limit: signupLimit.limit }
-        : { error: message, error_code: 'signup_ip_limit', used: signupLimit.used, limit: signupLimit.limit };
-      return NextResponse.json(body, { status: 429 });
-    }
-
-    const email = rawEmail.toLowerCase();
-
-    const { data: existing, error: lookupError } = await supabase
-      .from('api_keys')
-      .select('id')
-      .eq('owner_label', email)
-      .eq('is_active', true)
-      .limit(1)
-      .maybeSingle();
-
-    if (lookupError) {
-      console.error('[signup] lookup error:', lookupError.message);
-      return NextResponse.json({ error: 'Internal error, please try again' }, { status: 500 });
-    }
-
-    if (existing) {
-      return NextResponse.json(
-        {
-          error: 'This email already has an active API key',
-          error_code: 'email_exists',
-          note: 'Keys are only shown once at creation and cannot be retrieved again. If you lost yours, contact us to have it reissued.',
-        },
-        { status: 409 },
-      );
-    }
-
-    const { rawKey, keyHash, keyPrefix } = generateApiKey();
-    const record = await insertApiKey(keyHash, keyPrefix, email, 'free', ref);
-
-    if (!record) {
-      return NextResponse.json({ error: 'Failed to create API key, please try again' }, { status: 500 });
-    }
-
-    // Fire-and-forget — never blocks or fails this response, see
-    // lib/send-email.ts's header for why.
-    waitUntil(sendApiKeyEmail({ to: email, apiKey: rawKey, dailyLimit: FREE_DAILY_LIMIT, lang }));
-
-    return NextResponse.json({
-      api_key: rawKey,
-      key_prefix: keyPrefix,
-      tier: record.tier,
-      // FIX: was hardcoded 100 -- stale from before the pricing finalized
-      // at 15/day (see lib/rate-limit.ts FREE_DAILY_LIMIT, which was
-      // already correctly enforcing 15). This response text told every
-      // new signup a wrong, 6.6x-too-generous number while the real
-      // limit silently kicked in at 15. Now reads the same constant the
-      // rate limiter actually enforces, so the two can't drift apart again.
-      daily_limit: FREE_DAILY_LIMIT,
-      created_at: record.created_at,
-      warning: 'This key is shown once and cannot be retrieved again. Store it securely.',
+    const result = await issueFreeApiKey({
+      email: body.email,
+      lang: body.lang,
+      ref: body.ref,
+      clientIp: extractClientIp(request),
     });
+    return NextResponse.json(result.body, { status: result.status });
   } catch (error: any) {
     console.error('[signup] error:', error);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });

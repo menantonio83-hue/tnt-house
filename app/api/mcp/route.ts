@@ -1,3 +1,10 @@
+// Version 1.9 — app/api/mcp/route.ts
+//
+// v1.9: new get_free_api_key tool that reuses the exact web signup logic
+// (lib/free-key-signup.ts) so the MCP path shares per-email dedup and the
+// IP/global signup cap; works with no Authorization header and does not
+// consume the 5/day anonymous check quota.
+//
 // Version 1.8 — app/api/mcp/route.ts
 //
 // v1.8: anonymous check_token_risk now also counts subnet+UA and
@@ -124,6 +131,7 @@ import { requireApiKey } from '@/lib/api-auth';
 import { enforceRateLimit, enforceRateLimitBatch } from '@/lib/rate-limit';
 import { fetchTokenRisk } from '@/lib/token-risk-core';
 import { getMintRiskHistory } from '@/lib/mint-risk-history-store';
+import { issueFreeApiKey } from '@/lib/free-key-signup';
 import { logApiRequest } from '@/lib/request-logger';
 import { checkMcpAnonLimit, normalizeSessionId, recordMcpAnonSuccess } from '@/lib/mcp-anon-limit';
 import type { ApiKeyRecord } from '@/lib/api-key-store';
@@ -151,9 +159,12 @@ const PUBLIC_METHODS = new Set(['initialize', 'notifications/initialized', 'ping
 // get_token_risk_history: no quota at all — already free/uncounted for
 // a real key (pure read from stored history), so there's no cost reason
 // to gate an anonymous caller either.
+// get_free_api_key: works with no key; does NOT consume the 5/day
+// anonymous check quota — abuse protection is the signup IP/global cap
+// inside issueFreeApiKey (lib/free-key-signup.ts).
 // Deliberately NOT check_token_risk_batch: it can burn up to
 // MAX_BATCH_SIZE upstream calls in one shot — key or x402 only.
-const ANON_ALLOWED_TOOLS = new Set(['check_token_risk', 'get_token_risk_history']);
+const ANON_ALLOWED_TOOLS = new Set(['check_token_risk', 'get_token_risk_history', 'get_free_api_key']);
 
 function jsonResult(data: unknown, isError = false) {
   return { content: [{ type: 'text' as const, text: JSON.stringify(data) }], isError };
@@ -355,6 +366,31 @@ function buildServer(apiKey: ApiKeyRecord | null, clientIp: string, userAgent: s
   );
 
   server.registerTool(
+    'get_free_api_key',
+    {
+      title: 'Get a free API key',
+      description:
+        'Issues a free RiskDataApi key for an email address (15 checks/day instead of 5 anonymous calls/day). No email verification. One active key per email; the key is returned once and also emailed. Use it when you hit the anonymous daily limit.',
+      inputSchema: { email: z.string().max(200).describe('Email address to register the free key to') },
+    },
+    async ({ email }) => {
+      const result = await issueFreeApiKey({ email, clientIp });
+      if (result.status === 200) {
+        return jsonResult({
+          ...result.body,
+          usage: {
+            mcp: 'Send the key as an HTTP header on every MCP request: Authorization: Bearer <api_key> (MCP endpoint https://www.tnt-audit.com/api/mcp).',
+            rest: 'GET https://www.tnt-audit.com/api/v1/token-risk?mint=<mint> with the same Authorization header.',
+            daily_limit: result.body.daily_limit,
+            note: 'Store the key securely; it cannot be shown again.',
+          },
+        });
+      }
+      return jsonResult(result.body, true);
+    },
+  );
+
+  server.registerTool(
     'get_token_risk_history',
     {
       title: 'Get historical risk trend for a Solana token',
@@ -433,9 +469,10 @@ export async function POST(request: NextRequest) {
       // v1.6: a missing/invalid key on tools/call no longer hard-blocks
       // here IF this specific call is one of ANON_ALLOWED_TOOLS — let
       // it through with apiKey = null; check_token_risk enforces its
-      // own dedicated 5/day quota inside the handler, and
-      // get_token_risk_history has no quota at all. batch still 401s
-      // here exactly as before.
+      // own dedicated 5/day quota inside the handler,
+      // get_token_risk_history has no quota at all, and
+      // get_free_api_key uses the signup IP/global cap inside
+      // issueFreeApiKey (not the 5/day quota). batch still 401s here.
       if (!isAnonAllowedCall) {
         return auth.response ?? NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       }
