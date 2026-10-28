@@ -1,3 +1,9 @@
+// Version 1.1 — app/risk-api/ChatWidget.tsx
+//
+// v1.1 (2026-10-28): 429 and 5xx replies show the localized
+// chatLimitReached / chatConnectionError strings instead of the route's
+// English-only error text.
+//
 // Version 1.0 — app/risk-api/ChatWidget.tsx
 //
 // Same pattern as app/page.js's own chat widget (existing file, not
@@ -99,8 +105,17 @@ export default function ChatWidget() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: history }),
       });
-      const data = await res.json();
-      setMessages((prev) => prev.concat([{ sender: 'bot', text: data.reply || data.error || 'Error. Try again.' }]));
+      const data = await res.json().catch(() => ({}));
+      // Server error strings are English-only; show the localized ones
+      // for rate limit (429) and upstream/server failures (5xx).
+      const text =
+        data.reply ||
+        (res.status === 429
+          ? t.chatLimitReached
+          : res.status >= 500
+            ? t.chatConnectionError
+            : data.error || t.chatConnectionError);
+      setMessages((prev) => prev.concat([{ sender: 'bot', text }]));
     } catch {
       setMessages((prev) => prev.concat([{ sender: 'bot', text: t.chatConnectionError }]));
     }
