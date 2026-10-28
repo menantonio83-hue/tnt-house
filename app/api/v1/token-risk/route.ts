@@ -1,3 +1,7 @@
+// Version 1.15 — app/api/v1/token-risk/route.ts
+//
+// v1.15: demo headers/messages/refusals use the canonical https://www.tnt-audit.com origin (also covers the v4 structured demo_limit_reached refusals added without a header bump).
+//
 // Version 1.14 — app/api/v1/token-risk/route.ts
 //
 // v1.14: one hardcoded, publicly-announced demo API key — a time-boxed
@@ -234,8 +238,8 @@ function demoPublicHeaders(remaining: number): Record<string, string> {
   return {
     'X-RiskApi-Demo-Remaining': String(remaining),
     'X-RiskApi-Demo-Total': String(DEMO_TOTAL_LIMIT),
-    'X-RiskApi-Upgrade-Url': 'https://tnt-audit.com/api/demo-cta?to=risk-api',
-    'X-RiskApi-X402-Url': 'https://tnt-audit.com/api/v1/token-risk/x402',
+    'X-RiskApi-Upgrade-Url': 'https://www.tnt-audit.com/api/demo-cta?to=risk-api',
+    'X-RiskApi-X402-Url': 'https://www.tnt-audit.com/api/v1/token-risk/x402',
   };
 }
 
@@ -244,9 +248,9 @@ function demoPublicField(remaining: number) {
     is_demo_key: true,
     calls_remaining: remaining,
     calls_total: DEMO_TOTAL_LIMIT,
-    message: `Public demo key — ${remaining}/${DEMO_TOTAL_LIMIT} left, shared by everyone. Like it? Get your own free key (15/day, no card): https://tnt-audit.com/api/demo-cta?to=risk-api`,
-    get_your_own_key: 'https://tnt-audit.com/api/demo-cta?to=risk-api',
-    x402: { endpoint: '/api/v1/token-risk/x402', price_usd: 0.02, docs: 'https://tnt-audit.com/api/demo-cta?to=x402-docs' },
+    message: `Public demo key — ${remaining}/${DEMO_TOTAL_LIMIT} left, shared by everyone. Like it? Get your own free key (15/day, no card): https://www.tnt-audit.com/api/demo-cta?to=risk-api`,
+    get_your_own_key: 'https://www.tnt-audit.com/api/demo-cta?to=risk-api',
+    x402: { endpoint: '/api/v1/token-risk/x402', price_usd: 0.02, docs: 'https://www.tnt-audit.com/api/demo-cta?to=x402-docs' },
   };
 }
 
@@ -357,7 +361,7 @@ export async function GET(request: NextRequest) {
             NextResponse.json(
               buildRefusalBody(
                 'demo_limit_reached',
-                `💀 Public demo is dead — all ${DEMO_TOTAL_LIMIT} calls used. It's not coming back. Get your own free key (15/day, no card): https://tnt-audit.com/risk-api`,
+                `💀 Public demo is dead — all ${DEMO_TOTAL_LIMIT} calls used. It's not coming back. Get your own free key (15/day, no card): https://www.tnt-audit.com/risk-api`,
                 [freeKeyOption(), x402Option()],
                 { demo: demoPublicField(0) },
               ),
@@ -450,13 +454,13 @@ export async function GET(request: NextRequest) {
             ? {
                 error: `Anonymous demo calls hit today's site-wide cap (${demo.limit}/day across all visitors) 🫡`,
                 next: "Try again after UTC midnight — or grab a free key now for a quota that's yours alone, not shared with every other visitor.",
-                url: 'https://tnt-audit.com/risk-api',
+                url: 'https://www.tnt-audit.com/risk-api',
                 agents_note: 'Building a bot? x402 pay-per-call skips the key entirely — $0.02/call, no signup.',
               }
             : {
                 error: `You've burned through your ${demo.limit} free checks today 🫡`,
                 next: 'Free key = 5x more (15/day), and it\'s your own guaranteed quota — not shared with other visitors.',
-                url: 'https://tnt-audit.com/risk-api',
+                url: 'https://www.tnt-audit.com/risk-api',
                 agents_note: 'Building a bot? x402 pay-per-call skips the key entirely — $0.02/call, no signup.',
               };
         return respond(
@@ -504,7 +508,7 @@ export async function GET(request: NextRequest) {
           ...(isDemoCall
             ? {
                 _demo: {
-                  note: 'This is a free anonymous demo response (limited per day). Get a free API key with a full 15/day quota at https://tnt-audit.com/risk-api',
+                  note: 'This is a free anonymous demo response (limited per day). Get a free API key with a full 15/day quota at https://www.tnt-audit.com/risk-api',
                 },
               }
             : {}),

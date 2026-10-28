@@ -1,3 +1,7 @@
+// Version 4.3 — lib/rate-limit.ts
+//
+// v4.3: upgrade_url / x402_url / topup_url in refusals use the canonical https://www.tnt-audit.com origin.
+//
 // Version 4.2 — lib/rate-limit.ts
 //
 // v4.2: structured, machine-readable refusals — every quota/credit 402 now carries error_code/message/options from lib/refusal-options.ts so an AI agent can continue automatically (top up, x402, or free key).
@@ -141,10 +145,10 @@ function buildLimitReachedResponse(
         overage_rate_usd: overageRate,
         subscription_price_usd: SUBSCRIPTION_USD,
         subscription_monthly_quota: SUBSCRIPTION_MONTHLY_QUOTA,
-        upgrade_url: 'https://tnt-audit.com/risk-api#billing',
-        x402_url: 'https://tnt-audit.com/api/v1/token-risk/x402',
+        upgrade_url: 'https://www.tnt-audit.com/risk-api#billing',
+        x402_url: 'https://www.tnt-audit.com/api/v1/token-risk/x402',
         x402_price_usd: 0.02,
-        topup_url: 'https://tnt-audit.com/api/v1/billing/create-invoice',
+        topup_url: 'https://www.tnt-audit.com/api/v1/billing/create-invoice',
         min_topup_usd: MIN_TOPUP_USD,
         note: `Three ways to continue: (1) No account? Pay per call via x402 at $0.02/call (USDC on Solana) at x402_url. (2) Top up call credit with this key: POST topup_url with JSON {"api_key":"<your key>","kind":"topup","currency":"SOL" or "USDC","usd_amount":${MIN_TOPUP_USD}-${MAX_TOPUP_USD}}, send the exact pay_amount to the returned wallet_address, then POST /api/v1/billing/verify-payment with {"payment_id","api_key"} — after that each call over the free cap costs $${overageRate}. (3) Subscribe for $${SUBSCRIPTION_USD} = ${SUBSCRIPTION_MONTHLY_QUOTA} calls/30 days at $${OVERAGE_RATE_SUBSCRIBED_USD}/call overage after that. Your free quota resets at ${resetAt}.`,
       },
@@ -173,7 +177,7 @@ function buildGlobalPoolReachedResponse(
         used: GLOBAL_FREE_DAILY_LIMIT,
         reset_at: resetAt,
         resets_in: humanizeResetAt(resetAt),
-        upgrade_url: 'https://tnt-audit.com/risk-api#billing',
+        upgrade_url: 'https://www.tnt-audit.com/risk-api#billing',
         note: 'Subscribe or top up call credits for guaranteed access that never depends on the shared free pool.',
       },
     ),
@@ -316,7 +320,7 @@ export async function enforceRateLimit(
           error: 'Free tier temporarily unavailable — the usage counter could not be read. Please try again shortly, or top up/subscribe for guaranteed access.',
           limit: FREE_DAILY_LIMIT,
           reset_at: resetAt,
-          upgrade_url: 'https://tnt-audit.com/risk-api#billing',
+          upgrade_url: 'https://www.tnt-audit.com/risk-api#billing',
         },
         { status: 503, headers: extraHeaders },
       ),
@@ -347,7 +351,7 @@ export async function enforceRateLimit(
               error: 'Free tier temporarily unavailable — the shared free pool could not be checked. Please try again shortly, or top up/subscribe for guaranteed access.',
               limit: FREE_DAILY_LIMIT,
               reset_at: resetAt,
-              upgrade_url: 'https://tnt-audit.com/risk-api#billing',
+              upgrade_url: 'https://www.tnt-audit.com/risk-api#billing',
             },
             { status: 503, headers: extraHeaders },
           ),
@@ -552,7 +556,7 @@ export async function enforceRateLimitBatch(
           error: 'Free tier temporarily unavailable — the usage counter could not be read. Please try again shortly, or top up/subscribe for guaranteed access.',
           limit: FREE_DAILY_LIMIT,
           reset_at: resetAt,
-          upgrade_url: 'https://tnt-audit.com/risk-api#billing',
+          upgrade_url: 'https://www.tnt-audit.com/risk-api#billing',
         },
         { status: 503, headers: extraHeaders },
       ),
@@ -591,7 +595,7 @@ export async function enforceRateLimitBatch(
               error: 'Free tier temporarily unavailable — the shared free pool could not be checked. Please try again shortly, or top up/subscribe for guaranteed access.',
               limit: FREE_DAILY_LIMIT,
               reset_at: resetAt,
-              upgrade_url: 'https://tnt-audit.com/risk-api#billing',
+              upgrade_url: 'https://www.tnt-audit.com/risk-api#billing',
             },
             { status: 503, headers: extraHeaders },
           ),

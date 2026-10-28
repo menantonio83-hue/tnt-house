@@ -4,7 +4,7 @@ A remote **[Model Context Protocol](https://modelcontextprotocol.io) (MCP)** ser
 
 Built with the official **[`@modelcontextprotocol/sdk`](https://www.npmjs.com/package/@modelcontextprotocol/sdk)** (TypeScript), using the `McpServer` class and `WebStandardStreamableHTTPServerTransport` for a stateless, serverless-friendly deployment on Vercel.
 
-- **Endpoint:** `https://tnt-audit.com/api/mcp`
+- **Endpoint:** `https://www.tnt-audit.com/api/mcp`
 - **Transport:** Streamable HTTP (stateless — a fresh `McpServer` + transport is created per request, no in-memory session state, safe for serverless)
 - **Auth:** `Authorization: Bearer <api_key>` — same API key used by the REST endpoints below. Get a free key (15 requests/day, no card) at [tnt-audit.com/risk-api](https://www.tnt-audit.com/risk-api).
 - **Source:** [`route.ts`](./route.ts) in this directory

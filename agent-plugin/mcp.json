@@ -3,7 +3,7 @@
   "mcpServers": {
     "tnt-house-risk-data-api": {
       "type": "streamable-http",
-      "url": "https://tnt-audit.com/api/mcp"
+      "url": "https://www.tnt-audit.com/api/mcp"
     }
   }
 }

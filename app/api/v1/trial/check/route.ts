@@ -1,3 +1,7 @@
+// Version 1.3 — app/api/v1/trial/check/route.ts
+//
+// v1.3: upgrade_url uses the canonical https://www.tnt-audit.com origin.
+//
 // Version 1.2 — app/api/v1/trial/check/route.ts
 //
 // v1.2: added GET — a status-only peek (peekTrialLimit, lib/trial-limit.ts
@@ -128,7 +132,7 @@ export async function POST(request: NextRequest) {
             error: `Free trials are at capacity for today (${trial.used}/${trial.limit} globally)`,
             trial_calls_used: trial.used,
             trial_calls_remaining: 0,
-            upgrade_url: 'https://tnt-audit.com/risk-api#get-key',
+            upgrade_url: 'https://www.tnt-audit.com/risk-api#get-key',
             note: `Get a free API key for ${15} checks/day — no card required, just an email.`,
           },
           { status: 429, headers: RESPONSE_HEADERS },
@@ -147,7 +151,7 @@ export async function POST(request: NextRequest) {
           error: `Free trial limit reached (${ANON_TRIAL_LIMIT} checks per IP, no email)`,
           trial_calls_used: trial.used,
           trial_calls_remaining: Math.max(0, ANON_TRIAL_LIMIT - trial.used),
-          upgrade_url: 'https://tnt-audit.com/risk-api#get-key',
+          upgrade_url: 'https://www.tnt-audit.com/risk-api#get-key',
           note: `Get a free API key for ${15} checks/day — no card required, just an email.`,
         },
         { status: 403, headers: RESPONSE_HEADERS },

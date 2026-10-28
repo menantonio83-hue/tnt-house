@@ -1,3 +1,7 @@
+// Version 1.14 — app/api/mcp/route.ts
+//
+// v1.14: all public URLs in tool notes/instructions use the canonical https://www.tnt-audit.com origin.
+//
 // Version 1.13 — app/api/mcp/route.ts
 //
 // v1.13: added create_topup_invoice and check_payment self-authenticating billing tools; both reuse lib/billing-actions.ts (the exact REST billing logic) and never log the API key.
@@ -330,7 +334,7 @@ function buildServer(apiKey: ApiKeyRecord | null, clientIp: string, userAgent: s
             _mcp_anon: {
               used: usedNow,
               limit: gate.limit,
-              note: `Anonymous MCP call ${usedNow}/${gate.limit} today, no signup. Get a free key for 15/day — self-serve (no human needed): POST {"email":"you@example.com"} to https://tnt-audit.com/api/v1/signup, response includes api_key directly. Human form: https://tnt-audit.com/risk-api`,
+              note: `Anonymous MCP call ${usedNow}/${gate.limit} today, no signup. Get a free key for 15/day — self-serve (no human needed): POST {"email":"you@example.com"} to https://www.tnt-audit.com/api/v1/signup, response includes api_key directly. Human form: https://www.tnt-audit.com/risk-api`,
             },
           },
           !result.ok,
