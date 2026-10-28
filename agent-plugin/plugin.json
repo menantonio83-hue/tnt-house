@@ -1,8 +1,8 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "tnt-house-risk-data-api",
-  "version": "1.14.0",
-  "description": "Solana token risk-scoring for AI trading agents. One call returns a 0-100 safety score, on-chain-provable insider wallet cluster detection (shared first-funder tracing), mint/freeze authority status, honeypot risk, and LP-lock status for any Solana token mint. Works with zero setup: 3 free anonymous calls/day, no signup, no API key. x402 pay-per-call ($0.02/call in USDC) is also supported for fully autonomous agents. Free key with a 15/day quota at tnt-audit.com/risk-api.",
+  "version": "1.14.1",
+  "description": "Solana token risk-scoring for AI trading agents. One call returns a 0-100 safety score, on-chain-provable insider wallet cluster detection (shared first-funder tracing), mint/freeze authority status, honeypot risk, and LP-lock status for any Solana token mint. Works with zero setup: 5 free anonymous MCP calls/day, no signup, no API key. Then a free email key (15 calls/day, via the get_free_api_key tool or https://www.tnt-audit.com/risk-api) or x402 pay-per-call ($0.02/call in USDC) for fully autonomous agents.",
   "author": {
     "name": "TNT House",
     "url": "https://www.tnt-audit.com/risk-api"

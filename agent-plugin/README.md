@@ -12,25 +12,33 @@ Registry — no separate integration needed.
 
 ## What you get with zero configuration
 
-- `check_token_risk` works with **no API key** for the first 3 calls/day per
-  IP (100/day global cap) — a genuine anonymous trial, not a locked demo.
+- `check_token_risk` works with **no API key** for **5 free anonymous MCP
+  calls/day** — a genuine anonymous trial, not a locked demo. (Each caller is
+  also capped per IP, per subnet and by a global daily pool.)
 - Returns a 0-100 safety score, insider wallet cluster detection (shared
   first-funder tracing), mint/freeze authority status, honeypot risk, and
   LP-lock status for any Solana token mint.
+- `get_token_risk_history` is free and works without a key too.
 
-## Higher limits / other tools
+## When the free calls run out
 
-`check_token_risk_batch` (up to 25 mints/call) and `get_token_risk_history`
-require a Bearer API key. Per the Agent Plugins spec, `mcp.json` cannot embed
-credentials in `headers` — get a free key (15 calls/day) at
-[tnt-audit.com/risk-api](https://www.tnt-audit.com/risk-api) and add it as an
-`Authorization: Bearer <key>` header wherever your client exposes that option
-for configured MCP servers.
+Every quota refusal returns JSON with `error_code`, `message` and an
+`options[]` array giving the price and exact next step. Two ways to continue:
 
-x402 pay-per-call ($0.02/call in USDC, no key at all) is also available for
-fully autonomous agents — see
-[tnt-audit.com/risk-api](https://www.tnt-audit.com/risk-api) for the x402
-endpoint.
+1. **Free email key — 15 calls/day, no card.** Call the MCP tool
+   `get_free_api_key` with your email, or `POST
+   https://www.tnt-audit.com/api/v1/signup`. Send the key as an
+   `Authorization: Bearer <api_key>` header, or pass it in the optional
+   `api_key` tool argument if your client cannot set headers. Per the Agent
+   Plugins spec, `mcp.json` cannot embed credentials in `headers`.
+2. **x402 pay-per-call — $0.02/call in USDC on Solana, no account at all.**
+   `GET https://www.tnt-audit.com/api/v1/token-risk/x402?mint=<mint>`.
+
+`check_token_risk_batch` (up to 25 mints/call, N mints = N calls) needs a key
+or x402. Paid top-ups are available via the `create_topup_invoice` and
+`check_payment` tools.
+
+Quick start for agents: https://www.tnt-audit.com/llms.txt
 
 ## Links
 

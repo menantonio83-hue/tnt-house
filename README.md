@@ -18,19 +18,19 @@ This repository hosts a remote **Model Context Protocol (MCP) server** exposing 
 ## Getting Started (3 steps)
 
 1. **Try it now, no signup** — no API key needed for your first **5 MCP calls/day** (no signup at all). Three ways, pick whichever is easiest:
-   - **⚡ Glama's MCP Inspector (fastest, zero setup, real MCP call)** — go to [glama.ai/mcp/inspector](https://glama.ai/mcp/inspector), paste `https://tnt-audit.com/api/mcp` as the server URL, and call `check_token_risk` right in your browser — no install needed.
+   - **⚡ Glama's MCP Inspector (fastest, zero setup, real MCP call)** — go to [glama.ai/mcp/inspector](https://glama.ai/mcp/inspector), paste `https://www.tnt-audit.com/api/mcp` as the server URL, and call `check_token_risk` right in your browser — no install needed.
    - **Claude Desktop / Cursor** — paste this into your MCP config, no key required:
      ```json
      {
        "mcpServers": {
          "tnt-risk-data-api": {
            "command": "npx",
-           "args": ["-y", "mcp-remote", "https://tnt-audit.com/api/mcp"]
+           "args": ["-y", "mcp-remote", "https://www.tnt-audit.com/api/mcp"]
          }
        }
      }
      ```
-   - **Browser, raw REST preview** — open [a live example](https://tnt-audit.com/api/v1/token-risk?mint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v) directly, no install, no signup. ⚠️ *This is a REST preview of the underlying data, not the MCP tool itself — for the real MCP tool, use the Inspector above.*
+   - **Browser, raw REST preview** — open [a live example](https://www.tnt-audit.com/api/v1/token-risk?mint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v) directly, no install, no signup. ⚠️ *This is a REST preview of the underlying data, not the MCP tool itself — for the real MCP tool, use the Inspector above.*
 2. **Want more?** — get a free API key in seconds at [tnt-audit.com/risk-api](https://www.tnt-audit.com/risk-api) (email only, no card).
 3. **Need higher volume?** — on the same page, paste your key into the pricing section to pay per-call, by subscription, or via x402 (autonomous agents, no key at all).
 
@@ -47,7 +47,7 @@ This repository includes a remote **[Model Context Protocol](https://modelcontex
 
 - **Source:** [`app/api/mcp/route.ts`](./app/api/mcp/route.ts)
 - **Docs:** [`app/api/mcp/README.md`](./app/api/mcp/README.md)
-- **Endpoint:** `https://tnt-audit.com/api/mcp` (Streamable HTTP transport)
+- **Endpoint:** `https://www.tnt-audit.com/api/mcp` (Streamable HTTP transport)
 - **Auth:** optional — first 5 calls/day need no `Authorization` header at all. Beyond that: `Authorization: Bearer <api_key>` — free key at [tnt-audit.com/risk-api](https://www.tnt-audit.com/risk-api)
 
 ### Tools

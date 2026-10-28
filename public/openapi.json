@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "TNT House Risk-Data API",
-    "description": "Real-time Solana token safety scores, on-chain-provable insider cluster detection, and market fundamentals — built for AI trading agents. Free tier: 15 requests/day, no card required (try 3 anonymous calls with no signup at all via /api/v1/trial/check). See https://www.tnt-audit.com/risk-api for pricing and to get a key.",
+    "description": "Real-time Solana token safety scores, on-chain-provable insider cluster detection, and market fundamentals — built for AI trading agents. Free tier: 15 requests/day, no card required. No signup at all: 5 free anonymous calls/day via the MCP server at https://www.tnt-audit.com/api/mcp, or 3 trial checks via /api/v1/trial/check. x402 pay-per-call: $0.02 USDC, no key. See https://www.tnt-audit.com/risk-api for pricing and to get a key.",
     "version": "1.15.0",
     "contact": {
       "url": "https://www.tnt-audit.com/risk-api",
