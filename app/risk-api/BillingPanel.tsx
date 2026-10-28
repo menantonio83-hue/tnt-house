@@ -1,3 +1,7 @@
+// Version 8.13 — app/risk-api/BillingPanel.tsx
+//
+// v8.13: verify poll interval 4 s -> 5 s to match the server-side per-payment verify throttle.
+//
 // Version 8.12 — app/risk-api/BillingPanel.tsx
 //
 // v8.12: wired up for the 7-language i18n system (see app/risk-api/
@@ -136,7 +140,9 @@ interface StatusResponse {
 
 const SITE_URL = 'https://tnt-audit.com';
 const VERIFY_TIMEOUT_MS = 15 * 60 * 1000;
-const POLL_INTERVAL_MS = 4000;
+// 5 s matches the server-side per-payment verify throttle (lib/verify-throttle.ts);
+// a throttled poll just returns verified:false and the next tick retries.
+const POLL_INTERVAL_MS = 5000;
 // Real, traced timing divergence from app/page.js's equivalent flow
 // (not a guess): there, openWalletInAppBrowser is immediately followed
 // by `await runAuditAndSave(...)` — a genuinely slow async operation —

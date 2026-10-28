@@ -1,3 +1,7 @@
+// Version 7.19 — app/api/v1/billing/verify-payment/route.ts
+//
+// v7.19: throttled via lib/verify-throttle.ts — 600/hour per IP (before the key lookup), 1 per 5 s per payment_id, and after 30 checks/hour per key 1 per minute per payment_id (before Helius/Supabase); 429 + Retry-After + retry_after; fails open if Redis is down; never counts against call quotas. payment_id capped at 100 chars.
+//
 // Version 7.18 — app/api/v1/billing/verify-payment/route.ts
 //
 // v7.18: logic moved to lib/billing-actions.ts, shared with MCP tools; behaviour unchanged
@@ -50,6 +54,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { findApiKeyByRawKey } from '@/lib/api-key-store';
 import { verifyPaymentForKey } from '@/lib/billing-actions';
+import { checkVerifyIpThrottle, checkVerifyThrottle, throttledBody } from '@/lib/verify-throttle';
+
+function clientIpOf(request: NextRequest): string {
+  const forwardedFor = request.headers.get('x-forwarded-for');
+  return forwardedFor ? forwardedFor.split(',')[0].trim() : 'unknown';
+}
+
+function throttled(body: ReturnType<typeof throttledBody>) {
+  return NextResponse.json(body, { status: 429, headers: { 'Retry-After': String(body.retry_after) } });
+}
 
 export const dynamic = 'force-dynamic';
 
@@ -62,14 +76,23 @@ export async function POST(request: NextRequest) {
     if (!paymentId) {
       return NextResponse.json({ verified: false, reason: 'Missing payment_id' }, { status: 400 });
     }
+    if (paymentId.length > 100) {
+      return NextResponse.json({ verified: false, reason: 'Invalid payment_id' }, { status: 400 });
+    }
     if (!rawKey) {
       return NextResponse.json({ verified: false, reason: 'Missing api_key' }, { status: 400 });
     }
+
+    const ipGate = await checkVerifyIpThrottle(clientIpOf(request));
+    if (ipGate.allowed === false) return throttled(throttledBody(ipGate));
 
     const key = await findApiKeyByRawKey(rawKey);
     if (!key) {
       return NextResponse.json({ verified: false, reason: 'Invalid or revoked API key' }, { status: 401 });
     }
+
+    const gate = await checkVerifyThrottle(key.id, paymentId);
+    if (gate.allowed === false) return throttled(throttledBody(gate));
 
     const result = await verifyPaymentForKey(key, paymentId);
     return NextResponse.json(result.body, { status: result.status });

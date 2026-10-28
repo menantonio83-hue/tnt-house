@@ -1,7 +1,7 @@
 {
   "serverInfo": {
     "name": "tnt-house-risk-data-api",
-    "version": "1.4.0",
+    "version": "1.4.1",
     "description": "RiskDataApi — Solana token risk for AI agents. 5 MCP calls/day free with no signup, then a free email key (15/day, via the get_free_api_key tool) or x402 pay-per-call ($0.02 USDC). Returns safety_score, first-funder insider clusters, honeypot risk, LP lock, mint/freeze authority in one call."
   },
   "authentication": {
@@ -106,7 +106,7 @@
     },
     {
       "name": "check_payment",
-      "description": "Checks on-chain whether an invoice from create_topup_invoice has been paid and, if so, credits your key. Safe to call repeatedly (idempotent). Returns verified true/false with a reason.",
+      "description": "Checks on-chain whether an invoice from create_topup_invoice has been paid and, if so, credits your key. Safe to call repeatedly (idempotent), at most once every 5 seconds per payment_id (after 30 checks per hour per key, once a minute); if throttled it returns error_code verify_rate_limited with retry_after seconds. Returns verified true/false with a reason.",
       "inputSchema": {
         "type": "object",
         "properties": {

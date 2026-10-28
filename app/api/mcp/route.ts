@@ -1,3 +1,7 @@
+// Version 1.16 — app/api/mcp/route.ts
+//
+// v1.16: check_payment is throttled via lib/verify-throttle.ts (1 per 5 s per payment_id; after 30 checks/hour per key, 1 per minute per payment_id); a throttled call returns error_code verify_rate_limited + retry_after without calling Helius or Supabase, fails open if Redis is down, and never counts against call quotas.
+//
 // Version 1.15 — app/api/mcp/route.ts
 //
 // v1.15: quota/credit refusals now attach owner handoff info via lib/owner-handoff — keyed blocks can carry a one-time $5 USDC top-up link for the key owner, anonymous blocks get owner_message + owner_pay_url pointing to https://www.tnt-audit.com/agent-access.
@@ -162,6 +166,7 @@ import { checkMcpAnonLimit, normalizeSessionId, recordMcpAnonSuccess } from '@/l
 import { buildRefusalBody, freeKeyOption, x402Option } from '@/lib/refusal-options';
 import { attachOwnerHandoff, attachAnonOwnerInfo } from '@/lib/owner-handoff';
 import { createInvoiceForKey, verifyPaymentForKey } from '@/lib/billing-actions';
+import { checkVerifyThrottle, throttledBody } from '@/lib/verify-throttle';
 import { MIN_TOPUP_USD, MAX_TOPUP_USD } from '@/lib/billing-pricing';
 import type { ApiKeyRecord } from '@/lib/api-key-store';
 
@@ -511,7 +516,7 @@ function buildServer(apiKey: ApiKeyRecord | null, clientIp: string, userAgent: s
     'check_payment',
     {
       title: 'Check an invoice payment',
-      description: 'Checks on-chain whether an invoice from create_topup_invoice has been paid and, if so, credits your key. Safe to call repeatedly (idempotent). Returns verified true/false with a reason.',
+      description: 'Checks on-chain whether an invoice from create_topup_invoice has been paid and, if so, credits your key. Safe to call repeatedly (idempotent), at most once every 5 seconds per payment_id (after 30 checks per hour per key, once a minute); if throttled it returns error_code verify_rate_limited with retry_after seconds. Returns verified true/false with a reason.',
       inputSchema: {
         api_key: z.string().max(200).optional().describe(API_KEY_ARG_DESCRIPTION),
         payment_id: z.string().max(100).describe('payment_id returned by create_topup_invoice'),
@@ -521,6 +526,8 @@ function buildServer(apiKey: ApiKeyRecord | null, clientIp: string, userAgent: s
       const resolved = await resolveCallKey(apiKey, api_key);
       if (resolved.error) return resolved.error;
       if (!resolved.key) return NEED_KEY_RESULT;
+      const gate = await checkVerifyThrottle(resolved.key.id, payment_id);
+      if (gate.allowed === false) return jsonResult(throttledBody(gate), true);
       const result = await verifyPaymentForKey(resolved.key, payment_id);
       return jsonResult(result.body, result.status >= 400);
     },
