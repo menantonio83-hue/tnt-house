@@ -119,12 +119,12 @@ export default function RiskApiSignupForm() {
           <p className="text-[11px] text-slate-400 mb-2">{t.signupQuickStartLabel}</p>
           <div className="flex items-start gap-2 bg-black border border-purple-500/30 rounded px-3 py-2.5">
             <code className="text-[10px] sm:text-[11px] text-emerald-300 break-all flex-1 font-mono leading-relaxed">
-              curl "https://tnt-audit.com/api/v1/token-risk?mint=&lt;MINT_ADDRESS&gt;" \
+              curl "https://www.tnt-audit.com/api/v1/token-risk?mint=&lt;MINT_ADDRESS&gt;" \
               <br />
               {'  '}-H "Authorization: Bearer {issuedKey.api_key}"
             </code>
             <CopyButton
-              text={`curl "https://tnt-audit.com/api/v1/token-risk?mint=<MINT_ADDRESS>" \\\n  -H "Authorization: Bearer ${issuedKey.api_key}"`}
+              text={`curl "https://www.tnt-audit.com/api/v1/token-risk?mint=<MINT_ADDRESS>" \\\n  -H "Authorization: Bearer ${issuedKey.api_key}"`}
               label={t.copyLabel}
             />
           </div>

@@ -153,7 +153,7 @@ import InsiderClusterGraph from './InsiderClusterGraph';
 import DemoPublicKeyWidget from './DemoPublicKeyWidget';
 import { useRiskApiLang } from './LangContext';
 
-const CURL_EXAMPLE = `curl "https://tnt-audit.com/api/v1/token-risk?mint=<MINT_ADDRESS>" \\
+const CURL_EXAMPLE = `curl "https://www.tnt-audit.com/api/v1/token-risk?mint=<MINT_ADDRESS>" \\
   -H "Authorization: Bearer tnt_sk_your_key_here"`;
 
 const PYTHON_EXAMPLE = `import requests
@@ -162,7 +162,7 @@ API_KEY = "tnt_sk_your_key_here"
 MINT_ADDRESS = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
 
 response = requests.get(
-    "https://tnt-audit.com/api/v1/token-risk",
+    "https://www.tnt-audit.com/api/v1/token-risk",
     params={"mint": MINT_ADDRESS},
     headers={"Authorization": f"Bearer {API_KEY}"},
 )
@@ -177,7 +177,7 @@ else:
 
 const TYPESCRIPT_EXAMPLE = `async function checkTokenRisk(mint: string, apiKey: string) {
   const res = await fetch(
-    \`https://tnt-audit.com/api/v1/token-risk?mint=\${mint}\`,
+    \`https://www.tnt-audit.com/api/v1/token-risk?mint=\${mint}\`,
     { headers: { Authorization: \`Bearer \${apiKey}\` } },
   );
 
@@ -185,7 +185,7 @@ const TYPESCRIPT_EXAMPLE = `async function checkTokenRisk(mint: string, apiKey: 
   return res.json();
 }`;
 
-const WEBHOOK_SUBSCRIBE_EXAMPLE = `curl -X POST "https://tnt-audit.com/api/v1/webhooks/subscribe" \\
+const WEBHOOK_SUBSCRIBE_EXAMPLE = `curl -X POST "https://www.tnt-audit.com/api/v1/webhooks/subscribe" \\
   -H "Authorization: Bearer tnt_sk_your_key_here" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -249,12 +249,12 @@ const CLAUDE_MCP_CONFIG = `{
   "mcpServers": {
     "tnt-risk-data-api": {
       "command": "npx",
-      "args": ["-y", "mcp-remote", "https://tnt-audit.com/api/mcp"]
+      "args": ["-y", "mcp-remote", "https://www.tnt-audit.com/api/mcp"]
     }
   }
 }`;
 
-const CHATGPT_ACTION_URL = 'https://tnt-audit.com/openapi.json';
+const CHATGPT_ACTION_URL = 'https://www.tnt-audit.com/openapi.json';
 
 const ELIZAOS_INSTALL = `npm install eliza-plugin-tnt-risk-api`;
 
@@ -601,7 +601,7 @@ export default function RiskApiPageContent({ requestsServed, demoKey }: { reques
               <span className="text-[10px] text-slate-500 hidden sm:flex items-center gap-2">
                 application/json
                 <a href="/openapi.json" className="underline hover:text-purple-300 transition">openapi.json</a>
-                <CopyButton text="https://tnt-audit.com/openapi.json" label={t.copyOpenApiUrl} />
+                <CopyButton text="https://www.tnt-audit.com/openapi.json" label={t.copyOpenApiUrl} />
               </span>
             </div>
 
