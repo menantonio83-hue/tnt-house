@@ -174,7 +174,7 @@ import { requireApiKey } from '@/lib/api-auth';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { logApiRequest } from '@/lib/request-logger';
 import { fetchTokenRisk, toPublicTokenRisk } from '@/lib/token-risk-core';
-import { checkDemoLimit } from '@/lib/demo-limit';
+import { checkDemoLimit, REST_ANON_DAILY_LIMIT_PER_IP } from '@/lib/demo-limit';
 import { consumeDemoPublicKey, DEMO_TOTAL_LIMIT } from '@/lib/demo-public-key-limit';
 
 // v1.14: one hardcoded, publicly-announced demo API key — a time-boxed
@@ -446,8 +446,23 @@ export async function GET(request: NextRequest) {
       // instead of an immediate Unauthorized, mirroring app/api/mcp/
       // route.ts's check_token_risk demo carve-out exactly.
       isDemoCall = true;
+      // Validate mint BEFORE consuming a free check, so a request with
+      // no mint returns 400 without burning quota.
+      const demoMint = new URL(request.url).searchParams.get('mint') || new URL(request.url).searchParams.get('ca');
+      if (!demoMint) {
+        return respond(
+          NextResponse.json(
+            {
+              error: 'Missing required parameter: mint (or ca)',
+              example: 'GET /api/v1/token-risk?mint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+            },
+            { status: 400, headers: responseHeaders },
+          ),
+          { error: 'missing_mint' },
+        );
+      }
       const clientIp = extractClientIp(request);
-      const demo = await checkDemoLimit(clientIp);
+      const demo = await checkDemoLimit(clientIp, REST_ANON_DAILY_LIMIT_PER_IP);
       if (!demo.allowed) {
         // v1.13: honest, value-forward copy — see version note above.
         // Sells volume + a guaranteed (non-shared) quota, since that's
@@ -463,7 +478,7 @@ export async function GET(request: NextRequest) {
               }
             : {
                 error: `You've burned through your ${demo.limit} free checks today 🫡`,
-                next: 'Free key = 5x more (15/day), and it\'s your own guaranteed quota — not shared with other visitors.',
+                next: 'Free key = 3x more (15/day), and it\'s your own guaranteed quota — not shared with other visitors.',
                 url: 'https://www.tnt-audit.com/risk-api',
                 agents_note: 'Building a bot? x402 pay-per-call skips the key entirely — $0.02/call, no signup.',
               };

@@ -78,6 +78,9 @@ const redis =
 // not enough to matter as a free scraping vector on its own.
 const DEMO_DAILY_LIMIT_PER_IP = 3;
 
+// Keyless REST bots (/api/v1/token-risk): 5/day, same as anonymous MCP.
+export const REST_ANON_DAILY_LIMIT_PER_IP = 5;
+
 // Backstop across ALL anonymous demo callers combined, regardless of
 // how many distinct IPs show up — see v1.2 note above.
 const DEMO_DAILY_LIMIT_GLOBAL = 100;
@@ -119,10 +122,13 @@ async function incrementDailyCounter(key: string): Promise<number | null> {
 // clientIp should already be extracted by the caller (first hop of
 // X-Forwarded-For) — this module doesn't know about NextRequest/headers,
 // same separation of concerns as lib/rate-limit.ts vs lib/rate-limit-store.ts.
-export async function checkDemoLimit(clientIp: string): Promise<DemoLimitResult> {
+export async function checkDemoLimit(
+  clientIp: string,
+  perIpLimit: number = DEMO_DAILY_LIMIT_PER_IP,
+): Promise<DemoLimitResult> {
   if (!redis) {
     console.error('[demo-limit] Redis not configured, failing closed on anonymous demo calls.');
-    return { allowed: false, used: 0, limit: DEMO_DAILY_LIMIT_PER_IP, reason: 'per_ip' };
+    return { allowed: false, used: 0, limit: perIpLimit, reason: 'per_ip' };
   }
 
   const today = new Date().toISOString().slice(0, 10);
@@ -142,7 +148,7 @@ export async function checkDemoLimit(clientIp: string): Promise<DemoLimitResult>
   // v1.1's "Redis not configured" case: an anonymous, unmetered surface
   // is the wrong place to fail open.
   if (perIpUsed === null || globalUsed === null) {
-    return { allowed: false, used: 0, limit: DEMO_DAILY_LIMIT_PER_IP, reason: 'per_ip' };
+    return { allowed: false, used: 0, limit: perIpLimit, reason: 'per_ip' };
   }
 
   if (globalUsed > DEMO_DAILY_LIMIT_GLOBAL) {
@@ -150,9 +156,9 @@ export async function checkDemoLimit(clientIp: string): Promise<DemoLimitResult>
   }
 
   return {
-    allowed: perIpUsed <= DEMO_DAILY_LIMIT_PER_IP,
+    allowed: perIpUsed <= perIpLimit,
     used: perIpUsed,
-    limit: DEMO_DAILY_LIMIT_PER_IP,
-    reason: perIpUsed > DEMO_DAILY_LIMIT_PER_IP ? 'per_ip' : undefined,
+    limit: perIpLimit,
+    reason: perIpUsed > perIpLimit ? 'per_ip' : undefined,
   };
 }
