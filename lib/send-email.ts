@@ -163,15 +163,15 @@ export async function sendApiKeyEmail({ to, apiKey, dailyLimit, lang }: SendKeyE
     ? `TNT House Risk-Data API <noreply@${process.env.RESEND_EMAIL_DOMAIN}>`
     : DEFAULT_FROM;
 
-  const curlExample = `curl "https://tnt-audit.com/api/v1/token-risk?mint=<MINT_ADDRESS>" \\\n  -H "Authorization: Bearer ${apiKey}"`;
+  const curlExample = `curl "https://www.tnt-audit.com/api/v1/token-risk?mint=<MINT_ADDRESS>" \\\n  -H "Authorization: Bearer ${apiKey}"`;
 
   // Real working example (USDC's mint) instead of an empty "" — see
   // v1.4 header. Comment marks exactly what to swap, right on the line
   // that matters, not a separate paragraph someone has to cross-
   // reference back to the code.
-  const pythonExample = `import requests\n\nresponse = requests.get(\n    "https://tnt-audit.com/api/v1/token-risk",\n    params={"mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"},  # <-- replace with the token you want to check\n    headers={"Authorization": "Bearer ${apiKey}"}\n)\ndata = response.json()\nprint(data["safety_score"])  # 0-100, higher = safer`;
+  const pythonExample = `import requests\n\nresponse = requests.get(\n    "https://www.tnt-audit.com/api/v1/token-risk",\n    params={"mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"},  # <-- replace with the token you want to check\n    headers={"Authorization": "Bearer ${apiKey}"}\n)\ndata = response.json()\nprint(data["safety_score"])  # 0-100, higher = safer`;
 
-  const aiPrompt = `I have a Solana token risk-checking API key: ${apiKey}\n\nI want to check if this token is a scam before I buy it — the token's mint address is: <PASTE THE TOKEN ADDRESS HERE>\n\nSend a GET request to https://tnt-audit.com/api/v1/token-risk?mint=<the address above>\nwith header: Authorization: Bearer ${apiKey}\n\nThen explain the result to me in plain language: is the safety_score good or bad, and what are the biggest risks (holder concentration, mint/freeze authority, liquidity)?`;
+  const aiPrompt = `I have a Solana token risk-checking API key: ${apiKey}\n\nI want to check if this token is a scam before I buy it — the token's mint address is: <PASTE THE TOKEN ADDRESS HERE>\n\nSend a GET request to https://www.tnt-audit.com/api/v1/token-risk?mint=<the address above>\nwith header: Authorization: Bearer ${apiKey}\n\nThen explain the result to me in plain language: is the safety_score good or bad, and what are the biggest risks (holder concentration, mint/freeze authority, liquidity)?`;
 
   const html = `
     <div style="font-family: monospace, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; background: #0a0a0f; color: #e2e2e2;">
@@ -205,7 +205,7 @@ export async function sendApiKeyEmail({ to, apiKey, dailyLimit, lang }: SendKeyE
 
       <p style="color: #fbbf24; font-size: 13px; margin-top: 24px;">⚠️ ${t.keyWarning}</p>
       <p style="color: #94a3b8; font-size: 12px; margin-top: 12px;">
-        ${t.docsLabel} <a href="https://tnt-audit.com/risk-api" style="color: #a78bfa;">tnt-audit.com/risk-api</a>
+        ${t.docsLabel} <a href="https://www.tnt-audit.com/risk-api" style="color: #a78bfa;">tnt-audit.com/risk-api</a>
       </p>
     </div>
   `.trim();
@@ -215,7 +215,7 @@ export async function sendApiKeyEmail({ to, apiKey, dailyLimit, lang }: SendKeyE
   // bolded (mint address name in each language, DexScreener, pump.fun)
   // read fine as plain words without it.
   const mintExplainerPlain = t.mintExplainer.replace(/<\/?strong[^>]*>/g, '');
-  const text = `Your TNT House Risk-Data API key:\n\n${apiKey}\n\n${t.keyReadyIntro.replace('{dailyLimit}', String(dailyLimit))}\n\n${mintExplainerPlain}\n\n--- ${t.optionATitle} ---\n${t.optionADesc}\n\n${aiPrompt}\n\n(${t.optionAWarning})\n\n--- ${t.optionBTitle} ---\n${t.optionBDesc}\n\n${pythonExample}\n\n--- ${t.optionCTitle} ---\n${curlExample}\n\n${t.keyWarning}\n\n${t.docsLabel} https://tnt-audit.com/risk-api`;
+  const text = `Your TNT House Risk-Data API key:\n\n${apiKey}\n\n${t.keyReadyIntro.replace('{dailyLimit}', String(dailyLimit))}\n\n${mintExplainerPlain}\n\n--- ${t.optionATitle} ---\n${t.optionADesc}\n\n${aiPrompt}\n\n(${t.optionAWarning})\n\n--- ${t.optionBTitle} ---\n${t.optionBDesc}\n\n${pythonExample}\n\n--- ${t.optionCTitle} ---\n${curlExample}\n\n${t.keyWarning}\n\n${t.docsLabel} https://www.tnt-audit.com/risk-api`;
 
   const attempt = await sendViaResend(resendApiKey, fromAddress, to, html, text);
 
