@@ -263,9 +263,7 @@ export async function GET(request: NextRequest) {
     responseHeaders['Server-Timing'] =
       `verify;dur=${verifyMs}, score;dur=${scoreMs}, settle;dur=${settleMs}, total;dur=${totalMs}`;
     if (settlement.transactionHash) {
-      const receiptJson = JSON.stringify({ success: true, transaction: settlement.transactionHash });
-      responseHeaders['X-PAYMENT-RESPONSE'] = receiptJson;
-      responseHeaders['PAYMENT-RESPONSE'] = receiptJson;
+      Object.assign(responseHeaders, paymentResponseHeaders(settlement.transactionHash, requirement.network));
     }
 
     return NextResponse.json(
@@ -295,12 +293,26 @@ function inProgress(): NextResponse {
   );
 }
 
-function paidResponse(result: Parameters<typeof toPublicTokenRisk>[0], transactionHash?: string): NextResponse {
+// x402 settle response header: base64 of the JSON SettleResponse, as
+// @x402/core's decodePaymentResponseHeader expects (v2 reads
+// PAYMENT-RESPONSE first, then X-PAYMENT-RESPONSE; v1 also used base64).
+// Plain JSON made the official client throw "Invalid payment response header".
+function paymentResponseHeaders(transactionHash: string, network: string): Record<string, string> {
+  const encoded = Buffer.from(
+    JSON.stringify({ success: true, transaction: transactionHash, network }),
+    'utf8',
+  ).toString('base64');
+  return { 'PAYMENT-RESPONSE': encoded, 'X-PAYMENT-RESPONSE': encoded };
+}
+
+function paidResponse(
+  result: Parameters<typeof toPublicTokenRisk>[0],
+  transactionHash: string | undefined,
+  network: string,
+): NextResponse {
   const headers: Record<string, string> = { ...CORS_HEADERS };
   if (transactionHash) {
-    const receiptJson = JSON.stringify({ success: true, transaction: transactionHash });
-    headers['X-PAYMENT-RESPONSE'] = receiptJson;
-    headers['PAYMENT-RESPONSE'] = receiptJson;
+    Object.assign(headers, paymentResponseHeaders(transactionHash, network));
   }
   return NextResponse.json({ ...toPublicTokenRisk(result) }, { headers });
 }
@@ -329,7 +341,7 @@ async function handleKnownReceipt(
 
   if (receipt.state === 'settled') {
     console.log('[x402] repeat of a settled payment, fresh result', { mint, totalMs: Date.now() - t0 });
-    return paidResponse(result, receipt.transactionHash);
+    return paidResponse(result, receipt.transactionHash, requirement.network);
   }
 
   // settle_timeout: try settle once more.
@@ -338,7 +350,7 @@ async function handleKnownReceipt(
     await saveX402Receipt(receiptId, { state: 'settled', mint, transactionHash: settlement.transactionHash });
     if (result.cluster_analysis === 'pending') waitUntil(grantPendingGrace(mint));
     console.log('[x402] settle retry ok', { mint, totalMs: Date.now() - t0 });
-    return paidResponse(result, settlement.transactionHash);
+    return paidResponse(result, settlement.transactionHash, requirement.network);
   }
   if (settlement.timedOut) {
     return respond402({ ...challenge, error: settlement.errorReason ?? 'Payment settlement failed' });
