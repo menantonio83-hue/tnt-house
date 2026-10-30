@@ -209,6 +209,14 @@ export async function verifyPaymentForKeyId(
       new Date(payment.created_at).getTime(),
     );
 
+    if (match.temporaryError) {
+      // Could not finish the check — never expire here, money may have arrived.
+      return {
+        status: 503,
+        body: { verified: false, reason: 'Temporary error, please try again later.' },
+      };
+    }
+
     if (!match.found || !match.signature) {
       const justExpired = await expireStalePendingPayment(payment.id, PENDING_INVOICE_TTL_MINUTES);
       if (justExpired) {

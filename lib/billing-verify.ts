@@ -72,6 +72,10 @@ export interface PaymentMatch {
   signature?: string;
   received?: number;
   reason?: string;
+  // true when the check could not be completed (e.g. the database was
+  // unreachable). The payment may exist; callers must not expire the
+  // invoice and should ask the client to retry later.
+  temporaryError?: boolean;
 }
 
 function isFailedTx(tx: any): boolean {
@@ -251,7 +255,10 @@ export async function findMatchingPayment(
   }
 
   const unused = await dropUsedSignatures(candidates);
-  if (unused === null || unused.length === 0) {
+  if (unused === null) {
+    return { found: false, temporaryError: true, reason: 'Temporary error, please try again later' };
+  }
+  if (unused.length === 0) {
     return { found: false, reason: 'No matching transaction found' };
   }
 

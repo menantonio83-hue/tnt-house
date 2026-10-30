@@ -205,6 +205,13 @@ export async function POST(request: NextRequest) {
   const since = new Date(order.created_at).getTime();
   const match = await findMatchingPayment(payAmount, currency, since);
 
+  if (match.temporaryError) {
+    return NextResponse.json(
+      { verified: false, reason: 'temporary_error', message: 'Temporary error, please try again later.' },
+      { status: 503 },
+    );
+  }
+
   if (!match.found || !match.signature) {
     return NextResponse.json({
       verified: false,
