@@ -1,9 +1,10 @@
 // Version 1.7 — lib/x402/verify.ts
 //
-// v1.7: a verified payment is claimed atomically (Redis SET NX) and
-// tied to one mint before any scoring. The paid resource URL includes
-// that mint. A settle timeout keeps the receipt so the same mint can
-// be retried without paying again. Redis down fails closed.
+// v1.7: replay protection on top of the v1.6 flow. A verified payment
+// is claimed in Redis (SET NX) and tied to one mint. A settle timeout
+// keeps the claim so a retry of the same payment can settle again
+// instead of paying twice. The 402 challenge and the resource check
+// are unchanged. Redis down: the old flow runs, with a warning.
 //
 // Version 1.6 — lib/x402/verify.ts
 //
@@ -200,11 +201,8 @@ export async function verifyPayment(
   }
 
   if (expectedResourceUrl) {
-    const claimedUrl = claimedResourceUrl(paymentPayload);
-    // A client that echoes the resource must echo this mint's URL.
-    // A payload with no resource URL is still pinned to the mint by
-    // the receipt claim below — the same proof cannot be reused.
-    if (claimedUrl !== null && claimedUrl !== expectedResourceUrl) {
+    const claimedUrl = (paymentPayload.resource as { url?: unknown } | undefined)?.url;
+    if (typeof claimedUrl === 'string' && claimedUrl !== expectedResourceUrl) {
       return { isValid: false, errorReason: 'resource_mismatch' };
     }
   }
@@ -273,22 +271,11 @@ export async function settlePayment(
     const err = error as Error;
     const timedOut = err.name === 'TimeoutError' || err.name === 'AbortError' || /timeout|aborted/i.test(err.message);
     console.error('[x402] /settle request error:', err.message);
-    return {
-      success: false,
-      errorReason: timedOut ? 'facilitator_timeout' : 'facilitator_unreachable',
-      timedOut,
-    };
+    return { success: false, errorReason: timedOut ? 'facilitator_timeout' : 'facilitator_unreachable', timedOut };
   }
 }
 
-function claimedResourceUrl(payload: Record<string, unknown>): string | null {
-  const resource = payload.resource;
-  if (typeof resource === 'string') return resource;
-  if (resource && typeof resource === 'object' && typeof (resource as { url?: unknown }).url === 'string') {
-    return (resource as { url: string }).url;
-  }
-  return null;
-}
+// ---- v1.7 replay protection (best effort when Redis is down) ----
 
 const receiptRedis =
   process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN
@@ -298,45 +285,43 @@ const receiptRedis =
 const RECEIPT_HELD_TTL_SECONDS = 120;
 const RECEIPT_DONE_TTL_SECONDS = 24 * 60 * 60;
 
-interface StoredReceipt {
-  state: 'held' | 'settled' | 'accepted';
+// held: being processed now. settled: paid. settle_timeout: verified,
+// settle did not answer in time — the next retry settles again.
+export type X402ReceiptState = 'held' | 'settled' | 'settle_timeout';
+
+export interface X402Receipt {
+  state: X402ReceiptState;
   mint: string;
   token?: string;
-  body?: Record<string, unknown>;
   transactionHash?: string;
 }
 
-export interface X402ReceiptGate {
-  kind: 'claimed' | 'done' | 'mismatch' | 'busy' | 'redis_down';
-  token?: string;
-  body?: Record<string, unknown>;
-  transactionHash?: string;
-}
+export type X402ReceiptLookup =
+  | { kind: 'none' }
+  | { kind: 'unavailable' }
+  | { kind: 'found'; receipt: X402Receipt };
 
 function receiptKey(receiptId: string): string {
   return `x402-receipt:${receiptId}`;
 }
 
-function parseStoredReceipt(raw: unknown): StoredReceipt | null {
-  const value = typeof raw === 'string' ? safeJson(raw) : raw;
-  if (!value || typeof value !== 'object') return null;
-  const rec = value as StoredReceipt;
-  if ((rec.state !== 'held' && rec.state !== 'settled' && rec.state !== 'accepted') || typeof rec.mint !== 'string') {
-    return null;
+function parseReceipt(raw: unknown): X402Receipt | null {
+  let value = raw;
+  if (typeof raw === 'string') {
+    try {
+      value = JSON.parse(raw);
+    } catch {
+      return null;
+    }
   }
+  if (!value || typeof value !== 'object') return null;
+  const rec = value as X402Receipt;
+  if (!['held', 'settled', 'settle_timeout'].includes(rec.state) || typeof rec.mint !== 'string') return null;
   return rec;
 }
 
-function safeJson(raw: string): unknown {
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
-}
-
-// Stable id for one payment proof. Prefers the signed transaction so a
-// re-encoded header for the same cheque still collides.
+// Stable id for one payment: the signed transaction inside the header,
+// so re-encoding the same header gives the same id.
 export function x402ReceiptId(paymentHeader: string): string | null {
   try {
     const decoded = decodePaymentHeader(paymentHeader);
@@ -354,49 +339,65 @@ export function x402ReceiptId(paymentHeader: string): string | null {
   }
 }
 
-export async function claimX402Receipt(receiptId: string, mint: string): Promise<X402ReceiptGate> {
-  if (!receiptRedis) return { kind: 'redis_down' };
-  const token = randomUUID();
-  const key = receiptKey(receiptId);
+export async function lookupX402Receipt(receiptId: string): Promise<X402ReceiptLookup> {
+  if (!receiptRedis) return { kind: 'unavailable' };
   try {
-    const acquired = await receiptRedis.set(key, { state: 'held', mint, token } satisfies StoredReceipt, { nx: true, ex: RECEIPT_HELD_TTL_SECONDS });
-    if (acquired === 'OK') return { kind: 'claimed', token };
-    const existing = parseStoredReceipt(await receiptRedis.get(key));
-    if (!existing) return { kind: 'redis_down' };
-    if (existing.mint !== mint) return { kind: 'mismatch' };
-    if ((existing.state === 'settled' || existing.state === 'accepted') && existing.body) {
-      return { kind: 'done', body: existing.body, transactionHash: existing.transactionHash };
-    }
-    return { kind: 'busy' };
+    const raw = await receiptRedis.get(receiptKey(receiptId));
+    if (raw === null || raw === undefined) return { kind: 'none' };
+    const receipt = parseReceipt(raw);
+    return receipt ? { kind: 'found', receipt } : { kind: 'none' };
   } catch (error) {
-    console.error('[x402] receipt claim failed:', (error as Error).message);
-    return { kind: 'redis_down' };
+    console.warn('[x402] receipt lookup failed, replay protection off for this call:', (error as Error).message);
+    return { kind: 'unavailable' };
   }
 }
 
-export async function releaseX402Receipt(receiptId: string, token: string): Promise<void> {
-  if (!receiptRedis) return;
-  const key = receiptKey(receiptId);
+export type X402ClaimResult =
+  | { kind: 'claimed'; token: string }
+  | { kind: 'taken'; receipt: X402Receipt | null }
+  | { kind: 'unavailable' };
+
+export async function claimX402Receipt(receiptId: string, mint: string): Promise<X402ClaimResult> {
+  if (!receiptRedis) return { kind: 'unavailable' };
+  const token = randomUUID();
   try {
-    const existing = parseStoredReceipt(await receiptRedis.get(key));
-    if (existing?.state === 'held' && existing.token === token) {
-      await receiptRedis.del(key);
+    const record: X402Receipt = { state: 'held', mint, token };
+    const ok = await receiptRedis.set(receiptKey(receiptId), record, { nx: true, ex: RECEIPT_HELD_TTL_SECONDS });
+    if (ok === 'OK') return { kind: 'claimed', token };
+    const raw = await receiptRedis.get(receiptKey(receiptId));
+    return { kind: 'taken', receipt: parseReceipt(raw) };
+  } catch (error) {
+    console.warn('[x402] receipt claim failed, replay protection off for this call:', (error as Error).message);
+    return { kind: 'unavailable' };
+  }
+}
+
+export async function releaseX402Receipt(receiptId: string, token: string | null): Promise<void> {
+  if (!receiptRedis) return;
+  try {
+    const current = parseReceipt(await receiptRedis.get(receiptKey(receiptId)));
+    if (!current) return;
+    if (token === null ? current.state === 'settle_timeout' : current.state === 'held' && current.token === token) {
+      await receiptRedis.del(receiptKey(receiptId));
     }
   } catch (error) {
-    console.error('[x402] receipt release failed:', (error as Error).message);
+    console.warn('[x402] receipt release failed:', (error as Error).message);
   }
 }
 
 export async function saveX402Receipt(
   receiptId: string,
-  record: { state: 'settled' | 'accepted'; mint: string; body: Record<string, unknown>; transactionHash?: string },
-): Promise<boolean> {
-  if (!receiptRedis) return false;
+  record: { state: 'settled' | 'settle_timeout'; mint: string; transactionHash?: string },
+): Promise<void> {
+  if (!receiptRedis) return;
   try {
     await receiptRedis.set(receiptKey(receiptId), record, { ex: RECEIPT_DONE_TTL_SECONDS });
-    return true;
   } catch (error) {
-    console.error('[x402] receipt save failed:', (error as Error).message);
-    return false;
+    console.warn('[x402] receipt save failed:', (error as Error).message);
   }
+}
+
+// Facilitator wording for "this payment already went through".
+export function isAlreadySettled(errorReason: string | undefined): boolean {
+  return typeof errorReason === 'string' && /already|duplicate|processed/i.test(errorReason);
 }
