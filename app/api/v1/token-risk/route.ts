@@ -1,3 +1,10 @@
+// Version 1.17 — app/api/v1/token-risk/route.ts
+//
+// v1.17: a presented key that is missing from the table, revoked, or
+// mistyped is a 401. It no longer falls through to the anonymous 5/day
+// demo, and it does not spend that quota. No Authorization header at
+// all still gets the anonymous demo. The public demo key is unchanged.
+//
 // Version 1.16 — app/api/v1/token-risk/route.ts
 //
 // v1.16: keyed rate-limit refusals now attach an owner handoff via withOwnerHandoff so a human can pay a $5 USDC top-up for that specific key without exposing the key.
@@ -441,13 +448,20 @@ export async function GET(request: NextRequest) {
       if (rateLimit.creditBalanceUsd !== null) {
         responseHeaders['X-Credit-Balance-Usd'] = rateLimit.creditBalanceUsd.toFixed(4);
       }
+    } else if (rawAuthHeader.trim().length > 0) {
+      // A key was sent (wrong, revoked, expired, or a typo). Do not
+      // treat it as a guest and do not spend the anonymous quota.
+      return respond(
+        NextResponse.json(
+          { error: 'API key not found or invalid' },
+          { status: 401, headers: CORS_HEADERS },
+        ),
+        { error: 'invalid_api_key' },
+      );
     } else {
-      // v1.12: no valid key — try the small anonymous demo allowance
-      // instead of an immediate Unauthorized, mirroring app/api/mcp/
-      // route.ts's check_token_risk demo carve-out exactly.
-      isDemoCall = true;
-      // Validate mint BEFORE consuming a free check, so a request with
+      // No key at all — small anonymous demo allowance. A request with
       // no mint returns 400 without burning quota.
+      isDemoCall = true;
       const demoMint = new URL(request.url).searchParams.get('mint') || new URL(request.url).searchParams.get('ca');
       if (!demoMint) {
         return respond(

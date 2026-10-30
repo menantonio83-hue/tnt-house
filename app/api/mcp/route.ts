@@ -1,3 +1,10 @@
+// Version 1.17 — app/api/mcp/route.ts
+//
+// v1.17: an Authorization header that does not match a live key is a
+// 401. It is not treated as an anonymous caller and does not spend the
+// 5/day anonymous quota. No header at all still allows the anonymous
+// tools. The api_key argument is unchanged.
+//
 // Version 1.16 — app/api/mcp/route.ts
 //
 // v1.16: check_payment is throttled via lib/verify-throttle.ts (1 per 5 s per payment_id; after 30 checks/hour per key, 1 per minute per payment_id); a throttled call returns error_code verify_rate_limited + retry_after without calling Helius or Supabase, fails open if Redis is down, and never counts against call quotas.
@@ -614,19 +621,13 @@ export async function POST(request: NextRequest) {
   if (!isPublic) {
     const auth = await requireApiKey(request, {});
     if (!auth.ok || !auth.key) {
-      // v1.6: a missing/invalid key on tools/call no longer hard-blocks
-      // here IF this specific call is one of ANON_ALLOWED_TOOLS — let
-      // it through with apiKey = null; check_token_risk enforces its
-      // own dedicated 5/day quota inside the handler,
-      // get_token_risk_history has no quota at all, and
-      // get_free_api_key uses the signup IP/global cap inside
-      // issueFreeApiKey (not the 5/day quota).
-      // v1.10: check_token_risk / check_token_risk_batch with an
-      // api_key argument also pass through here; the handlers
-      // authenticate the argument and reject invalid keys.
-      // v1.13: create_topup_invoice / check_payment are always
-      // self-authenticating — they never allow anonymous access; the
-      // handlers require a key (header or api_key argument).
+      const presentedCredential = (request.headers.get('authorization') || '').trim().length > 0;
+      if (presentedCredential) {
+        return NextResponse.json({ error: 'API key not found or invalid' }, { status: 401 });
+      }
+      // No header at all. Anonymous tools keep their own 5/day quota.
+      // A tool that also accepts an api_key argument still reaches its
+      // handler, which rejects a bad argument without spending that quota.
       if (!isAnonAllowedCall && !isKeyArgCall && !isSelfAuthCall) {
         return auth.response ?? NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
       }
