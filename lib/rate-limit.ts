@@ -1,3 +1,11 @@
+// Version 4.4 — lib/rate-limit.ts
+//
+// v4.4: a key with call credit is never refused because the shared free
+// pool is empty. That call is charged as overage instead. The personal
+// daily counter moves only when a call is actually served from the free
+// quota — a refusal does not increment it. Paid tier and an active
+// subscription already skip this pool; they still do.
+//
 // Version 4.3 — lib/rate-limit.ts
 //
 // v4.3: upgrade_url / x402_url / topup_url in refusals use the canonical https://www.tnt-audit.com origin.
@@ -185,6 +193,26 @@ function buildGlobalPoolReachedResponse(
   );
 }
 
+
+function canAffordFreeOverage(balance: number | null | undefined, calls: number): boolean {
+  if (calls <= 0) return true;
+  const cents = Math.round((balance ?? 0) * 100);
+  const costCents = calls * Math.round(OVERAGE_RATE_FREE_USD * 100);
+  return cents >= costCents;
+}
+
+function freeTierUnavailableResponse(message: string, resetAt: string, extraHeaders: HeadersInit): NextResponse {
+  return NextResponse.json(
+    {
+      error: message,
+      limit: FREE_DAILY_LIMIT,
+      reset_at: resetAt,
+      upgrade_url: 'https://www.tnt-audit.com/risk-api#billing',
+    },
+    { status: 503, headers: extraHeaders },
+  );
+}
+
 export async function enforceRateLimit(
   key: ApiKeyRecord,
   extraHeaders: HeadersInit = {},
@@ -276,37 +304,14 @@ export async function enforceRateLimit(
   }
 
   // Free tier (including an expired subscription, which falls back here).
+  // Credit is checked before any refusal from the shared free pool, and
+  // the daily counter is incremented only after this call is allowed as
+  // a free call. See v4.4.
   const usageDate = todayUtcDateString();
   const resetAt = nextUtcMidnightIso();
-
   const current = await getDailyUsage(key.id, usageDate);
-  if (current !== null && current >= FREE_DAILY_LIMIT && (key.credit_balance_usd ?? 0) < OVERAGE_RATE_FREE_USD) {
-    const used = Math.min(current, FREE_DAILY_LIMIT);
-    return {
-      allowed: false,
-      limit: FREE_DAILY_LIMIT,
-      used,
-      remaining: 0,
-      resetAt,
-      creditBalanceUsd: key.credit_balance_usd,
-      usedOverageCredit: false,
-      response: buildLimitReachedResponse(
-        'free_daily_limit_reached',
-        'Daily free-tier limit reached and call-credit balance is empty',
-        FREE_DAILY_LIMIT,
-        used,
-        resetAt,
-        OVERAGE_RATE_FREE_USD,
-        extraHeaders,
-      ),
-    };
-  }
 
-  const used = await incrementDailyUsage(key.id, usageDate);
-
-  if (used === null) {
-    // v4.0 (M-5): fail CLOSED — see header. The old fail-open made a
-    // Supabase outage silently unmeter the entire free tier.
+  if (current === null) {
     return {
       allowed: false,
       limit: FREE_DAILY_LIMIT,
@@ -315,78 +320,64 @@ export async function enforceRateLimit(
       resetAt,
       creditBalanceUsd: key.credit_balance_usd,
       usedOverageCredit: false,
-      response: NextResponse.json(
-        {
-          error: 'Free tier temporarily unavailable — the usage counter could not be read. Please try again shortly, or top up/subscribe for guaranteed access.',
-          limit: FREE_DAILY_LIMIT,
-          reset_at: resetAt,
-          upgrade_url: 'https://www.tnt-audit.com/risk-api#billing',
-        },
-        { status: 503, headers: extraHeaders },
+      response: freeTierUnavailableResponse(
+        'Free tier temporarily unavailable — the usage counter could not be read. Please try again shortly, or top up/subscribe for guaranteed access.',
+        resetAt,
+        extraHeaders,
       ),
     };
   }
 
-  if (used <= FREE_DAILY_LIMIT) {
-    // v3.8: this call is within the KEY's own personal quota — but
-    // still gate it against the site-wide pool, since it's genuinely
-    // free (no credit drawn). Overage-credit calls below this branch
-    // are NOT gated — those are paying calls.
-    const isFirstCallToday = used === 1;
-    const globalPool = await consumeGlobalFreePool(1);
-
-    if (!globalPool.allowed && !isFirstCallToday) {
-      if (globalPool.reason === 'infra') {
-        // v4.0 (M-5): fail CLOSED on the pool layer too — see header.
-        return {
-          allowed: false,
-          limit: FREE_DAILY_LIMIT,
-          used,
-          remaining: null,
-          resetAt,
-          creditBalanceUsd: key.credit_balance_usd,
-          usedOverageCredit: false,
-          response: NextResponse.json(
-            {
-              error: 'Free tier temporarily unavailable — the shared free pool could not be checked. Please try again shortly, or top up/subscribe for guaranteed access.',
-              limit: FREE_DAILY_LIMIT,
-              reset_at: resetAt,
-              upgrade_url: 'https://www.tnt-audit.com/risk-api#billing',
-            },
-            { status: 503, headers: extraHeaders },
-          ),
-        };
-      }
+  if (current >= FREE_DAILY_LIMIT) {
+    if (!canAffordFreeOverage(key.credit_balance_usd, 1)) {
+      const used = Math.min(current, FREE_DAILY_LIMIT);
       return {
         allowed: false,
         limit: FREE_DAILY_LIMIT,
         used,
-        remaining: Math.max(0, FREE_DAILY_LIMIT - used),
+        remaining: 0,
         resetAt,
         creditBalanceUsd: key.credit_balance_usd,
         usedOverageCredit: false,
-        response: buildGlobalPoolReachedResponse(used, FREE_DAILY_LIMIT, resetAt, extraHeaders),
+        response: buildLimitReachedResponse(
+          'free_daily_limit_reached',
+          'Daily free-tier limit reached and call-credit balance is empty',
+          FREE_DAILY_LIMIT,
+          used,
+          resetAt,
+          OVERAGE_RATE_FREE_USD,
+          extraHeaders,
+        ),
+      };
+    }
+
+    const newBalance = await decrementCreditIfSufficient(key.id, OVERAGE_RATE_FREE_USD);
+    if (newBalance === null) {
+      const used = Math.min(current, FREE_DAILY_LIMIT);
+      return {
+        allowed: false,
+        limit: FREE_DAILY_LIMIT,
+        used,
+        remaining: 0,
+        resetAt,
+        creditBalanceUsd: key.credit_balance_usd,
+        usedOverageCredit: false,
+        response: buildLimitReachedResponse(
+          'free_daily_limit_reached',
+          'Daily free-tier limit reached and call-credit balance is empty',
+          FREE_DAILY_LIMIT,
+          used,
+          resetAt,
+          OVERAGE_RATE_FREE_USD,
+          extraHeaders,
+        ),
       };
     }
 
     return {
       allowed: true,
       limit: FREE_DAILY_LIMIT,
-      used,
-      remaining: Math.max(0, FREE_DAILY_LIMIT - used),
-      resetAt,
-      creditBalanceUsd: key.credit_balance_usd,
-      usedOverageCredit: false,
-      response: null,
-    };
-  }
-
-  const newBalance = await decrementCreditIfSufficient(key.id, OVERAGE_RATE_FREE_USD);
-  if (newBalance !== null) {
-    return {
-      allowed: true,
-      limit: FREE_DAILY_LIMIT,
-      used,
+      used: Math.min(current, FREE_DAILY_LIMIT),
       remaining: 0,
       resetAt,
       creditBalanceUsd: newBalance,
@@ -395,23 +386,123 @@ export async function enforceRateLimit(
     };
   }
 
+  // Inside this key's own 15/day. The shared pool applies only to a call
+  // we are about to give away for free. If the pool cannot, and the key
+  // has credit, charge that credit and do not touch the daily counter.
+  const isFirstCallToday = current === 0;
+  const globalPool = await consumeGlobalFreePool(1);
+  const poolGivesFreeCall = globalPool.allowed || isFirstCallToday;
+
+  if (!poolGivesFreeCall) {
+    if (canAffordFreeOverage(key.credit_balance_usd, 1)) {
+      const newBalance = await decrementCreditIfSufficient(key.id, OVERAGE_RATE_FREE_USD);
+      if (newBalance !== null) {
+        return {
+          allowed: true,
+          limit: FREE_DAILY_LIMIT,
+          used: current,
+          remaining: Math.max(0, FREE_DAILY_LIMIT - current),
+          resetAt,
+          creditBalanceUsd: newBalance,
+          usedOverageCredit: true,
+          response: null,
+        };
+      }
+    }
+
+    if (globalPool.reason === 'infra') {
+      return {
+        allowed: false,
+        limit: FREE_DAILY_LIMIT,
+        used: current,
+        remaining: null,
+        resetAt,
+        creditBalanceUsd: key.credit_balance_usd,
+        usedOverageCredit: false,
+        response: freeTierUnavailableResponse(
+          'Free tier temporarily unavailable — the shared free pool could not be checked. Please try again shortly, or top up/subscribe for guaranteed access.',
+          resetAt,
+          extraHeaders,
+        ),
+      };
+    }
+
+    return {
+      allowed: false,
+      limit: FREE_DAILY_LIMIT,
+      used: current,
+      remaining: Math.max(0, FREE_DAILY_LIMIT - current),
+      resetAt,
+      creditBalanceUsd: key.credit_balance_usd,
+      usedOverageCredit: false,
+      response: buildGlobalPoolReachedResponse(current, FREE_DAILY_LIMIT, resetAt, extraHeaders),
+    };
+  }
+
+  const used = await incrementDailyUsage(key.id, usageDate);
+
+  if (used === null) {
+    return {
+      allowed: false,
+      limit: FREE_DAILY_LIMIT,
+      used: current,
+      remaining: null,
+      resetAt,
+      creditBalanceUsd: key.credit_balance_usd,
+      usedOverageCredit: false,
+      response: freeTierUnavailableResponse(
+        'Free tier temporarily unavailable — the usage counter could not be read. Please try again shortly, or top up/subscribe for guaranteed access.',
+        resetAt,
+        extraHeaders,
+      ),
+    };
+  }
+
+  if (used > FREE_DAILY_LIMIT) {
+    // A parallel call from this same key crossed the personal cap between
+    // the read above and this increment. This call is overage, not free.
+    const newBalance = await decrementCreditIfSufficient(key.id, OVERAGE_RATE_FREE_USD);
+    if (newBalance !== null) {
+      return {
+        allowed: true,
+        limit: FREE_DAILY_LIMIT,
+        used,
+        remaining: 0,
+        resetAt,
+        creditBalanceUsd: newBalance,
+        usedOverageCredit: true,
+        response: null,
+      };
+    }
+    return {
+      allowed: false,
+      limit: FREE_DAILY_LIMIT,
+      used: FREE_DAILY_LIMIT,
+      remaining: 0,
+      resetAt,
+      creditBalanceUsd: key.credit_balance_usd,
+      usedOverageCredit: false,
+      response: buildLimitReachedResponse(
+        'free_daily_limit_reached',
+        'Daily free-tier limit reached and call-credit balance is empty',
+        FREE_DAILY_LIMIT,
+        FREE_DAILY_LIMIT,
+        resetAt,
+        OVERAGE_RATE_FREE_USD,
+        extraHeaders,
+      ),
+    };
+  }
+
   return {
-    allowed: false,
+    allowed: true,
     limit: FREE_DAILY_LIMIT,
     used,
-    remaining: 0,
+    remaining: Math.max(0, FREE_DAILY_LIMIT - used),
     resetAt,
     creditBalanceUsd: key.credit_balance_usd,
     usedOverageCredit: false,
-    response: buildLimitReachedResponse(
-      'free_daily_limit_reached',
-      'Daily free-tier limit reached and call-credit balance is empty',
-      FREE_DAILY_LIMIT,
-      used,
-      resetAt,
-      OVERAGE_RATE_FREE_USD,
-      extraHeaders,
-    ),
+    response: null,
   };
 }
 
@@ -537,12 +628,16 @@ export async function enforceRateLimitBatch(
   }
 
   // Free tier (including an expired subscription, which falls back here).
+  // Same rule as enforceRateLimit (v4.4): the shared pool can only block
+  // calls that would have been free. If the key can pay for whatever the
+  // pool does not cover, charge that and allow the whole batch. The daily
+  // counter grows only by the calls actually given away for free. A
+  // refused batch does not increment it. No first-batch grace — unchanged.
   const usageDate = todayUtcDateString();
   const resetAt = nextUtcMidnightIso();
-  const usedAfter = await incrementDailyUsageBy(key.id, usageDate, count);
+  const current = await getDailyUsage(key.id, usageDate);
 
-  if (usedAfter === null) {
-    // v4.0 (M-5): fail CLOSED — see header.
+  if (current === null) {
     return {
       allowed: false,
       limit: FREE_DAILY_LIMIT,
@@ -551,112 +646,136 @@ export async function enforceRateLimitBatch(
       resetAt,
       creditBalanceUsd: key.credit_balance_usd,
       usedOverageCredit: false,
-      response: NextResponse.json(
-        {
-          error: 'Free tier temporarily unavailable — the usage counter could not be read. Please try again shortly, or top up/subscribe for guaranteed access.',
-          limit: FREE_DAILY_LIMIT,
-          reset_at: resetAt,
-          upgrade_url: 'https://www.tnt-audit.com/risk-api#billing',
-        },
-        { status: 503, headers: extraHeaders },
+      response: freeTierUnavailableResponse(
+        'Free tier temporarily unavailable — the usage counter could not be read. Please try again shortly, or top up/subscribe for guaranteed access.',
+        resetAt,
+        extraHeaders,
       ),
     };
   }
 
-  // Exact, not an approximation — increment_daily_usage_by() is an
-  // uncapped +N, so usedBefore = usedAfter - count always holds.
-  const usedBefore = usedAfter - count;
-  const withinFreeCount = Math.max(0, Math.min(count, FREE_DAILY_LIMIT - usedBefore));
-  const overCount = count - withinFreeCount;
+  const freeSlots = Math.max(0, FREE_DAILY_LIMIT - current);
+  const wantsFree = Math.min(count, freeSlots);
+  const mustPay = count - wantsFree;
 
-  // v3.8: gate the genuinely-free portion of this batch against the
-  // site-wide pool — same concept as enforceRateLimit() above, but
-  // NO first-batch grace here (deliberate simplification: "first call
-  // today" doesn't cleanly generalize to "first batch, however large"
-  // without risking one grace-covered batch draining a big chunk of
-  // the shared pool). Only checked when some of the batch is actually
-  // free (withinFreeCount > 0) — a batch that's ENTIRELY overage
-  // doesn't touch the free pool at all.
-  if (withinFreeCount > 0) {
-    const globalPool = await consumeGlobalFreePool(withinFreeCount);
-    if (!globalPool.allowed) {
+  if (mustPay > 0 && !canAffordFreeOverage(key.credit_balance_usd, mustPay)) {
+    const used = Math.min(current, FREE_DAILY_LIMIT);
+    return {
+      allowed: false,
+      limit: FREE_DAILY_LIMIT,
+      used,
+      remaining: 0,
+      resetAt,
+      creditBalanceUsd: key.credit_balance_usd,
+      usedOverageCredit: false,
+      response: buildLimitReachedResponse(
+        'free_daily_limit_reached',
+        `Batch of ${count} needs ${mustPay} overage call(s) past the daily free-tier limit, and the call-credit balance is insufficient to cover them`,
+        FREE_DAILY_LIMIT,
+        used,
+        resetAt,
+        OVERAGE_RATE_FREE_USD,
+        extraHeaders,
+      ),
+    };
+  }
+
+  let freeGranted = 0;
+  if (wantsFree > 0) {
+    const globalPool = await consumeGlobalFreePool(wantsFree);
+    if (globalPool.allowed) {
+      freeGranted = wantsFree;
+    } else if (!canAffordFreeOverage(key.credit_balance_usd, count)) {
       if (globalPool.reason === 'infra') {
-        // v4.0 (M-5): fail CLOSED on the pool layer too — see header.
         return {
           allowed: false,
           limit: FREE_DAILY_LIMIT,
-          used: usedAfter,
+          used: current,
           remaining: null,
           resetAt,
           creditBalanceUsd: key.credit_balance_usd,
           usedOverageCredit: false,
-          response: NextResponse.json(
-            {
-              error: 'Free tier temporarily unavailable — the shared free pool could not be checked. Please try again shortly, or top up/subscribe for guaranteed access.',
-              limit: FREE_DAILY_LIMIT,
-              reset_at: resetAt,
-              upgrade_url: 'https://www.tnt-audit.com/risk-api#billing',
-            },
-            { status: 503, headers: extraHeaders },
+          response: freeTierUnavailableResponse(
+            'Free tier temporarily unavailable — the shared free pool could not be checked. Please try again shortly, or top up/subscribe for guaranteed access.',
+            resetAt,
+            extraHeaders,
           ),
         };
       }
       return {
         allowed: false,
         limit: FREE_DAILY_LIMIT,
-        used: usedAfter,
-        remaining: Math.max(0, FREE_DAILY_LIMIT - usedAfter),
+        used: current,
+        remaining: Math.max(0, FREE_DAILY_LIMIT - current),
         resetAt,
         creditBalanceUsd: key.credit_balance_usd,
         usedOverageCredit: false,
-        response: buildGlobalPoolReachedResponse(usedAfter, FREE_DAILY_LIMIT, resetAt, extraHeaders),
+        response: buildGlobalPoolReachedResponse(current, FREE_DAILY_LIMIT, resetAt, extraHeaders),
       };
     }
   }
 
-  if (overCount === 0) {
-    return {
-      allowed: true,
-      limit: FREE_DAILY_LIMIT,
-      used: usedAfter,
-      remaining: Math.max(0, FREE_DAILY_LIMIT - usedAfter),
-      resetAt,
-      creditBalanceUsd: key.credit_balance_usd,
-      usedOverageCredit: false,
-      response: null,
-    };
+  const payCount = count - freeGranted;
+  let creditBalance = key.credit_balance_usd;
+  if (payCount > 0) {
+    const charged = await decrementCreditIfSufficient(key.id, payCount * OVERAGE_RATE_FREE_USD);
+    if (charged === null) {
+      const used = Math.min(current, FREE_DAILY_LIMIT);
+      return {
+        allowed: false,
+        limit: FREE_DAILY_LIMIT,
+        used,
+        remaining: Math.max(0, FREE_DAILY_LIMIT - used),
+        resetAt,
+        creditBalanceUsd: key.credit_balance_usd,
+        usedOverageCredit: false,
+        response: buildLimitReachedResponse(
+          'free_daily_limit_reached',
+          `Batch of ${count} needs ${payCount} overage call(s) past the daily free-tier limit, and the call-credit balance is insufficient to cover them`,
+          FREE_DAILY_LIMIT,
+          used,
+          resetAt,
+          OVERAGE_RATE_FREE_USD,
+          extraHeaders,
+        ),
+      };
+    }
+    creditBalance = charged;
   }
 
-  const newBalance = await decrementCreditIfSufficient(key.id, overCount * OVERAGE_RATE_FREE_USD);
-  if (newBalance !== null) {
-    return {
-      allowed: true,
-      limit: FREE_DAILY_LIMIT,
-      used: usedAfter,
-      remaining: 0,
-      resetAt,
-      creditBalanceUsd: newBalance,
-      usedOverageCredit: true,
-      response: null,
-    };
+  let used = current;
+  if (freeGranted > 0) {
+    const usedAfter = await incrementDailyUsageBy(key.id, usageDate, freeGranted);
+    if (usedAfter === null) {
+      if (payCount === 0) {
+        return {
+          allowed: false,
+          limit: FREE_DAILY_LIMIT,
+          used: current,
+          remaining: null,
+          resetAt,
+          creditBalanceUsd: key.credit_balance_usd,
+          usedOverageCredit: false,
+          response: freeTierUnavailableResponse(
+            'Free tier temporarily unavailable — the usage counter could not be read. Please try again shortly, or top up/subscribe for guaranteed access.',
+            resetAt,
+            extraHeaders,
+          ),
+        };
+      }
+    } else {
+      used = usedAfter;
+    }
   }
 
   return {
-    allowed: false,
+    allowed: true,
     limit: FREE_DAILY_LIMIT,
-    used: usedAfter,
-    remaining: 0,
+    used,
+    remaining: Math.max(0, FREE_DAILY_LIMIT - used),
     resetAt,
-    creditBalanceUsd: key.credit_balance_usd,
-    usedOverageCredit: false,
-    response: buildLimitReachedResponse(
-      'free_daily_limit_reached',
-      `Batch of ${count} needs ${overCount} overage call(s) past the daily free-tier limit, and the call-credit balance is insufficient to cover them`,
-      FREE_DAILY_LIMIT,
-      usedAfter,
-      resetAt,
-      OVERAGE_RATE_FREE_USD,
-      extraHeaders,
-    ),
+    creditBalanceUsd: creditBalance,
+    usedOverageCredit: payCount > 0,
+    response: null,
   };
 }
