@@ -82,7 +82,7 @@
 
 import { NextResponse } from 'next/server';
 import type { ApiKeyRecord } from '@/lib/api-key-store';
-import { getDailyUsage, incrementDailyUsage, incrementDailyUsageBy, todayUtcDateString, nextUtcMidnightIso } from '@/lib/rate-limit-store';
+import { getDailyUsage, incrementDailyUsage, incrementDailyUsageBy, releaseDailyUsage, todayUtcDateString, nextUtcMidnightIso } from '@/lib/rate-limit-store';
 import { incrementSubscriptionUsage, incrementSubscriptionUsageBy, decrementCreditIfSufficient } from '@/lib/billing-store';
 import { consumeGlobalFreePool, GLOBAL_FREE_DAILY_LIMIT } from '@/lib/free-tier-global-pool';
 import {
@@ -386,59 +386,11 @@ export async function enforceRateLimit(
     };
   }
 
-  // Inside this key's own 15/day. The shared pool applies only to a call
-  // we are about to give away for free. If the pool cannot, and the key
-  // has credit, charge that credit and do not touch the daily counter.
-  const isFirstCallToday = current === 0;
-  const globalPool = await consumeGlobalFreePool(1);
-  const poolGivesFreeCall = globalPool.allowed || isFirstCallToday;
-
-  if (!poolGivesFreeCall) {
-    if (canAffordFreeOverage(key.credit_balance_usd, 1)) {
-      const newBalance = await decrementCreditIfSufficient(key.id, OVERAGE_RATE_FREE_USD);
-      if (newBalance !== null) {
-        return {
-          allowed: true,
-          limit: FREE_DAILY_LIMIT,
-          used: current,
-          remaining: Math.max(0, FREE_DAILY_LIMIT - current),
-          resetAt,
-          creditBalanceUsd: newBalance,
-          usedOverageCredit: true,
-          response: null,
-        };
-      }
-    }
-
-    if (globalPool.reason === 'infra') {
-      return {
-        allowed: false,
-        limit: FREE_DAILY_LIMIT,
-        used: current,
-        remaining: null,
-        resetAt,
-        creditBalanceUsd: key.credit_balance_usd,
-        usedOverageCredit: false,
-        response: freeTierUnavailableResponse(
-          'Free tier temporarily unavailable — the shared free pool could not be checked. Please try again shortly, or top up/subscribe for guaranteed access.',
-          resetAt,
-          extraHeaders,
-        ),
-      };
-    }
-
-    return {
-      allowed: false,
-      limit: FREE_DAILY_LIMIT,
-      used: current,
-      remaining: Math.max(0, FREE_DAILY_LIMIT - current),
-      resetAt,
-      creditBalanceUsd: key.credit_balance_usd,
-      usedOverageCredit: false,
-      response: buildGlobalPoolReachedResponse(current, FREE_DAILY_LIMIT, resetAt, extraHeaders),
-    };
-  }
-
+  // Inside this key's own 15/day. Take the slot with the atomic +1 first,
+  // then decide. First-call grace is `used === 1` after that increment:
+  // only one of two parallel requests can see 1. If this call is refused,
+  // or paid from credit because the free pool is empty, the +1 is rolled
+  // back so a refusal does not burn the daily counter.
   const used = await incrementDailyUsage(key.id, usageDate);
 
   if (used === null) {
@@ -459,25 +411,30 @@ export async function enforceRateLimit(
   }
 
   if (used > FREE_DAILY_LIMIT) {
-    // A parallel call from this same key crossed the personal cap between
-    // the read above and this increment. This call is overage, not free.
-    const newBalance = await decrementCreditIfSufficient(key.id, OVERAGE_RATE_FREE_USD);
-    if (newBalance !== null) {
-      return {
-        allowed: true,
-        limit: FREE_DAILY_LIMIT,
-        used,
-        remaining: 0,
-        resetAt,
-        creditBalanceUsd: newBalance,
-        usedOverageCredit: true,
-        response: null,
-      };
+    // A parallel call crossed the personal cap between the read above and
+    // this increment. This call is overage. If it cannot be paid, roll
+    // the +1 back and refuse.
+    if (canAffordFreeOverage(key.credit_balance_usd, 1)) {
+      const newBalance = await decrementCreditIfSufficient(key.id, OVERAGE_RATE_FREE_USD);
+      if (newBalance !== null) {
+        return {
+          allowed: true,
+          limit: FREE_DAILY_LIMIT,
+          used,
+          remaining: 0,
+          resetAt,
+          creditBalanceUsd: newBalance,
+          usedOverageCredit: true,
+          response: null,
+        };
+      }
     }
+    const rolledBack = await releaseDailyUsage(key.id, usageDate, 1);
+    const shown = rolledBack ?? Math.min(used, FREE_DAILY_LIMIT);
     return {
       allowed: false,
       limit: FREE_DAILY_LIMIT,
-      used: FREE_DAILY_LIMIT,
+      used: shown,
       remaining: 0,
       resetAt,
       creditBalanceUsd: key.credit_balance_usd,
@@ -486,11 +443,65 @@ export async function enforceRateLimit(
         'free_daily_limit_reached',
         'Daily free-tier limit reached and call-credit balance is empty',
         FREE_DAILY_LIMIT,
-        FREE_DAILY_LIMIT,
+        shown,
         resetAt,
         OVERAGE_RATE_FREE_USD,
         extraHeaders,
       ),
+    };
+  }
+
+  const isFirstCallToday = used === 1;
+  const globalPool = await consumeGlobalFreePool(1);
+  const poolGivesFreeCall = globalPool.allowed || isFirstCallToday;
+
+  if (!poolGivesFreeCall) {
+    if (canAffordFreeOverage(key.credit_balance_usd, 1)) {
+      const newBalance = await decrementCreditIfSufficient(key.id, OVERAGE_RATE_FREE_USD);
+      if (newBalance !== null) {
+        const rolledBack = await releaseDailyUsage(key.id, usageDate, 1);
+        const shown = rolledBack ?? Math.max(0, used - 1);
+        return {
+          allowed: true,
+          limit: FREE_DAILY_LIMIT,
+          used: shown,
+          remaining: Math.max(0, FREE_DAILY_LIMIT - shown),
+          resetAt,
+          creditBalanceUsd: newBalance,
+          usedOverageCredit: true,
+          response: null,
+        };
+      }
+    }
+
+    const rolledBack = await releaseDailyUsage(key.id, usageDate, 1);
+    const shown = rolledBack ?? Math.max(0, used - 1);
+    if (globalPool.reason === 'infra') {
+      return {
+        allowed: false,
+        limit: FREE_DAILY_LIMIT,
+        used: shown,
+        remaining: null,
+        resetAt,
+        creditBalanceUsd: key.credit_balance_usd,
+        usedOverageCredit: false,
+        response: freeTierUnavailableResponse(
+          'Free tier temporarily unavailable — the shared free pool could not be checked. Please try again shortly, or top up/subscribe for guaranteed access.',
+          resetAt,
+          extraHeaders,
+        ),
+      };
+    }
+
+    return {
+      allowed: false,
+      limit: FREE_DAILY_LIMIT,
+      used: shown,
+      remaining: Math.max(0, FREE_DAILY_LIMIT - shown),
+      resetAt,
+      creditBalanceUsd: key.credit_balance_usd,
+      usedOverageCredit: false,
+      response: buildGlobalPoolReachedResponse(shown, FREE_DAILY_LIMIT, resetAt, extraHeaders),
     };
   }
 
@@ -628,16 +639,20 @@ export async function enforceRateLimitBatch(
   }
 
   // Free tier (including an expired subscription, which falls back here).
-  // Same rule as enforceRateLimit (v4.4): the shared pool can only block
-  // calls that would have been free. If the key can pay for whatever the
-  // pool does not cover, charge that and allow the whole batch. The daily
-  // counter grows only by the calls actually given away for free. A
-  // refused batch does not increment it. No first-batch grace — unchanged.
+  // The daily counter is incremented FIRST, by the whole batch, in one
+  // atomic step. How many of those calls are still inside the personal
+  // 15 is computed from that result, so two parallel batches cannot both
+  // see "15 free left". Only the part past 15 is charged to credit. If
+  // the credit cannot cover it, the increment is rolled back and the
+  // batch is refused. If the increment itself fails, the batch is refused
+  // with 503 — it is never allowed unmetered. The shared pool still
+  // cannot block a key that can pay: those calls are charged instead, and
+  // the free-counter slots for them are given back. No first-batch grace.
   const usageDate = todayUtcDateString();
   const resetAt = nextUtcMidnightIso();
-  const current = await getDailyUsage(key.id, usageDate);
+  const usedAfter = await incrementDailyUsageBy(key.id, usageDate, count);
 
-  if (current === null) {
+  if (usedAfter === null) {
     return {
       allowed: false,
       limit: FREE_DAILY_LIMIT,
@@ -654,78 +669,61 @@ export async function enforceRateLimitBatch(
     };
   }
 
-  const freeSlots = Math.max(0, FREE_DAILY_LIMIT - current);
-  const wantsFree = Math.min(count, freeSlots);
-  const mustPay = count - wantsFree;
+  const usedBefore = usedAfter - count;
+  const withinFree = Math.max(0, Math.min(count, FREE_DAILY_LIMIT - usedBefore));
+  const overCount = count - withinFree;
 
-  if (mustPay > 0 && !canAffordFreeOverage(key.credit_balance_usd, mustPay)) {
-    const used = Math.min(current, FREE_DAILY_LIMIT);
-    return {
-      allowed: false,
-      limit: FREE_DAILY_LIMIT,
-      used,
-      remaining: 0,
-      resetAt,
-      creditBalanceUsd: key.credit_balance_usd,
-      usedOverageCredit: false,
-      response: buildLimitReachedResponse(
-        'free_daily_limit_reached',
-        `Batch of ${count} needs ${mustPay} overage call(s) past the daily free-tier limit, and the call-credit balance is insufficient to cover them`,
-        FREE_DAILY_LIMIT,
-        used,
-        resetAt,
-        OVERAGE_RATE_FREE_USD,
-        extraHeaders,
-      ),
-    };
-  }
+  let payCount = overCount;
+  let releaseFreeSlots = 0;
 
-  let freeGranted = 0;
-  if (wantsFree > 0) {
-    const globalPool = await consumeGlobalFreePool(wantsFree);
-    if (globalPool.allowed) {
-      freeGranted = wantsFree;
-    } else if (!canAffordFreeOverage(key.credit_balance_usd, count)) {
-      if (globalPool.reason === 'infra') {
+  if (withinFree > 0) {
+    const globalPool = await consumeGlobalFreePool(withinFree);
+    if (!globalPool.allowed) {
+      const payInstead = withinFree + overCount;
+      if (!canAffordFreeOverage(key.credit_balance_usd, payInstead)) {
+        await releaseDailyUsage(key.id, usageDate, count);
+        if (globalPool.reason === 'infra') {
+          return {
+            allowed: false,
+            limit: FREE_DAILY_LIMIT,
+            used: Math.max(0, usedBefore),
+            remaining: null,
+            resetAt,
+            creditBalanceUsd: key.credit_balance_usd,
+            usedOverageCredit: false,
+            response: freeTierUnavailableResponse(
+              'Free tier temporarily unavailable — the shared free pool could not be checked. Please try again shortly, or top up/subscribe for guaranteed access.',
+              resetAt,
+              extraHeaders,
+            ),
+          };
+        }
         return {
           allowed: false,
           limit: FREE_DAILY_LIMIT,
-          used: current,
-          remaining: null,
+          used: Math.max(0, usedBefore),
+          remaining: Math.max(0, FREE_DAILY_LIMIT - usedBefore),
           resetAt,
           creditBalanceUsd: key.credit_balance_usd,
           usedOverageCredit: false,
-          response: freeTierUnavailableResponse(
-            'Free tier temporarily unavailable — the shared free pool could not be checked. Please try again shortly, or top up/subscribe for guaranteed access.',
-            resetAt,
-            extraHeaders,
-          ),
+          response: buildGlobalPoolReachedResponse(Math.max(0, usedBefore), FREE_DAILY_LIMIT, resetAt, extraHeaders),
         };
       }
-      return {
-        allowed: false,
-        limit: FREE_DAILY_LIMIT,
-        used: current,
-        remaining: Math.max(0, FREE_DAILY_LIMIT - current),
-        resetAt,
-        creditBalanceUsd: key.credit_balance_usd,
-        usedOverageCredit: false,
-        response: buildGlobalPoolReachedResponse(current, FREE_DAILY_LIMIT, resetAt, extraHeaders),
-      };
+      payCount = payInstead;
+      releaseFreeSlots = withinFree;
     }
   }
 
-  const payCount = count - freeGranted;
   let creditBalance = key.credit_balance_usd;
   if (payCount > 0) {
     const charged = await decrementCreditIfSufficient(key.id, payCount * OVERAGE_RATE_FREE_USD);
     if (charged === null) {
-      const used = Math.min(current, FREE_DAILY_LIMIT);
+      await releaseDailyUsage(key.id, usageDate, count);
       return {
         allowed: false,
         limit: FREE_DAILY_LIMIT,
-        used,
-        remaining: Math.max(0, FREE_DAILY_LIMIT - used),
+        used: Math.max(0, usedBefore),
+        remaining: 0,
         resetAt,
         creditBalanceUsd: key.credit_balance_usd,
         usedOverageCredit: false,
@@ -733,7 +731,7 @@ export async function enforceRateLimitBatch(
           'free_daily_limit_reached',
           `Batch of ${count} needs ${payCount} overage call(s) past the daily free-tier limit, and the call-credit balance is insufficient to cover them`,
           FREE_DAILY_LIMIT,
-          used,
+          Math.max(0, usedBefore),
           resetAt,
           OVERAGE_RATE_FREE_USD,
           extraHeaders,
@@ -743,29 +741,10 @@ export async function enforceRateLimitBatch(
     creditBalance = charged;
   }
 
-  let used = current;
-  if (freeGranted > 0) {
-    const usedAfter = await incrementDailyUsageBy(key.id, usageDate, freeGranted);
-    if (usedAfter === null) {
-      if (payCount === 0) {
-        return {
-          allowed: false,
-          limit: FREE_DAILY_LIMIT,
-          used: current,
-          remaining: null,
-          resetAt,
-          creditBalanceUsd: key.credit_balance_usd,
-          usedOverageCredit: false,
-          response: freeTierUnavailableResponse(
-            'Free tier temporarily unavailable — the usage counter could not be read. Please try again shortly, or top up/subscribe for guaranteed access.',
-            resetAt,
-            extraHeaders,
-          ),
-        };
-      }
-    } else {
-      used = usedAfter;
-    }
+  let used = usedAfter;
+  if (releaseFreeSlots > 0) {
+    const rolledBack = await releaseDailyUsage(key.id, usageDate, releaseFreeSlots);
+    used = rolledBack ?? Math.max(0, usedAfter - releaseFreeSlots);
   }
 
   return {

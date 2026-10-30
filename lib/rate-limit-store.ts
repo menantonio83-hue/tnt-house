@@ -144,6 +144,46 @@ export async function incrementDailyUsageBy(
   return data as number;
 }
 
+// Undoes an incrementDailyUsage / incrementDailyUsageBy when the call is
+// then refused or served from credit instead of the free quota.
+// Compare-and-swap on the existing row — no new SQL function. Retries if
+// a parallel request changed the counter between the read and the write.
+// Returns the new total, or null if the row could not be rolled back.
+export async function releaseDailyUsage(
+  keyId: string,
+  usageDateUtc: string,
+  amount: number,
+): Promise<number | null> {
+  if (!Number.isInteger(amount) || amount <= 0) return null;
+
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const current = await getDailyUsage(keyId, usageDateUtc);
+    if (current === null) return null;
+    if (current < amount) {
+      console.error('[rate-limit-store] release_daily_usage would go negative:', current, amount);
+      return null;
+    }
+    const next = current - amount;
+    const { data, error } = await supabase
+      .from('api_key_usage_daily')
+      .update({ request_count: next })
+      .eq('key_id', keyId)
+      .eq('usage_date', usageDateUtc)
+      .eq('request_count', current)
+      .select('request_count')
+      .maybeSingle();
+
+    if (error) {
+      console.error('[rate-limit-store] release_daily_usage error:', error.message);
+      return null;
+    }
+    if (data && typeof data.request_count === 'number') return data.request_count;
+  }
+
+  console.error('[rate-limit-store] release_daily_usage lost the race after retries');
+  return null;
+}
+
 export function todayUtcDateString(): string {
   return new Date().toISOString().slice(0, 10); // "YYYY-MM-DD" in UTC
 }
