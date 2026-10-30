@@ -56,6 +56,7 @@ export default function RiskApiSignupForm() {
   const [status, setStatus] = useState<Status>('idle');
   const [errorMsg, setErrorMsg] = useState('');
   const [issuedKey, setIssuedKey] = useState<IssuedKey | null>(null);
+  const [notice, setNotice] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,6 +86,13 @@ export default function RiskApiSignupForm() {
         return;
       }
 
+      if (typeof data.api_key !== 'string' || data.api_key.length === 0) {
+        setErrorMsg(data.note || data.error || 'Check your email for the new key.');
+        setStatus('error');
+        return;
+      }
+
+      setNotice(typeof data.email_notice === 'string' ? data.email_notice : '');
       setIssuedKey({ api_key: data.api_key, daily_limit: data.daily_limit });
       setStatus('success');
     } catch {
@@ -111,7 +119,7 @@ export default function RiskApiSignupForm() {
         <div className="flex items-start gap-2 text-[11px] text-amber-300/90 bg-amber-500/5 border border-amber-500/20 rounded px-3 py-2 mb-3">
           <AlertTriangle size={13} className="shrink-0 mt-0.5" />
           <span>
-            {t.signupWarningPrefix} {issuedKey.daily_limit} {t.signupWarningSuffix}
+            {notice || `${t.signupWarningPrefix} ${issuedKey.daily_limit} ${t.signupWarningSuffix}`}
           </span>
         </div>
 
