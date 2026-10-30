@@ -448,7 +448,18 @@ export async function GET(request: NextRequest) {
       if (rateLimit.creditBalanceUsd !== null) {
         responseHeaders['X-Credit-Balance-Usd'] = rateLimit.creditBalanceUsd.toFixed(4);
       }
-    } else if (rawAuthHeader.trim().length > 0) {
+    } else if (auth.lookupFailed) {
+      // The key lookup failed (database error) — not an invalid key and
+      // not a guest. Ask the caller to retry; no quota is spent.
+      return respond(
+        auth.response ??
+          NextResponse.json(
+            { error: 'Temporary error, please try again later' },
+            { status: 503, headers: CORS_HEADERS },
+          ),
+        { error: 'key_lookup_failed' },
+      );
+    } else if (rawBearerToken) {
       // A key was sent (wrong, revoked, expired, or a typo). Do not
       // treat it as a guest and do not spend the anonymous quota.
       return respond(

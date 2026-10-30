@@ -89,7 +89,12 @@ export async function insertApiKey(
   return data as ApiKeyRecord;
 }
 
-export async function findApiKeyByHash(keyHash: string): Promise<ApiKeyRecord | null> {
+// Distinguishes "no such active key" (record null, failed false) from
+// "the lookup itself failed" (failed true) so callers never report a
+// database outage as an invalid key.
+export async function lookupApiKeyByHash(
+  keyHash: string,
+): Promise<{ record: ApiKeyRecord | null; failed: boolean }> {
   const { data, error } = await supabase
     .from(TABLE)
     .select('*')
@@ -99,9 +104,13 @@ export async function findApiKeyByHash(keyHash: string): Promise<ApiKeyRecord | 
 
   if (error) {
     console.error('[api-key-store] lookup error:', error.message);
-    return null;
+    return { record: null, failed: true };
   }
-  return data as ApiKeyRecord | null;
+  return { record: (data as ApiKeyRecord | null) ?? null, failed: false };
+}
+
+export async function findApiKeyByHash(keyHash: string): Promise<ApiKeyRecord | null> {
+  return (await lookupApiKeyByHash(keyHash)).record;
 }
 
 // Convenience for routes that receive a raw key directly from a form

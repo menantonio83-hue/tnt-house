@@ -621,7 +621,19 @@ export async function POST(request: NextRequest) {
   if (!isPublic) {
     const auth = await requireApiKey(request, {});
     if (!auth.ok || !auth.key) {
-      const presentedCredential = (request.headers.get('authorization') || '').trim().length > 0;
+      // A key counts as sent only for "Bearer <non-empty value>". A blank
+      // Bearer or another scheme is treated as no key. The public demo
+      // key is not in the api_keys table and stays a guest here, as before.
+      const bearer = (request.headers.get('authorization') || '').match(/^Bearer\s+(.+)$/i);
+      const bearerToken = bearer ? bearer[1].trim() : '';
+      const isDemoPublicKey = !!process.env.DEMO_PUBLIC_KEY && bearerToken === process.env.DEMO_PUBLIC_KEY;
+      if (auth.lookupFailed && !isDemoPublicKey) {
+        return NextResponse.json(
+          { error: 'Temporary error, please try again later' },
+          { status: 503, headers: { 'Retry-After': '5' } },
+        );
+      }
+      const presentedCredential = bearerToken.length > 0 && !isDemoPublicKey;
       if (presentedCredential) {
         return NextResponse.json({ error: 'API key not found or invalid' }, { status: 401 });
       }

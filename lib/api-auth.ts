@@ -19,7 +19,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { waitUntil } from '@vercel/functions';
 import { hashApiKey, isValidKeyFormat } from '@/lib/api-key';
-import { findApiKeyByHash, touchApiKeyUsage, type ApiKeyRecord } from '@/lib/api-key-store';
+import { findApiKeyByHash, lookupApiKeyByHash, touchApiKeyUsage, type ApiKeyRecord } from '@/lib/api-key-store';
 
 // NOTE: deliberately a flat interface, NOT a discriminated union
 // ({ ok: true; key } | { ok: false; response }). This project's
@@ -32,6 +32,9 @@ export interface ApiKeyAuthResult {
   ok: boolean;
   key: ApiKeyRecord | null;
   response: NextResponse | null;
+  // true when the key lookup itself failed (database error), not when
+  // the key is simply unknown. Callers must not treat it as "no key".
+  lookupFailed?: boolean;
 }
 
 // v2.4: authenticate a raw API key string. Returns the matching record
@@ -85,7 +88,20 @@ export async function requireApiKey(
   }
 
   const keyHash = hashApiKey(rawKey);
-  const record = await findApiKeyByHash(keyHash);
+  const lookup = await lookupApiKeyByHash(keyHash);
+  const record = lookup.record;
+
+  if (lookup.failed) {
+    return {
+      ok: false,
+      key: null,
+      lookupFailed: true,
+      response: NextResponse.json(
+        { error: 'Temporary error, please try again later' },
+        { status: 503, headers: { 'Retry-After': '5', ...(extraHeaders as Record<string, string>) } },
+      ),
+    };
+  }
 
   if (!record) {
     return {
