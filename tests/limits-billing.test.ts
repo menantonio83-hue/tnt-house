@@ -39,6 +39,20 @@ function seedKey(balance: number, usage = 0): { id: string; raw: string } {
   return { id, raw: generated.rawKey };
 }
 
+function seedSubscription(balance: number, used: number): { id: string; raw: string } {
+  const key = seedKey(balance, 0);
+  const row = rows('api_keys').find((item) => item.id === key.id);
+  row!.tier = 'subscription';
+  row!.subscription_expires_at = '2026-12-01T00:00:00.000Z';
+  row!.subscription_cycle_calls_used = used;
+  return key;
+}
+
+function cycleOf(keyId: string): number {
+  const row = rows('api_keys').find((item) => item.id === keyId);
+  return Number(row?.subscription_cycle_calls_used ?? 0);
+}
+
 function riskUrl(mint?: string): string {
   const url = new URL('https://www.tnt-audit.com/api/v1/token-risk');
   if (mint !== undefined) url.searchParams.set('mint', mint);
@@ -54,6 +68,29 @@ function riskRequest(mint: string | undefined, headers: Record<string, string> =
 async function riskGet(mint: string | undefined, headers: Record<string, string> = {}) {
   const { GET } = await import('@/app/api/v1/token-risk/route');
   return GET(riskRequest(mint, headers));
+}
+
+async function mcpCall(rawKey?: string) {
+  const { POST } = await import('@/app/api/mcp/route');
+  const headers: Record<string, string> = {
+    'content-type': 'application/json',
+    accept: 'application/json, text/event-stream',
+    'x-forwarded-for': IP,
+    'user-agent': 'vitest-guest',
+  };
+  if (rawKey) headers.authorization = `Bearer ${rawKey}`;
+  return POST(
+    new NextRequest('https://www.tnt-audit.com/api/mcp', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/call',
+        params: { name: 'check_token_risk', arguments: { mint: MINT } },
+      }),
+    }),
+  );
 }
 
 async function batchPost(rawKey: string, mints: string[]) {
@@ -106,9 +143,11 @@ function identityCounts(): number[] {
 }
 
 let settles = 0;
+let heliusBody: unknown[] = [];
 
 beforeEach(() => {
   settles = 0;
+  heliusBody = [];
   setFetchHandler(async (url) => {
     if (url.includes('helius.xyz')) {
       return new Response(JSON.stringify(heliusBody), { status: 200 });
@@ -126,8 +165,6 @@ beforeEach(() => {
     throw new Error(`unexpected outbound request: ${url}`);
   });
 });
-
-let heliusBody: unknown[] = [];
 
 it('email key: 15th check is free, 16th charges $0.02, $0.01 is refused unchanged', async () => {
   const key = seedKey(1);
@@ -294,7 +331,6 @@ it('after UTC midnight the same key is free again and the Redis day key changes'
   expect(usageOf(key.id, '2026-10-30')).toBe(15);
   expect(creditOf(key.id)).toBe(0);
   expect(redisData.has('free-tier-pool:2026-10-31')).toBe(true);
-  expect('free-tier-pool:2026-10-30').not.toBe('free-tier-pool:2026-10-31');
 });
 
 it('x402 binds a receipt to one mint, does not settle a repeat, and still pays when Redis is down', async () => {
@@ -330,6 +366,50 @@ it('USDC must match to the millionth; a neighbor $0.000001 away does not', async
   heliusBody = [transfer('sig-neighbor-only', expected + 0.000001)];
   const neighbor = await findMatchingPayment(expected, 'USDC', Date.now() - 60_000);
   expect(neighbor.found).toBe(false);
+});
+
+it('subscription is free inside 5000 calls and then charges $0.015', async () => {
+  const inside = seedSubscription(1, 0);
+  const freeCall = await riskGet(MINT, { authorization: `Bearer ${inside.raw}` });
+  expect(freeCall.status).toBe(200);
+  expect(cycleOf(inside.id)).toBe(1);
+  expect(creditOf(inside.id)).toBe(1);
+
+  const over = seedSubscription(1, 5000);
+  const paidCall = await riskGet(MINT, { authorization: `Bearer ${over.raw}` });
+  expect(paidCall.status).toBe(200);
+  expect(cycleOf(over.id)).toBe(5001);
+  expect(creditOf(over.id)).toBeCloseTo(0.985, 6);
+});
+
+it('an MCP call with a key charges the same way as REST', async () => {
+  const key = seedKey(1, 14);
+  const freeCall = await mcpCall(key.raw);
+  const freeText = await freeCall.text();
+  expect(freeCall.status, freeText).toBe(200);
+  expect(freeText).not.toContain('free_daily_limit_reached');
+  expect(usageOf(key.id, DAY)).toBe(15);
+  expect(creditOf(key.id)).toBe(1);
+
+  const paidCall = await mcpCall(key.raw);
+  const paidText = await paidCall.text();
+  expect(paidCall.status, paidText).toBe(200);
+  expect(paidText).not.toContain('free_daily_limit_reached');
+  expect(usageOf(key.id, DAY)).toBe(15);
+  expect(creditOf(key.id)).toBeCloseTo(0.98, 6);
+});
+
+it('Redis down does not hand out a free check to a key or a guest', async () => {
+  const key = seedKey(0, 1);
+  setRedisDown(true);
+  const keyed = await riskGet(MINT, { authorization: `Bearer ${key.raw}` });
+  expect(keyed.status).toBe(503);
+  expect(usageOf(key.id, DAY)).toBe(1);
+  expect(creditOf(key.id)).toBe(0);
+
+  const guest = await riskGet(MINT);
+  expect(guest.status).toBe(429);
+  expect(demoCount()).toBe(0);
 });
 
 function transfer(signature: string, amount: number) {

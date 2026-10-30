@@ -94,7 +94,7 @@ importers:
         specifier: ^5.4.5
         version: 5.9.3
       vitest:
-        specifier: '3'
+        specifier: 3.2.7
         version: 3.2.7(@types/node@26.4.0)(jiti@1.21.7)
 
 packages:

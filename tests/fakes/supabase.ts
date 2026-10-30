@@ -111,13 +111,21 @@ function rpc(name: string, args: Record<string, unknown>): { data: unknown; erro
     }
     return { data: addUsage(String(args.p_key_id), String(args.p_usage_date), amount), error: null };
   }
+  if (name === 'increment_subscription_usage') {
+    const key = rows('api_keys').find((item) => item.id === args.p_key_id);
+    if (!key) return { data: null, error: { message: 'key not found' } };
+    const quota = Number(args.p_quota);
+    const next = Math.min(Number(key.subscription_cycle_calls_used ?? 0) + 1, quota + 1);
+    key.subscription_cycle_calls_used = next;
+    return { data: next, error: null };
+  }
   if (name === 'decrement_credit_if_sufficient') {
     const key = rows('api_keys').find((item) => item.id === args.p_key_id);
     if (!key) return { data: null, error: null };
-    const have = Math.round(Number(key.credit_balance_usd) * 100);
-    const cost = Math.round(Number(args.p_amount) * 100);
+    const have = Math.round(Number(key.credit_balance_usd) * 1_000_000);
+    const cost = Math.round(Number(args.p_amount) * 1_000_000);
     if (have < cost) return { data: null, error: null };
-    const left = (have - cost) / 100;
+    const left = (have - cost) / 1_000_000;
     key.credit_balance_usd = left;
     return { data: left, error: null };
   }
