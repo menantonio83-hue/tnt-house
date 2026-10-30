@@ -23,8 +23,10 @@
 //     id uuid primary key default gen_random_uuid(),
 //     key_hash text not null unique,      -- sha256(rawKey), raw key is NEVER stored
 //     key_prefix text not null,           -- display-only, e.g. "tnt_sk_a1b2c3d"
-//     owner_label text,                   -- free-text for now (email/project name);
-//                                          -- becomes a real user_id once Stage 5 ships auth
+//     owner_label text,                   -- free-text (email for free signups).
+//                                          -- At most one ACTIVE row per email: see
+//                                          -- migrations/2026-10-30-one-active-email-key.sql.
+//                                          -- Run that file in Supabase; it is not applied here.
 //     tier text not null default 'free',  -- 'free' | 'paid' | 'subscription'
 //     is_active boolean not null default true,
 //     created_at timestamptz not null default now(),
@@ -76,17 +78,67 @@ export async function insertApiKey(
   tier: ApiKeyTier = 'free',
   referredBy?: string | null,
 ): Promise<ApiKeyRecord | null> {
+  const inserted = await insertApiKeyRow(keyHash, keyPrefix, ownerLabel, tier, referredBy ?? null, true);
+  return inserted.record;
+}
+
+// Same insert, but the caller can keep the row inactive (a replacement
+// key that must not count until the email actually goes out) and can
+// tell a unique-index collision apart from any other database error.
+export async function insertApiKeyRow(
+  keyHash: string,
+  keyPrefix: string,
+  ownerLabel: string,
+  tier: ApiKeyTier,
+  referredBy: string | null,
+  isActive: boolean,
+): Promise<{ record: ApiKeyRecord | null; duplicate: boolean }> {
   const { data, error } = await supabase
     .from(TABLE)
-    .insert({ key_hash: keyHash, key_prefix: keyPrefix, owner_label: ownerLabel, tier, referred_by: referredBy ?? null })
+    .insert({
+      key_hash: keyHash,
+      key_prefix: keyPrefix,
+      owner_label: ownerLabel,
+      tier,
+      referred_by: referredBy,
+      is_active: isActive,
+    })
     .select()
     .single();
 
   if (error) {
-    console.error('[api-key-store] insert error:', error.message);
+    const duplicate =
+      error.code === '23505' ||
+      (typeof error.message === 'string' && error.message.includes('duplicate key value violates unique constraint'));
+    if (!duplicate) {
+      console.error('[api-key-store] insert error:', error.message);
+    }
+    return { record: null, duplicate };
+  }
+  return { record: data as ApiKeyRecord, duplicate: false };
+}
+
+export async function listActiveKeysByOwner(ownerLabel: string): Promise<ApiKeyRecord[] | null> {
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select('*')
+    .eq('owner_label', ownerLabel)
+    .eq('is_active', true);
+
+  if (error) {
+    console.error('[api-key-store] list active keys error:', error.message);
     return null;
   }
-  return data as ApiKeyRecord;
+  return (data as ApiKeyRecord[]) ?? [];
+}
+
+export async function setApiKeyActive(id: string, active: boolean): Promise<boolean> {
+  const { error } = await supabase.from(TABLE).update({ is_active: active }).eq('id', id);
+  if (error) {
+    console.error('[api-key-store] set active error:', error.message);
+    return false;
+  }
+  return true;
 }
 
 // Distinguishes "no such active key" (record null, failed false) from

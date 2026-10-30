@@ -138,7 +138,6 @@ import type { LangCode } from '@/app/risk-api/i18n';
 import { EMAIL_TRANSLATIONS } from '@/lib/email-translations';
 
 const RESEND_API_URL = 'https://api.resend.com/emails';
-const DEFAULT_FROM = 'TNT House Risk-Data API <onboarding@resend.dev>';
 
 interface SendKeyEmailParams {
   to: string;
@@ -147,11 +146,23 @@ interface SendKeyEmailParams {
   lang?: LangCode;
 }
 
-export async function sendApiKeyEmail({ to, apiKey, dailyLimit, lang }: SendKeyEmailParams): Promise<void> {
+export interface SendKeyEmailResult {
+  sent: boolean;
+}
+
+export async function sendApiKeyEmail({ to, apiKey, dailyLimit, lang }: SendKeyEmailParams): Promise<SendKeyEmailResult> {
   const resendApiKey = process.env.RESEND_API_KEY;
+  const domain = process.env.RESEND_EMAIL_DOMAIN?.trim();
+
+  // onboarding@resend.dev only delivers to the Resend account owner.
+  // Never send a customer's key from that sandbox address.
+  if (!domain) {
+    console.warn('[send-email] RESEND_EMAIL_DOMAIN is not set — not sending, the sandbox sender would not reach this person.');
+    return { sent: false };
+  }
   if (!resendApiKey) {
-    console.warn('[send-email] RESEND_API_KEY not set — skipping email, key was still shown on screen.');
-    return;
+    console.warn('[send-email] RESEND_API_KEY not set — email not sent.');
+    return { sent: false };
   }
 
   // Falls back to English for an unrecognized/missing lang — same
@@ -159,9 +170,7 @@ export async function sendApiKeyEmail({ to, apiKey, dailyLimit, lang }: SendKeyE
   // of this file's fail-soft design.
   const t = EMAIL_TRANSLATIONS[lang as LangCode] || EMAIL_TRANSLATIONS.en;
 
-  const fromAddress = process.env.RESEND_EMAIL_DOMAIN
-    ? `TNT House Risk-Data API <noreply@${process.env.RESEND_EMAIL_DOMAIN}>`
-    : DEFAULT_FROM;
+  const fromAddress = `TNT House Risk-Data API <noreply@${domain}>`;
 
   const curlExample = `curl "https://www.tnt-audit.com/api/v1/token-risk?mint=<MINT_ADDRESS>" \\\n  -H "Authorization: Bearer ${apiKey}"`;
 
@@ -218,27 +227,11 @@ export async function sendApiKeyEmail({ to, apiKey, dailyLimit, lang }: SendKeyE
   const text = `Your TNT House Risk-Data API key:\n\n${apiKey}\n\n${t.keyReadyIntro.replace('{dailyLimit}', String(dailyLimit))}\n\n${mintExplainerPlain}\n\n--- ${t.optionATitle} ---\n${t.optionADesc}\n\n${aiPrompt}\n\n(${t.optionAWarning})\n\n--- ${t.optionBTitle} ---\n${t.optionBDesc}\n\n${pythonExample}\n\n--- ${t.optionCTitle} ---\n${curlExample}\n\n${t.keyWarning}\n\n${t.docsLabel} https://www.tnt-audit.com/risk-api`;
 
   const attempt = await sendViaResend(resendApiKey, fromAddress, to, html, text);
-
-  // v1.2: the ONE Resend error worth a fallback retry — domain not
-  // verified yet is a temporary, known, self-resolving state (fixed by
-  // finishing DNS verification in the Resend dashboard, not by us).
-  // Every other failure (bad API key, rate limit, network error, etc.)
-  // just logs and gives up, same as before — retrying those wouldn't
-  // help and could mask a real problem.
-  if (!attempt.ok && attempt.status === 403 && attempt.body?.includes('domain is not verified')) {
-    console.warn(
-      `[send-email] Custom domain (${fromAddress}) not verified yet — retrying with sandbox address.`,
-    );
-    const retry = await sendViaResend(resendApiKey, DEFAULT_FROM, to, html, text);
-    if (!retry.ok) {
-      console.error(`[send-email] Sandbox fallback also failed: ${retry.status} ${retry.body}`);
-    }
-    return;
-  }
-
   if (!attempt.ok) {
-    console.error(`[send-email] Resend API returned ${attempt.status}: ${attempt.body}`);
+    console.error(`[send-email] Resend API returned ${attempt.status}`);
+    return { sent: false };
   }
+  return { sent: true };
 }
 
 interface ResendAttempt {
