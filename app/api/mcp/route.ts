@@ -362,7 +362,7 @@ function buildServer(apiKey: ApiKeyRecord | null, clientIp: string, userAgent: s
         }
         const result = await fetchTokenRisk(mint);
         if (!result.ok) {
-          await releaseMcpAnonSlot(clientIp, userAgent, sessionId);
+          await releaseMcpAnonSlot(gate.claimedKeys);
         }
         waitUntil(
           logApiRequest({

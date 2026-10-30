@@ -1,8 +1,15 @@
-// The 5 successful-call buckets are claimed with INCR before the
-// upstream call. If the claim is over the limit it is rolled back.
-// A failed check returns the slot via releaseMcpAnonSlot. A bad mint
-// is rejected by the route before this function runs, so it does not
-// touch the global 300 ceiling. Redis down still fails closed.
+// Version 1.4 — lib/mcp-anon-limit.ts
+//
+// v1.4: the 5 successful-call identity buckets are CLAIMED with INCR
+// before the upstream call (no more read-then-record race). If the
+// claim is over any limit it is rolled back at once. A failed check
+// returns the slot via releaseMcpAnonSlot(decision.claimedKeys): the
+// exact keys claimed (so a release after UTC midnight never touches the
+// new day's counter). Release is a Lua "decrement only if > 0, delete at
+// 0" so a counter never goes below 0 and no key is left without a TTL.
+// A Redis error mid-count releases whatever identity slots were already
+// taken (best effort) and fails closed. A bad mint is rejected by the
+// route before this runs, so it does not touch the 300 global ceiling.
 //
 // Version 1.3 — lib/mcp-anon-limit.ts
 //
@@ -15,8 +22,8 @@
 //     normalized and capped to 256 chars before hashing. No header -> no
 //     session bucket, behaviour identical to before for that client.
 // A call is refused when ANY identity bucket has reached 5.
-// These are READ (redis.get) in checkMcpAnonLimit and only INCRed in
-// recordMcpAnonSuccess, exactly like the original IP+UA identity bucket.
+// (v1.3 read these with redis.get and INCRed them after success; since
+// v1.4 they are claimed up front and released on failure, see above.)
 // The existing global/per_subnet/per_ip ATTEMPT counters are unchanged
 // and still INCRed on every check. identityUsed now = max(IP+UA,
 // subnet+UA, session-if-present), and the final 'identity' refusal uses
@@ -67,9 +74,9 @@
 //
 // Only a SUCCESSFUL check_token_risk call burns the IDENTITY quota — the
 // caller (app/api/mcp/route.ts) checks the full quota stack with
-// checkMcpAnonLimit() BEFORE calling fetchTokenRisk(), then only calls
-// recordMcpAnonSuccess() after confirming result.ok. An invalid mint /
-// upstream failure never costs the visitor one of their 5 identity calls
+// checkMcpAnonLimit() BEFORE calling fetchTokenRisk() (which claims the
+// slot), then calls releaseMcpAnonSlot() if the result is not ok. An
+// invalid mint / upstream failure never costs the visitor one of their 5 identity calls
 // (the per-IP and global attempt counters move regardless, same
 // convention as lib/demo-limit.ts).
 //
@@ -213,10 +220,6 @@ export function normalizeSessionId(raw: string | null | undefined): string | nul
   return trimmed.slice(0, 256);
 }
 
-export function anonIdentityUsed(ipUa: number | null, subnetUa: number | null, session: number | null): number {
-  return Math.max(ipUa ?? 0, subnetUa ?? 0, session ?? 0);
-}
-
 export interface McpAnonDecision {
   allowed: boolean;
   used: number;
@@ -227,11 +230,14 @@ export interface McpAnonDecision {
   // unavailable (fail closed), 'ok' when allowed.
   reason: 'ok' | 'identity' | 'per_ip' | 'per_subnet' | 'global' | 'infra';
   resetAt: number; // unix seconds, UTC midnight — messaging only, not the actual Redis TTL
+  // Identity keys claimed for this call (only when allowed). Pass to
+  // releaseMcpAnonSlot() if the check fails.
+  claimedKeys?: string[];
 }
 
-// v1.1: the single gate for anonymous MCP calls. Checks the identity
-// bucket (IP+UA, read-only — only SUCCESSFUL calls burn it, see
-// recordMcpAnonSuccess), the per-IP bucket and the global bucket (both
+// v1.1: the single gate for anonymous MCP calls. Claims the identity
+// buckets (v1.4: INCR up front, released on failure via
+// releaseMcpAnonSlot), the per-IP bucket and the global bucket (both
 // INCR — attempts count, same "counters increment regardless of what
 // happens after" convention as lib/demo-limit.ts). Call BEFORE doing the
 // expensive upstream work, so a blocked visitor never triggers a real
@@ -250,26 +256,38 @@ export async function checkMcpAnonLimit(ip: string, userAgent: string, sessionId
   const idKeys = identityKeys(ip, userAgent, sessionId);
 
   try {
-    const counts = await Promise.all([
+    const settled = await Promise.allSettled([
       redis.incr(perIpKey),
       redis.incr(perSubnetKey),
       redis.incr(globalKey),
       ...idKeys.map((key) => redis.incr(key)),
     ]);
+    const failed = settled.find((r) => r.status === 'rejected') as PromiseRejectedResult | undefined;
+    if (failed) {
+      // Give back any identity slot that was already taken, then fail closed.
+      await rollbackIdentity(idKeys.filter((_, i) => settled[3 + i].status === 'fulfilled'));
+      throw failed.reason;
+    }
+    const counts = settled.map((r) => (r as PromiseFulfilledResult<number>).value);
     const perIpUsed = counts[0];
     const perSubnetUsed = counts[1];
     const globalUsed = counts[2];
     const identityCounts = counts.slice(3);
     const identityUsed = identityCounts.length > 0 ? Math.max(...identityCounts) : 0;
 
-    await Promise.all([
-      perIpUsed === 1 ? redis.expire(perIpKey, secondsUntilUtcMidnight()) : Promise.resolve(),
-      perSubnetUsed === 1 ? redis.expire(perSubnetKey, secondsUntilUtcMidnight()) : Promise.resolve(),
-      globalUsed === 1 ? redis.expire(globalKey, secondsUntilUtcMidnight()) : Promise.resolve(),
-      ...idKeys.map((key, index) =>
-        identityCounts[index] === 1 ? redis.expire(key, KEY_TTL_SECONDS) : Promise.resolve(),
-      ),
-    ]);
+    try {
+      await Promise.all([
+        perIpUsed === 1 ? redis.expire(perIpKey, secondsUntilUtcMidnight()) : Promise.resolve(),
+        perSubnetUsed === 1 ? redis.expire(perSubnetKey, secondsUntilUtcMidnight()) : Promise.resolve(),
+        globalUsed === 1 ? redis.expire(globalKey, secondsUntilUtcMidnight()) : Promise.resolve(),
+        ...idKeys.map((key, index) =>
+          identityCounts[index] === 1 ? redis.expire(key, KEY_TTL_SECONDS) : Promise.resolve(),
+        ),
+      ]);
+    } catch (e) {
+      await rollbackIdentity(idKeys);
+      throw e;
+    }
 
     const identityOver = identityUsed > MCP_ANON_DAILY_LIMIT;
     const attemptOver =
@@ -298,7 +316,7 @@ export async function checkMcpAnonLimit(ip: string, userAgent: string, sessionId
         resetAt,
       };
     }
-    return { allowed: true, used: identityUsed, limit: MCP_ANON_DAILY_LIMIT, reason: 'ok', resetAt };
+    return { allowed: true, used: identityUsed, limit: MCP_ANON_DAILY_LIMIT, reason: 'ok', resetAt, claimedKeys: idKeys };
   } catch (e) {
     console.error('[mcp-anon-limit] Redis error checking anonymous MCP quota:', (e as Error).message);
     return { allowed: false, used: 0, limit: MCP_ANON_DAILY_LIMIT, reason: 'infra', resetAt };
@@ -313,17 +331,29 @@ function identityKeys(ip: string, userAgent: string, sessionId?: string | null):
   return keys;
 }
 
+// Lua: decrement only while > 0; delete the key when it would hit 0.
+// Never goes negative, never creates a key, never leaves a TTL-less key.
+const SAFE_RELEASE_LUA = `
+local v = tonumber(redis.call('GET', KEYS[1]) or '0')
+if v == nil or v <= 0 then return 0 end
+if v == 1 then redis.call('DEL', KEYS[1]) return 0 end
+return redis.call('DECR', KEYS[1])
+`;
+
 async function rollbackIdentity(keys: string[]): Promise<void> {
   if (!redis || keys.length === 0) return;
+  const client = redis;
   try {
-    await Promise.all(keys.map((key) => redis!.decr(key)));
+    await Promise.all(keys.map((key) => client.eval(SAFE_RELEASE_LUA, [key], [])));
   } catch (e) {
     console.error('[mcp-anon-limit] Redis error rolling back identity slot:', (e as Error).message);
   }
 }
 
-// Gives back the 5-success slot claimed by checkMcpAnonLimit. Does not
-// touch the attempt counters (per IP, per subnet, global).
-export async function releaseMcpAnonSlot(ip: string, userAgent: string, sessionId?: string | null): Promise<void> {
-  await rollbackIdentity(identityKeys(ip, userAgent, sessionId));
+// Gives back the 5-success slot claimed by checkMcpAnonLimit — into the
+// exact keys it claimed (decision.claimedKeys), never a newer day's key.
+// Does not touch the attempt counters (per IP, per subnet, global).
+export async function releaseMcpAnonSlot(claimedKeys: string[] | undefined): Promise<void> {
+  if (!claimedKeys || claimedKeys.length === 0) return;
+  await rollbackIdentity(claimedKeys);
 }
