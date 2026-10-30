@@ -223,17 +223,19 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
-// Best-effort client IP for the anonymous demo limiter ONLY — never used
-// for auth or billing of a real key. Identical to the helper in
-// app/api/mcp/route.ts; kept as a literal duplicate rather than a shared
-// lib import, same reasoning as that file's MAX_BATCH_SIZE note — this
-// is a two-line, route-local concern, not worth a shared module.
+// Seconds until the demo limiter resets (UTC midnight, same as
+// lib/demo-limit.ts) — used for the guest 429 Retry-After header.
 function secondsUntilUtcMidnight(): number {
   const now = new Date();
   const next = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
   return Math.max(1, Math.ceil((next - now.getTime()) / 1000));
 }
 
+// Best-effort client IP for the anonymous demo limiter ONLY — never used
+// for auth or billing of a real key. Identical to the helper in
+// app/api/mcp/route.ts; kept as a literal duplicate rather than a shared
+// lib import, same reasoning as that file's MAX_BATCH_SIZE note — this
+// is a two-line, route-local concern, not worth a shared module.
 function extractClientIp(request: NextRequest): string {
   const forwardedFor = request.headers.get('x-forwarded-for');
   if (forwardedFor) return forwardedFor.split(',')[0].trim();

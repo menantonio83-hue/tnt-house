@@ -47,7 +47,7 @@ import { requireApiKey } from '@/lib/api-auth';
 import { enforceRateLimitBatch } from '@/lib/rate-limit';
 import { logApiRequest } from '@/lib/request-logger';
 import { withOwnerHandoff } from '@/lib/owner-handoff';
-import { fetchTokenRisk, toPublicTokenRisk } from '@/lib/token-risk-core';
+import { fetchTokenRisk, isValidSolanaMint, toPublicTokenRisk } from '@/lib/token-risk-core';
 
 // Same 60s ceiling as the single-mint route — a batch of 25 concurrent
 // fetchTokenRisk() calls has the same worst-case per-item budget
@@ -135,10 +135,21 @@ export async function POST(request: NextRequest) {
     const mintList = mints as string[];
     mintCount = mintList.length;
 
-    // 2. Rate limit — charges N calls (one per mint), atomically, before
+    // 2. Validate every address BEFORE charging — an invalid address is
+    // answered with a per-item error and is never charged.
+    const validMints = mintList.filter((m) => isValidSolanaMint(m));
+    if (validMints.length === 0) {
+      logBatch(400, 'all_mints_invalid');
+      return NextResponse.json(
+        { error: 'No valid Solana mint addresses in "mints"; nothing was charged' },
+        { status: 400, headers: CORS_HEADERS },
+      );
+    }
+
+    // 3. Rate limit — charges one call per VALID mint, atomically, before
     // any upstream work happens. All-or-nothing: either the whole batch
     // is allowed, or none of it runs.
-    const rateLimit = await enforceRateLimitBatch(auth.key, mintList.length, CORS_HEADERS);
+    const rateLimit = await enforceRateLimitBatch(auth.key, validMints.length, CORS_HEADERS);
     if (!rateLimit.allowed) {
       logBatch(402, 'rate_limited');
       return (
@@ -161,7 +172,13 @@ export async function POST(request: NextRequest) {
     // every failure mode (bad address, upstream error) resolves to a
     // { ok: false, ... } result, so one bad mint in the batch can't
     // abort the others.
-    const results = await Promise.all(mintList.map((mint) => fetchTokenRisk(mint)));
+    const results = await Promise.all(
+      mintList.map((mint) =>
+        isValidSolanaMint(mint)
+          ? fetchTokenRisk(mint)
+          : Promise.resolve<Awaited<ReturnType<typeof fetchTokenRisk>>>({ ok: false, mint, status: 400, error: `Invalid mint address: ${mint}` }),
+      ),
+    );
 
     // Fire-and-forget per-mint logging — same analytics granularity as
     // the single-mint endpoint (which mints get queried, error rates),
@@ -196,7 +213,7 @@ export async function POST(request: NextRequest) {
               },
         ),
         batch_size: mintList.length,
-        charged_calls: mintList.length,
+        charged_calls: validMints.length,
       },
       { headers: rateLimitHeaders },
     );

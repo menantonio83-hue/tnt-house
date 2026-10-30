@@ -1,6 +1,6 @@
 // v1.18: a keyed check validates the mint before quota or credit is
-// spent. When the anonymous 5/day quota is used up, the HTTP status is
-// 429 with Retry-After. 401 stays only for a bad key.
+// spent. When the anonymous 5/day quota is used up, the reply stays an
+// HTTP 200 tool error (as before) and now says when the quota resets.
 //
 // Version 1.17 — app/api/mcp/route.ts
 //
@@ -341,9 +341,13 @@ function buildServer(apiKey: ApiKeyRecord | null, clientIp: string, userAgent: s
                 : gate.reason === 'infra'
                   ? 'Anonymous MCP access is temporarily unavailable. Please try again shortly, or use a free API key (15/day) from https://www.tnt-audit.com/risk-api.'
                   : `Anonymous MCP quota used (${gate.used}/${gate.limit} today). Get a free email key (15/day) at https://www.tnt-audit.com/risk-api or pay per call via x402 GET /api/v1/token-risk/x402 ($0.02).`;
+          const resetHint =
+            gate.reason === 'infra'
+              ? ''
+              : ` Free quota resets at 00:00 UTC (in ${Math.ceil(secondsUntilUtcMidnight() / 60)} min).`;
           const anonRefusal = buildRefusalBody(
             gate.reason === 'infra' ? 'anon_unavailable' : 'anon_limit_reached',
-            message,
+            message + resetHint,
             [freeKeyOption(), x402Option()],
             { used: gate.used, limit: gate.limit },
           );
@@ -677,19 +681,7 @@ export async function POST(request: NextRequest) {
   const server = buildServer(apiKey, extractClientIp(request), extractUserAgent(request), extractSessionId(request));
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined });
   await server.connect(transport);
-  const mcpResponse = await transport.handleRequest(request);
-  if (apiKey || toolName !== 'check_token_risk' || mcpResponse.status !== 200) {
-    return mcpResponse;
-  }
-  try {
-    const body = await mcpResponse.clone().text();
-    if (!body.includes('anon_limit_reached')) return mcpResponse;
-    const headers = new Headers(mcpResponse.headers);
-    headers.set('Retry-After', String(secondsUntilUtcMidnight()));
-    return new Response(body, { status: 429, headers });
-  } catch {
-    return mcpResponse;
-  }
+  return transport.handleRequest(request);
 }
 
 // Stateless mode has no standalone GET/SSE stream (no session to
