@@ -1,3 +1,10 @@
+// Version 1.11 — app/api/v1/token-risk/x402/route.ts
+//
+// v1.11: the paid resource URL includes the mint. A verified receipt is
+// claimed before scoring. Scoring failure releases it. A settle timeout
+// keeps it and a retry of the same receipt and mint returns the saved
+// result without paying again. Redis down is a 503, not a free call.
+//
 // Version 1.10 — app/api/v1/token-risk/x402/route.ts
 //
 // v1.10: pending-grace fix (see lib/x402/pending-grace.ts's header for
@@ -36,6 +43,10 @@ import {
   buildPaymentRequiredBody,
   verifyPayment,
   settlePayment,
+  claimX402Receipt,
+  releaseX402Receipt,
+  saveX402Receipt,
+  x402ReceiptId,
   type PaymentRequiredBody,
 } from '@/lib/x402/verify';
 
@@ -116,10 +127,13 @@ export async function GET(request: NextRequest) {
   const paymentHeader =
     request.headers.get('X-PAYMENT') || request.headers.get('PAYMENT-SIGNATURE');
 
+  const resourcePath = `${RESOURCE_PATH}?mint=${encodeURIComponent(mint)}`;
+  const resourceUrl = `https://www.tnt-audit.com${resourcePath}`;
+
   let challenge: PaymentRequiredBody;
   try {
     challenge = await buildPaymentRequiredBody(
-      RESOURCE_PATH,
+      resourcePath,
       PRICE_USDC_ATOMIC,
       DESCRIPTION,
       paymentHeader ? undefined : 'Payment required',
@@ -137,14 +151,11 @@ export async function GET(request: NextRequest) {
   }
 
   const requirement = challenge.accepts[0];
+  let heldReceipt: { id: string; token: string } | null = null;
 
   try {
     const tVerifyStart = Date.now();
-    const verification = await verifyPayment(
-      paymentHeader,
-      requirement,
-      `https://www.tnt-audit.com${RESOURCE_PATH}`,
-    );
+    const verification = await verifyPayment(paymentHeader, requirement, resourceUrl);
     const verifyMs = Date.now() - tVerifyStart;
     if (!verification.isValid) {
       console.log('[x402][latency] verify_failed', { verifyMs });
@@ -154,12 +165,55 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    const receiptId = x402ReceiptId(paymentHeader);
+    if (!receiptId) {
+      return respond402({ ...challenge, error: 'Payment verification failed' });
+    }
+    const claim = await claimX402Receipt(receiptId, mint);
+    if (claim.kind === 'redis_down') {
+      return NextResponse.json(
+        { error: 'Payment check is temporarily unavailable. Try again shortly.', error_code: 'receipt_store_unavailable' },
+        { status: 503, headers: CORS_HEADERS },
+      );
+    }
+    if (claim.kind === 'mismatch') {
+      return NextResponse.json(
+        { error: 'This payment was already used for a different mint', error_code: 'receipt_mint_mismatch' },
+        { status: 409, headers: CORS_HEADERS },
+      );
+    }
+    if (claim.kind === 'busy') {
+      return NextResponse.json(
+        { error: 'This payment is already being processed', error_code: 'receipt_in_progress' },
+        { status: 409, headers: CORS_HEADERS },
+      );
+    }
+    if (claim.kind === 'done' && claim.body) {
+      const replayHeaders: Record<string, string> = { ...CORS_HEADERS };
+      if (claim.transactionHash) {
+        const receiptJson = JSON.stringify({ success: true, transaction: claim.transactionHash });
+        replayHeaders['X-PAYMENT-RESPONSE'] = receiptJson;
+        replayHeaders['PAYMENT-RESPONSE'] = receiptJson;
+      }
+      return NextResponse.json(claim.body, { headers: replayHeaders });
+    }
+    if (claim.kind !== 'claimed' || !claim.token) {
+      return NextResponse.json(
+        { error: 'Payment check is temporarily unavailable. Try again shortly.', error_code: 'receipt_store_unavailable' },
+        { status: 503, headers: CORS_HEADERS },
+      );
+    }
+    const claimToken = claim.token;
+    heldReceipt = { id: receiptId, token: claimToken };
+
     let result;
     const tScoreStart = Date.now();
     try {
       result = await fetchTokenRisk(mint);
     } catch (error) {
       console.error('[token-risk/x402] scoring error before settlement:', error);
+      await releaseX402Receipt(receiptId, claimToken);
+      heldReceipt = null;
       return NextResponse.json(
         { error: 'Internal error' },
         { status: 500, headers: CORS_HEADERS },
@@ -168,6 +222,8 @@ export async function GET(request: NextRequest) {
     const scoreMs = Date.now() - tScoreStart;
 
     if (!result.ok) {
+      await releaseX402Receipt(receiptId, claimToken);
+      heldReceipt = null;
       return NextResponse.json(
         { error: result.error ?? 'Unknown error', ...(result.details ? { details: result.details } : {}) },
         { status: result.status ?? 502, headers: CORS_HEADERS },
@@ -177,13 +233,36 @@ export async function GET(request: NextRequest) {
     const tSettleStart = Date.now();
     const settlement = await settlePayment(paymentHeader, requirement);
     const settleMs = Date.now() - tSettleStart;
+    const publicBody = toPublicTokenRisk(result) as Record<string, unknown>;
     if (!settlement.success) {
+      if (settlement.timedOut) {
+        await saveX402Receipt(receiptId, { state: 'accepted', mint, body: publicBody });
+        heldReceipt = null;
+        console.log('[x402][latency] settle_timeout', { verifyMs, scoreMs, settleMs });
+        return NextResponse.json(
+          {
+            error: 'Payment settlement timed out. Retry this same request with the same mint to get the result without paying again.',
+            error_code: 'settlement_timeout',
+          },
+          { status: 503, headers: CORS_HEADERS },
+        );
+      }
       console.log('[x402][latency] settle_failed', { verifyMs, scoreMs, settleMs });
+      await releaseX402Receipt(receiptId, claimToken);
+      heldReceipt = null;
       return respond402({
         ...challenge,
         error: settlement.errorReason ?? 'Payment settlement failed',
       });
     }
+
+    await saveX402Receipt(receiptId, {
+      state: 'settled',
+      mint,
+      body: publicBody,
+      transactionHash: settlement.transactionHash,
+    });
+    heldReceipt = null;
 
     // v1.10: this call just paid to kick off (or check) this mint's
     // analysis — if it's still 'pending', open a short free-repoll
@@ -218,6 +297,7 @@ export async function GET(request: NextRequest) {
     );
   } catch (error) {
     console.error('[token-risk/x402] unhandled error:', error);
+    if (heldReceipt) await releaseX402Receipt(heldReceipt.id, heldReceipt.token);
     return NextResponse.json({ error: 'Internal error' }, { status: 500, headers: CORS_HEADERS });
   }
 }
