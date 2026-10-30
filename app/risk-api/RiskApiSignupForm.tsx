@@ -86,12 +86,6 @@ export default function RiskApiSignupForm() {
         return;
       }
 
-      if (typeof data.api_key !== 'string' || data.api_key.length === 0) {
-        setErrorMsg(data.note || data.error || 'Check your email for the new key.');
-        setStatus('error');
-        return;
-      }
-
       setNotice(typeof data.email_notice === 'string' ? data.email_notice : '');
       setIssuedKey({ api_key: data.api_key, daily_limit: data.daily_limit });
       setStatus('success');

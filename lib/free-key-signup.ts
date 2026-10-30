@@ -1,9 +1,9 @@
 // Version 1.1 — lib/free-key-signup.ts
 //
 // v1.1: if the email does not actually send, the response says so and
-// still shows the new key. A repeat signup emails a replacement key
-// (the old one is revoked) at most once per 10 minutes and does not
-// show that key. Two fast signups for one email cannot both stay active.
+// still shows the new key. A repeat signup for an email that already has
+// an active key gets 409 email_exists, same as before, and never touches
+// any existing key. Two fast signups for one email cannot both stay active.
 //
 // Version 1.0 — lib/free-key-signup.ts
 //
@@ -12,7 +12,7 @@
 // from lib/signup-limit.ts.
 
 import { generateApiKey, hashApiKey } from '@/lib/api-key';
-import { insertApiKeyRow, listActiveKeysByOwner, setApiKeyActive, type ApiKeyRecord } from '@/lib/api-key-store';
+import { insertApiKeyRow, listActiveKeysByOwner, setApiKeyActive } from '@/lib/api-key-store';
 import { FREE_DAILY_LIMIT } from '@/lib/billing-pricing';
 import { sendApiKeyEmail } from '@/lib/send-email';
 import { checkSignupLimit } from '@/lib/signup-limit';
@@ -30,23 +30,12 @@ const VALID_LANGS: LangCode[] = ['en', 'es', 'fr', 'el', 'ru', 'it', 'zh'];
 // arbitrary client-supplied text. Add a new entry here (lowercase) when
 // onboarding a new partner; nothing else needs to change.
 const KNOWN_REFERRAL_CODES = ['lumo', 'demo_public'];
-const REISSUE_WAIT_MS = 10 * 60 * 1000;
 const EMAIL_NOT_SENT = 'Your key was created, but the email could not be sent — copy the key now.';
 
 const redis =
   process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN
     ? new Redis({ url: process.env.KV_REST_API_URL, token: process.env.KV_REST_API_TOKEN })
     : null;
-
-function newestFirst(rows: ApiKeyRecord[]): ApiKeyRecord[] {
-  return [...rows].sort((a, b) => b.created_at.localeCompare(a.created_at) || b.id.localeCompare(a.id));
-}
-
-function issuedTooRecently(rows: ApiKeyRecord[]): boolean {
-  const newest = newestFirst(rows)[0];
-  if (!newest) return false;
-  return Date.now() - Date.parse(newest.created_at) < REISSUE_WAIT_MS;
-}
 
 async function withEmailLock(email: string, work: () => Promise<FreeKeySignupResult>): Promise<FreeKeySignupResult> {
   if (!redis) return work();
@@ -119,9 +108,21 @@ async function issueForEmail(email: string, lang: LangCode | undefined, ref: str
     return { status: 500, body: { error: 'Internal error, please try again' } };
   }
   if (active.length > 0) {
-    return reissue(email, active, lang, ref);
+    return emailExists();
   }
   return createFirstKey(email, lang, ref);
+}
+
+// Same status and body as before v1.1, so bots and the site form see no change.
+function emailExists(): FreeKeySignupResult {
+  return {
+    status: 409,
+    body: {
+      error: 'This email already has an active API key',
+      error_code: 'email_exists',
+      note: 'Keys are only shown once at creation and cannot be retrieved again. If you lost yours, contact us to have it reissued.',
+    },
+  };
 }
 
 async function createFirstKey(email: string, lang: LangCode | undefined, ref: string | null): Promise<FreeKeySignupResult> {
@@ -129,13 +130,7 @@ async function createFirstKey(email: string, lang: LangCode | undefined, ref: st
   const inserted = await insertApiKeyRow(keyHash, keyPrefix, email, 'free', ref, true);
   if (!inserted.record) {
     if (inserted.duplicate) {
-      return {
-        status: 429,
-        body: {
-          error: 'A key for this email was just created. Use the key from the first response, or wait 10 minutes to have a new one emailed.',
-          error_code: 'reissue_too_soon',
-        },
-      };
+      return emailExists();
     }
     return { status: 500, body: { error: 'Failed to create API key, please try again' } };
   }
@@ -145,13 +140,7 @@ async function createFirstKey(email: string, lang: LangCode | undefined, ref: st
     const oldestFirst = [...rows].sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id));
     if (oldestFirst[0].id !== inserted.record.id) {
       await setApiKeyActive(inserted.record.id, false);
-      return {
-        status: 429,
-        body: {
-          error: 'A key for this email was just created. Use the key from the first response, or wait 10 minutes to have a new one emailed.',
-          error_code: 'reissue_too_soon',
-        },
-      };
+      return emailExists();
     }
     for (const extra of oldestFirst.slice(1)) {
       await setApiKeyActive(extra.id, false);
@@ -170,65 +159,6 @@ async function createFirstKey(email: string, lang: LangCode | undefined, ref: st
       warning: 'This key is shown once and cannot be retrieved again. Store it securely.',
       email_sent: emailResult.sent,
       ...(emailResult.sent ? {} : { email_notice: EMAIL_NOT_SENT }),
-    },
-  };
-}
-
-async function reissue(
-  email: string,
-  active: ApiKeyRecord[],
-  lang: LangCode | undefined,
-  ref: string | null,
-): Promise<FreeKeySignupResult> {
-  if (issuedTooRecently(active)) {
-    return {
-      status: 429,
-      body: {
-        error: 'A key for this email was issued less than 10 minutes ago. Try again later.',
-        error_code: 'reissue_too_soon',
-      },
-    };
-  }
-
-  const previous = newestFirst(active)[0];
-  const { rawKey, keyHash, keyPrefix } = generateApiKey();
-  const pending = await insertApiKeyRow(keyHash, keyPrefix, email, 'free', ref, false);
-  if (!pending.record) {
-    return { status: 500, body: { error: 'Failed to create API key, please try again' } };
-  }
-
-  for (const old of active) {
-    await setApiKeyActive(old.id, false);
-  }
-  const activated = await setApiKeyActive(pending.record.id, true);
-  if (!activated) {
-    await setApiKeyActive(previous.id, true);
-    return { status: 500, body: { error: 'Internal error, please try again' } };
-  }
-
-  const emailResult = await sendApiKeyEmail({ to: email, apiKey: rawKey, dailyLimit: FREE_DAILY_LIMIT, lang });
-  if (!emailResult.sent) {
-    await setApiKeyActive(pending.record.id, false);
-    await setApiKeyActive(previous.id, true);
-    return {
-      status: 503,
-      body: {
-        error: 'The email could not be sent, so your existing key was not replaced.',
-        error_code: 'email_not_sent',
-      },
-    };
-  }
-
-  for (const old of active) {
-    if (old.id !== pending.record.id) await setApiKeyActive(old.id, false);
-  }
-  return {
-    status: 200,
-    body: {
-      reissued: true,
-      email_sent: true,
-      key_prefix: keyPrefix,
-      note: 'A new key was sent to this email. The previous key no longer works. The key is not shown again here.',
     },
   };
 }
