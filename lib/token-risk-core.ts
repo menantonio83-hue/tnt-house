@@ -515,6 +515,16 @@ export function toPublicTokenRisk(result: TokenRiskResult): PublicTokenRisk {
   return body;
 }
 
+export function isValidSolanaMint(mint: string): boolean {
+  try {
+    // eslint-disable-next-line no-new
+    new PublicKey(mint);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // Validates + fetches + scores a single mint. Never throws — every
 // failure path (bad address, upstream fetch failure, unexpected
 // exception) resolves to a TokenRiskFailure so a batch of N mints can
@@ -524,13 +534,9 @@ export async function fetchTokenRisk(mintRaw: string): Promise<TokenRiskResult> 
   const mint = mintRaw;
 
   try {
-    // eslint-disable-next-line no-new
-    new PublicKey(mint);
-  } catch {
-    return { ok: false, mint, status: 400, error: `Invalid mint address: ${mint}` };
-  }
-
-  try {
+    if (!isValidSolanaMint(mint)) {
+      return { ok: false, mint, status: 400, error: `Invalid mint address: ${mint}` };
+    }
     const fetchStartedAt = Date.now();
     const [mintInfo, firstHolderRisk, rawDexData, rugCheckData, realHolderCount] = await Promise.all([
       withTimeout(getMintInfo(mint), MINT_INFO_TIMEOUT_MS, null),

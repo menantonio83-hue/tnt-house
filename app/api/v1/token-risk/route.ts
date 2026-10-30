@@ -1,3 +1,8 @@
+// v1.18: a keyed call checks the mint before any quota or credit is
+// spent. A missing or invalid Solana address is 400 and costs nothing.
+// A guest who has used the 5 free checks gets 429 and Retry-After,
+// not 401. 401 stays only for a bad key.
+//
 // Version 1.17 — app/api/v1/token-risk/route.ts
 //
 // v1.17: a presented key that is missing from the table, revoked, or
@@ -180,7 +185,7 @@ import { waitUntil } from '@vercel/functions';
 import { requireApiKey } from '@/lib/api-auth';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { logApiRequest } from '@/lib/request-logger';
-import { fetchTokenRisk, toPublicTokenRisk } from '@/lib/token-risk-core';
+import { fetchTokenRisk, isValidSolanaMint, toPublicTokenRisk } from '@/lib/token-risk-core';
 import { checkDemoLimit, REST_ANON_DAILY_LIMIT_PER_IP } from '@/lib/demo-limit';
 import { consumeDemoPublicKey, DEMO_TOTAL_LIMIT } from '@/lib/demo-public-key-limit';
 
@@ -223,6 +228,12 @@ const CORS_HEADERS = {
 // app/api/mcp/route.ts; kept as a literal duplicate rather than a shared
 // lib import, same reasoning as that file's MAX_BATCH_SIZE note — this
 // is a two-line, route-local concern, not worth a shared module.
+function secondsUntilUtcMidnight(): number {
+  const now = new Date();
+  const next = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
+  return Math.max(1, Math.ceil((next - now.getTime()) / 1000));
+}
+
 function extractClientIp(request: NextRequest): string {
   const forwardedFor = request.headers.get('x-forwarded-for');
   if (forwardedFor) return forwardedFor.split(',')[0].trim();
@@ -428,8 +439,31 @@ export async function GET(request: NextRequest) {
     if (auth.ok && auth.key) {
       keyId = auth.key.id;
 
-      // 0.5. Rate limit — counts against the key's daily quota before any
-      // RPC work happens, whether or not the request turns out valid.
+      const keyedParams = new URL(request.url).searchParams;
+      mint = keyedParams.get('mint') || keyedParams.get('ca');
+      if (!mint) {
+        return respond(
+          NextResponse.json(
+            {
+              error: 'Missing required parameter: mint (or ca)',
+              example: 'GET /api/v1/token-risk?mint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+            },
+            { status: 400, headers: responseHeaders },
+          ),
+          { error: 'missing_mint' },
+        );
+      }
+      if (!isValidSolanaMint(mint)) {
+        return respond(
+          NextResponse.json(
+            { error: `Invalid mint address: ${mint}` },
+            { status: 400, headers: responseHeaders },
+          ),
+          { error: 'invalid_mint' },
+        );
+      }
+
+      // Rate limit only after the mint is a real Solana address.
       const rateLimit = await enforceRateLimit(auth.key, CORS_HEADERS);
       if (!rateLimit.allowed) {
         return respond(
@@ -508,7 +542,14 @@ export async function GET(request: NextRequest) {
                 agents_note: 'Building a bot? x402 pay-per-call skips the key entirely — $0.02/call, no signup.',
               };
         return respond(
-          NextResponse.json(body, { status: 401, headers: CORS_HEADERS }),
+          NextResponse.json(body, {
+            status: 429,
+            headers: {
+              ...CORS_HEADERS,
+              'Retry-After': String(secondsUntilUtcMidnight()),
+              'Access-Control-Expose-Headers': 'Retry-After',
+            },
+          }),
           { error: 'demo_limit_exceeded' },
         );
       }

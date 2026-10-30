@@ -1,3 +1,7 @@
+// v1.18: a keyed check validates the mint before quota or credit is
+// spent. When the anonymous 5/day quota is used up, the HTTP status is
+// 429 with Retry-After. 401 stays only for a bad key.
+//
 // Version 1.17 — app/api/mcp/route.ts
 //
 // v1.17: an Authorization header that does not match a live key is a
@@ -165,7 +169,7 @@ import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/
 import serverCard from '@/public/.well-known/mcp/server-card.json';
 import { authenticateRawApiKey, requireApiKey } from '@/lib/api-auth';
 import { enforceRateLimit, enforceRateLimitBatch } from '@/lib/rate-limit';
-import { fetchTokenRisk } from '@/lib/token-risk-core';
+import { fetchTokenRisk, isValidSolanaMint } from '@/lib/token-risk-core';
 import { getMintRiskHistory } from '@/lib/mint-risk-history-store';
 import { issueFreeApiKey } from '@/lib/free-key-signup';
 import { logApiRequest } from '@/lib/request-logger';
@@ -186,6 +190,18 @@ export const maxDuration = 60;
 // exports — see that file's own note). If that cap ever changes,
 // update both.
 const MAX_BATCH_SIZE = 25;
+
+function secondsUntilUtcMidnight(): number {
+  const now = new Date();
+  const next = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
+  return Math.max(1, Math.ceil((next - now.getTime()) / 1000));
+}
+
+function mintProblem(mint: string | null | undefined): string | null {
+  if (!mint || !mint.trim()) return 'Missing required parameter: mint';
+  if (!isValidSolanaMint(mint)) return `Invalid mint address: ${mint}`;
+  return null;
+}
 
 // JSON-RPC methods that never touch paid/private data — safe to allow
 // with no Authorization header so directory health-checkers and new
@@ -366,6 +382,10 @@ function buildServer(apiKey: ApiKeyRecord | null, clientIp: string, userAgent: s
       }
 
       const startedAt = Date.now();
+      const problem = mintProblem(mint);
+      if (problem) {
+        return jsonResult({ error: problem }, true);
+      }
       const rateLimit = await enforceRateLimit(callKey, {});
       if (!rateLimit.allowed) {
         waitUntil(
@@ -422,6 +442,12 @@ function buildServer(apiKey: ApiKeyRecord | null, clientIp: string, userAgent: s
         );
       }
       const startedAt = Date.now();
+      for (const one of mints) {
+        const problem = mintProblem(one);
+        if (problem) {
+          return jsonResult({ error: problem }, true);
+        }
+      }
       const rateLimit = await enforceRateLimitBatch(callKey, mints.length, {});
       if (!rateLimit.allowed) {
         waitUntil(
@@ -651,7 +677,19 @@ export async function POST(request: NextRequest) {
   const server = buildServer(apiKey, extractClientIp(request), extractUserAgent(request), extractSessionId(request));
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined });
   await server.connect(transport);
-  return transport.handleRequest(request);
+  const mcpResponse = await transport.handleRequest(request);
+  if (apiKey || toolName !== 'check_token_risk' || mcpResponse.status !== 200) {
+    return mcpResponse;
+  }
+  try {
+    const body = await mcpResponse.clone().text();
+    if (!body.includes('anon_limit_reached')) return mcpResponse;
+    const headers = new Headers(mcpResponse.headers);
+    headers.set('Retry-After', String(secondsUntilUtcMidnight()));
+    return new Response(body, { status: 429, headers });
+  } catch {
+    return mcpResponse;
+  }
 }
 
 // Stateless mode has no standalone GET/SSE stream (no session to
