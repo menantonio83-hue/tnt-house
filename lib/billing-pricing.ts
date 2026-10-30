@@ -238,14 +238,20 @@ export async function resolveBaseAmount(usdAmount: number, currency: Currency): 
 // guarantee against a colliding amount ever being accepted; the wide
 // random range just keeps collisions (and therefore retries) rare in
 // ordinary use.
+// One salt step. billing-verify matches USDC exactly in this unit and
+// matches SOL exactly in lamports (finer than this step), so a payment
+// for one invoice cannot also fit the next salt.
+export const USDC_SALT_SCALE = 1_000_000; // $0.000001
+export const SOL_SALT_SCALE = 1_000_000; // 0.000001 SOL
+
 function saltUsdc(usdAmount: number): number {
   const saltMicros = 1 + Math.floor(Math.random() * 9999); // $0.000001–$0.009999
-  return Math.round(usdAmount * 1e6 + saltMicros) / 1e6;
+  return Math.round(usdAmount * USDC_SALT_SCALE + saltMicros) / USDC_SALT_SCALE;
 }
 
 function saltSol(solAmount: number): number {
   const saltMicroSol = 1 + Math.floor(Math.random() * 9999); // 0.000001–0.009999 SOL
-  return Math.round(solAmount * 1e6 + saltMicroSol) / 1e6;
+  return Math.round(solAmount * SOL_SALT_SCALE + saltMicroSol) / SOL_SALT_SCALE;
 }
 
 function saltMrdtWholeTokens(mrdtAmount: number): number {

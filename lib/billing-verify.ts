@@ -1,3 +1,11 @@
+// Version 7.17 — lib/billing-verify.ts
+//
+// v7.17: a payment can no longer be credited to the wrong invoice.
+// USDC must match exactly in millionths of a dollar (the salt step).
+// SOL must match exactly in lamports, which is finer than its salt step.
+// If several transfers fit, the closest amount wins, not the first one
+// in the page. A signature already stored on any invoice is skipped.
+//
 // Version 7.16 — lib/billing-verify.ts
 //
 // v7.16: defense-in-depth — findMatchInPage now independently checks
@@ -35,15 +43,20 @@
 // tolerance instead — loose enough for float rounding, nowhere near
 // loose enough to match a different invoice.
 
+import { SOL_SALT_SCALE, USDC_SALT_SCALE } from '@/lib/billing-pricing';
+import { supabaseAdmin } from '@/lib/supabase-admin';
+
 const RECIPIENT_WALLET = 'Ev6oXBXo6qyoaT5wypJ2Umxch91F7cFvE1SarYLaUn8Z';
 const MRDT_MINT = '8Q22r9qUm4AzFzTpZgaPYMxqq4z5WxE9FVa7X9dsvmBg';
 const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 const LAMPORTS_PER_SOL = 1_000_000_000;
 
+// MRDT invoices are whole tokens, so half a token only covers float
+// rounding. USDC and SOL are not in this table: they must match exactly
+// (see amountsMatch), because their salt step is smaller than the old
+// 0.00005 / 0.000001 windows.
 const TOLERANCE: Record<string, number> = {
-  SOL: 0.000001, // 1 microSOL
-  USDC: 0.00005,
-  MRDT: 0.5, // whole-token amounts, half a token covers float rounding only
+  MRDT: 0.5,
 };
 
 // Helius returns at most 100 transactions per call. MAX_PAGES bounds
@@ -100,15 +113,29 @@ async function fetchHeliusPage(
   return { transactions: data };
 }
 
-function findMatchInPage(
+interface AmountCandidate {
+  signature: string;
+  received: number;
+  delta: number;
+}
+
+function sameScale(received: number, expected: number, scale: number): boolean {
+  if (!Number.isFinite(received) || !Number.isFinite(expected)) return false;
+  return Math.round(received * scale) === Math.round(expected * scale);
+}
+
+function collectCandidates(
   transactions: any[],
   expectedAmount: number,
   currency: 'SOL' | 'MRDT' | 'USDC',
-  tolerance: number,
   sinceSeconds: number,
-): PaymentMatch | null {
+): AmountCandidate[] {
+  const found: AmountCandidate[] = [];
+  const mrdtTolerance = TOLERANCE.MRDT;
+
   for (const tx of transactions) {
     if (isFailedTx(tx)) continue;
+    if (typeof tx.signature !== 'string' || tx.signature.length === 0) continue;
 
     // Defense-in-depth: don't rely solely on Helius's gte-time query
     // param having filtered correctly — independently skip anything
@@ -119,9 +146,8 @@ function findMatchInPage(
       for (const transfer of tx.tokenTransfers) {
         if (transfer.mint === MRDT_MINT && transfer.toUserAccount === RECIPIENT_WALLET) {
           const received = parseFloat(transfer.tokenAmount ?? transfer.amount ?? 0);
-          if (Math.abs(received - expectedAmount) <= tolerance) {
-            return { found: true, signature: tx.signature, received };
-          }
+          const delta = Math.abs(received - expectedAmount);
+          if (delta <= mrdtTolerance) found.push({ signature: tx.signature, received, delta });
         }
       }
     }
@@ -130,8 +156,10 @@ function findMatchInPage(
       for (const transfer of tx.tokenTransfers) {
         if (transfer.mint === USDC_MINT && transfer.toUserAccount === RECIPIENT_WALLET) {
           const received = parseFloat(transfer.tokenAmount ?? transfer.amount ?? 0);
-          if (Math.abs(received - expectedAmount) <= tolerance) {
-            return { found: true, signature: tx.signature, received };
+          // Exact millionths of a dollar. The salt step is one millionth,
+          // so a neighboring invoice is a whole step away and cannot fit.
+          if (sameScale(received, expectedAmount, USDC_SALT_SCALE)) {
+            found.push({ signature: tx.signature, received, delta: Math.abs(received - expectedAmount) });
           }
         }
       }
@@ -140,15 +168,44 @@ function findMatchInPage(
     if (currency === 'SOL' && tx.nativeTransfers?.length) {
       for (const transfer of tx.nativeTransfers) {
         if (transfer.toUserAccount === RECIPIENT_WALLET) {
-          const receivedSol = (transfer.amount || 0) / LAMPORTS_PER_SOL;
-          if (Math.abs(receivedSol - expectedAmount) <= tolerance) {
-            return { found: true, signature: tx.signature, received: receivedSol };
+          const receivedLamports = Number(transfer.amount || 0);
+          const saltSteps = Math.round(expectedAmount * SOL_SALT_SCALE);
+          const expectedLamports = saltSteps * (LAMPORTS_PER_SOL / SOL_SALT_SCALE);
+          // Lamports are finer than the 0.000001 SOL salt step, so an
+          // exact lamport match is stricter than half a salt step.
+          if (Number.isSafeInteger(receivedLamports) && receivedLamports === expectedLamports) {
+            const receivedSol = receivedLamports / LAMPORTS_PER_SOL;
+            found.push({ signature: tx.signature, received: receivedSol, delta: Math.abs(receivedSol - expectedAmount) });
           }
         }
       }
     }
   }
-  return null;
+  return found;
+}
+
+// One on-chain signature can pay at most one invoice. Checked against
+// both tables that credit this same wallet, so a site order and an API
+// invoice cannot claim the same transaction.
+async function dropUsedSignatures(candidates: AmountCandidate[]): Promise<AmountCandidate[] | null> {
+  const signatures = [...new Set(candidates.map((c) => c.signature))];
+  if (signatures.length === 0) return [];
+
+  const used = new Set<string>();
+  for (let i = 0; i < signatures.length; i += 50) {
+    const chunk = signatures.slice(i, i + 50);
+    for (const table of ['risk_api_payments', 'site_orders']) {
+      const { data, error } = await supabaseAdmin.from(table).select('tx_signature').in('tx_signature', chunk);
+      if (error) {
+        console.error('[billing-verify] could not check whether the signature was already used:', error.message);
+        return null;
+      }
+      for (const row of data ?? []) {
+        if (row.tx_signature) used.add(row.tx_signature);
+      }
+    }
+  }
+  return candidates.filter((c) => !used.has(c.signature));
 }
 
 export async function findMatchingPayment(
@@ -162,10 +219,10 @@ export async function findMatchingPayment(
   }
 
   const sinceSeconds = Math.floor(sinceMs / 1000) - 10; // 10s clock-sync buffer, same as the site's verifier
-  const tolerance = TOLERANCE[currency] ?? 0.00001;
 
   let before: string | undefined;
   let lastReason = 'No matching transaction found';
+  const candidates: AmountCandidate[] = [];
 
   for (let page = 0; page < MAX_PAGES; page++) {
     const { transactions, reason } = await fetchHeliusPage(apiKey, sinceSeconds, before);
@@ -182,13 +239,25 @@ export async function findMatchingPayment(
       break; // exhausted — no more pages to walk
     }
 
-    const match = findMatchInPage(transactions, expectedAmount, currency, tolerance, sinceSeconds);
-    if (match) return match;
+    candidates.push(...collectCandidates(transactions, expectedAmount, currency, sinceSeconds));
 
     if (transactions.length < PAGE_LIMIT) break; // short page — this was the last one
 
     before = transactions[transactions.length - 1].signature;
   }
 
-  return { found: false, reason: lastReason };
+  if (candidates.length === 0) {
+    return { found: false, reason: lastReason };
+  }
+
+  const unused = await dropUsedSignatures(candidates);
+  if (unused === null || unused.length === 0) {
+    return { found: false, reason: 'No matching transaction found' };
+  }
+
+  // Equal closeness keeps the first one seen. Pages are newest-first,
+  // and Array.sort is stable, so a tie stays on the newest transfer.
+  unused.sort((a, b) => a.delta - b.delta);
+  const best = unused[0];
+  return { found: true, signature: best.signature, received: best.received };
 }
