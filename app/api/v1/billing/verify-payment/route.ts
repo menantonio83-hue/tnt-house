@@ -98,6 +98,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(result.body, { status: result.status });
   } catch (error: any) {
     console.error('[billing/verify-payment] error:', error);
-    return NextResponse.json({ verified: false, reason: error.message }, { status: 500 });
+    return NextResponse.json({ verified: false, reason: 'Temporary error, please try again' }, { status: 500 });
   }
 }

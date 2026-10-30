@@ -173,7 +173,7 @@ import { fetchTokenRisk, isValidSolanaMint } from '@/lib/token-risk-core';
 import { getMintRiskHistory } from '@/lib/mint-risk-history-store';
 import { issueFreeApiKey } from '@/lib/free-key-signup';
 import { logApiRequest } from '@/lib/request-logger';
-import { checkMcpAnonLimit, normalizeSessionId, recordMcpAnonSuccess } from '@/lib/mcp-anon-limit';
+import { checkMcpAnonLimit, normalizeSessionId, releaseMcpAnonSlot } from '@/lib/mcp-anon-limit';
 import { buildRefusalBody, freeKeyOption, x402Option } from '@/lib/refusal-options';
 import { attachOwnerHandoff, attachAnonOwnerInfo } from '@/lib/owner-handoff';
 import { createInvoiceForKey, verifyPaymentForKey } from '@/lib/billing-actions';
@@ -329,6 +329,10 @@ function buildServer(apiKey: ApiKeyRecord | null, clientIp: string, userAgent: s
       // cost one of the 5.
       if (!callKey) {
         const startedAt = Date.now();
+        const problem = mintProblem(mint);
+        if (problem) {
+          return jsonResult({ error: problem }, true);
+        }
         const gate = await checkMcpAnonLimit(clientIp, userAgent, sessionId);
         if (!gate.allowed) {
           const message =
@@ -357,8 +361,8 @@ function buildServer(apiKey: ApiKeyRecord | null, clientIp: string, userAgent: s
           return jsonResult(anonBody, true);
         }
         const result = await fetchTokenRisk(mint);
-        if (result.ok) {
-          waitUntil(recordMcpAnonSuccess(clientIp, userAgent, sessionId));
+        if (!result.ok) {
+          await releaseMcpAnonSlot(clientIp, userAgent, sessionId);
         }
         waitUntil(
           logApiRequest({
@@ -371,7 +375,7 @@ function buildServer(apiKey: ApiKeyRecord | null, clientIp: string, userAgent: s
             error: result.ok ? null : result.error ?? 'unknown_error',
           }),
         );
-        const usedNow = result.ok ? gate.used + 1 : gate.used;
+        const usedNow = result.ok ? gate.used : Math.max(0, gate.used - 1);
         return jsonResult(
           {
             ...result,

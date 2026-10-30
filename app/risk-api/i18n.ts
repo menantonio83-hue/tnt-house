@@ -477,14 +477,14 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
         version: 'v1.18',
         date: '2026-08-29',
         changes: [
-          "Pay-per-call (unsubscribed PAYG) overage rate: \$0.04 -> \$0.02/call -- lowers the friction of a first trial for a new user who isn't ready to commit to the \$45 subscription yet. As a result PAYG and x402 are now the same rate; x402's pitch was rewritten from \"cheaper than PAYG\" to \"no account or key needed\" -- the accurate differentiator.",
+          "Pay-per-call (unsubscribed PAYG) overage was lowered to \$0.02/call -- lowers the friction of a first trial for a new user who isn't ready to commit to the \$45 subscription yet. PAYG and x402 are the same rate; x402's pitch is \"no account or key needed\".",
         ],
       },
       {
         version: 'v1.17',
         date: '2026-08-28',
         changes: [
-          "Subscription pricing change: monthly quota 1000 -> 5000 calls/30 days, subscribed overage $0.02 -> $0.015/call. Free (15/day), PAYG ($0.04/call unsubscribed), and x402 ($0.02/call) rates are unchanged -- pricing brought below the closest paid competitor (token-rugcheck via x402, $0.02/call for comparable commodity data) after a competitor-research review.",
+          "Subscription pricing change: monthly quota 1000 -> 5000 calls/30 days, subscribed overage $0.02 -> $0.015/call. Free (15/day) and x402 ($0.02/call) were not changed by this step -- pricing brought below the closest paid competitor (token-rugcheck via x402, $0.02/call for comparable commodity data) after a competitor-research review.",
         ],
       },
       {
@@ -617,7 +617,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     freeFeature3: 'No credit card',
     tierPayPerCall: 'PAY-PER-CALL',
     payPerCallFeature1: 'Top up any amount $5–$500',
-    payPerCallFeature2: 'Only charged past the free 15/day',
+    payPerCallFeature2: '$0.02 per check after the free 15/day',
     payPerCallFeature3: 'Subscribers pay $0.015/call for overage beyond their quota',
     tierSubscription: 'SUBSCRIPTION',
     subFeature1: '5000 calls included',
@@ -837,14 +837,14 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
         version: 'v1.18',
         date: '2026-08-29',
         changes: [
-          "Tarifa de exceso pay-per-call (PAYG sin suscripción): \$0.04 -> \$0.02/llamada -- reduce la fricción de una primera prueba para un usuario nuevo que aún no está listo para la suscripción de \$45. Como resultado, PAYG y x402 tienen ahora la misma tarifa; el mensaje de x402 se reescribió de \"más barato que PAYG\" a \"sin cuenta ni key necesaria\" -- el diferenciador real.",
+          "La tarifa de exceso pay-per-call (PAYG sin suscripción) bajó a \$0.02/llamada -- reduce la fricción de una primera prueba para un usuario nuevo que aún no está listo para la suscripción de \$45. PAYG y x402 tienen la misma tarifa; el mensaje de x402 es \"sin cuenta ni key necesaria\".",
         ],
       },
       {
         version: 'v1.17',
         date: '2026-08-28',
         changes: [
-          "Cambio de precios de suscripción: cuota mensual 1000 -> 5000 llamadas/30 días, exceso con suscripción $0.02 -> $0.015/llamada. Las tarifas Free (15/día), PAYG ($0.04/llamada sin suscripción) y x402 ($0.02/llamada) no cambian -- precio ajustado por debajo del competidor de pago más cercano (token-rugcheck vía x402, $0.02/llamada por datos comparables) tras una revisión de la competencia.",
+          "Cambio de precios de suscripción: cuota mensual 1000 -> 5000 llamadas/30 días, exceso con suscripción $0.02 -> $0.015/llamada. Free (15/día) y x402 ($0.02/llamada) no cambiaron en este paso -- precio ajustado por debajo del competidor de pago más cercano (token-rugcheck vía x402, $0.02/llamada por datos comparables) tras una revisión de la competencia.",
         ],
       },
       {
@@ -977,7 +977,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     freeFeature3: 'Sin tarjeta de crédito',
     tierPayPerCall: 'PAGO POR LLAMADA',
     payPerCallFeature1: 'Recarga cualquier importe entre $5 y $500',
-    payPerCallFeature2: 'Solo se cobra al superar las 15/día gratis',
+    payPerCallFeature2: '$0.02 por comprobación después de las 15 gratis al día',
     payPerCallFeature3: 'Los suscriptores pagan $0.015/llamada por exceso sobre su cuota',
     tierSubscription: 'SUSCRIPCIÓN',
     subFeature1: '5000 llamadas incluidas',
@@ -1194,14 +1194,14 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
         version: 'v1.18',
         date: '2026-08-29',
         changes: [
-          "Tarif de dépassement pay-per-call (PAYG sans abonnement) : 0,04 \$ -> 0,02 \$/appel -- réduit la friction d'un premier essai pour un nouvel utilisateur pas encore prêt pour l'abonnement à 45 \$. Résultat : PAYG et x402 ont désormais le même tarif ; le message de x402 est passé de \"moins cher que PAYG\" à \"sans compte ni clé nécessaire\" -- le véritable argument différenciant.",
+          "Le tarif de dépassement pay-per-call (PAYG sans abonnement) a été abaissé à 0,02 \$/appel -- réduit la friction d'un premier essai pour un nouvel utilisateur pas encore prêt pour l'abonnement à 45 \$. PAYG et x402 ont le même tarif ; le message de x402 est \"sans compte ni clé nécessaire\".",
         ],
       },
       {
         version: 'v1.17',
         date: '2026-08-28',
         changes: [
-          "Changement de tarification de l'abonnement : quota mensuel 1000 -> 5000 appels/30 jours, dépassement avec abonnement 0,02 $ -> 0,015 $/appel. Les tarifs Free (15/jour), PAYG (0,04 $/appel sans abonnement) et x402 (0,02 $/appel) restent inchangés -- prix ajusté en dessous du concurrent payant le plus proche (token-rugcheck via x402, 0,02 $/appel pour des données comparables) après une revue de la concurrence.",
+          "Changement de tarification de l'abonnement : quota mensuel 1000 -> 5000 appels/30 jours, dépassement avec abonnement 0,02 $ -> 0,015 $/appel. Free (15/jour) et x402 (0,02 $/appel) n'ont pas changé à cette étape -- prix ajusté en dessous du concurrent payant le plus proche (token-rugcheck via x402, 0,02 $/appel pour des données comparables) après une revue de la concurrence.",
         ],
       },
       {
@@ -1334,7 +1334,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     freeFeature3: 'Pas de carte bancaire',
     tierPayPerCall: 'PAIEMENT À L\'APPEL',
     payPerCallFeature1: 'Rechargez n\'importe quel montant entre $5 et $500',
-    payPerCallFeature2: 'Facturé seulement au-delà des 15/jour gratuits',
+    payPerCallFeature2: '0,02 $ par vérification après les 15 gratuites par jour',
     payPerCallFeature3: 'Les abonnés paient 0,015 $/appel pour le dépassement de leur quota',
     tierSubscription: 'ABONNEMENT',
     subFeature1: '5000 appels inclus',
@@ -1551,14 +1551,14 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
         version: 'v1.18',
         date: '2026-08-29',
         changes: [
-          "Τιμή υπέρβασης pay-per-call (PAYG χωρίς συνδρομή): \$0.04 -> \$0.02/κλήση -- μειώνει την τριβή μιας πρώτης δοκιμής για έναν νέο χρήστη που δεν είναι ακόμα έτοιμος για τη συνδρομή των \$45. Ως αποτέλεσμα, PAYG και x402 έχουν πλέον την ίδια τιμή· το μήνυμα του x402 άλλαξε από \"φθηνότερο από το PAYG\" σε \"χωρίς λογαριασμό ή key\" -- το πραγματικό διαφοροποιητικό στοιχείο.",
+          "Η τιμή υπέρβασης pay-per-call (PAYG χωρίς συνδρομή) μειώθηκε σε \$0.02/κλήση -- μειώνει την τριβή μιας πρώτης δοκιμής για έναν νέο χρήστη που δεν είναι ακόμα έτοιμος για τη συνδρομή των \$45. PAYG και x402 έχουν την ίδια τιμή· το μήνυμα του x402 είναι \"χωρίς λογαριασμό ή key\".",
         ],
       },
       {
         version: 'v1.17',
         date: '2026-08-28',
         changes: [
-          "Αλλαγή τιμολόγησης συνδρομής: μηνιαία ποσόστωση 1000 -> 5000 κλήσεις/30 ημέρες, υπέρβαση με συνδρομή $0.02 -> $0.015/κλήση. Οι τιμές Free (15/ημέρα), PAYG ($0.04/κλήση χωρίς συνδρομή) και x402 ($0.02/κλήση) παραμένουν αμετάβλητες -- η τιμή προσαρμόστηκε κάτω από τον πλησιέστερο επί πληρωμή ανταγωνιστή (token-rugcheck μέσω x402, $0.02/κλήση για συγκρίσιμα δεδομένα) μετά από έρευνα ανταγωνισμού.",
+          "Αλλαγή τιμολόγησης συνδρομής: μηνιαία ποσόστωση 1000 -> 5000 κλήσεις/30 ημέρες, υπέρβαση με συνδρομή $0.02 -> $0.015/κλήση. Οι τιμές Free (15/ημέρα) και x402 ($0.02/κλήση) δεν άλλαξαν σε αυτό το βήμα -- η τιμή προσαρμόστηκε κάτω από τον πλησιέστερο επί πληρωμή ανταγωνιστή (token-rugcheck μέσω x402, $0.02/κλήση για συγκρίσιμα δεδομένα) μετά από έρευνα ανταγωνισμού.",
         ],
       },
       {
@@ -1691,7 +1691,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     freeFeature3: 'Χωρίς πιστωτική κάρτα',
     tierPayPerCall: 'ΠΛΗΡΩΜΗ ΑΝΑ ΚΛΗΣΗ',
     payPerCallFeature1: 'Φόρτισε οποιοδήποτε ποσό $5–$500',
-    payPerCallFeature2: 'Χρέωση μόνο πέρα από τις δωρεάν 15/ημέρα',
+    payPerCallFeature2: '$0.02 ανά έλεγχο μετά τις δωρεάν 15/ημέρα',
     payPerCallFeature3: 'Οι συνδρομητές πληρώνουν $0.015/κλήση για υπέρβαση της ποσόστωσής τους',
     tierSubscription: 'ΣΥΝΔΡΟΜΗ',
     subFeature1: '5000 κλήσεις περιλαμβάνονται',
@@ -1908,14 +1908,14 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
         version: 'v1.18',
         date: '2026-08-29',
         changes: [
-          "Ставка overage для pay-per-call (PAYG без подписки): \$0.04 -> \$0.02/запрос -- снижает порог входа для первой пробы новому пользователю, который ещё не готов сразу на подписку за \$45. В результате PAYG и x402 теперь по одной ставке; посыл x402 переписан с \"дешевле, чем PAYG\" на \"без аккаунта и ключа\" -- это и есть реальное отличие.",
+          "Ставка overage для pay-per-call (PAYG без подписки) снижена до \$0.02/запрос -- снижает порог входа для первой пробы новому пользователю, который ещё не готов сразу на подписку за \$45. PAYG и x402 теперь по одной ставке; посыл x402 — \"без аккаунта и ключа\".",
         ],
       },
       {
         version: 'v1.17',
         date: '2026-08-28',
         changes: [
-          "Изменение цены подписки: месячная квота 1000 -> 5000 запросов/30 дней, overage при подписке $0.02 -> $0.015/запрос. Тарифы Free (15/день), PAYG ($0.04/запрос без подписки) и x402 ($0.02/запрос) не изменились -- цена скорректирована ниже ближайшего платного конкурента (token-rugcheck через x402, $0.02/запрос за сопоставимые данные) после анализа конкурентов.",
+          "Изменение цены подписки: месячная квота 1000 -> 5000 запросов/30 дней, overage при подписке $0.02 -> $0.015/запрос. Тарифы Free (15/день) и x402 ($0.02/запрос) на этом шаге не менялись -- цена скорректирована ниже ближайшего платного конкурента (token-rugcheck через x402, $0.02/запрос за сопоставимые данные) после анализа конкурентов.",
         ],
       },
       {
@@ -2048,7 +2048,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     freeFeature3: 'Без карты',
     tierPayPerCall: 'ОПЛАТА ЗА ЗАПРОС',
     payPerCallFeature1: 'Пополнение на любую сумму $5–$500',
-    payPerCallFeature2: 'Списывается только сверх бесплатных 15/день',
+    payPerCallFeature2: '$0.02 за проверку после 15 в день',
     payPerCallFeature3: 'Подписчики платят $0.015/запрос за превышение своей квоты',
     tierSubscription: 'ПОДПИСКА',
     subFeature1: '5000 запросов включено',
@@ -2268,14 +2268,14 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
         version: 'v1.18',
         date: '2026-08-29',
         changes: [
-          "Tariffa di eccedenza pay-per-call (PAYG senza abbonamento): \$0.04 -> \$0.02/chiamata -- riduce l'attrito di una prima prova per un nuovo utente non ancora pronto per l'abbonamento da \$45. Di conseguenza PAYG e x402 hanno ora la stessa tariffa; il messaggio di x402 è stato riscritto da \"più economico di PAYG\" a \"senza account o key\" -- il vero elemento distintivo.",
+          "La tariffa di eccedenza pay-per-call (PAYG senza abbonamento) è stata abbassata a \$0.02/chiamata -- riduce l'attrito di una prima prova per un nuovo utente non ancora pronto per l'abbonamento da \$45. PAYG e x402 hanno la stessa tariffa; il messaggio di x402 è \"senza account o key\".",
         ],
       },
       {
         version: 'v1.17',
         date: '2026-08-28',
         changes: [
-          "Modifica prezzi abbonamento: quota mensile 1000 -> 5000 chiamate/30 giorni, eccedenza con abbonamento $0.02 -> $0.015/chiamata. Le tariffe Free (15/giorno), PAYG ($0.04/chiamata senza abbonamento) e x402 ($0.02/chiamata) restano invariate -- prezzo adeguato al di sotto del concorrente a pagamento più vicino (token-rugcheck via x402, $0.02/chiamata per dati comparabili) dopo un'analisi della concorrenza.",
+          "Modifica prezzi abbonamento: quota mensile 1000 -> 5000 chiamate/30 giorni, eccedenza con abbonamento $0.02 -> $0.015/chiamata. Le tariffe Free (15/giorno) e x402 ($0.02/chiamata) non sono cambiate in questo passaggio -- prezzo adeguato al di sotto del concorrente a pagamento più vicino (token-rugcheck via x402, $0.02/chiamata per dati comparabili) dopo un'analisi della concorrenza.",
         ],
       },
       {
@@ -2408,7 +2408,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     freeFeature3: 'Nessuna carta di credito',
     tierPayPerCall: 'PAGAMENTO A CHIAMATA',
     payPerCallFeature1: 'Ricarica qualsiasi importo tra $5 e $500',
-    payPerCallFeature2: 'Addebitato solo oltre le 15/giorno gratuite',
+    payPerCallFeature2: '$0.02 a verifica dopo le 15 gratuite al giorno',
     payPerCallFeature3: "Gli abbonati pagano $0.015/chiamata per l'eccedenza oltre la quota",
     tierSubscription: 'ABBONAMENTO',
     subFeature1: '5000 chiamate incluse',
@@ -2625,14 +2625,14 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
         version: 'v1.18',
         date: '2026-08-29',
         changes: [
-          "按次付费（未订阅 PAYG）超额费率：\$0.04 -> \$0.02/次 —— 降低新用户在尚未准备好 \$45 订阅前进行首次试用的门槛。结果 PAYG 与 x402 费率现已相同；x402 的宣传语从\"比 PAYG 便宜\"改写为\"无需账户或密钥\" —— 这才是真正的差异点。",
+          "按次付费（未订阅 PAYG）超额费率降至 \$0.02/次 —— 降低新用户在尚未准备好 \$45 订阅前进行首次试用的门槛。PAYG 与 x402 费率相同；x402 的说明是\"无需账户或密钥\"。",
         ],
       },
       {
         version: 'v1.17',
         date: '2026-08-28',
         changes: [
-          "订阅定价调整：月度配额从 1000 提升至 5000 次调用/30 天，订阅后超额费率从 $0.02 降至 $0.015/次。Free（15次/天）、PAYG（未订阅 $0.04/次）和 x402（$0.02/次）费率保持不变 —— 在竞品调研后，将价格调整至低于最接近的付费竞品（token-rugcheck 通过 x402，$0.02/次，提供类似的基础数据）。",
+          "订阅定价调整：月度配额从 1000 提升至 5000 次调用/30 天，订阅后超额费率从 $0.02 降至 $0.015/次。Free（15次/天）和 x402（$0.02/次）在这一步没有变化 —— 在竞品调研后，将价格调整至低于最接近的付费竞品（token-rugcheck 通过 x402，$0.02/次，提供类似的基础数据）。",
         ],
       },
       {
@@ -2765,7 +2765,7 @@ export const RISK_API_TRANSLATIONS: Record<LangCode, RiskApiTranslations> = {
     freeFeature3: '无需信用卡',
     tierPayPerCall: '按次付费',
     payPerCallFeature1: '可充值 $5–$500 之间任意金额',
-    payPerCallFeature2: '仅在超出免费的 15 次/天后才会扣费',
+    payPerCallFeature2: '免费 15 次/天之后，每次检查 $0.02',
     payPerCallFeature3: '订阅后超出配额部分按 $0.015/次 计费',
     tierSubscription: '订阅',
     subFeature1: '含 5000 次调用',
