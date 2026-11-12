@@ -85,6 +85,67 @@ function respond402(body: PaymentRequiredBody): NextResponse {
   });
 }
 
+const MISSING_MINT_BODY = { error: 'Missing required parameter: mint (or ca)' };
+
+function missingMintResponse(): NextResponse {
+  return NextResponse.json(MISSING_MINT_BODY, { status: 400, headers: CORS_HEADERS });
+}
+
+function hasBearerApiKey(request: NextRequest): boolean {
+  return /^Bearer\s+\S+/i.test(request.headers.get('authorization') || '');
+}
+
+async function buildChallenge(errorMessage?: string): Promise<PaymentRequiredBody | NextResponse> {
+  try {
+    return await buildPaymentRequiredBody(
+      RESOURCE_PATH,
+      PRICE_USDC_ATOMIC,
+      DESCRIPTION,
+      errorMessage,
+    );
+  } catch (error) {
+    console.error('[token-risk/x402] failed to build payment challenge:', error);
+    return NextResponse.json(
+      { error: 'Payment facilitator temporarily unavailable' },
+      { status: 503, headers: CORS_HEADERS },
+    );
+  }
+}
+
+// No mint. Unpaid probes get the same 402 as a minted call. A real
+// payment is verified and then rejected with 400 before the receipt is
+// claimed or settled, so the caller can retry with a mint and is not
+// charged for an empty request. An API key is rejected the same way
+// without touching quota or credit — this route does not bill keys.
+async function respondWhenMintMissing(
+  request: NextRequest,
+  paymentHeader: string | null,
+): Promise<NextResponse> {
+  if (!paymentHeader) {
+    if (hasBearerApiKey(request)) return missingMintResponse();
+    const challenge = await buildChallenge('Payment required');
+    if (challenge instanceof NextResponse) return challenge;
+    return respond402(challenge);
+  }
+
+  const challenge = await buildChallenge();
+  if (challenge instanceof NextResponse) return challenge;
+
+  const verification = await verifyPayment(
+    paymentHeader,
+    challenge.accepts[0],
+    `https://www.tnt-audit.com${RESOURCE_PATH}`,
+  );
+  if (!verification.isValid) {
+    return respond402({
+      ...challenge,
+      error: verification.errorReason ?? 'Payment verification failed',
+    });
+  }
+
+  return missingMintResponse();
+}
+
 export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
 }
@@ -97,12 +158,15 @@ export async function GET(request: NextRequest) {
   // demand payment at all.
   const { searchParams } = new URL(request.url);
   const mint = searchParams.get('mint') || searchParams.get('ca');
+  const paymentHeader =
+    request.headers.get('X-PAYMENT') || request.headers.get('PAYMENT-SIGNATURE');
 
+  // x402-list health checks GET this path with no mint and no payment.
+  // An unpaid request must still return the 402 payment challenge, or
+  // the catalog marks the service offline. A payment or API key with
+  // no mint stays a 400, and that happens before settle or any charge.
   if (!mint) {
-    return NextResponse.json(
-      { error: 'Missing required parameter: mint (or ca)' },
-      { status: 400, headers: CORS_HEADERS },
-    );
+    return respondWhenMintMissing(request, paymentHeader);
   }
 
   // v1.10: free re-poll while this mint's cluster analysis is still
@@ -129,24 +193,8 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const paymentHeader =
-    request.headers.get('X-PAYMENT') || request.headers.get('PAYMENT-SIGNATURE');
-
-  let challenge: PaymentRequiredBody;
-  try {
-    challenge = await buildPaymentRequiredBody(
-      RESOURCE_PATH,
-      PRICE_USDC_ATOMIC,
-      DESCRIPTION,
-      paymentHeader ? undefined : 'Payment required',
-    );
-  } catch (error) {
-    console.error('[token-risk/x402] failed to build payment challenge:', error);
-    return NextResponse.json(
-      { error: 'Payment facilitator temporarily unavailable' },
-      { status: 503, headers: CORS_HEADERS },
-    );
-  }
+  const challenge = await buildChallenge(paymentHeader ? undefined : 'Payment required');
+  if (challenge instanceof NextResponse) return challenge;
 
   if (!paymentHeader) {
     return respond402(challenge);

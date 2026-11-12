@@ -118,11 +118,14 @@ function paymentHeader(transaction: string): string {
   ).toString('base64');
 }
 
-async function x402Get(mint: string, transaction?: string) {
+async function x402Get(mint?: string, transaction?: string, extraHeaders: Record<string, string> = {}) {
   const { GET } = await import('@/app/api/v1/token-risk/x402/route');
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = { ...extraHeaders };
   if (transaction) headers['x-payment'] = paymentHeader(transaction);
-  return GET(new NextRequest(`https://www.tnt-audit.com/api/v1/token-risk/x402?mint=${mint}`, { headers }));
+  const url = mint
+    ? `https://www.tnt-audit.com/api/v1/token-risk/x402?mint=${encodeURIComponent(mint)}`
+    : 'https://www.tnt-audit.com/api/v1/token-risk/x402';
+  return GET(new NextRequest(url, { headers }));
 }
 
 function secondsUntilUtcMidnight(): number {
@@ -351,6 +354,86 @@ it('x402 binds a receipt to one mint, does not settle a repeat, and still pays w
   const withoutRedis = await x402Get(MINT, 'tx-other');
   expect(withoutRedis.status).toBe(200);
   expect(settles).toBe(1);
+});
+
+it('x402: no mint and no payment is the same 402 challenge as a minted unpaid call', async () => {
+  const probe = await x402Get();
+  const withMint = await x402Get(MINT);
+  expect(probe.status).toBe(402);
+  expect(withMint.status).toBe(402);
+
+  const probeBody = await probe.json();
+  const withMintBody = await withMint.json();
+  expect(probeBody).toEqual(withMintBody);
+  expect(probeBody).toMatchObject({
+    x402Version: 2,
+    error: 'Payment required',
+    resource: {
+      url: 'https://www.tnt-audit.com/api/v1/token-risk/x402',
+      mimeType: 'application/json',
+    },
+    accepts: [expect.objectContaining({ scheme: 'exact', amount: '20000' })],
+  });
+
+  const encoded = probe.headers.get('payment-required');
+  expect(encoded).toBeTruthy();
+  expect(encoded).toBe(withMint.headers.get('payment-required'));
+  expect(JSON.parse(Buffer.from(encoded!, 'base64').toString('utf8'))).toEqual(probeBody);
+  expect(settles).toBe(0);
+});
+
+it('x402: a payment or API key with no mint is 400 and is not settled', async () => {
+  const paid = await x402Get(undefined, 'tx-no-mint');
+  expect(paid.status).toBe(400);
+  expect(await paid.json()).toEqual({ error: 'Missing required parameter: mint (or ca)' });
+  expect(paid.headers.get('payment-required')).toBeNull();
+  expect(settles).toBe(0);
+
+  const signed = await x402Get(undefined, undefined, {
+    'payment-signature': paymentHeader('tx-sig-no-mint'),
+  });
+  expect(signed.status).toBe(400);
+  expect(await signed.json()).toEqual({ error: 'Missing required parameter: mint (or ca)' });
+  expect(settles).toBe(0);
+
+  const key = seedKey(1, 3);
+  const keyed = await x402Get(undefined, undefined, { authorization: `Bearer ${key.raw}` });
+  expect(keyed.status).toBe(400);
+  expect(await keyed.json()).toEqual({ error: 'Missing required parameter: mint (or ca)' });
+  expect(settles).toBe(0);
+  expect(usageOf(key.id, DAY)).toBe(3);
+  expect(creditOf(key.id)).toBe(1);
+
+  const keyedWithMint = await x402Get(MINT, undefined, { authorization: `Bearer ${key.raw}` });
+  expect(keyedWithMint.status).toBe(402);
+  expect(settles).toBe(0);
+  expect(usageOf(key.id, DAY)).toBe(3);
+  expect(creditOf(key.id)).toBe(1);
+
+  const retried = await x402Get(MINT, 'tx-no-mint');
+  expect(retried.status).toBe(200);
+  expect(settles).toBe(1);
+});
+
+it('x402: an invalid payment with no mint is a 402 and is not settled', async () => {
+  setFetchHandler(async (url) => {
+    if (url.includes('/verify')) {
+      return new Response(JSON.stringify({ isValid: false, invalidReason: 'wrong amount' }), { status: 200 });
+    }
+    if (url.includes('/settle')) {
+      settles += 1;
+      return new Response(JSON.stringify({ success: true, transaction: 'settled-tx' }), { status: 200 });
+    }
+    throw new Error(`unexpected outbound request: ${url}`);
+  });
+
+  const response = await x402Get(undefined, 'tx-invalid');
+  expect(response.status).toBe(402);
+  const body = await response.json();
+  expect(body.x402Version).toBe(2);
+  expect(body.error).toBe('wrong amount');
+  expect(response.headers.get('payment-required')).toBeTruthy();
+  expect(settles).toBe(0);
 });
 
 it('USDC must match to the millionth; a neighbor $0.000001 away does not', async () => {
